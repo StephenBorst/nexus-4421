@@ -1,14 +1,46 @@
 :root {
   --oui-font-family: 'Manrope', sans-serif;
 
+  /* global font sizes */
+  --oui-font-size-xs: 12px;   /* small labels, table footers */
+  --oui-font-size-sm: 12px;   /* default small text */
+  --oui-font-size-md: 14px;   /* default body, chart labels */
+  --oui-font-size-lg: 16px;   /* nav items, headings */
+  --oui-font-size-xl: 20px;   /* section titles, key values */
+  --oui-font-size-2xl: 24px;  /* page titles */
+
+  /* specific semantic font sizes */
+  --oui-font-size-nav: var(--oui-font-size-lg);              /* 16px */
+  --oui-font-size-stats-label: 12px;                         /* stats labels */
+  --oui-font-size-stats-value: 15px;                         /* stats values (was 14px) */
+  --oui-font-size-chart-axis: var(--oui-font-size-sm);       /* 12px */
+  --oui-font-size-chart-lastprice: var(--oui-font-size-md);  /* 14px */
+  --oui-font-size-button: var(--oui-font-size-md);           /* 14px */
+  --oui-font-size-pair-name: var(--oui-font-size-xl);        /* 20px */
+
+  /*  order book specific sizes */
+  --oui-font-size-ob-header: 13px;   /* was 12px */
+  --oui-font-size-ob-row:    14px;   /* was 13px */
+  --oui-font-size-ob-mid:    19px;   /* was 20px */
+
+  /* font weights + line-heights */
+  --oui-font-weight-regular: 400;
+  --oui-font-weight-medium: 500;
+  --oui-font-weight-semibold: 600;
+  --oui-font-weight-bold: 700;
+
+  --oui-line-height-tight: 1.15;
+  --oui-line-height-normal: 1.35;
+  --oui-line-height-loose: 1.5;
+
   /* colors */
-  --oui-color-primary: 176 132 233;
-  --oui-color-primary-light: 213 190 244;
-  --oui-color-primary-darken: 137 76 209;
+  --oui-color-primary: 56 210 199;
+  --oui-color-primary-light: 56 210 199;
+  --oui-color-primary-darken: 56 210 199;
   --oui-color-primary-contrast: 255 255 255;
 
-  --oui-color-link: 189 107 237;
-  --oui-color-link-light: 217 152 250;
+  --oui-color-link: 56 210 199;
+  --oui-color-link-light: 56 210 199;
 
   --oui-color-secondary: 255 255 255;
   --oui-color-tertiary: 218 218 218;
@@ -38,25 +70,25 @@
   --oui-color-base-4: 57 52 74;
   --oui-color-base-5: 51 46 66;
   --oui-color-base-6: 43 38 56;
-  --oui-color-base-7: 36 32 47;
+  --oui-color-base-7: 64 59 88;
   --oui-color-base-8: 29 26 38;
-  --oui-color-base-9: 22 20 28;
-  --oui-color-base-10: 14 13 18;
+  --oui-color-base-9: 15 26 31;
+  --oui-color-base-10: 30 38 43;
 
   --oui-color-base-foreground: 255 255 255;
   --oui-color-line: 255 255 255;
 
-  --oui-color-trading-loss: 245 97 139;
+  --oui-color-trading-loss: 217 139 139;        /* red sell text */
   --oui-color-trading-loss-contrast: 255 255 255;
-  --oui-color-trading-profit: 41 233 169;
+  --oui-color-trading-profit: 71 199 176;        /* green buy text */
   --oui-color-trading-profit-contrast: 255 255 255;
 
   /* gradients */
-  --oui-gradient-primary-start: 40 0 97;
-  --oui-gradient-primary-end: 189 107 237;
+  --oui-gradient-primary-start: 56 210 199;
+  --oui-gradient-primary-end: 101 240 194;
 
   --oui-gradient-secondary-start: 81 42 121;
-  --oui-gradient-secondary-end: 176 132 233;
+  --oui-gradient-secondary-end: 56 210 199;
 
   --oui-gradient-success-start: 1 83 68;
   --oui-gradient-success-end: 41 223 169;
@@ -64,8 +96,8 @@
   --oui-gradient-danger-start: 153 24 76;
   --oui-gradient-danger-end: 245 97 139;
 
-  --oui-gradient-brand-start: 231 219 249;
-  --oui-gradient-brand-end: 159 107 225;
+  --oui-gradient-brand-start: 56 210 199;
+  --oui-gradient-brand-end: 56 210 199;
   --oui-gradient-brand-stop-start: 6.62%;
   --oui-gradient-brand-stop-end: 86.5%;
   --oui-gradient-brand-angle: 17.44deg;
@@ -77,12 +109,12 @@
   --oui-gradient-neutral-end: 38 41 46;
 
   /* rounded */
-  --oui-rounded-sm: 2px;
-  --oui-rounded: 4px;
+  --oui-rounded-sm: 0px;
+  --oui-rounded: 0px;
   --oui-rounded-md: 6px;
-  --oui-rounded-lg: 8px;
-  --oui-rounded-xl: 12px;
-  --oui-rounded-2xl: 16px;
+  --oui-rounded-lg: 0px;
+  --oui-rounded-xl: 0px;
+  --oui-rounded-2xl: 0px;
   --oui-rounded-full: 9999px;
 
   /* spacing */
