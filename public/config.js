@@ -13,7 +13,7 @@ window.__RUNTIME_CONFIG__ = {
   "VITE_ENABLE_ABSTRACT_WALLET": "true",
   "VITE_DISABLE_EVM_WALLETS": "false",
   "VITE_DISABLE_SOLANA_WALLETS": "false",
-  "VITE_WALLETCONNECT_PROJECT_ID": "",
+  "VITE_WALLETCONNECT_PROJECT_ID": "6289cbd1ecc3fe027bc0bd206b7cb86a",
   "VITE_APP_NAME": "Nexus Trading Labs",
   "VITE_APP_DESCRIPTION": "A powerful decentralized perpetual trading platform.",
   "VITE_HAS_PRIMARY_LOGO": "true",
