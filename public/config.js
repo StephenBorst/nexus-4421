@@ -25,7 +25,7 @@ window.__RUNTIME_CONFIG__ = {
   "VITE_TELEGRAM_URL": "",
   "VITE_DISCORD_URL": "",
   "VITE_TWITTER_URL": "",
-  "VITE_SEO_SITE_NAME": "Nexus Labs",
+  "VITE_SEO_SITE_NAME": "Nexus Trading Labs",
   "VITE_SEO_SITE_DESCRIPTION": "A powerful decentralized perpetual trading platform.",
   "VITE_SEO_SITE_URL": "https://nexustradinglabs.com",
   "VITE_SEO_SITE_LANGUAGE": "en",
