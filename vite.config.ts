@@ -34,7 +34,17 @@ function htmlTitlePlugin(): Plugin {
   return {
     name: "html-title-transform",
     transformIndexHtml(html) {
-      return html.replace(/<title>.*?<\/title>/, `<title>${title}</title>`);
+      return html
+  .replace(/<title>.*?<\/title>/, `<title>${title}</title>`)
+  .replace(/<\/title>/, `</title>
+    <meta property="og:title" content="${title}" />
+    <meta property="og:description" content="Perp DEX on Orderly + Arbitrum" />
+    <meta property="og:image" content="https://nexustradinglabs.com/preview.png" />
+    <meta property="og:url" content="https://nexustradinglabs.com" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${title}" />
+    <meta name="twitter:description" content="Perp DEX on Orderly + Arbitrum" />
+    <meta name="twitter:image" content="https://nexustradinglabs.com/preview.png" />`);
     },
   };
 }
