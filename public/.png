@@ -1,1 +1,1 @@
-npx puppeteer-cli screenshot --width 1200 --height 630 preview_og.html preview.png
+
