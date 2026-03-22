@@ -1,5 +1,5 @@
 window.__RUNTIME_CONFIG__ = {
-  "VITE_ORDERLY_BROKER_ID": "demo",
+  "VITE_ORDERLY_BROKER_ID": "nexus_trading",
   "VITE_ORDERLY_BROKER_NAME": "Nexus Trading Labs",
   "VITE_BROKER_EOA_ADDRESS": "0x34dfc08eb3b7ed60d00e5b2cb611ac27c152b45c",
   "VITE_DISABLE_MAINNET": "false",
