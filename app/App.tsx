@@ -1,27 +1,41 @@
-import { Outlet } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
-import OrderlyProvider from "@/components/orderlyProvider";
-import { HttpsRequiredWarning } from "@/components/HttpsRequiredWarning";
-import { withBasePath } from "./utils/base-path";
-import { getSEOConfig, getUserLanguage } from "./utils/seo";
+import React, { useState, useEffect } from 'react';
+import Helmet from 'react-helmet';
+import HttpsRequiredWarning from './components/HttpsRequiredWarning';
+import OrderlyProvider from './components/OrderlyProvider';
+import Outlet from './components/Outlet';
+import OnboardingModal from './components'; // Ensure the correct path
 
-export default function App() {
-  const seoConfig = getSEOConfig();
-  const defaultLanguage = getUserLanguage();
-  
-  return (
-    <>
-      <Helmet>
-        <html lang={seoConfig.language || defaultLanguage} />
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" type="image/webp" href={withBasePath("/favicon.webp")} />
-      </Helmet>
-      <HttpsRequiredWarning />
-      <OrderlyProvider>
-        <Outlet />
-      </OrderlyProvider>
-    </>
-  );
-}
+const App = () => {
+    const [showOnboarding, setShowOnboarding] = useState(
+        localStorage.getItem('ntl_onboarded') === null
+    );
 
+    useEffect(() => {
+        if (!localStorage.getItem('ntl_onboarded')) {
+            setShowOnboarding(true);
+        }
+    }, []);
+
+    const handleComplete = () => {
+        localStorage.setItem('ntl_onboarded', 'true');
+        setShowOnboarding(false);
+    };
+
+    const handleSkip = () => {
+        localStorage.setItem('ntl_onboarded', 'true');
+        setShowOnboarding(false);
+    };
+
+    return (
+        <OrderlyProvider>
+            <Helmet />
+            <HttpsRequiredWarning />
+            {showOnboarding && (
+                <OnboardingModal onComplete={handleComplete} onSkip={handleSkip} />
+            )}
+            <Outlet />
+        </OrderlyProvider>
+    );
+};
+
+export default App;
