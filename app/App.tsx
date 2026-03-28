@@ -1,29 +1,47 @@
-import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
-import OnboardingModal from './OnboardingModal';
+import { useState, useEffect } from "react";
+import { Outlet } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
+import OrderlyProvider from "@/components/orderlyProvider";
+import { HttpsRequiredWarning } from "@/components/HttpsRequiredWarning";
+import OnboardingModal from "@/components/OnboardingModal";
+import { withBasePath } from "./utils/base-path";
+import { getSEOConfig, getUserLanguage } from "./utils/seo";
 
-const App = () => {
-  const [isFirstVisit, setIsFirstVisit] = useState(true);
+export default function App() {
+  const seoConfig = getSEOConfig();
+  const defaultLanguage = getUserLanguage();
+  const [showOnboarding, setShowOnboarding] = useState(
+    !localStorage.getItem('ntl_onboarded')
+  );
 
   useEffect(() => {
-    const hasVisited = localStorage.getItem('hasVisited');
-    if (hasVisited) {
-      setIsFirstVisit(false);
-    } else {
-      localStorage.setItem('hasVisited', 'true');
+    const hasOnboarded = localStorage.getItem('ntl_onboarded');
+    if (hasOnboarded === 'true') {
+      setShowOnboarding(false);
     }
   }, []);
-
+  
   return (
-    <Router>
+    <>
       <Helmet>
-        <title>My App</title>
+        <html lang={seoConfig.language || defaultLanguage} />
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" type="image/webp" href={withBasePath("/favicon.webp")} />
       </Helmet>
-      {isFirstVisit && <OnboardingModal />}
-      {/* Other components go here */}
-    </Router>
+      <HttpsRequiredWarning />
+      {showOnboarding && (
+        <OnboardingModal
+          onComplete={() => {
+            localStorage.setItem('ntl_onboarded', 'true');
+            setShowOnboarding(false);
+          }}
+          onSkip={() => setShowOnboarding(false)}
+        />
+      )}
+      <OrderlyProvider>
+        <Outlet />
+      </OrderlyProvider>
+    </>
   );
-};
-
-export default App;
+}
