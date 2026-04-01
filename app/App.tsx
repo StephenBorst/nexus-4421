@@ -7,6 +7,33 @@ import OnboardingModal from "@/components/OnboardingModal";
 import { withBasePath } from "./utils/base-path";
 import { getSEOConfig, getUserLanguage } from "./utils/seo";
 
+const ORDERLY_MARKETS_KEY = "orderly_markets";
+const NEXUS_FAVORITES_BACKUP = "nexus_favorites_backup";
+
+function backupFavorites() {
+  try {
+    const raw = localStorage.getItem(ORDERLY_MARKETS_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed?.favorites?.length > 0) {
+      localStorage.setItem(NEXUS_FAVORITES_BACKUP, JSON.stringify(parsed.favorites));
+    }
+  } catch {}
+}
+
+function restoreFavorites() {
+  try {
+    const backup = localStorage.getItem(NEXUS_FAVORITES_BACKUP);
+    if (!backup) return;
+    const raw = localStorage.getItem(ORDERLY_MARKETS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (!parsed?.favorites?.length) {
+      parsed.favorites = JSON.parse(backup);
+      localStorage.setItem(ORDERLY_MARKETS_KEY, JSON.stringify(parsed));
+    }
+  } catch {}
+}
+
 export default function App() {
   const seoConfig = getSEOConfig();
   const defaultLanguage = getUserLanguage();
@@ -19,6 +46,21 @@ export default function App() {
     if (hasOnboarded === 'true') {
       setShowOnboarding(false);
     }
+
+    // restore favorites on load
+    restoreFavorites();
+
+    // backup favorites whenever localStorage changes
+    const handleStorage = () => backupFavorites();
+    window.addEventListener("storage", handleStorage);
+
+    // also poll every 3 seconds to catch same-tab changes
+    const interval = setInterval(backupFavorites, 3000);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      clearInterval(interval);
+    };
   }, []);
   
   return (
