@@ -2,7 +2,7 @@ let CACHE_NAME = 'orderly-dex-v1';
 const CACHE_VERSION = 'v1';
 let cacheNameInitialized = false;
 
-const NEVER_CACHE = ['/', '/index.html', '/config.js'];
+const NEVER_CACHE = ['/', '/index.html', '/config.js', '/icon-192.png', '/icon-512.png', '/favicon.webp', '/manifest.json'];
 
 async function initializeCacheName() {
   if (cacheNameInitialized) {
