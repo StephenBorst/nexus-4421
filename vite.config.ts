@@ -6,6 +6,8 @@ import { nodePolyfills } from "vite-plugin-node-polyfills";
 import fs from "fs";
 import path from "path";
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 function loadConfigTitle(): string {
   try {
     const configPath = path.join(__dirname, "public/config.js");
@@ -58,17 +60,11 @@ export default defineConfig(() => {
       host: true,
     },
     base: basePath,
-    plugins: [
-      react(),
-      tsconfigPaths(),
-      htmlTitlePlugin(),
-      cjsInterop({
-        dependencies: ["bs58", "@coral-xyz/anchor", "lodash"],
-      }),
-      nodePolyfills({
-        include: ["buffer", "crypto", "stream"],
-      }),
-    ],
+    plugins: [react(), tsconfigPaths(), htmlTitlePlugin(), cjsInterop({
+      dependencies: ["bs58", "@coral-xyz/anchor", "lodash"],
+    }), nodePolyfills({
+      include: ["buffer", "crypto", "stream"],
+    }), cloudflare()],
     build: {
       outDir: "build/client",
     },
