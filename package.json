@@ -14,8 +14,9 @@
     "dev": "tsx scripts/generate-manifest.ts && vite",
     "generate:manifest": "tsx scripts/generate-manifest.ts",
     "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint .",
-    "preview": "vite preview",
-    "typecheck": "tsc"
+    "preview": "yarn run build && wrangler dev",
+    "typecheck": "tsc",
+    "deploy": "yarn run build && wrangler deploy"
   },
   "dependencies": {
     "@orderly.network/affiliate": "2.11.1",
@@ -50,6 +51,7 @@
     "woofi-swap-widget-kit": "^0.0.38"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.31.0",
     "@types/node": "^20.11.30",
     "@types/react": "^18.2.20",
     "@types/react-dom": "^18.2.7",
@@ -70,6 +72,7 @@
     "vite": "^7.1.9",
     "vite-plugin-cjs-interop": "^2.3.0",
     "vite-plugin-node-polyfills": "0.24.0",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "wrangler": "^4.80.0"
   }
 }
