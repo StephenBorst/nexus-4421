@@ -29,7 +29,7 @@ import {
 } from "./runtime-config";
 import { Link } from "react-router-dom";
 import CustomLeftNav from "@/components/CustomLeftNav";
-
+import { buildCampaignsUrl } from "@/components/CampaignsNavTitle";
 interface MainNavItem {
   name: string;
   href: string;
@@ -262,7 +262,11 @@ export const useOrderlyConfig = () => {
       href: menu.href,
     }));
 
-    const allMenuItems = [...translatedEnabledMenus, ...customMenus];
+    const campaignsMenu = getRuntimeConfigBoolean("VITE_ENABLE_CAMPAIGNS")
+  ? [{ name: "Campaigns", href: buildCampaignsUrl(), target: "_blank" as const }]
+  : [];
+
+const allMenuItems = [...translatedEnabledMenus, ...customMenus, ...campaignsMenu];
 
     const supportedBottomNavMenus = [
       "Trading",
