@@ -1,0 +1,16 @@
+{
+  "projectId": "prj_bMzfTA5fqfPEXdNaMm1PhQAy8Pa6",
+  "orgId": "team_BUtPTji6PfMTxTJG3Yv1uXR6",
+  "projectName": "nexus-4421",
+  "settings": {
+    "createdAt": 1774077160597,
+    "framework": "vite",
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": "NODE_OPTIONS=--max-old-space-size=4096 yarn build",
+    "outputDirectory": "build/client",
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "24.x"
+  }
+}

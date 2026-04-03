@@ -7,3 +7,6 @@ node_modules
 # SpecStory explanation file
 .specstory/.what-is-this.md
 /public/manifest.json
+
+.yarn/install-state.gz
+
