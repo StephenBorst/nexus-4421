@@ -1,0 +1,11 @@
+/* Fallback styles (was missing). Keep minimal so build succeeds. */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}
