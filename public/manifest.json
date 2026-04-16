@@ -1,19 +1,31 @@
 {
   "name": "Nexus Trading Labs",
-  "short_name": "Nexus Trading Labs",
+  "short_name": "Nexus",
   "description": "A powerful decentralized perpetual trading platform.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#403b58",
+  "background_color": "#0a0a0f",
   "theme_color": "#38d2c7",
   "orientation": "any",
   "icons": [
     {
-      "src": "/favicon.webp",
-      "sizes": "200x200",
-      "type": "image/webp",
-      "purpose": "any maskable"
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "categories": [
@@ -28,9 +40,9 @@
       "url": "/perp",
       "icons": [
         {
-          "src": "/favicon.webp",
-          "sizes": "200x200",
-          "type": "image/webp"
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
         }
       ]
     },
@@ -41,9 +53,9 @@
       "url": "/portfolio",
       "icons": [
         {
-          "src": "/favicon.webp",
-          "sizes": "200x200",
-          "type": "image/webp"
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
         }
       ]
     }
