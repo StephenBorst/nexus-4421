@@ -3541,34 +3541,34 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@orderly.network/affiliate@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/affiliate@npm:2.12.1"
+"@orderly.network/affiliate@npm:^2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/affiliate@npm:2.12.4"
   dependencies:
-    "@orderly.network/chart": "npm:2.12.1"
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/react-app": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/ui-connector": "npm:2.12.1"
-    "@orderly.network/ui-scaffold": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/chart": "npm:2.12.4"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/react-app": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/ui-connector": "npm:2.12.4"
+    "@orderly.network/ui-scaffold": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     date-fns: "npm:^3.6.0"
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/16319f82f5a1adcc386ba0a7b1b4b020e53a9bd30eb0e407777f423a2828b22875954b7417e971ede59d5dc0e535faddd1370143bc6fb16d39e5d194f5460ec4
+  checksum: 10c0/73239b414e9a9e57810c06621c1a857aafeeb248931a40a5964704df9f6ff14232c459ff08049aae849e69d7589550887d78f48b361ce183a62a3e9e47b20e3a
   languageName: node
   linkType: hard
 
-"@orderly.network/chart@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/chart@npm:2.12.1"
+"@orderly.network/chart@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/chart@npm:2.12.4"
   dependencies:
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     d3-array: "npm:^3.2.4"
     d3-axis: "npm:^3.0.0"
     d3-scale: "npm:^4.0.2"
@@ -3578,72 +3578,72 @@ __metadata:
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/1185ec1d05b5ff87091381bd8a65c62a4b631732f5fca2515c2601c7d83f01c83fac0674811dd4f5d7a2a0ad103676940afa57ab25ebba15ab4d15250860807d
+  checksum: 10c0/719dae1a1dc112eec18f15d05ff3e7ef618be1e3077313db92f8a5bb26c7394cac2635aef63581e3c6b553987f3270421966eaa734a10f05ef68d8877b00444c
   languageName: node
   linkType: hard
 
-"@orderly.network/core@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/core@npm:2.12.1"
+"@orderly.network/core@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/core@npm:2.12.4"
   dependencies:
     "@noble/ed25519": "npm:^2.0.0"
-    "@orderly.network/types": "npm:2.12.1"
+    "@orderly.network/types": "npm:2.12.4"
     "@solana/web3.js": "npm:^1.95.3"
     bs58: "npm:^5.0.0"
     ethers: "npm:^6.16.0"
     ethers-decode-error: "npm:^2.1.3"
     eventemitter3: "npm:^5.0.1"
     lodash.merge: "npm:^4.6.2"
-  checksum: 10c0/aa56dee0bb85eb0f8210ae1b5423b4b9ded91005ccfb0913dffcfdc40d17d10d547daf624d75992dbe744e75ea172093935896bb1258c44fb98df63933cc7579
+  checksum: 10c0/faf40358603b309c319591402e968a71485db5833813c3b268674c8c8c031803e3dccf8b926b343f1e3b2d27cfb940be953994c736f79cfd298c2eca4e52f0a8
   languageName: node
   linkType: hard
 
-"@orderly.network/default-evm-adapter@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/default-evm-adapter@npm:2.12.1"
+"@orderly.network/default-evm-adapter@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/default-evm-adapter@npm:2.12.4"
   dependencies:
     "@noble/ed25519": "npm:^2.0.0"
-    "@orderly.network/core": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
+    "@orderly.network/core": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
     bs58: "npm:^5.0.0"
-  checksum: 10c0/abc7aa08386d64962807c8cb28b20f9dc810bf6d0dd0a08d4df9b3a528f33d344ab1a45db51a5dd489a73e1db6af0ee0ed52d42dbc5b6d3a52d8c316ace9125f
+  checksum: 10c0/eeea83d2448b3a589342501df8b48dfbf0db5a1ba0e72fe86adde0a940cf03eef55f57afb40207c82150975d38bbd859ada60925f532b2f08707bf1687758399
   languageName: node
   linkType: hard
 
-"@orderly.network/default-solana-adapter@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/default-solana-adapter@npm:2.12.1"
+"@orderly.network/default-solana-adapter@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/default-solana-adapter@npm:2.12.4"
   dependencies:
     "@coral-xyz/anchor": "npm:0.29.0"
     "@layerzerolabs/lz-solana-sdk-v2": "npm:2.3.45-oft-rc.0"
     "@layerzerolabs/lz-v2-utilities": "npm:2.3.45-oft-rc.0"
     "@noble/ed25519": "npm:^2.0.0"
-    "@orderly.network/core": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
+    "@orderly.network/core": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
     "@solana/spl-token": "npm:0.4.8"
     "@solana/wallet-adapter-base": "npm:0.9.23"
     "@solana/web3.js": "npm:^1.95.3"
     bs58: "npm:^5.0.0"
     ethereum-cryptography: "npm:2.2.1"
     ethers: "npm:^6.16.0"
-  checksum: 10c0/1a1148cb0067566f00c734754002429c1fcca6bdc4f1f269ab4a76fcaa88cc84b51692c26fab2b422048e690428b99d9d7ccbed0aa03a80399e72947ce359219
+  checksum: 10c0/1b2fb6f55d9e52226d52cf581d636468758e264bd300a86566806881c5b22f4aadb0ee8b27323da3a462ee949aaa7fbfd139e7cf0e7af6abbbae200f8eadaa55
   languageName: node
   linkType: hard
 
-"@orderly.network/hooks@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/hooks@npm:2.12.1"
+"@orderly.network/hooks@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/hooks@npm:2.12.4"
   dependencies:
     "@akamfoad/qr": "npm:^0.4.0"
     "@amplitude/analytics-browser": "npm:2.11.13"
-    "@orderly.network/core": "npm:2.12.1"
-    "@orderly.network/default-evm-adapter": "npm:2.12.1"
-    "@orderly.network/default-solana-adapter": "npm:2.12.1"
-    "@orderly.network/net": "npm:2.12.1"
-    "@orderly.network/perp": "npm:4.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
-    "@orderly.network/web3-provider-ethers": "npm:2.12.1"
+    "@orderly.network/core": "npm:2.12.4"
+    "@orderly.network/default-evm-adapter": "npm:2.12.4"
+    "@orderly.network/default-solana-adapter": "npm:2.12.4"
+    "@orderly.network/net": "npm:2.12.4"
+    "@orderly.network/perp": "npm:4.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
+    "@orderly.network/web3-provider-ethers": "npm:2.12.4"
     immer: "npm:^10.1.1"
     lodash: "npm:^4.17.21"
     ramda: "npm:^0.29.0"
@@ -3654,13 +3654,13 @@ __metadata:
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/089ac7af5b5b8a589c62b143cb23edd366ee8e7c702cdf250efd7e63b53c1120c8396c94962701effac7394a7823a58d6f612aa3fe03d40bc1f90df714016fd4
+  checksum: 10c0/49cf7d2577d84f3f55f92e46dfe30d618d273aeeb0488ade3b8c86a7ec428a0d66b8a6f389ccf34191b666059c1441ab2a893bc86a1559dbd57797fc3d407eef
   languageName: node
   linkType: hard
 
-"@orderly.network/i18n@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/i18n@npm:2.12.1"
+"@orderly.network/i18n@npm:2.12.4, @orderly.network/i18n@npm:^2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/i18n@npm:2.12.4"
   dependencies:
     fs-extra: "npm:^11.2.0"
     i18next: "npm:^24.2.2"
@@ -3672,67 +3672,67 @@ __metadata:
     react-dom: ">=18"
   bin:
     i18n: bin/cli.js
-  checksum: 10c0/ed546d24cce7667829229b87d04c47706e07be5f645ec4fcee7c14335feed72923ed26062cab3feca9acfaf2215377e3ba548575e5b88e9a353a33f9ebfee3b2
+  checksum: 10c0/913b2b705878c04c9625f73a535704851df4b4376950d2aaf9bbe610c6a5f7e9c2f0492a9dc564773e18cf5cf7faeafd92efbc14eb1a7a263799613151c33f52
   languageName: node
   linkType: hard
 
-"@orderly.network/markets@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/markets@npm:2.12.1"
+"@orderly.network/markets@npm:2.12.4, @orderly.network/markets@npm:^2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/markets@npm:2.12.4"
   dependencies:
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/ui-scaffold": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/ui-scaffold": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     ramda: "npm:^0.31.3"
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/b4d6ef52730cd06b7d1407f8ab839a102d8adf9f94b749bf3c93e127df6500f94a37fec2091da3285f3d2b8ade3ef622cd322f232fe98260a3b0ff4988b55c33
+  checksum: 10c0/f8e505f4584199b9b7d3b1ffaef1a5a0391e78fdb96a119aaaedc65d35a57ea6c6181ee2854dad974bb123bc7a65c6b4e471e7f668fa4b9b094ad98df0ddcc77
   languageName: node
   linkType: hard
 
-"@orderly.network/net@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/net@npm:2.12.1"
+"@orderly.network/net@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/net@npm:2.12.4"
   dependencies:
     eventemitter3: "npm:^5.0.1"
-  checksum: 10c0/ddaafd673c33f569230eec55dd6687cfef6b8821168e434c0938896da99f2f50f4efa4781e848fb2d8ec99172e5922002cef8ba7c2192a0560016c81885ae9d6
+  checksum: 10c0/4605cbf8cab985e7c072924c3c209cc0f3844112be4c21fe16ac8ddeab386a9931838e271c5b873bc912bea1084f0ef10547d9225e098488e2e50a7cec15dfb3
   languageName: node
   linkType: hard
 
-"@orderly.network/perp@npm:4.12.1":
-  version: 4.12.1
-  resolution: "@orderly.network/perp@npm:4.12.1"
+"@orderly.network/perp@npm:4.12.4":
+  version: 4.12.4
+  resolution: "@orderly.network/perp@npm:4.12.4"
   dependencies:
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
-  checksum: 10c0/2552e08741b0da2d65fe3983e8bfe0caa485b0cdf11b88f33dfdcf7e4a92b08ec85d119df30e084849605a04d752e28b77c4db285504a06adcdfe3f058193c58
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
+  checksum: 10c0/a21cde2f25f4e5613303513fd47938b63cec4999fc2e4c1ca6cfb0cda9b8a1acd30ac0e7a36f0c64310aff4cef18b9577ccec763a726a609013ebaef1677db44
   languageName: node
   linkType: hard
 
-"@orderly.network/portfolio@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/portfolio@npm:2.12.1"
+"@orderly.network/portfolio@npm:2.12.4, @orderly.network/portfolio@npm:^2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/portfolio@npm:2.12.4"
   dependencies:
-    "@orderly.network/chart": "npm:2.12.1"
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/perp": "npm:4.12.1"
-    "@orderly.network/react-app": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/ui-chain-selector": "npm:2.12.1"
-    "@orderly.network/ui-connector": "npm:2.12.1"
-    "@orderly.network/ui-leverage": "npm:2.12.1"
-    "@orderly.network/ui-orders": "npm:2.12.1"
-    "@orderly.network/ui-positions": "npm:2.12.1"
-    "@orderly.network/ui-scaffold": "npm:2.12.1"
-    "@orderly.network/ui-share": "npm:2.12.1"
-    "@orderly.network/ui-transfer": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/chart": "npm:2.12.4"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/perp": "npm:4.12.4"
+    "@orderly.network/react-app": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/ui-chain-selector": "npm:2.12.4"
+    "@orderly.network/ui-connector": "npm:2.12.4"
+    "@orderly.network/ui-leverage": "npm:2.12.4"
+    "@orderly.network/ui-orders": "npm:2.12.4"
+    "@orderly.network/ui-positions": "npm:2.12.4"
+    "@orderly.network/ui-scaffold": "npm:2.12.4"
+    "@orderly.network/ui-share": "npm:2.12.4"
+    "@orderly.network/ui-transfer": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     date-fns: "npm:^3.6.0"
     immer: "npm:^10.1.1"
     lodash: "npm:^4.17.21"
@@ -3740,47 +3740,47 @@ __metadata:
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/7587d05758c8e7bbdf9d1f1768c5b8c6a50728e5c59003ef1e313853cb9c39cd427cd003e3d59ca0543d5e4c5958d3deb69867c8c2d3d24cd0b4d587f74c2731
+  checksum: 10c0/a2924053f2481ca95f0c5b23ec2ddba1d7be1c07a8a18d70554fa189f746876d7711a3109d34b8b9f1aa29f7ee65e673358a44bfbc3bf08e13ae363423a892f8
   languageName: node
   linkType: hard
 
-"@orderly.network/react-app@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/react-app@npm:2.12.1"
+"@orderly.network/react-app@npm:2.12.4, @orderly.network/react-app@npm:^2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/react-app@npm:2.12.4"
   dependencies:
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     date-fns: "npm:^3.6.0"
-  checksum: 10c0/9c16483da8493ac0ff66a13026147b9346d0e4764f5bde276a4d03ca43e680356b35a76fe31312c538b0b9b201a35b3ec76d80a2f1705f8d2ab2fb39faf87f23
+  checksum: 10c0/36ba38bee7f699858fbdfb6c6d85d035f9d7b193f797a5a1db70ddf1fa6c28f907eea00b4fc97c4adffa655733bde4e6160dd72762f7b822923ed1363df0b444
   languageName: node
   linkType: hard
 
-"@orderly.network/trading-leaderboard@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/trading-leaderboard@npm:2.12.1"
+"@orderly.network/trading-leaderboard@npm:^2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/trading-leaderboard@npm:2.12.4"
   dependencies:
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/react-app": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/ui-connector": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/react-app": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/ui-connector": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     date-fns: "npm:^3.6.0"
     ramda: "npm:^0.29.0"
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/34f1377c0795691d4ae1a92f5077637fa68ede54198f1d27a006883254943c299d70d09c0380fea74969da0f603cad23aef6d1bb1a2e1b173825e27083e84660
+  checksum: 10c0/68defa5e141169d0349699672e548760ba1954267612917e379ac1f54da64d259c22b29ba14983ac4d830861c647f2814ce96b30fd174473c5db5955aa0d90fe
   languageName: node
   linkType: hard
 
-"@orderly.network/trading-points@npm:1.4.1":
-  version: 1.4.1
-  resolution: "@orderly.network/trading-points@npm:1.4.1"
+"@orderly.network/trading-points@npm:^1.4.4":
+  version: 1.4.4
+  resolution: "@orderly.network/trading-points@npm:1.4.4"
   dependencies:
     date-fns: "npm:^3.6.0"
     ramda: "npm:^0.29.0"
@@ -3793,290 +3793,290 @@ __metadata:
     "@orderly.network/utils": ">=2.12.1"
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/fb448dccdbe62ee712532851893e1fa8e378b2681700c64711f8a10e2e24ef475a8c9b48ca358b637c29ce73bc52e8ddc05b13ecdc169b816f9de6bb8adfe931
+  checksum: 10c0/0be74ed91d4a72855a6a01427e363ab8725702603715f87cda26be3695f0e5c0c35fb7b9539f5ebafd85611d47c193695270b79e6035edc2479a058381ebe17a
   languageName: node
   linkType: hard
 
-"@orderly.network/trading@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/trading@npm:2.12.1"
+"@orderly.network/trading@npm:^2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/trading@npm:2.12.4"
   dependencies:
     "@dnd-kit/core": "npm:^6.3.1"
     "@dnd-kit/modifiers": "npm:^9.0.0"
     "@dnd-kit/sortable": "npm:^10.0.0"
     "@dnd-kit/utilities": "npm:^3.2.2"
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/markets": "npm:2.12.1"
-    "@orderly.network/portfolio": "npm:2.12.1"
-    "@orderly.network/react-app": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/ui-chain-selector": "npm:2.12.1"
-    "@orderly.network/ui-connector": "npm:2.12.1"
-    "@orderly.network/ui-leverage": "npm:2.12.1"
-    "@orderly.network/ui-order-entry": "npm:2.12.1"
-    "@orderly.network/ui-orders": "npm:2.12.1"
-    "@orderly.network/ui-positions": "npm:2.12.1"
-    "@orderly.network/ui-scaffold": "npm:2.12.1"
-    "@orderly.network/ui-share": "npm:2.12.1"
-    "@orderly.network/ui-tradingview": "npm:2.12.1"
-    "@orderly.network/ui-transfer": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/markets": "npm:2.12.4"
+    "@orderly.network/portfolio": "npm:2.12.4"
+    "@orderly.network/react-app": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/ui-chain-selector": "npm:2.12.4"
+    "@orderly.network/ui-connector": "npm:2.12.4"
+    "@orderly.network/ui-leverage": "npm:2.12.4"
+    "@orderly.network/ui-order-entry": "npm:2.12.4"
+    "@orderly.network/ui-orders": "npm:2.12.4"
+    "@orderly.network/ui-positions": "npm:2.12.4"
+    "@orderly.network/ui-scaffold": "npm:2.12.4"
+    "@orderly.network/ui-share": "npm:2.12.4"
+    "@orderly.network/ui-tradingview": "npm:2.12.4"
+    "@orderly.network/ui-transfer": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     "@uiw/react-split": "npm:^5.9.3"
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/d8e729a76f0ee1ee6031b3b5c680fb00206c6292b536380d8cce285218f950a59be7f36e33475f9617cf47ab0cf02b26e96332b5992064a019d1a6a7b6377086
+  checksum: 10c0/6cc4ef7c3fb537da04fb201025320902b8494eccb0addcc1ceec3be1bf9c8342d82d9aacb1657ecb66dc17d2516b91778e5a3b58f6bc92c35a61123bcac6aa32
   languageName: node
   linkType: hard
 
-"@orderly.network/types@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/types@npm:2.12.1"
+"@orderly.network/types@npm:2.12.4, @orderly.network/types@npm:^2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/types@npm:2.12.4"
   dependencies:
     superstruct: "npm:^2.0.2"
-  checksum: 10c0/f7ff0ad087d482d1a89d0ca44ac5854541ffe124ca58d595ba82bc78978d344c277b62cecaa44782f311e849cf1308ff9a40e5ab6a0dc194f484192090ae408c
+  checksum: 10c0/006f1b49e0ca04cd63f07e6fc90c375e660ed68b1ba42a244e874783c91da8d7793a52e2cfff71419d6b60765f4a34d573050828162dbe1efcafb055b795f3f2
   languageName: node
   linkType: hard
 
-"@orderly.network/ui-chain-selector@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/ui-chain-selector@npm:2.12.1"
+"@orderly.network/ui-chain-selector@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/ui-chain-selector@npm:2.12.4"
   dependencies:
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/react-app": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/react-app": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/131b045023c4ec7822d86ebc1172949ea592baf2f02cafbf74cca6058987705d7673f8d16a2863b945aa2a17a2e7818982117279b467f10431403483b94a97ed
+  checksum: 10c0/77cb2c5bdb1494e0a763f80b2a13e6e2778252e3206fcd28c7b6ec60056aa57f3b13f3bbab710fc77471cfc0e85a8f413102faacd817b4ed12f0912e218e3a2f
   languageName: node
   linkType: hard
 
-"@orderly.network/ui-connector@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/ui-connector@npm:2.12.1"
+"@orderly.network/ui-connector@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/ui-connector@npm:2.12.4"
   dependencies:
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/react-app": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/ui-chain-selector": "npm:2.12.1"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/react-app": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/ui-chain-selector": "npm:2.12.4"
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/51a8cce0c02819406292b6f29211207f766e3625c3ae9ed7b7bd4d4f5f71f861ec87ad38bd57171dc7c03ec54bf1ff220368b11e76b1ac8308c2e39ed3a76b9a
+  checksum: 10c0/9975f2151aa6910d0b1ce64ee7b3c4761de31724bce8890e34cfbd28f34b77fd24ab57859f38d2f415d15fafe2da46be4f840c3e413f64aef26b48e042c69677
   languageName: node
   linkType: hard
 
-"@orderly.network/ui-leverage@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/ui-leverage@npm:2.12.1"
+"@orderly.network/ui-leverage@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/ui-leverage@npm:2.12.4"
   dependencies:
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/perp": "npm:4.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/perp": "npm:4.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/88cf143c650b25f7c4294a72f0f9c28607b6580ee5bab9851b5aed08bf002ba160de2d651d4bd1da4529fac32afa8d27ab1c22d37adbd94e1ba06e5a70f0dc16
+  checksum: 10c0/9111e7d92921c4f24ec1cc6a25ed6e6bf660adf03c12d53f7e0dc996ba32c8d741e08092adcbace70c35d79c604aac07d137e21dc7ae5a9655dc933263e815a1
   languageName: node
   linkType: hard
 
-"@orderly.network/ui-notification@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/ui-notification@npm:2.12.1"
+"@orderly.network/ui-notification@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/ui-notification@npm:2.12.4"
   dependencies:
     "@date-fns/utc": "npm:1.2.0"
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/react-app": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/react-app": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     date-fns: "npm:^3.6.0"
     immer: "npm:^10.1.1"
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/0a0bef84a86d2af15bb042212e740b59c40490cc4b4db9b7002f4bed5e5238dda276053fe45425275dab803031fbda666e832d2cf9c4dfa80150eb91f950c547
+  checksum: 10c0/4c8fa958714b022e55e84e2a7cd9676e97cca61eec44f2a32da9d17d6e91432279786d842ef04d4dc53eec217a2a01f9d898be0902330aade8ecfbd12cda18e7
   languageName: node
   linkType: hard
 
-"@orderly.network/ui-order-entry@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/ui-order-entry@npm:2.12.1"
+"@orderly.network/ui-order-entry@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/ui-order-entry@npm:2.12.4"
   dependencies:
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/perp": "npm:4.12.1"
-    "@orderly.network/react-app": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/ui-connector": "npm:2.12.1"
-    "@orderly.network/ui-leverage": "npm:2.12.1"
-    "@orderly.network/ui-scaffold": "npm:2.12.1"
-    "@orderly.network/ui-tpsl": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/perp": "npm:4.12.4"
+    "@orderly.network/react-app": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/ui-connector": "npm:2.12.4"
+    "@orderly.network/ui-leverage": "npm:2.12.4"
+    "@orderly.network/ui-scaffold": "npm:2.12.4"
+    "@orderly.network/ui-tpsl": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     ramda: "npm:^0.31.3"
-  checksum: 10c0/3dcfd75fbf44e2f5f25cd287b935ce2c776dfac046a8f3351d0853d659cf24006033489897a0e977e45cf143c94c58b53369b6f30b4a2a8078710d9d23855ca3
+  checksum: 10c0/d91d71c7d8083e70198be256db488eb94b600c2fab00eebe943892d083e04512c567855acd4bd7d5b21e68414a979f7fac441ebefe72d9b5b13e30cde5cfcef6
   languageName: node
   linkType: hard
 
-"@orderly.network/ui-orders@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/ui-orders@npm:2.12.1"
+"@orderly.network/ui-orders@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/ui-orders@npm:2.12.4"
   dependencies:
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/react-app": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/ui-connector": "npm:2.12.1"
-    "@orderly.network/ui-share": "npm:2.12.1"
-    "@orderly.network/ui-tpsl": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/react-app": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/ui-connector": "npm:2.12.4"
+    "@orderly.network/ui-share": "npm:2.12.4"
+    "@orderly.network/ui-tpsl": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     date-fns: "npm:^3.6.0"
-  checksum: 10c0/fc147bc0c428232076893c4bf9bb31a5785be3d6a79d5f7076215e8bc48ea1f349badb6d0e0e84029b9682381a4ef84ef6d299a0c8649340b3ee09954305d245
+  checksum: 10c0/64203682a0e24a6926444f1d598e0fc9dfe4e8992ca678089b9066ec480dd1ffb6c2300a7087c0e0a2c5514aa21aaa1f913ef84ff5caa1502a9a44d4edade8d9
   languageName: node
   linkType: hard
 
-"@orderly.network/ui-positions@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/ui-positions@npm:2.12.1"
+"@orderly.network/ui-positions@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/ui-positions@npm:2.12.4"
   dependencies:
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/perp": "npm:4.12.1"
-    "@orderly.network/react-app": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/ui-connector": "npm:2.12.1"
-    "@orderly.network/ui-leverage": "npm:2.12.1"
-    "@orderly.network/ui-share": "npm:2.12.1"
-    "@orderly.network/ui-tpsl": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/perp": "npm:4.12.4"
+    "@orderly.network/react-app": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/ui-connector": "npm:2.12.4"
+    "@orderly.network/ui-leverage": "npm:2.12.4"
+    "@orderly.network/ui-share": "npm:2.12.4"
+    "@orderly.network/ui-tpsl": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     date-fns: "npm:^3.6.0"
     immer: "npm:^10.1.1"
     ramda: "npm:^0.29.0"
-  checksum: 10c0/d2766fb94fc71dc44081fb8916876e5da2c4b8afe7e697f981f04e5f988219fb93c516c35e8eb35867af5fcd56cdf1a1dd0da88d00448ea9eb1faee5c5d181b9
+  checksum: 10c0/d8e21350fa61370cff5e9400b7dff94638c5726b7e6398ab3f9ac699a6951df638ee33e3e2619d1a8209b51555850b43fc3bfee405faac389fa5bec40e84cd6e
   languageName: node
   linkType: hard
 
-"@orderly.network/ui-scaffold@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/ui-scaffold@npm:2.12.1"
+"@orderly.network/ui-scaffold@npm:2.12.4, @orderly.network/ui-scaffold@npm:^2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/ui-scaffold@npm:2.12.4"
   dependencies:
     "@akamfoad/qr": "npm:^0.4.0"
     "@date-fns/utc": "npm:1.2.0"
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/react-app": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/ui-chain-selector": "npm:2.12.1"
-    "@orderly.network/ui-connector": "npm:2.12.1"
-    "@orderly.network/ui-notification": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/react-app": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/ui-chain-selector": "npm:2.12.4"
+    "@orderly.network/ui-connector": "npm:2.12.4"
+    "@orderly.network/ui-notification": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     date-fns: "npm:^3.6.0"
     immer: "npm:^10.1.1"
     jsqr: "npm:^1.4.0"
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/f98ac5f139b0514c2b6f85cc8ed264610bcb81fbf0bd2cdc10e2df66fb53c900c0eff3d24d64ff4d291f02bac3ebedb72a87aa1acb7e903127c2e3a891b1a129
+  checksum: 10c0/7a6a9edd70904601d4380e769e5c46c5deccc5e88f687b365f5a87982c670695d6d4807624b1166782f7bd0231bc3f2e2ded7b66b1de5d5bec5504da007f130d
   languageName: node
   linkType: hard
 
-"@orderly.network/ui-share@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/ui-share@npm:2.12.1"
+"@orderly.network/ui-share@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/ui-share@npm:2.12.4"
   dependencies:
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/3bc0db08d563257e648cb15fce0a58f80a6bd12e101ceffa74a7f9e02a692044757a1d99bc6793498a7b8359cba426d5dbd52f11d91452a12c3aba92c42cc3bc
+  checksum: 10c0/fe2e85a9e8fdeffd496c61c84759c7952999d60a2c671d628459115258d9345c43fe7e832d4e233c03e4bea7ce155d85c9943dfc565cfa66d199183bdfd61ee1
   languageName: node
   linkType: hard
 
-"@orderly.network/ui-tpsl@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/ui-tpsl@npm:2.12.1"
+"@orderly.network/ui-tpsl@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/ui-tpsl@npm:2.12.4"
   dependencies:
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/perp": "npm:4.12.1"
-    "@orderly.network/react-app": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/ui-connector": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
-  checksum: 10c0/7834d50f84e4d14aeb40022b487655a1d785f1c072c8e2dbdeef22b50242280a295f2fa10c06d9d756e63fd2632a2f48b52ca1b0736d270111d13937021d8cf5
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/perp": "npm:4.12.4"
+    "@orderly.network/react-app": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/ui-connector": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
+  checksum: 10c0/e6a3fe5767610546cb9df541c1c9c32521b93924cea75cd9df8a3acdd177aebcd19b0c6e39fb07a28f22cbae0e910323f36d35b96240ac63a06099a0e45ae451
   languageName: node
   linkType: hard
 
-"@orderly.network/ui-tradingview@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/ui-tradingview@npm:2.12.1"
+"@orderly.network/ui-tradingview@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/ui-tradingview@npm:2.12.4"
   dependencies:
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/net": "npm:2.12.1"
-    "@orderly.network/react-app": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/ui-connector": "npm:2.12.1"
-    "@orderly.network/ui-positions": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/net": "npm:2.12.4"
+    "@orderly.network/react-app": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/ui-connector": "npm:2.12.4"
+    "@orderly.network/ui-positions": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     date-fns: "npm:^3.6.0"
-  checksum: 10c0/80452ca65fb5378cc3958e957b9dcfb3dec927d52c5eb181cff1bf0428a6fdc7a06353af60c88091ee2eb773b61d2de6207b540c5d26445e059d5ff10a302258
+  checksum: 10c0/0529dc7fe74b27cd643c26beabd83e8c39e5e214aa4fa440c1efc5d73005cd5f7a5a1da0835390e96eb6cae8682d620a88f674ae4d2896b83334338c9ae1a681
   languageName: node
   linkType: hard
 
-"@orderly.network/ui-transfer@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/ui-transfer@npm:2.12.1"
+"@orderly.network/ui-transfer@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/ui-transfer@npm:2.12.4"
   dependencies:
     "@akamfoad/qr": "npm:^0.4.0"
     "@layerzerolabs/scan-client": "npm:^0.0.6"
-    "@orderly.network/core": "npm:2.12.1"
-    "@orderly.network/default-solana-adapter": "npm:2.12.1"
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/perp": "npm:4.12.1"
-    "@orderly.network/react-app": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/ui-chain-selector": "npm:2.12.1"
-    "@orderly.network/ui-connector": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/core": "npm:2.12.4"
+    "@orderly.network/default-solana-adapter": "npm:2.12.4"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/perp": "npm:4.12.4"
+    "@orderly.network/react-app": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/ui-chain-selector": "npm:2.12.4"
+    "@orderly.network/ui-connector": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     "@solana/web3.js": "npm:^1.95.3"
     ethers: "npm:^6.16.0"
     ramda: "npm:^0.29.1"
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/d5d9892bc15052874ed2f7d7bd34e95de33228212d5df1c792c480316797a80a628f51f86f60f6e63e815ae4267c4edb0f56caec35f0065d9532689fc5b869ce
+  checksum: 10c0/63690fd2d36b4103d0040bd710d6e85925dc7a81148741719a66eaa8dd1af2c9dd50fb1e9086b3d2906b9229f00ba11cce6107e9bd7fbd780343441079a321bd
   languageName: node
   linkType: hard
 
-"@orderly.network/ui@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/ui@npm:2.12.1"
+"@orderly.network/ui@npm:2.12.4, @orderly.network/ui@npm:^2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/ui@npm:2.12.4"
   dependencies:
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/utils": "npm:2.12.4"
     "@radix-ui/react-avatar": "npm:^1.0.3"
     "@radix-ui/react-checkbox": "npm:^1.0.4"
     "@radix-ui/react-collapsible": "npm:^1.0.3"
@@ -4106,56 +4106,56 @@ __metadata:
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/8213833d4cdb7be5a16bda633dc659cd44c3d19a515c07f4ad82b6974559c8215420e84d5824580b0eceec7adc615a12296e5a87f50ef35d2e4ac0ac2bdba908
+  checksum: 10c0/5e92ca65008632b05f00097996b075f2e232ccce4346aff8c6ba62e48470ddd8ce4215a2620dc775065c8503b5c887ceb9d49973a39f3e389fa559b81de9ae01
   languageName: node
   linkType: hard
 
-"@orderly.network/utils@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/utils@npm:2.12.1"
+"@orderly.network/utils@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/utils@npm:2.12.4"
   dependencies:
-    "@orderly.network/types": "npm:2.12.1"
+    "@orderly.network/types": "npm:2.12.4"
     dayjs: "npm:^1.11.9"
     decimal.js-light: "npm:^2.5.1"
-  checksum: 10c0/38255d5da2ae2a159ed78881de19b23fd28478be9ba0f9558f339141a6be80b3f6536b29441a7c2741cc2defe949d2ffa569f9d8c4296f47d5099dad726e30fa
+  checksum: 10c0/aa04728db717b287c204166fcde8c7d92abcc52b73cd75c2a639e5a041c1e11eb72ec43819d7b0be71c42fe68f7616ecc7cf50bb8d34527a9b2bd9032dd1c33b
   languageName: node
   linkType: hard
 
-"@orderly.network/vaults@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/vaults@npm:2.12.1"
+"@orderly.network/vaults@npm:^2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/vaults@npm:2.12.4"
   dependencies:
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/react-app": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/ui-connector": "npm:2.12.1"
-    "@orderly.network/ui-transfer": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/react-app": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/ui-connector": "npm:2.12.4"
+    "@orderly.network/ui-transfer": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     date-fns: "npm:^3.6.0"
     ramda: "npm:^0.29.0"
     zustand: "npm:^4.5.5"
   peerDependencies:
     react: ">=18"
     react-dom: ">=18"
-  checksum: 10c0/ec3dda33f7d3b9cfc07167a764b071008cc372b821a6bc3ddae880c78cdb551b6c0cc24507fd06e8fa835634b20a67471bc6a6952f866207fc74d99b38e5630e
+  checksum: 10c0/10869e0b18098a2a7a7f889c691da410e0aefa4d742269487a005c4910844c2e3375ca325621976bfa792d7342349724e1b985a4b6169916522bce4e60b50dd8
   languageName: node
   linkType: hard
 
-"@orderly.network/wallet-connector-privy@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/wallet-connector-privy@npm:2.12.1"
+"@orderly.network/wallet-connector-privy@npm:^2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/wallet-connector-privy@npm:2.12.4"
   dependencies:
     "@abstract-foundation/agw-client": "npm:^1.6.2"
     "@abstract-foundation/agw-react": "npm:^1.6.4"
-    "@orderly.network/core": "npm:2.12.1"
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/ui-connector": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/core": "npm:2.12.4"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/i18n": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/ui-connector": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     "@privy-io/react-auth": "npm:^2.25.0"
     "@solana-mobile/wallet-adapter-mobile": "npm:^2.1.4"
     "@solana/wallet-adapter-base": "npm:^0.9.23"
@@ -4172,20 +4172,20 @@ __metadata:
     zustand: "npm:^4.5.5"
   peerDependencies:
     react: ">=18"
-  checksum: 10c0/6219b6e0d1fd85a361779614e12008e8ff1228d3ab284f18c7f7a7da6cd0446f6c3ba8bb69e790d972fb5e2fc48df76c9649b688782cd29c15af93a5ea3bf2ba
+  checksum: 10c0/71afe0bd6de73da638ed400c98dd314ec4d7e2c7a1844cf9595151ed401acc03dca14561639442f48f435760e6394ce4358f5094388a0bb5de800f6fe07ab012
   languageName: node
   linkType: hard
 
-"@orderly.network/wallet-connector@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/wallet-connector@npm:2.12.1"
+"@orderly.network/wallet-connector@npm:^2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/wallet-connector@npm:2.12.4"
   dependencies:
     "@binance/w3w-blocknative-connector": "npm:^1.1.7"
-    "@orderly.network/core": "npm:2.12.1"
-    "@orderly.network/hooks": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/utils": "npm:2.12.1"
+    "@orderly.network/core": "npm:2.12.4"
+    "@orderly.network/hooks": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
+    "@orderly.network/ui": "npm:2.12.4"
+    "@orderly.network/utils": "npm:2.12.4"
     "@solana-mobile/wallet-adapter-mobile": "npm:^2.1.4"
     "@solana/spl-token": "npm:0.4.8"
     "@solana/wallet-adapter-base": "npm:^0.9.23"
@@ -4202,19 +4202,19 @@ __metadata:
     rxjs: "npm:^7.5.5"
   peerDependencies:
     react: ">=18"
-  checksum: 10c0/91e001fb5e4b58ae404963468348fa5210f999190528f6fc95b23f40b373292d27f5fb8ef75f3584f94d1fe0bbd1d4064d4767f6f6692b4b835e8a7770ddf1aa
+  checksum: 10c0/e78c313c735164d350eb09de704ad8b2d17512b48337a0924e49a333bd3794254e5553401150aa24ddd8383ee15478b264efee1aa2824e3e3e107bcc2a20dc5e
   languageName: node
   linkType: hard
 
-"@orderly.network/web3-provider-ethers@npm:2.12.1":
-  version: 2.12.1
-  resolution: "@orderly.network/web3-provider-ethers@npm:2.12.1"
+"@orderly.network/web3-provider-ethers@npm:2.12.4":
+  version: 2.12.4
+  resolution: "@orderly.network/web3-provider-ethers@npm:2.12.4"
   dependencies:
-    "@orderly.network/default-evm-adapter": "npm:2.12.1"
-    "@orderly.network/types": "npm:2.12.1"
+    "@orderly.network/default-evm-adapter": "npm:2.12.4"
+    "@orderly.network/types": "npm:2.12.4"
     ethers: "npm:^6.16.0"
     ethers-decode-error: "npm:^2.1.3"
-  checksum: 10c0/481be8a220a608f9350628234b23b1d71696d8f37b15df65b1c2342cf159c3630594821f9e67290dced9ca3db30a6355971cf70a8fa80ab85c6b11b19f8e348a
+  checksum: 10c0/ab65378d91359691cb83424cf4676e2b2092e26b4c891ee926bc9f352080dcfde520b704d0fedea8af5c1d90f13e6fe521738f7b31184df16eca1f4c604ca5ee
   languageName: node
   linkType: hard
 
@@ -7862,6 +7862,75 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@supabase/auth-js@npm:2.103.3":
+  version: 2.103.3
+  resolution: "@supabase/auth-js@npm:2.103.3"
+  dependencies:
+    tslib: "npm:2.8.1"
+  checksum: 10c0/ca6eef1cbe41a0be33881655a0925a42ce5f9832a0de5c8fb563b78edb5b6a7a109c4873ffd56a0af0d209fc961178dbdf890f51ee2bb6d38b803a2ddbe29a38
+  languageName: node
+  linkType: hard
+
+"@supabase/functions-js@npm:2.103.3":
+  version: 2.103.3
+  resolution: "@supabase/functions-js@npm:2.103.3"
+  dependencies:
+    tslib: "npm:2.8.1"
+  checksum: 10c0/6ab1ff6280d3d1efff268f32d67071fee93b07db8a39e4e924fd3e9d83d9b1f4aad562590d1402e731a9aee8b2bdcf883129a9bccedbf2e436c1fa658c3a7b6e
+  languageName: node
+  linkType: hard
+
+"@supabase/phoenix@npm:^0.4.0":
+  version: 0.4.0
+  resolution: "@supabase/phoenix@npm:0.4.0"
+  checksum: 10c0/67973ccace7c8ca2ecdc13dc14f9e80f8b957daa56e75642c6265302287e7124ced3aa9df740dd31e6905e51f0f60d271351117a9e946743ad30ec21210a9421
+  languageName: node
+  linkType: hard
+
+"@supabase/postgrest-js@npm:2.103.3":
+  version: 2.103.3
+  resolution: "@supabase/postgrest-js@npm:2.103.3"
+  dependencies:
+    tslib: "npm:2.8.1"
+  checksum: 10c0/0f0bf4cd48c819e50cc446d61ef042cff7fc10fddd233b3d20e24320403235821d0c3a1a336398c09e72ca540e313cf3c008eee9f6d535db9a10528591b41bde
+  languageName: node
+  linkType: hard
+
+"@supabase/realtime-js@npm:2.103.3":
+  version: 2.103.3
+  resolution: "@supabase/realtime-js@npm:2.103.3"
+  dependencies:
+    "@supabase/phoenix": "npm:^0.4.0"
+    "@types/ws": "npm:^8.18.1"
+    tslib: "npm:2.8.1"
+    ws: "npm:^8.18.2"
+  checksum: 10c0/24d538608e4713206745fe250d450ae32e9a1a2fe75103460da090845d908e0574f175cb13839c0c7589821b7aed1614cfe997f36aa04f5cd8259deddaa0de03
+  languageName: node
+  linkType: hard
+
+"@supabase/storage-js@npm:2.103.3":
+  version: 2.103.3
+  resolution: "@supabase/storage-js@npm:2.103.3"
+  dependencies:
+    iceberg-js: "npm:^0.8.1"
+    tslib: "npm:2.8.1"
+  checksum: 10c0/4f9d67ce6ecba8fc54e6f48bee45d7aec0efe8f083ae29cb897d929545b2a20beb7eb1199e394b98d2eccab9bf4c14e329eb320b698e4be820775313afdc5c92
+  languageName: node
+  linkType: hard
+
+"@supabase/supabase-js@npm:^2.103.3":
+  version: 2.103.3
+  resolution: "@supabase/supabase-js@npm:2.103.3"
+  dependencies:
+    "@supabase/auth-js": "npm:2.103.3"
+    "@supabase/functions-js": "npm:2.103.3"
+    "@supabase/postgrest-js": "npm:2.103.3"
+    "@supabase/realtime-js": "npm:2.103.3"
+    "@supabase/storage-js": "npm:2.103.3"
+  checksum: 10c0/23f2531e23bfce557fc6b3db679748e228d95d5c369537df9b47f5c00e5d1702a50551197831687c080062f69ffb8fee24eb3d1d0b43c17bbb2a20190c163485
+  languageName: node
+  linkType: hard
+
 "@swc/helpers@npm:^0.5.0, @swc/helpers@npm:^0.5.11":
   version: 0.5.17
   resolution: "@swc/helpers@npm:0.5.17"
@@ -8788,7 +8857,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/ws@npm:^8.2.2":
+"@types/ws@npm:^8.18.1, @types/ws@npm:^8.2.2":
   version: 8.18.1
   resolution: "@types/ws@npm:8.18.1"
   dependencies:
@@ -12505,24 +12574,25 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "dex-creator-template@workspace:."
   dependencies:
-    "@orderly.network/affiliate": "npm:2.12.1"
-    "@orderly.network/i18n": "npm:2.12.1"
-    "@orderly.network/markets": "npm:2.12.1"
-    "@orderly.network/portfolio": "npm:2.12.1"
-    "@orderly.network/react-app": "npm:2.12.1"
-    "@orderly.network/trading": "npm:2.12.1"
-    "@orderly.network/trading-leaderboard": "npm:2.12.1"
-    "@orderly.network/trading-points": "npm:1.4.1"
-    "@orderly.network/types": "npm:2.12.1"
-    "@orderly.network/ui": "npm:2.12.1"
-    "@orderly.network/ui-scaffold": "npm:2.12.1"
-    "@orderly.network/vaults": "npm:2.12.1"
-    "@orderly.network/wallet-connector": "npm:2.12.1"
-    "@orderly.network/wallet-connector-privy": "npm:2.12.1"
+    "@orderly.network/affiliate": "npm:^2.12.4"
+    "@orderly.network/i18n": "npm:^2.12.4"
+    "@orderly.network/markets": "npm:^2.12.4"
+    "@orderly.network/portfolio": "npm:^2.12.4"
+    "@orderly.network/react-app": "npm:^2.12.4"
+    "@orderly.network/trading": "npm:^2.12.4"
+    "@orderly.network/trading-leaderboard": "npm:^2.12.4"
+    "@orderly.network/trading-points": "npm:^1.4.4"
+    "@orderly.network/types": "npm:^2.12.4"
+    "@orderly.network/ui": "npm:^2.12.4"
+    "@orderly.network/ui-scaffold": "npm:^2.12.4"
+    "@orderly.network/vaults": "npm:^2.12.4"
+    "@orderly.network/wallet-connector": "npm:^2.12.4"
+    "@orderly.network/wallet-connector-privy": "npm:^2.12.4"
     "@privy-io/cross-app-connect": "npm:^0.2.1"
     "@solana-mobile/wallet-adapter-mobile": "npm:^2.2.0"
     "@solana/wallet-adapter-base": "npm:^0.9.24"
     "@solana/wallet-adapter-wallets": "npm:^0.19.36"
+    "@supabase/supabase-js": "npm:^2.103.3"
     "@tanstack/query-core": "npm:^5.79.0"
     "@types/node": "npm:^20.11.30"
     "@types/react": "npm:^18.2.20"
@@ -15120,6 +15190,13 @@ __metadata:
     typescript:
       optional: true
   checksum: 10c0/7ac11a67d618ec714beef303aa497c1249bf5f1977dd3ebe9ca2673dfa6cadbba9e2d39ec1337688903ae3866ce9c1bc22cd6b265e66cce54c5db3a9bbedd390
+  languageName: node
+  linkType: hard
+
+"iceberg-js@npm:^0.8.1":
+  version: 0.8.1
+  resolution: "iceberg-js@npm:0.8.1"
+  checksum: 10c0/e504da64cc26e8ad7c5344353a7203c671a740c14eb6086f20505f5e9739cab774493e616032530c962df97f2a855115cc2e89a47dd81581df5917b21a69ec48
   languageName: node
   linkType: hard
 
@@ -20719,7 +20796,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tslib@npm:^2.0.0, tslib@npm:^2.0.3, tslib@npm:^2.1.0, tslib@npm:^2.3.0, tslib@npm:^2.4.0, tslib@npm:^2.4.1, tslib@npm:^2.6.0, tslib@npm:^2.8.0":
+"tslib@npm:2.8.1, tslib@npm:^2.0.0, tslib@npm:^2.0.3, tslib@npm:^2.1.0, tslib@npm:^2.3.0, tslib@npm:^2.4.0, tslib@npm:^2.4.1, tslib@npm:^2.6.0, tslib@npm:^2.8.0":
   version: 2.8.1
   resolution: "tslib@npm:2.8.1"
   checksum: 10c0/9c4759110a19c53f992d9aae23aac5ced636e99887b51b9e61def52611732872ff7668757d4e4c61f19691e36f4da981cd9485e869b4a7408d689f6bf1f14e62
@@ -22434,6 +22511,21 @@ __metadata:
     utf-8-validate:
       optional: true
   checksum: 10c0/bd7d5f4aaf04fae7960c23dcb6c6375d525e00f795dd20b9385902bd008c40a94d3db3ce97d878acc7573df852056ca546328b27b39f47609f80fb22a0a9b61d
+  languageName: node
+  linkType: hard
+
+"ws@npm:^8.18.2":
+  version: 8.20.0
+  resolution: "ws@npm:8.20.0"
+  peerDependencies:
+    bufferutil: ^4.0.1
+    utf-8-validate: ">=5.0.2"
+  peerDependenciesMeta:
+    bufferutil:
+      optional: true
+    utf-8-validate:
+      optional: true
+  checksum: 10c0/956ac5f11738c914089b65878b9223692ace77337ba55379ae68e1ecbeae9b47a0c6eb9403688f609999a58c80d83d99865fe0029b229d308b08c1ef93d4ea14
   languageName: node
   linkType: hard
 
