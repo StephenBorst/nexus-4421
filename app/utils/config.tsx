@@ -266,7 +266,9 @@ export const useOrderlyConfig = () => {
   ? [{ name: "Campaigns", href: buildCampaignsUrl(), target: "_blank" as const }]
   : [];
 
-const allMenuItems = [...translatedEnabledMenus, ...customMenus, ...campaignsMenu];
+  const labMenu = [{ name: "LAB", href: "/lab" }];
+
+const allMenuItems = [...translatedEnabledMenus, ...customMenus, ...campaignsMenu, ...labMenu];
 
     const supportedBottomNavMenus = [
       "Trading",

@@ -36,6 +36,9 @@ const SwapIndex = lazy(() => import('./pages/swap/Index'));
 const PointsLayout = lazy(() => import('./pages/points/Layout'));
 const PointsIndex = lazy(() => import('./pages/points/Index'));
 
+// ✅ LAB PAGE ADDED
+const TheLabPage = lazy(() => import('./pages/lab'));
+const LabLayout = lazy(() => import('./pages/lab/Layout'));
 
 async function loadRuntimeConfig() {
   return new Promise<void>((resolve) => {
@@ -86,6 +89,16 @@ const router = createBrowserRouter([
     errorElement: <ErrorBoundary />,
     children: [
       { index: true, element: <IndexPage /> },
+
+      // ✅ LAB ROUTE ADDED
+      {
+  path: 'lab',
+  element: <LabLayout />,
+  children: [
+    { index: true, element: <TheLabPage /> },
+  ],
+},
+
       {
         path: 'perp',
         element: <PerpLayout />,
@@ -179,4 +192,3 @@ if ('serviceWorker' in navigator) {
       });
   });
 }
-
