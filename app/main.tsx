@@ -42,6 +42,7 @@ const LabLayout = lazy(() => import('./pages/lab/Layout'));
 
 // ✅ FEED PAGE
 const FeedPage = lazy(() => import('./pages/feed'));
+const FeedLayout = lazy(() => import('./pages/feed/Layout'));
 
 async function loadRuntimeConfig() {
   return new Promise<void>((resolve) => {
@@ -105,7 +106,7 @@ const router = createBrowserRouter([
       // ✅ FEED ROUTE
       {
         path: 'feed',
-        element: <LabLayout />,
+        element: <FeedLayout />,
         children: [
           { index: true, element: <FeedPage /> },
         ],
