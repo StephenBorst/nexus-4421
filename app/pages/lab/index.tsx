@@ -830,6 +830,18 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile }: {
                 🔔 ALERTS
               </a>
             )}
+            <button
+              onClick={() => onUpdate(t.id, { isPublic: !t.isPublic })}
+              title={t.isPublic ? "Click to make private" : "Click to publish to feed"}
+              style={{
+                ...navBtnStyle, fontSize: 10, minHeight: 36, padding: "6px 12px",
+                color: t.isPublic ? "#00ff88" : "#3a5a4a",
+                borderColor: t.isPublic ? "#1a4a2a" : "#1a2e1a",
+                background: t.isPublic ? "#0a2a0a" : "transparent",
+              }}
+            >
+              {t.isPublic ? "📡 PUBLIC" : "📡 PRIVATE"}
+            </button>
             <button onClick={() => onRemove(t.id)} style={{ ...navBtnStyle, fontSize: 10, color: "#ff4444", borderColor: "#2a1a1a", minHeight: 36, padding: "6px 12px" }}>REMOVE</button>
           </div>
         </div>

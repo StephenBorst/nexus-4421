@@ -4,9 +4,12 @@
  * KV namespace binding: LAB_STORE  (set in Cloudflare dashboard)
  *
  * Routes:
- *   GET  /lab/:address  → fetch all LAB data for wallet
- *   PUT  /lab/:address  → save all LAB data for wallet
- *   DELETE /lab/:address/thesis/:id → remove one thesis
+ *   GET    /lab/:address              → fetch all LAB data for wallet
+ *   PUT    /lab/:address              → save all LAB data for wallet
+ *   DELETE /lab/:address/thesis/:id   → remove one thesis
+ *   GET    /profile/:address          → fetch profile { pfp, displayName }
+ *   PUT    /profile/:address          → save profile { pfp, displayName }
+ *   GET    /feed                      → public theses feed (all wallets, isPublic=true)
  */
 
 const ALLOWED_ORIGINS = [
@@ -46,8 +49,74 @@ export default {
 
     const url = new URL(request.url);
     const parts = url.pathname.split("/").filter(Boolean);
-    // parts: ["lab", ":address"] or ["lab", ":address", "thesis", ":id"]
 
+    // ── /feed ──────────────────────────────────────────────
+    if (parts[0] === "feed") {
+      if (request.method !== "GET") {
+        return json({ error: "method not allowed" }, request, 405);
+      }
+      // List all LAB_STORE keys, collect public theses across all wallets
+      const listed = await env.LAB_STORE.list({ prefix: "lab:" });
+      const feedItems = [];
+
+      for (const key of listed.keys) {
+        const raw = await env.LAB_STORE.get(key.name);
+        if (!raw) continue;
+        const data = JSON.parse(raw);
+        const address = key.name.replace("lab:", "");
+
+        // Fetch profile for this wallet (pfp + displayName)
+        const profileRaw = await env.LAB_STORE.get(`profile:${address}`);
+        const profile = profileRaw ? JSON.parse(profileRaw) : {};
+
+        const publicTheses = (data.theses || []).filter((t) => t.isPublic === true);
+        for (const thesis of publicTheses) {
+          feedItems.push({
+            ...thesis,
+            wallet: address,
+            pfp: profile.pfp || null,
+            displayName: profile.displayName || null,
+          });
+        }
+      }
+
+      // Sort newest first
+      feedItems.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      return json({ feed: feedItems }, request);
+    }
+
+    // ── /profile/:address ──────────────────────────────────
+    if (parts[0] === "profile") {
+      if (!parts[1]) return json({ error: "not found" }, request, 404);
+      const address = normalizeAddress(parts[1]);
+      const profileKey = `profile:${address}`;
+
+      if (request.method === "GET") {
+        const raw = await env.LAB_STORE.get(profileKey);
+        if (!raw) return json({ pfp: null, displayName: null }, request);
+        return json(JSON.parse(raw), request);
+      }
+
+      if (request.method === "PUT") {
+        let body;
+        try {
+          body = await request.json();
+        } catch {
+          return json({ error: "invalid json" }, request, 400);
+        }
+        // Only allow pfp (URL string) and displayName
+        const profile = {
+          pfp: typeof body.pfp === "string" ? body.pfp.trim().slice(0, 500) : null,
+          displayName: typeof body.displayName === "string" ? body.displayName.trim().slice(0, 40) : null,
+        };
+        await env.LAB_STORE.put(profileKey, JSON.stringify(profile));
+        return json({ ok: true }, request);
+      }
+
+      return json({ error: "method not allowed" }, request, 405);
+    }
+
+    // ── /lab/:address ──────────────────────────────────────
     if (parts[0] !== "lab" || !parts[1]) {
       return json({ error: "not found" }, request, 404);
     }
@@ -73,7 +142,6 @@ export default {
         return json({ error: "invalid json" }, request, 400);
       }
 
-      // Validate shape
       if (!Array.isArray(body.theses) || typeof body.notes !== "object") {
         return json({ error: "expected { theses: [], notes: {} }" }, request, 400);
       }

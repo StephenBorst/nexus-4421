@@ -29,6 +29,7 @@ import {
 } from "./runtime-config";
 import { Link } from "react-router-dom";
 import CustomLeftNav from "@/components/CustomLeftNav";
+import ProfileAvatar from "@/components/ProfileAvatar";
 import { buildCampaignsUrl } from "@/components/CampaignsNavTitle";
 interface MainNavItem {
   name: string;
@@ -267,8 +268,9 @@ export const useOrderlyConfig = () => {
   : [];
 
   const labMenu = [{ name: "LAB", href: "/lab" }];
+  const feedMenu = [{ name: "FEED", href: "/feed" }];
 
-const allMenuItems = [...translatedEnabledMenus, ...customMenus, ...campaignsMenu, ...labMenu];
+const allMenuItems = [...translatedEnabledMenus, ...customMenus, ...campaignsMenu, ...labMenu, ...feedMenu];
 
     const supportedBottomNavMenus = [
       "Trading",
@@ -318,7 +320,7 @@ const allMenuItems = [...translatedEnabledMenus, ...customMenus, ...campaignsMen
           >
             {isMobile && (
               <CustomLeftNav
-                menus={[...translatedEnabledMenus, ...labMenu]}
+                menus={[...translatedEnabledMenus, ...labMenu, ...feedMenu]}
                 externalLinks={customMenus}
               />
             )}
@@ -345,6 +347,7 @@ const allMenuItems = [...translatedEnabledMenus, ...customMenus, ...campaignsMen
             {components.subAccount}
             {components.chainMenu}
             {components.walletConnect}
+            <ProfileAvatar />
           </Flex>
         </Flex>
       );

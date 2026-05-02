@@ -40,6 +40,9 @@ const PointsIndex = lazy(() => import('./pages/points/Index'));
 const TheLabPage = lazy(() => import('./pages/lab'));
 const LabLayout = lazy(() => import('./pages/lab/Layout'));
 
+// ✅ FEED PAGE
+const FeedPage = lazy(() => import('./pages/feed'));
+
 async function loadRuntimeConfig() {
   return new Promise<void>((resolve) => {
     const script = document.createElement('script');
@@ -92,12 +95,21 @@ const router = createBrowserRouter([
 
       // ✅ LAB ROUTE ADDED
       {
-  path: 'lab',
-  element: <LabLayout />,
-  children: [
-    { index: true, element: <TheLabPage /> },
-  ],
-},
+        path: 'lab',
+        element: <LabLayout />,
+        children: [
+          { index: true, element: <TheLabPage /> },
+        ],
+      },
+
+      // ✅ FEED ROUTE
+      {
+        path: 'feed',
+        element: <LabLayout />,
+        children: [
+          { index: true, element: <FeedPage /> },
+        ],
+      },
 
       {
         path: 'perp',

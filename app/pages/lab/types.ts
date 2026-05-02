@@ -21,4 +21,7 @@ export interface ThesisTrade {
   fundingCost72h: number;
   status: ThesisStatus;
   actualPnl: number | null;
+  isPublic?: boolean;
+  pfp?: string;
+  displayName?: string;
 }
