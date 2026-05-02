@@ -1,5 +1,4 @@
 workers/
-scripts/
 node_modules/
 build/server/
 .git/
