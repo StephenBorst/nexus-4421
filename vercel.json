@@ -1,6 +1,6 @@
 {
   "outputDirectory": "build/client",
-  "buildCommand": "NODE_OPTIONS=--max-old-space-size=4096 yarn build",
+  "buildCommand": "yarn build",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
