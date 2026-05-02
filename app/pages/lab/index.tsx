@@ -1,4 +1,19 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+
+// ─── Responsive hook ──────────────────────────────────────
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth < breakpoint : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    setIsMobile(mq.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [breakpoint]);
+  return isMobile;
+}
 import { useCollateral, usePrivateQuery, useMutation, useAccount } from "@orderly.network/hooks";
 import { useLabStorage } from "@/hooks/useLabStorage";
 import type { ThesisTrade, ThesisStatus } from "./types";
@@ -740,11 +755,12 @@ function calcThesis(form: {
 }
 
 // ─── Thesis Card ──────────────────────────────────────────
-function ThesisCard({ t, onUpdate, onRemove, walletAddress }: {
+function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile }: {
   t: ThesisTrade;
   onUpdate: (id: string, patch: Partial<ThesisTrade>) => void;
   onRemove: (id: string) => void;
   walletAddress?: string | null;
+  isMobile?: boolean;
 }) {
   const [actualInput, setActualInput] = useState(t.actualPnl !== null ? String(t.actualPnl) : "");
   const [inputVisible, setInputVisible] = useState(false);
@@ -777,15 +793,15 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress }: {
       opacity: t.status === "INVALIDATED" ? 0.7 : 1,
     }}>
       {/* Top row */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 16, color: "#fff", fontWeight: "bold", fontFamily: "monospace" }}>{t.symbol}</div>
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "flex-start", justifyContent: "space-between", marginBottom: 10, gap: isMobile ? 10 : 0 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flex: 1, minWidth: 0 }}>
+          <div style={{ minWidth: 52 }}>
+            <div style={{ fontSize: 16, color: "#fff", fontWeight: "bold", fontFamily: "monospace" }}>{t.symbol.replace("PERP_","").replace("_USDC","")}</div>
             <div style={{ fontSize: 10, color: t.direction === "LONG" ? "#00ff88" : "#ff4444", fontFamily: "monospace" }}>
               {t.direction === "LONG" ? "↑" : "↓"} {t.direction} · {t.leverage.toFixed(1)}x
             </div>
           </div>
-          <div style={{ display: "flex", gap: 16, marginLeft: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(6, auto)", gap: isMobile ? "8px 12px" : "0 16px", flex: 1 }}>
             {[
               { label: "ENTRY", val: `$${t.entryPrice.toFixed(2)}` },
               { label: "STOP", val: `$${t.stopLoss.toFixed(2)}`, color: "#ff4444" },
@@ -801,31 +817,34 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress }: {
             ))}
           </div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-          <div style={{ fontSize: 9, color: "#2a4a3a", fontFamily: "monospace" }}>{new Date(t.createdAt).toLocaleString()}</div>
-          {t.status === "ACTIVE" && walletAddress && (
-            <a
-              href={`https://t.me/nexustradinglabs_bot?start=${walletAddress.toLowerCase()}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ ...navBtnStyle, fontSize: 10, color: "#29b6f6", borderColor: "#0a2a3a", textDecoration: "none", display: "inline-block", textAlign: "center" }}
-            >
-              🔔 ALERTS
-            </a>
-          )}
-          <button onClick={() => onRemove(t.id)} style={{ ...navBtnStyle, fontSize: 10, color: "#ff4444", borderColor: "#2a1a1a" }}>REMOVE</button>
+        <div style={{ display: "flex", flexDirection: isMobile ? "row" : "column", alignItems: isMobile ? "center" : "flex-end", justifyContent: isMobile ? "space-between" : "flex-start", gap: 6, flexShrink: 0 }}>
+          {!isMobile && <div style={{ fontSize: 9, color: "#2a4a3a", fontFamily: "monospace" }}>{new Date(t.createdAt).toLocaleDateString()}</div>}
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {t.status === "ACTIVE" && walletAddress && (
+              <a
+                href={`https://t.me/nexustradinglabs_bot?start=${walletAddress.toLowerCase()}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ ...navBtnStyle, fontSize: 10, color: "#29b6f6", borderColor: "#0a2a3a", textDecoration: "none", display: "inline-block", textAlign: "center", minHeight: 36, lineHeight: "22px", padding: "6px 12px" }}
+              >
+                🔔 ALERTS
+              </a>
+            )}
+            <button onClick={() => onRemove(t.id)} style={{ ...navBtnStyle, fontSize: 10, color: "#ff4444", borderColor: "#2a1a1a", minHeight: 36, padding: "6px 12px" }}>REMOVE</button>
+          </div>
         </div>
       </div>
 
       {/* Status buttons */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
         {(Object.keys(STATUS_CONFIG) as ThesisStatus[]).map((s) => {
           const c = STATUS_CONFIG[s];
           const active = t.status === s;
           return (
             <button key={s} onClick={() => handleStatusClick(s)} style={{
-              fontFamily: "monospace", fontSize: 9, padding: "4px 10px",
+              fontFamily: "monospace", fontSize: 9, padding: "6px 12px",
               cursor: "pointer", borderRadius: 3, letterSpacing: "0.06em",
+              minHeight: 32,
               border: `1px solid ${active ? c.border : "#1a2e1a"}`,
               background: active ? c.bg : "transparent",
               color: active ? c.color : "#2a4a3a",
@@ -1015,6 +1034,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
 
 // ─── Thesis View ──────────────────────────────────────────
 function ThesisView() {
+  const isMobile = useIsMobile();
   const { state: accountState } = useAccount();
   const walletAddress = (accountState as { address?: string })?.address ?? null;
   const { theses: trades, saveTheses } = useLabStorage(walletAddress);
@@ -1192,12 +1212,12 @@ function ThesisView() {
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 12, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 320px", gap: 12, alignItems: "start" }}>
         {/* Form */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={cardStyle}>
             <div style={{ fontSize: 10, color: "#fbbf24", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; INSTRUMENT</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 160px", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 160px", gap: 8 }}>
               <div>
                 <span style={fieldLabelStyle}>SYMBOL</span>
                 <input style={inputStyle} placeholder="BTC, ETH, SOL..." value={form.symbol} onChange={(e) => set("symbol", e.target.value)} />
@@ -1221,7 +1241,7 @@ function ThesisView() {
 
           <div style={cardStyle}>
             <div style={{ fontSize: 10, color: "#4a9fff", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; PRICE LEVELS</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: 8 }}>
               {[
                 { key: "entryPrice", label: "ENTRY", placeholder: "95000" },
                 { key: "stopLoss", label: "STOP LOSS", placeholder: "93000" },
@@ -1243,7 +1263,7 @@ function ThesisView() {
 
           <div style={cardStyle}>
             <div style={{ fontSize: 10, color: "#a855f7", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; RISK + FUNDING</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr", gap: 8 }}>
               <div>
                 <span style={fieldLabelStyle}>ACCOUNT SIZE (USDC)</span>
                 <input style={inputStyle} type="number" placeholder="10000" value={form.accountSize} onChange={(e) => set("accountSize", e.target.value)} />
@@ -1277,7 +1297,7 @@ function ThesisView() {
         </div>
 
         {/* Output Panel */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, position: "sticky", top: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, position: isMobile ? "static" : "sticky", top: 16 }}>
           <div style={{ ...cardStyle, border: "1px solid #1a3a2a" }}>
             <div style={{ fontSize: 10, color: "#00ff88", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: 16 }}>&#9632; CALCULATED OUTPUT</div>
             {!calc ? (
@@ -1447,7 +1467,7 @@ function ThesisView() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {filteredTrades.map((t) => (
-              <ThesisCard key={t.id} t={t} onUpdate={updateTrade} onRemove={removeTrade} walletAddress={walletAddress} />
+              <ThesisCard key={t.id} t={t} onUpdate={updateTrade} onRemove={removeTrade} walletAddress={walletAddress} isMobile={isMobile} />
             ))}
           </div>
         </div>
@@ -1517,33 +1537,42 @@ export default function TheLabPage() {
   const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1); } else setViewMonth((m) => m - 1); };
   const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1); } else setViewMonth((m) => m + 1); };
 
-  const tabs: { id: TabId; label: string }[] = [
-    { id: "analytics", label: "[ ANALYTICS ]" },
-    { id: "calendar", label: "[ CALENDAR ]" },
-    { id: "tradelog", label: "[ TRADE LOG ]" },
-    { id: "thesis", label: "[ THESIS ]" },
+  const isMobile = useIsMobile();
+
+  const tabs: { id: TabId; label: string; short: string }[] = [
+    { id: "analytics", label: "[ ANALYTICS ]", short: "STATS" },
+    { id: "calendar", label: "[ CALENDAR ]", short: "CAL" },
+    { id: "tradelog", label: "[ TRADE LOG ]", short: "LOG" },
+    { id: "thesis", label: "[ THESIS ]", short: "LAB" },
   ];
 
   const calendarProps = { dayGroups, onDayClick: handleDayClick, viewMonth, viewYear, onPrevMonth: prevMonth, onNextMonth: nextMonth, totalPnl };
 
   return (
     <div style={{ background: "#0a0e0a", minHeight: "100vh", padding: 0 }}>
-      <div style={{ display: "flex", gap: 2, padding: "8px 16px", borderBottom: "1px solid #1a2e1a", background: "#080c08", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", gap: 2 }}>
+      <div style={{ display: "flex", gap: 2, padding: isMobile ? "6px 8px" : "8px 16px", borderBottom: "1px solid #1a2e1a", background: "#080c08", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", gap: isMobile ? 4 : 2, flex: 1 }}>
           {tabs.map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
               background: activeTab === tab.id ? "#0a1a0a" : "none",
               border: `1px solid ${activeTab === tab.id ? "#00ff88" : "transparent"}`,
               color: activeTab === tab.id ? "#00ff88" : "#4a7a5a",
-              fontFamily: "monospace", fontSize: 11, padding: "5px 12px", cursor: "pointer", letterSpacing: "0.05em", borderRadius: 3,
-            }}>{tab.label}</button>
+              fontFamily: "monospace",
+              fontSize: isMobile ? 10 : 11,
+              padding: isMobile ? "6px 8px" : "5px 12px",
+              cursor: "pointer",
+              letterSpacing: "0.05em",
+              borderRadius: 3,
+              minHeight: isMobile ? 36 : "auto",
+              flex: isMobile ? 1 : "none",
+            }}>{isMobile ? tab.short : tab.label}</button>
           ))}
         </div>
-        <div style={{ fontSize: 9, fontFamily: "monospace", letterSpacing: "0.1em", color: syncing ? "#fbbf24" : synced ? "#00ff88" : "#2a4a3a" }}>
-          {syncing ? "⟳ SYNCING..." : synced ? "● SYNCED" : rootWalletAddress ? "○ LOCAL" : "○ CONNECT WALLET TO SYNC"}
+        <div style={{ fontSize: 9, fontFamily: "monospace", letterSpacing: "0.1em", color: syncing ? "#fbbf24" : synced ? "#00ff88" : "#2a4a3a", flexShrink: 0, marginLeft: 8 }}>
+          {syncing ? "⟳" : synced ? "●" : rootWalletAddress ? "○" : isMobile ? "○" : "○ CONNECT WALLET"}
         </div>
       </div>
-      <div style={{ padding: 16 }}>
+      <div style={{ padding: isMobile ? 12 : 16 }}>
         {activeTab === "analytics" && <AnalyticsView orders={processedTrades} totalPnl={totalPnl} winRate={winRate} collateral={availableBalance ?? 0} />}
         {activeTab === "calendar" && <CalendarView {...calendarProps} />}
         {activeTab === "tradelog" && (
