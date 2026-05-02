@@ -10,3 +10,11 @@
 .oui-portfolio-page .oui-box.oui-flex.oui-flex-nowrap > div:nth-child(2).oui-box.oui-flex.oui-justify-start.oui-flex-nowrap.oui-relative {
   display: none;
 }
+
+/* Fix mobile dead space below bottom nav — 100vh includes browser chrome,
+   100dvh (dynamic) correctly sizes to the visible viewport */
+@media (max-width: 767px) {
+  .oui-scaffold-root {
+    height: 100dvh !important;
+  }
+}

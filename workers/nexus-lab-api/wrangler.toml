@@ -1,0 +1,7 @@
+name = "nexus-lab-api"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "LAB_STORE"
+id = "12c4fcbc04cc4211902d49b8abc2a751"
