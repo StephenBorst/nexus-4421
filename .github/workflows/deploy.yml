@@ -12,13 +12,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
       - name: Build
-        run: node ./node_modules/.bin/tsx scripts/generate-manifest.ts && node ./node_modules/.bin/vite build --minify false && node ./node_modules/.bin/tsx scripts/generate-manifest.ts
+        run: node ./node_modules/.bin/tsx scripts/generate-manifest.ts && node ./node_modules/.bin/vite build --no-minify && node ./node_modules/.bin/tsx scripts/generate-manifest.ts
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
 
