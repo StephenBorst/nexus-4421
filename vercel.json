@@ -1,6 +1,6 @@
 {
   "outputDirectory": "build/client",
-  "buildCommand": "yarn build",
+  "buildCommand": "node ./node_modules/.bin/tsx scripts/generate-manifest.ts && node ./node_modules/.bin/vite build && node ./node_modules/.bin/tsx scripts/generate-manifest.ts",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
