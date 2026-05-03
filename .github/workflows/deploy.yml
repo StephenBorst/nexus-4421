@@ -19,6 +19,8 @@ jobs:
 
       - name: Build
         run: node ./node_modules/.bin/tsx scripts/generate-manifest.ts && node ./node_modules/.bin/vite build && node ./node_modules/.bin/tsx scripts/generate-manifest.ts
+        env:
+          NODE_OPTIONS: '--max-old-space-size=3072'
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
