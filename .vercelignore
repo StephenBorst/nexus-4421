@@ -2,3 +2,4 @@ workers/
 node_modules/
 build/server/
 .git/
+package-lock.json

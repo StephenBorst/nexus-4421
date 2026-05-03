@@ -18,9 +18,9 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Build
-        run: node ./node_modules/.bin/tsx scripts/generate-manifest.ts && node ./node_modules/.bin/vite build && node ./node_modules/.bin/tsx scripts/generate-manifest.ts
+        run: node ./node_modules/.bin/tsx scripts/generate-manifest.ts && node ./node_modules/.bin/vite build --minify false && node ./node_modules/.bin/tsx scripts/generate-manifest.ts
         env:
-          NODE_OPTIONS: '--max-old-space-size=3072'
+          NODE_OPTIONS: '--max-old-space-size=4096'
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
