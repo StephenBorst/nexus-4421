@@ -1,6 +1,6 @@
 {
   "outputDirectory": "build/client",
-  "buildCommand": "node --max-old-space-size=2048 ./node_modules/.bin/tsx scripts/generate-manifest.ts && node --max-old-space-size=2048 ./node_modules/.bin/vite build && node --max-old-space-size=2048 ./node_modules/.bin/tsx scripts/generate-manifest.ts",
+  "buildCommand": "yarn build",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
