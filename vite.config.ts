@@ -71,14 +71,6 @@ export default defineConfig(() => {
     ],
     build: {
       outDir: "build/client",
-      sourcemap: false,
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            vendor: ["react", "react-dom", "react-router-dom"],
-          },
-        },
-      },
     },
     optimizeDeps: {
       include: ["react", "react-dom", "react-router-dom"],
