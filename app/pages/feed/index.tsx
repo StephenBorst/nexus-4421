@@ -5,7 +5,8 @@
  * Each card shows: PFP + name, symbol/direction, entry/SL/TP, R:R, status, timestamp.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 
 const API_BASE = "https://nexus-lab-api.stephenpatrick24.workers.dev";
 
@@ -68,7 +69,7 @@ function Avatar({ pfp, displayName, size = 32 }: { pfp: string | null; displayNa
   );
 }
 
-function FeedCard({ thesis }: { thesis: FeedThesis }) {
+function FeedCard({ thesis, markPrice }: { thesis: FeedThesis; markPrice?: number | null }) {
   const cfg = STATUS_CONFIG[thesis.status];
   const shortAddr = `${thesis.wallet.slice(0, 6)}…${thesis.wallet.slice(-4)}`;
   const ticker = thesis.symbol.replace("PERP_", "").replace("_USDC", "");
@@ -136,6 +137,39 @@ function FeedCard({ thesis }: { thesis: FeedThesis }) {
         ))}
       </div>
 
+      {/* Live P&L — active theses with mark price */}
+      {thesis.status === "ACTIVE" && markPrice != null && (() => {
+        const { pnl, pct } = calcUnrealizedPnl(thesis.direction, thesis.entryPrice, markPrice, thesis.positionSize);
+        const toSL = distancePct(markPrice, thesis.stopLoss);
+        const toTP = distancePct(markPrice, thesis.takeProfit1);
+        const isWinning = pnl >= 0;
+        return (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px 12px", marginBottom: 10, paddingTop: 10, borderTop: "1px solid #1a2e1a" }}>
+            <div>
+              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>MARK</div>
+              <div style={{ fontSize: 12, color: "#fff", fontFamily: "monospace", fontWeight: "bold" }}>
+                ${markPrice.toFixed(markPrice < 10 ? 4 : 2)}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>UNREALIZED</div>
+              <div style={{ fontSize: 12, fontFamily: "monospace", fontWeight: "bold", color: isWinning ? "#00ff88" : "#ff4444" }}>
+                {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
+                <span style={{ fontSize: 9, marginLeft: 3, opacity: 0.7 }}>({pct >= 0 ? "+" : ""}{pct.toFixed(2)}%)</span>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>TO SL</div>
+              <div style={{ fontSize: 12, color: "#ff4444", fontFamily: "monospace", fontWeight: "bold" }}>{toSL.toFixed(2)}%</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>TO TP1</div>
+              <div style={{ fontSize: 12, color: "#00ff88", fontFamily: "monospace", fontWeight: "bold" }}>{toTP.toFixed(2)}%</div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Actual PnL (if closed) */}
       {thesis.actualPnl !== null && thesis.status !== "ACTIVE" && (
         <div style={{ fontFamily: "monospace", fontSize: 12, color: thesis.actualPnl >= 0 ? "#00ff88" : "#ff4444", marginBottom: 8 }}>
@@ -177,6 +211,13 @@ export default function FeedPage() {
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
+
+  // Live prices for all active feed theses
+  const activeSymbols = useMemo(
+    () => [...new Set(feed.filter((t) => t.status === "ACTIVE").map((t) => t.symbol))],
+    [feed]
+  );
+  const livePrices = useLivePrices(activeSymbols);
 
   const filtered = feed.filter((t) => {
     if (filter !== "ALL" && t.status !== filter) return false;
@@ -269,7 +310,7 @@ export default function FeedPage() {
         {!loading && !error && filtered.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {filtered.map((t) => (
-              <FeedCard key={`${t.wallet}-${t.id}`} thesis={t} />
+              <FeedCard key={`${t.wallet}-${t.id}`} thesis={t} markPrice={livePrices[t.symbol] ?? null} />
             ))}
           </div>
         )}

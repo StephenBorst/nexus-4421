@@ -16,6 +16,7 @@ function useIsMobile(breakpoint = 768) {
 }
 import { useCollateral, usePrivateQuery, useMutation, useAccount } from "@orderly.network/hooks";
 import { useLabStorage } from "@/hooks/useLabStorage";
+import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 import type { ThesisTrade, ThesisStatus } from "./types";
 
 // ─── Types ───────────────────────────────────────────────
@@ -755,12 +756,13 @@ function calcThesis(form: {
 }
 
 // ─── Thesis Card ──────────────────────────────────────────
-function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile }: {
+function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice }: {
   t: ThesisTrade;
   onUpdate: (id: string, patch: Partial<ThesisTrade>) => void;
   onRemove: (id: string) => void;
   walletAddress?: string | null;
   isMobile?: boolean;
+  markPrice?: number | null;
 }) {
   const [actualInput, setActualInput] = useState(t.actualPnl !== null ? String(t.actualPnl) : "");
   const [inputVisible, setInputVisible] = useState(false);
@@ -864,6 +866,45 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile }: {
           );
         })}
       </div>
+
+      {/* Live P&L — only shown for ACTIVE theses with a mark price */}
+      {t.status === "ACTIVE" && markPrice != null && (() => {
+        const { pnl, pct } = calcUnrealizedPnl(t.direction, t.entryPrice, markPrice, t.positionSize);
+        const toSL = distancePct(markPrice, t.stopLoss);
+        const toTP = distancePct(markPrice, t.takeProfit1);
+        const isWinning = pnl >= 0;
+        return (
+          <div style={{ borderTop: "1px solid #1a2e1a", paddingTop: 10, marginBottom: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: "8px 16px" }}>
+              <div>
+                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace", marginBottom: 2 }}>MARK PRICE</div>
+                <div style={{ fontSize: 13, color: "#fff", fontFamily: "monospace", fontWeight: "bold" }}>
+                  ${markPrice.toFixed(markPrice < 10 ? 4 : 2)}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace", marginBottom: 2 }}>UNREALIZED P&L</div>
+                <div style={{ fontSize: 13, fontFamily: "monospace", fontWeight: "bold", color: isWinning ? "#00ff88" : "#ff4444" }}>
+                  {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
+                  <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.7 }}>({pct >= 0 ? "+" : ""}{pct.toFixed(2)}%)</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace", marginBottom: 2 }}>TO SL</div>
+                <div style={{ fontSize: 13, color: "#ff4444", fontFamily: "monospace", fontWeight: "bold" }}>
+                  {toSL.toFixed(2)}%
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace", marginBottom: 2 }}>TO TP1</div>
+                <div style={{ fontSize: 13, color: "#00ff88", fontFamily: "monospace", fontWeight: "bold" }}>
+                  {toTP.toFixed(2)}%
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Actual P&L — only shown when closed */}
       {isClosed && (
@@ -1050,6 +1091,13 @@ function ThesisView() {
   const { state: accountState } = useAccount();
   const walletAddress = (accountState as { address?: string })?.address ?? null;
   const { theses: trades, saveTheses } = useLabStorage(walletAddress);
+
+  // Live prices for all active theses
+  const activeSymbols = useMemo(
+    () => [...new Set(trades.filter((t) => t.status === "ACTIVE").map((t) => t.symbol))],
+    [trades]
+  );
+  const livePrices = useLivePrices(activeSymbols);
 
   const [form, setForm] = useState({
     symbol: "",
@@ -1479,7 +1527,7 @@ function ThesisView() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {filteredTrades.map((t) => (
-              <ThesisCard key={t.id} t={t} onUpdate={updateTrade} onRemove={removeTrade} walletAddress={walletAddress} isMobile={isMobile} />
+              <ThesisCard key={t.id} t={t} onUpdate={updateTrade} onRemove={removeTrade} walletAddress={walletAddress} isMobile={isMobile} markPrice={livePrices[t.symbol] ?? null} />
             ))}
           </div>
         </div>
