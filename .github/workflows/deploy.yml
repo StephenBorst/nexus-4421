@@ -14,16 +14,13 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Enable Corepack (Yarn 4)
-        run: corepack enable
-
       - name: Install dependencies
-        run: corepack yarn install --frozen-lockfile
+        run: npm ci --legacy-peer-deps
 
       - name: Build
-        run: corepack yarn build
+        run: node ./node_modules/.bin/tsx scripts/generate-manifest.ts && node ./node_modules/.bin/vite build && node ./node_modules/.bin/tsx scripts/generate-manifest.ts
         env:
-          NODE_OPTIONS: '--max-old-space-size=6144'
+          NODE_OPTIONS: '--max-old-space-size=5120'
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
