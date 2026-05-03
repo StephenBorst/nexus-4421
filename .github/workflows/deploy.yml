@@ -10,6 +10,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Add swap space
+        run: |
+          sudo fallocate -l 4G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -20,7 +28,7 @@ jobs:
       - name: Build
         run: node ./node_modules/.bin/tsx scripts/generate-manifest.ts && node ./node_modules/.bin/vite build --no-minify && node ./node_modules/.bin/tsx scripts/generate-manifest.ts
         env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
+          NODE_OPTIONS: '--max-old-space-size=6144'
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
