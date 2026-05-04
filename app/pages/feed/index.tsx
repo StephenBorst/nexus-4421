@@ -887,10 +887,22 @@ export default function FeedPage() {
   const [search, setSearch] = useState("");
   const [copyTarget, setCopyTarget] = useState<FeedThesis | null>(null);
   const [view, setView] = useState<"feed" | "ranks">("feed");
+  // Ph19: on-chain trader count (trustless roster from ThesisRegistered logs)
+  const [onChainCount, setOnChainCount] = useState<number | null>(null);
 
   // Get connected wallet address
   const { state: accountState } = useAccount();
   const walletAddress = (accountState as { address?: string })?.address ?? null;
+
+  // Ph19: fetch on-chain wallet roster in parallel with feed
+  useEffect(() => {
+    fetch(`${API_BASE}/wallets/onchain`)
+      .then((r) => r.json())
+      .then((data: { wallets?: string[] }) => {
+        setOnChainCount((data.wallets ?? []).length);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -980,12 +992,18 @@ export default function FeedPage() {
               ? `${feed.length > 0 ? [...new Set(feed.map(t => t.wallet.toLowerCase()))].length : 0} trader${[...new Set(feed.map(t => t.wallet.toLowerCase()))].length !== 1 ? "s" : ""}`
               : `${filtered.length} thesis${filtered.length !== 1 ? "es" : ""}`}
           </div>
+          {/* Ph19: on-chain trader count from ThesisRegistered event log scan */}
+          {onChainCount !== null && onChainCount > 0 && (
+            <div style={{ fontSize: 8, fontFamily: "monospace", color: "#2a5a3a" }}>
+              ⛓ {onChainCount} on-chain
+            </div>
+          )}
           {!loading && view === "feed" && feed.length > 0 && (() => {
-            const onChainCount = feed.filter(t => t.onChainId !== undefined).length;
-            if (onChainCount === 0) return null;
+            const verifiedCount = feed.filter(t => t.onChainId !== undefined).length;
+            if (verifiedCount === 0) return null;
             return (
-              <div style={{ fontSize: 8, fontFamily: "monospace", color: "#2a5a3a" }}>
-                ⛓ {onChainCount}/{feed.length} verified on-chain
+              <div style={{ fontSize: 8, fontFamily: "monospace", color: "#1a4a2a" }}>
+                {verifiedCount}/{feed.length} theses verified
               </div>
             );
           })()}

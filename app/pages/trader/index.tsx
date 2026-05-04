@@ -474,10 +474,14 @@ export default function TraderPage() {
       el.setAttribute("content", content);
     };
 
+    const OG_BASE = "https://og.nexustradinglabs.com"; // Ph20: custom domain on nexus-lab-api Worker
     setMeta("og:title", title);
     setMeta("og:description", description);
-    // Worker endpoint — set og.nexustradinglabs.com as custom domain in CF dashboard to clean up URL
-    setMeta("og:image", `https://nexus-lab-api.stephenpatrick24.workers.dev/og/trader/${wallet}`);
+    setMeta("og:image", `${OG_BASE}/og/trader/${wallet}`);            // SVG — Discord, Telegram, iMessage
+    setMeta("twitter:card", "summary_large_image");
+    setMeta("twitter:title", title);
+    setMeta("twitter:description", description);
+    setMeta("twitter:image", `${OG_BASE}/og/trader/${wallet}.png`);   // Ph21: PNG for Twitter
     setMeta("og:url", window.location.href);
     document.title = title;
 
@@ -486,6 +490,10 @@ export default function TraderPage() {
       setMeta("og:description", "Non-custodial Perpetual DEX on Arbitrum");
       setMeta("og:image", "https://nexustradinglabs.com/og.png");
       setMeta("og:url", "https://trade.nexustradinglabs.com");
+      setMeta("twitter:card", "summary_large_image");
+      setMeta("twitter:title", "Nexus Trading Labs");
+      setMeta("twitter:description", "Non-custodial Perpetual DEX on Arbitrum");
+      setMeta("twitter:image", "https://nexustradinglabs.com/og.png");
       document.title = "Nexus Trading Labs";
     };
   }, [wallet, loading, displayName, shortAddr, stats.wins, stats.losses, stats.avgRR, stats.winRate]);
