@@ -1238,10 +1238,15 @@ function ThesisView() {
       console.log("[ThesisRegistry] attempting registerOnChain for thesis:", thesis.id, thesis.symbol);
       const mergedThesis = { ...thesis, ...patch };
       try {
-        const hash = await registerOnChain(mergedThesis);
-        console.log("[ThesisRegistry] registerOnChain result:", hash);
-        if (hash) {
-          persist(trades.map((t) => t.id === id ? { ...t, ...patch, onChainTxHash: hash } : t));
+        const result = await registerOnChain(mergedThesis);
+        console.log("[ThesisRegistry] registerOnChain result:", result);
+        if (result) {
+          const { hash, onChainId } = result;
+          persist(trades.map((t) => t.id === id ? {
+            ...t, ...patch,
+            onChainTxHash: hash,
+            ...(onChainId !== undefined ? { onChainId } : {}),
+          } : t));
           return;
         }
         // User rejected — keep private

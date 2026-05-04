@@ -10,6 +10,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useAccount } from "@orderly.network/hooks";
 import { useNavigate } from "react-router-dom";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
+import { fetchOnChainStats } from "@/hooks/useThesisRegistry";
 import type { ThesisTrade } from "@/pages/lab/types";
 
 const API_BASE = "https://nexus-lab-api.stephenpatrick24.workers.dev";
@@ -605,6 +606,61 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
   const board = useMemo(() => buildLeaderboard(feed), [feed]);
   const navigate = useNavigate();
 
+  // Ph12 -- trustless on-chain stats overlay
+  const [onChainStats, setOnChainStats] = useState<Map<string, { wins: number; losses: number; active: number }>>(new Map());
+  const [onChainLoading, setOnChainLoading] = useState(false);
+
+  useEffect(() => {
+    if (board.length === 0) return;
+    setOnChainLoading(true);
+    Promise.all(
+      board.map(async (trader) => {
+        try {
+          const stats = await fetchOnChainStats(trader.wallet);
+          return { wallet: trader.wallet.toLowerCase(), stats };
+        } catch {
+          return { wallet: trader.wallet.toLowerCase(), stats: null };
+        }
+      })
+    ).then((results) => {
+      const map = new Map<string, { wins: number; losses: number; active: number }>();
+      for (const { wallet, stats } of results) {
+        if (stats && (stats.wins + stats.losses + stats.active + stats.invalidated) > 0) {
+          map.set(wallet, { wins: stats.wins, losses: stats.losses, active: stats.active });
+        }
+      }
+      setOnChainStats(map);
+      setOnChainLoading(false);
+    });
+  }, [board.length]);
+
+  // Re-rank using on-chain data where available (trustless ordering)
+  const sortedBoard = useMemo(() => {
+    if (onChainStats.size === 0) return board;
+    return [...board]
+      .map((trader) => {
+        const oc = onChainStats.get(trader.wallet.toLowerCase());
+        if (!oc) return trader;
+        const closed = oc.wins + oc.losses;
+        return {
+          ...trader,
+          wins: oc.wins,
+          losses: oc.losses,
+          active: oc.active,
+          winRate: closed > 0 ? (oc.wins / closed) * 100 : 0,
+        };
+      })
+      .sort((a, b) => {
+        const aClosed = a.wins + a.losses;
+        const bClosed = b.wins + b.losses;
+        if (aClosed === 0 && bClosed === 0) return b.total - a.total;
+        if (aClosed === 0) return 1;
+        if (bClosed === 0) return -1;
+        if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+        return b.total - a.total;
+      });
+  }, [board, onChainStats]);
+
   if (board.length === 0) {
     return (
       <div style={{ textAlign: "center", padding: "60px 0" }}>
@@ -617,9 +673,17 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
   }
 
   return (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, paddingLeft: 2 }}>
+        <div style={{ width: 6, height: 6, borderRadius: "50%", background: onChainLoading ? "#fbbf24" : onChainStats.size > 0 ? "#00ff88" : "#3a5a4a" }} />
+        <span style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>
+          {onChainLoading ? "VERIFYING ON-CHAIN STATS..." : onChainStats.size > 0 ? `⛓ ${onChainStats.size} TRADER${onChainStats.size !== 1 ? "S" : ""} VERIFIED ON-CHAIN` : "RANKED BY KV DATA"}
+        </span>
+      </div>
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {board.map((trader, i) => {
+      {sortedBoard.map((trader, i) => {
         const rank = i + 1;
+        const isOnChainVerified = onChainStats.has(trader.wallet.toLowerCase());
         const closed = trader.wins + trader.losses;
         const shortAddr = `${trader.wallet.slice(0, 6)}…${trader.wallet.slice(-4)}`;
         const isExpanded = expandedWallet === trader.wallet.toLowerCase();
@@ -773,6 +837,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
         );
       })}
     </div>
+    </>
   );
 }
 
