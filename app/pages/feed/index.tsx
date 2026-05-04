@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useAccount } from "@orderly.network/hooks";
+import { useNavigate } from "react-router-dom";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 import type { ThesisTrade } from "@/pages/lab/types";
 
@@ -602,6 +603,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
 }) {
   const [expandedWallet, setExpandedWallet] = useState<string | null>(null);
   const board = useMemo(() => buildLeaderboard(feed), [feed]);
+  const navigate = useNavigate();
 
   if (board.length === 0) {
     return (
@@ -699,6 +701,27 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
             {/* Expanded: trader's theses */}
             {isExpanded && (
               <div style={{ borderTop: "1px solid #1a2e1a", padding: "10px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+                {/* Profile link */}
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); navigate(`/feed/trader/${trader.wallet}`); }}
+                    style={{
+                      background: "none", border: "1px solid #1a2e1a", borderRadius: 3,
+                      color: "#3a5a4a", fontFamily: "monospace", fontSize: 9,
+                      padding: "3px 8px", cursor: "pointer", letterSpacing: "0.05em",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = "#00ff88";
+                      (e.currentTarget as HTMLButtonElement).style.color = "#00ff88";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a2e1a";
+                      (e.currentTarget as HTMLButtonElement).style.color = "#3a5a4a";
+                    }}
+                  >
+                    VIEW PROFILE →
+                  </button>
+                </div>
                 {traderTheses.length === 0 ? (
                   <div style={{ fontFamily: "monospace", fontSize: 10, color: "#2a4a3a" }}>no theses</div>
                 ) : traderTheses.map((t) => {

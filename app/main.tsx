@@ -44,6 +44,9 @@ const LabLayout = lazy(() => import('./pages/lab/Layout'));
 const FeedPage = lazy(() => import('./pages/feed'));
 const FeedLayout = lazy(() => import('./pages/feed/Layout'));
 
+// ✅ TRADER PROFILE PAGE
+const TraderPage = lazy(() => import('./pages/trader'));
+
 async function loadRuntimeConfig() {
   return new Promise<void>((resolve) => {
     const script = document.createElement('script');
@@ -109,6 +112,7 @@ const router = createBrowserRouter([
         element: <FeedLayout />,
         children: [
           { index: true, element: <FeedPage /> },
+          { path: 'trader/:wallet', element: <TraderPage /> },
         ],
       },
 
