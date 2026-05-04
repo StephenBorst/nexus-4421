@@ -36,6 +36,8 @@ type FeedThesis = {
   fundingCost72h?: number;
   riskPercent?: number;
   accountSize?: number;
+  onChainId?: number;
+  onChainTxHash?: string;
 };
 
 const STATUS_CONFIG = {
@@ -415,6 +417,21 @@ function FeedCard({
           {cfg.label}
         </div>
         <div style={{ fontFamily: "monospace", fontSize: 9, color: "#2a4a3a", flexShrink: 0 }}>{timeAgo}</div>
+        {/* On-chain verified badge */}
+        {thesis.onChainId !== undefined && (
+          thesis.onChainTxHash ? (
+            <a
+              href={`https://arbiscan.io/tx/${thesis.onChainTxHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`On-chain verified · thesis #${thesis.onChainId}`}
+              style={{ fontSize: 12, textDecoration: "none", flexShrink: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >⛓</a>
+          ) : (
+            <span title={`On-chain verified · thesis #${thesis.onChainId}`} style={{ fontSize: 12, flexShrink: 0 }}>⛓</span>
+          )
+        )}
         {/* Copy button — only if wallet connected and not your own thesis */}
         {walletAddress && !isOwnThesis && (
           <button
@@ -525,6 +542,15 @@ function FeedCard({
       )}
     </div>
   );
+}
+
+// ─── Rep Score ───────────────────────────────────────────────────────────────
+function calcRepScore(wins: number, losses: number, avgRR: number): number {
+  const closed = wins + losses;
+  const winRate = closed > 0 ? (wins / closed) * 100 : 0;
+  const rrBonus = Math.min(avgRR * 10, 20);
+  const samplePenalty = Math.max(0, 10 - closed) * 2;
+  return Math.max(0, Math.min(100, Math.round(winRate + rrBonus - samplePenalty)));
 }
 
 // ─── Leaderboard ─────────────────────────────────────────────────────────────
@@ -756,6 +782,22 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                 </div>
               </div>
 
+              {/* Rep Score */}
+              {(() => {
+                const rep = calcRepScore(trader.wins, trader.losses, trader.avgRR);
+                return (
+                  <div style={{ textAlign: "center", minWidth: 44 }}>
+                    <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>REP</div>
+                    <div style={{
+                      fontFamily: "monospace", fontSize: 12, fontWeight: "bold",
+                      color: closed === 0 ? "#3a5a4a" : rep >= 70 ? "#00ff88" : rep >= 40 ? "#fbbf24" : "#ff4444",
+                    }}>
+                      {closed === 0 ? "—" : rep}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Expand chevron */}
               <div style={{ color: "#2a4a3a", fontSize: 10, fontFamily: "monospace" }}>
                 {isExpanded ? "▲" : "▼"}
@@ -939,10 +981,21 @@ export default function FeedPage() {
             ◆ RANKS
           </button>
         </div>
-        <div style={{ fontSize: 9, fontFamily: "monospace", color: "#3a5a4a" }}>
-          {loading ? "loading..." : view === "ranks"
-            ? `${feed.length > 0 ? [...new Set(feed.map(t => t.wallet.toLowerCase()))].length : 0} trader${[...new Set(feed.map(t => t.wallet.toLowerCase()))].length !== 1 ? "s" : ""}`
-            : `${filtered.length} thesis${filtered.length !== 1 ? "es" : ""}`}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+          <div style={{ fontSize: 9, fontFamily: "monospace", color: "#3a5a4a" }}>
+            {loading ? "loading..." : view === "ranks"
+              ? `${feed.length > 0 ? [...new Set(feed.map(t => t.wallet.toLowerCase()))].length : 0} trader${[...new Set(feed.map(t => t.wallet.toLowerCase()))].length !== 1 ? "s" : ""}`
+              : `${filtered.length} thesis${filtered.length !== 1 ? "es" : ""}`}
+          </div>
+          {!loading && view === "feed" && feed.length > 0 && (() => {
+            const onChainCount = feed.filter(t => t.onChainId !== undefined).length;
+            if (onChainCount === 0) return null;
+            return (
+              <div style={{ fontSize: 8, fontFamily: "monospace", color: "#2a5a3a" }}>
+                ⛓ {onChainCount}/{feed.length} verified on-chain
+              </div>
+            );
+          })()}
         </div>
       </div>
 

@@ -13,6 +13,15 @@ import type { ThesisTrade } from "@/pages/lab/types";
 
 const API_BASE = "https://nexus-lab-api.stephenpatrick24.workers.dev";
 
+// ─── Rep Score ───────────────────────────────────────────────────────────────
+function calcRepScore(wins: number, losses: number, avgRR: number): number {
+  const closed = wins + losses;
+  const winRate = closed > 0 ? (wins / closed) * 100 : 0;
+  const rrBonus = Math.min(avgRR * 10, 20);
+  const samplePenalty = Math.max(0, 10 - closed) * 2;
+  return Math.max(0, Math.min(100, Math.round(winRate + rrBonus - samplePenalty)));
+}
+
 type FeedThesis = {
   id: string;
   symbol: string;
@@ -446,6 +455,40 @@ export default function TraderPage() {
     });
   }
 
+  // Ph14 — OG meta tags for social sharing
+  useEffect(() => {
+    if (loading || !wallet) return;
+    const name = displayName ?? shortAddr;
+    const rep = calcRepScore(stats.wins, stats.losses, stats.avgRR);
+    const winRateStr = stats.winRate !== null ? `${stats.winRate.toFixed(0)}%` : "—";
+    const title = `${name} on Nexus`;
+    const description = `Win rate: ${winRateStr} | Avg R:R: 1:${stats.avgRR.toFixed(2)} | Rep: ${rep}`;
+
+    const setMeta = (property: string, content: string) => {
+      let el = document.querySelector(`meta[property="${property}"]`);
+      if (!el) {
+        el = document.createElement("meta");
+        el.setAttribute("property", property);
+        document.head.appendChild(el);
+      }
+      el.setAttribute("content", content);
+    };
+
+    setMeta("og:title", title);
+    setMeta("og:description", description);
+    setMeta("og:image", `https://og.nexustradinglabs.com/trader/${wallet}`);
+    setMeta("og:url", window.location.href);
+    document.title = title;
+
+    return () => {
+      setMeta("og:title", "Nexus Trading Labs");
+      setMeta("og:description", "Non-custodial Perpetual DEX on Arbitrum");
+      setMeta("og:image", "https://nexustradinglabs.com/og.png");
+      setMeta("og:url", "https://trade.nexustradinglabs.com");
+      document.title = "Nexus Trading Labs";
+    };
+  }, [wallet, loading, displayName, shortAddr, stats.wins, stats.losses, stats.avgRR, stats.winRate]);
+
   if (!wallet) return null;
 
   return (
@@ -507,6 +550,21 @@ export default function TraderPage() {
                   {theses.length} public thesis{theses.length !== 1 ? "es" : ""}
                 </div>
               </div>
+              {/* Rep Score badge */}
+              {stats.closed > 0 && (() => {
+                const rep = calcRepScore(stats.wins, stats.losses, stats.avgRR);
+                const repColor = rep >= 70 ? "#00ff88" : rep >= 40 ? "#fbbf24" : "#ff4444";
+                return (
+                  <div style={{
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                    padding: "8px 14px", border: `1px solid ${repColor}22`, borderRadius: 4,
+                    background: `${repColor}08`, flexShrink: 0,
+                  }}>
+                    <div style={{ fontFamily: "monospace", fontSize: 8, color: "#3a5a4a", letterSpacing: "0.08em" }}>REP</div>
+                    <div style={{ fontFamily: "monospace", fontSize: 28, fontWeight: "bold", color: repColor, lineHeight: 1.1 }}>{rep}</div>
+                  </div>
+                );
+              })()}
             </div>
 
             {theses.length === 0 ? (
