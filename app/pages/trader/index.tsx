@@ -668,26 +668,3 @@ export default function TraderPage() {
     </div>
   );
 }
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {theses
-                    .slice()
-                    .sort((a, b) => b.createdAt - a.createdAt)
-                    .map((t) => (
-                      <ThesisRow
-                        key={t.id}
-                        thesis={t}
-                        markPrice={livePrices[t.symbol] ?? null}
-                        onCopy={setCopyTarget}
-                        isOwn={isOwn}
-                        walletAddress={walletAddress}
-                      />
-                    ))}
-                </div>
-              </>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
