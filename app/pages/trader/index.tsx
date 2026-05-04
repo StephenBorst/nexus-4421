@@ -9,6 +9,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAccount } from "@orderly.network/hooks";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
+import { fetchOnChainRepScore } from "@/hooks/useThesisRegistry";
 import type { ThesisTrade } from "@/pages/lab/types";
 
 const API_BASE = "https://nexus-lab-api.stephenpatrick24.workers.dev";
@@ -397,6 +398,8 @@ export default function TraderPage() {
   const [error, setError] = useState(false);
   const [copyTarget, setCopyTarget] = useState<FeedThesis | null>(null);
   const [copied, setCopied] = useState(false);
+  // Ph26: on-chain Rep Score from NexusRepScore contract
+  const [onChainRep, setOnChainRep] = useState<number | null>(null);
 
   const { state: accountState } = useAccount();
   const walletAddress = (accountState as { address?: string })?.address ?? null;
@@ -407,6 +410,7 @@ export default function TraderPage() {
     if (!wallet) return;
     setLoading(true);
     setError(false);
+    setOnChainRep(null);
     fetch(`${API_BASE}/feed`)
       .then((r) => r.json())
       .then((data: { feed: FeedThesis[] }) => {
@@ -415,6 +419,10 @@ export default function TraderPage() {
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
+    // Ph26: fetch on-chain Rep Score in parallel
+    fetchOnChainRepScore(wallet)
+      .then((result) => setOnChainRep(result.repScore))
+      .catch(() => {});
   }, [wallet]);
 
   // Live prices for active theses
@@ -459,7 +467,7 @@ export default function TraderPage() {
   useEffect(() => {
     if (loading || !wallet) return;
     const name = displayName ?? shortAddr;
-    const rep = calcRepScore(stats.wins, stats.losses, stats.avgRR);
+    const rep = onChainRep ?? calcRepScore(stats.wins, stats.losses, stats.avgRR);
     const winRateStr = stats.winRate !== null ? `${stats.winRate.toFixed(0)}%` : "—";
     const title = `${name} on Nexus`;
     const description = `Win rate: ${winRateStr} | Avg R:R: 1:${stats.avgRR.toFixed(2)} | Rep: ${rep}`;
@@ -499,6 +507,12 @@ export default function TraderPage() {
   }, [wallet, loading, displayName, shortAddr, stats.wins, stats.losses, stats.avgRR, stats.winRate]);
 
   if (!wallet) return null;
+
+  // Ph26: pre-compute rep display values to avoid IIFE pattern in JSX (TSC cascade errors)
+  const repForDisplay = onChainRep ?? calcRepScore(stats.wins, stats.losses, stats.avgRR);
+  const isOnChainRep = onChainRep !== null;
+  const repColor = repForDisplay >= 70 ? "#00ff88" : repForDisplay >= 40 ? "#fbbf24" : "#ff4444";
+  const showRepBadge = stats.closed > 0 || onChainRep !== null;
 
   return (
     <div style={{ background: "#0a0e0a", minHeight: "100vh" }}>
@@ -559,21 +573,19 @@ export default function TraderPage() {
                   {theses.length} public thesis{theses.length !== 1 ? "es" : ""}
                 </div>
               </div>
-              {/* Rep Score badge */}
-              {stats.closed > 0 && (() => {
-                const rep = calcRepScore(stats.wins, stats.losses, stats.avgRR);
-                const repColor = rep >= 70 ? "#00ff88" : rep >= 40 ? "#fbbf24" : "#ff4444";
-                return (
-                  <div style={{
-                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                    padding: "8px 14px", border: `1px solid ${repColor}22`, borderRadius: 4,
-                    background: `${repColor}08`, flexShrink: 0,
-                  }}>
-                    <div style={{ fontFamily: "monospace", fontSize: 8, color: "#3a5a4a", letterSpacing: "0.08em" }}>REP</div>
-                    <div style={{ fontFamily: "monospace", fontSize: 28, fontWeight: "bold", color: repColor, lineHeight: 1.1 }}>{rep}</div>
+              {/* Rep Score badge — Ph26: on-chain value from NexusRepScore contract */}
+              {showRepBadge && (
+                <div style={{
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  padding: "8px 14px", border: `1px solid ${repColor}22`, borderRadius: 4,
+                  background: `${repColor}08`, flexShrink: 0,
+                }}>
+                  <div style={{ fontFamily: "monospace", fontSize: 8, color: isOnChainRep ? "#00ff88" : "#3a5a4a", letterSpacing: "0.08em" }}>
+                    {isOnChainRep ? "⛓REP" : "REP"}
                   </div>
-                );
-              })()}
+                  <div style={{ fontFamily: "monospace", fontSize: 28, fontWeight: "bold", color: repColor, lineHeight: 1.1 }}>{repForDisplay}</div>
+                </div>
+              )}
             </div>
 
             {theses.length === 0 ? (
@@ -633,6 +645,29 @@ export default function TraderPage() {
                 <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", letterSpacing: "0.08em", marginBottom: 10 }}>
                   THESES — click to expand
                 </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {theses
+                    .slice()
+                    .sort((a, b) => b.createdAt - a.createdAt)
+                    .map((t) => (
+                      <ThesisRow
+                        key={t.id}
+                        thesis={t}
+                        markPrice={livePrices[t.symbol] ?? null}
+                        onCopy={setCopyTarget}
+                        isOwn={isOwn}
+                        walletAddress={walletAddress}
+                      />
+                    ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {theses
                     .slice()

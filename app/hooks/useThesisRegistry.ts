@@ -21,6 +21,33 @@ import type { ThesisTrade } from "@/pages/lab/types";
 
 export const THESIS_REGISTRY_ADDRESS = "0x2F4EdA890f96a7979d6f26bCB210cEDAD68346Bc" as const;
 
+// Ph26: NexusRepScore — trustless on-chain Rep Score
+export const REP_SCORE_ADDRESS = "0xAaEE9BF647252Df40ec32eAF6dA29804863483Fe" as const;
+
+const REP_SCORE_ABI = [
+  {
+    name: "getTraderBreakdown",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "trader", type: "address" }],
+    outputs: [
+      { name: "wins",        type: "uint256" },
+      { name: "losses",      type: "uint256" },
+      { name: "active",      type: "uint256" },
+      { name: "invalidated", type: "uint256" },
+      { name: "avgRR_e4",    type: "uint256" },
+      { name: "repScore",    type: "uint8"   },
+    ],
+  },
+  {
+    name: "getRepScore",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "trader", type: "address" }],
+    outputs: [{ name: "score", type: "uint8" }],
+  },
+] as const;
+
 const ABI = [
   {
     name: "registerThesis",
@@ -249,5 +276,31 @@ export async function fetchOnChainStats(
     losses: Number(losses),
     active: Number(active),
     invalidated: Number(invalidated),
+  };
+}
+
+// Ph26: fetch full breakdown including on-chain Rep Score from NexusRepScore contract
+export async function fetchOnChainRepScore(wallet: string): Promise<{
+  wins: number;
+  losses: number;
+  active: number;
+  invalidated: number;
+  avgRR: number;      // float (avgRR_e4 / 1e4)
+  repScore: number;   // 0–100 from contract
+}> {
+  const result = await publicClient.readContract({
+    address: REP_SCORE_ADDRESS,
+    abi: REP_SCORE_ABI,
+    functionName: "getTraderBreakdown",
+    args: [wallet as `0x${string}`],
+  });
+  const [wins, losses, active, invalidated, avgRR_e4, repScore] = result as [bigint, bigint, bigint, bigint, bigint, number];
+  return {
+    wins:        Number(wins),
+    losses:      Number(losses),
+    active:      Number(active),
+    invalidated: Number(invalidated),
+    avgRR:       Number(avgRR_e4) / 10_000,
+    repScore:    Number(repScore),
   };
 }

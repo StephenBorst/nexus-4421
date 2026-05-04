@@ -10,7 +10,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useAccount } from "@orderly.network/hooks";
 import { useNavigate } from "react-router-dom";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
-import { fetchOnChainStats } from "@/hooks/useThesisRegistry";
+import { fetchOnChainRepScore } from "@/hooks/useThesisRegistry";
 import type { ThesisTrade } from "@/pages/lab/types";
 
 const API_BASE = "https://nexus-lab-api.stephenpatrick24.workers.dev";
@@ -660,8 +660,8 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
   const board = useMemo(() => buildLeaderboard(feed), [feed]);
   const navigate = useNavigate();
 
-  // Ph12 -- trustless on-chain stats overlay
-  const [onChainStats, setOnChainStats] = useState<Map<string, { wins: number; losses: number; active: number }>>(new Map());
+  // Ph12/26 -- trustless on-chain stats + Rep Score from NexusRepScore contract
+  const [onChainStats, setOnChainStats] = useState<Map<string, { wins: number; losses: number; active: number; repScore: number; avgRR: number }>>(new Map());
   const [onChainLoading, setOnChainLoading] = useState(false);
 
   useEffect(() => {
@@ -670,17 +670,17 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
     Promise.all(
       board.map(async (trader) => {
         try {
-          const stats = await fetchOnChainStats(trader.wallet);
+          const stats = await fetchOnChainRepScore(trader.wallet);
           return { wallet: trader.wallet.toLowerCase(), stats };
         } catch {
           return { wallet: trader.wallet.toLowerCase(), stats: null };
         }
       })
     ).then((results) => {
-      const map = new Map<string, { wins: number; losses: number; active: number }>();
+      const map = new Map<string, { wins: number; losses: number; active: number; repScore: number; avgRR: number }>();
       for (const { wallet, stats } of results) {
         if (stats && (stats.wins + stats.losses + stats.active + stats.invalidated) > 0) {
-          map.set(wallet, { wins: stats.wins, losses: stats.losses, active: stats.active });
+          map.set(wallet, { wins: stats.wins, losses: stats.losses, active: stats.active, repScore: stats.repScore, avgRR: stats.avgRR });
         }
       }
       setOnChainStats(map);
@@ -688,25 +688,27 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
     });
   }, [board.length]);
 
-  // Re-rank using on-chain data where available (trustless ordering)
+  // Ph26: Re-rank using on-chain Rep Score from NexusRepScore contract (trustless ordering)
   const sortedBoard = useMemo(() => {
-    if (onChainStats.size === 0) return board;
     return [...board]
       .map((trader) => {
         const oc = onChainStats.get(trader.wallet.toLowerCase());
-        if (!oc) return trader;
+        if (!oc) return { ...trader, onChainRepScore: null as number | null };
         const closed = oc.wins + oc.losses;
         return {
           ...trader,
           wins: oc.wins,
           losses: oc.losses,
           active: oc.active,
+          avgRR: oc.avgRR,
           winRate: closed > 0 ? (oc.wins / closed) * 100 : 0,
+          onChainRepScore: oc.repScore,
         };
       })
       .sort((a, b) => {
-        const aRep = calcRepScore(a.wins, a.losses, a.avgRR);
-        const bRep = calcRepScore(b.wins, b.losses, b.avgRR);
+        // Prefer on-chain score; fall back to JS score
+        const aRep = a.onChainRepScore ?? calcRepScore(a.wins, a.losses, a.avgRR);
+        const bRep = b.onChainRepScore ?? calcRepScore(b.wins, b.losses, b.avgRR);
         if (bRep !== aRep) return bRep - aRep;
         return b.total - a.total;
       });
@@ -807,12 +809,16 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                 </div>
               </div>
 
-              {/* Rep Score */}
+              {/* Rep Score — Ph26: on-chain value when available */}
               {(() => {
-                const rep = calcRepScore(trader.wins, trader.losses, trader.avgRR);
+                const onChain = (trader as typeof trader & { onChainRepScore?: number | null }).onChainRepScore;
+                const rep = onChain ?? calcRepScore(trader.wins, trader.losses, trader.avgRR);
+                const isOnChain = onChain != null;
                 return (
                   <div style={{ textAlign: "center", minWidth: 44 }}>
-                    <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>REP</div>
+                    <div style={{ fontSize: 8, color: isOnChain ? "#00ff88" : "#3a5a4a", fontFamily: "monospace" }}>
+                      {isOnChain ? "⛓REP" : "REP"}
+                    </div>
                     <div style={{
                       fontFamily: "monospace", fontSize: 12, fontWeight: "bold",
                       color: closed === 0 ? "#3a5a4a" : rep >= 70 ? "#00ff88" : rep >= 40 ? "#fbbf24" : "#ff4444",
