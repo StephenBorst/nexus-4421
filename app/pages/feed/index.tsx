@@ -372,16 +372,22 @@ function FeedCard({
   markPrice,
   walletAddress,
   onCopy,
+  following,
+  onFollowToggle,
 }: {
   thesis: FeedThesis;
   markPrice?: number | null;
   walletAddress: string | null;
   onCopy: (t: FeedThesis) => void;
+  following: Set<string>;
+  onFollowToggle: (wallet: string) => void;
 }) {
   const cfg = STATUS_CONFIG[thesis.status];
   const shortAddr = `${thesis.wallet.slice(0, 6)}…${thesis.wallet.slice(-4)}`;
   const ticker = thesis.symbol.replace("PERP_", "").replace("_USDC", "");
   const isOwnThesis = walletAddress?.toLowerCase() === thesis.wallet.toLowerCase();
+  const isFollowing = following.has(thesis.wallet.toLowerCase());
+  const navigate = useNavigate();
   const timeAgo = (() => {
     const diff = Date.now() - thesis.createdAt;
     const h = Math.floor(diff / 3600000);
@@ -431,6 +437,32 @@ function FeedCard({
           ) : (
             <span title={`On-chain verified · thesis #${thesis.onChainId}`} style={{ fontSize: 12, flexShrink: 0 }}>⛓</span>
           )
+        )}
+        {/* Share link button */}
+        <button
+          onClick={() => navigate(`/feed/thesis/${thesis.wallet}/${thesis.id}`)}
+          title="View thesis permalink"
+          style={{
+            background: "none", border: "1px solid #1a2e1a", borderRadius: 3,
+            color: "#2a4a3a", fontFamily: "monospace", fontSize: 9,
+            padding: "3px 7px", cursor: "pointer", flexShrink: 0, letterSpacing: "0.05em",
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#4a9fff"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a3a5a"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#2a4a3a"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a2e1a"; }}
+        >↗</button>
+        {/* Follow button — only if wallet connected and not own wallet */}
+        {walletAddress && !isOwnThesis && (
+          <button
+            onClick={() => onFollowToggle(thesis.wallet.toLowerCase())}
+            title={isFollowing ? "Unfollow trader" : "Follow trader"}
+            style={{
+              background: isFollowing ? "#0a1a0a" : "none",
+              border: `1px solid ${isFollowing ? "#1a4a2a" : "#1a2e1a"}`,
+              borderRadius: 3, color: isFollowing ? "#00ff88" : "#3a5a4a",
+              fontFamily: "monospace", fontSize: 9,
+              padding: "3px 7px", cursor: "pointer", flexShrink: 0, letterSpacing: "0.05em",
+            }}
+          >{isFollowing ? "✓" : "+"}</button>
         )}
         {/* Copy button — only if wallet connected and not your own thesis */}
         {walletAddress && !isOwnThesis && (
@@ -878,17 +910,22 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
 
 // ─── Feed Page ───────────────────────────────────────────────────────────────
 type FilterStatus = "ALL" | "ACTIVE" | "HIT_TP" | "STOPPED_OUT" | "INVALIDATED";
+type DirFilter = "ALL" | "LONG" | "SHORT";
 
 export default function FeedPage() {
   const [feed, setFeed] = useState<FeedThesis[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState<FilterStatus>("ALL");
+  // Ph23: direction filter
+  const [dirFilter, setDirFilter] = useState<DirFilter>("ALL");
   const [search, setSearch] = useState("");
   const [copyTarget, setCopyTarget] = useState<FeedThesis | null>(null);
-  const [view, setView] = useState<"feed" | "ranks">("feed");
+  const [view, setView] = useState<"feed" | "ranks" | "following">("feed");
   // Ph19: on-chain trader count (trustless roster from ThesisRegistered logs)
   const [onChainCount, setOnChainCount] = useState<number | null>(null);
+  // Ph24: follow graph
+  const [following, setFollowing] = useState<Set<string>>(new Set());
 
   // Get connected wallet address
   const { state: accountState } = useAccount();
@@ -903,6 +940,35 @@ export default function FeedPage() {
       })
       .catch(() => {});
   }, []);
+
+  // Ph24: load follow graph when wallet connects
+  useEffect(() => {
+    if (!walletAddress) { setFollowing(new Set()); return; }
+    fetch(`${API_BASE}/follows/${walletAddress}`)
+      .then((r) => r.json())
+      .then((data: { following?: string[] }) => {
+        setFollowing(new Set((data.following ?? []).map((a: string) => a.toLowerCase())));
+      })
+      .catch(() => {});
+  }, [walletAddress]);
+
+  // Ph24: follow/unfollow handler
+  async function handleFollowToggle(targetWallet: string) {
+    if (!walletAddress) return;
+    const lower = targetWallet.toLowerCase();
+    const next = new Set(following);
+    if (next.has(lower)) next.delete(lower);
+    else next.add(lower);
+    setFollowing(next);
+    // persist
+    try {
+      await fetch(`${API_BASE}/follows/${walletAddress}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ following: [...next] }),
+      });
+    } catch { /* revert on failure would be nice but not critical */ }
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -923,8 +989,13 @@ export default function FeedPage() {
   );
   const livePrices = useLivePrices(activeSymbols);
 
-  const filtered = feed.filter((t) => {
+  // Ph24: following feed is the full feed filtered to followed wallets
+  const followingFeed = feed.filter((t) => following.has(t.wallet.toLowerCase()));
+
+  const baseForFilter = view === "following" ? followingFeed : feed;
+  const filtered = baseForFilter.filter((t) => {
     if (filter !== "ALL" && t.status !== filter) return false;
+    if (dirFilter !== "ALL" && t.direction !== dirFilter) return false; // Ph23
     if (search) {
       const q = search.toLowerCase();
       const ticker = t.symbol.replace("PERP_", "").replace("_USDC", "").toLowerCase();
@@ -970,9 +1041,7 @@ export default function FeedPage() {
               fontFamily: "monospace", fontSize: 10,
               padding: "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
             }}
-          >
-            ■ FEED
-          </button>
+          >■ FEED</button>
           <button
             onClick={() => setView("ranks")}
             style={{
@@ -982,9 +1051,20 @@ export default function FeedPage() {
               fontFamily: "monospace", fontSize: 10,
               padding: "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
             }}
-          >
-            ◆ RANKS
-          </button>
+          >◆ RANKS</button>
+          {/* Ph24: following tab — only when connected */}
+          {walletAddress && (
+            <button
+              onClick={() => setView("following")}
+              style={{
+                background: view === "following" ? "#0a1a2a" : "none",
+                border: `1px solid ${view === "following" ? "#4a9fff" : "#1a2e1a"}`,
+                color: view === "following" ? "#4a9fff" : "#4a7a5a",
+                fontFamily: "monospace", fontSize: 10,
+                padding: "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
+              }}
+            >◈ FOLLOWING{following.size > 0 ? ` (${following.size})` : ""}</button>
+          )}
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
           <div style={{ fontSize: 9, fontFamily: "monospace", color: "#3a5a4a" }}>
@@ -1011,6 +1091,40 @@ export default function FeedPage() {
       </div>
 
       <div style={{ padding: 16, maxWidth: 860, margin: "0 auto" }}>
+
+        {/* ── FOLLOWING VIEW ── */}
+        {view === "following" && (
+          <>
+            {following.size === 0 ? (
+              <div style={{ textAlign: "center", padding: "60px 0" }}>
+                <div style={{ fontSize: 20, color: "#2a4a3a", marginBottom: 8 }}>◈</div>
+                <div style={{ fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>
+                  not following anyone yet — hit + on a trader card to follow them
+                </div>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "60px 0" }}>
+                <div style={{ fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>
+                  no public theses from traders you follow
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {filtered.map((t) => (
+                  <FeedCard
+                    key={`${t.wallet}-${t.id}`}
+                    thesis={t}
+                    markPrice={livePrices[t.symbol] ?? null}
+                    walletAddress={walletAddress}
+                    onCopy={setCopyTarget}
+                    following={following}
+                    onFollowToggle={handleFollowToggle}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
 
         {/* ── RANKS VIEW ── */}
         {view === "ranks" && (
@@ -1039,6 +1153,21 @@ export default function FeedPage() {
               {(["ALL", "ACTIVE", "HIT_TP", "STOPPED_OUT", "INVALIDATED"] as FilterStatus[]).map((f) => (
                 <button key={f} onClick={() => setFilter(f)} style={navBtnStyle(filter === f)}>
                   {f === "ALL" ? "ALL" : STATUS_CONFIG[f].label}
+                </button>
+              ))}
+              {/* Ph23: direction filter */}
+              <div style={{ width: 1, height: 18, background: "#1a2e1a", margin: "0 2px" }} />
+              {(["ALL", "LONG", "SHORT"] as DirFilter[]).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDirFilter(d)}
+                  style={{
+                    ...navBtnStyle(dirFilter === d),
+                    color: dirFilter === d ? (d === "LONG" ? "#00ff88" : d === "SHORT" ? "#ff4444" : "#00ff88") : "#4a7a5a",
+                    borderColor: dirFilter === d ? (d === "LONG" ? "#00ff88" : d === "SHORT" ? "#ff4444" : "#00ff88") : "#1a2e1a",
+                  }}
+                >
+                  {d === "ALL" ? "L+S" : d === "LONG" ? "↑ LONG" : "↓ SHORT"}
                 </button>
               ))}
               <input
@@ -1093,6 +1222,8 @@ export default function FeedPage() {
                     markPrice={livePrices[t.symbol] ?? null}
                     walletAddress={walletAddress}
                     onCopy={setCopyTarget}
+                    following={following}
+                    onFollowToggle={handleFollowToggle}
                   />
                 ))}
               </div>

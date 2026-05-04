@@ -47,6 +47,9 @@ const FeedLayout = lazy(() => import('./pages/feed/Layout'));
 // ✅ TRADER PROFILE PAGE
 const TraderPage = lazy(() => import('./pages/trader'));
 
+// ✅ THESIS PERMALINK PAGE (Ph22)
+const ThesisPage = lazy(() => import('./pages/thesis'));
+
 async function loadRuntimeConfig() {
   return new Promise<void>((resolve) => {
     const script = document.createElement('script');
@@ -113,6 +116,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <FeedPage /> },
           { path: 'trader/:wallet', element: <TraderPage /> },
+          { path: 'thesis/:wallet/:id', element: <ThesisPage /> },
         ],
       },
 
