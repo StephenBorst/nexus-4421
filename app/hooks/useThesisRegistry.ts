@@ -122,7 +122,8 @@ export function useThesisRegistry() {
       setTxState("confirming");
       return hash;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "transaction failed";
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[ThesisRegistry] writeContractAsync error:", msg, err);
       // User rejected the transaction — treat as non-error (just cancelled)
       if (msg.includes("User rejected") || msg.includes("user rejected")) {
         setTxState("idle");
