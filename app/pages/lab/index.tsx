@@ -1235,16 +1235,22 @@ function ThesisView() {
 
     // Publishing to feed for the first time → register on-chain
     if (patch.isPublic === true && !thesis.isPublic && !thesis.onChainId) {
+      console.log("[ThesisRegistry] attempting registerOnChain for thesis:", thesis.id, thesis.symbol);
       const mergedThesis = { ...thesis, ...patch };
-      const hash = await registerOnChain(mergedThesis);
-      if (hash) {
-        // Store tx hash; on-chain ID will be resolved from tx receipt eventually
-        // For now we store the hash and mark it as pending on-chain registration
-        persist(trades.map((t) => t.id === id ? { ...t, ...patch, onChainTxHash: hash } : t));
+      try {
+        const hash = await registerOnChain(mergedThesis);
+        console.log("[ThesisRegistry] registerOnChain result:", hash);
+        if (hash) {
+          persist(trades.map((t) => t.id === id ? { ...t, ...patch, onChainTxHash: hash } : t));
+          return;
+        }
+        // User rejected — keep private
         return;
+      } catch (err) {
+        console.error("[ThesisRegistry] registerOnChain threw:", err);
+        // Fall through to save as public in KV even if on-chain fails
+        // so the feed still works while we debug
       }
-      // If user rejected or error, don't save the isPublic change — keep it private
-      if (!hash) return;
     }
 
     // Closing a thesis that was registered on-chain → call closeThesis()
