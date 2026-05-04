@@ -17,6 +17,7 @@ function useIsMobile(breakpoint = 768) {
 import { useCollateral, usePrivateQuery, useMutation, useAccount } from "@orderly.network/hooks";
 import { useLabStorage } from "@/hooks/useLabStorage";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
+import { useThesisRegistry } from "@/hooks/useThesisRegistry";
 import type { ThesisTrade, ThesisStatus } from "./types";
 
 // ─── Types ───────────────────────────────────────────────
@@ -1091,6 +1092,7 @@ function ThesisView() {
   const { state: accountState } = useAccount();
   const walletAddress = (accountState as { address?: string })?.address ?? null;
   const { theses: trades, saveTheses } = useLabStorage(walletAddress);
+  const { registerOnChain, closeOnChain } = useThesisRegistry();
 
   // Live prices for all active theses
   const activeSymbols = useMemo(
@@ -1227,7 +1229,39 @@ function ThesisView() {
     }
   };
 
-  const updateTrade = (id: string, patch: Partial<ThesisTrade>) => {
+  const updateTrade = async (id: string, patch: Partial<ThesisTrade>) => {
+    const thesis = trades.find((t) => t.id === id);
+    if (!thesis) return;
+
+    // Publishing to feed for the first time → register on-chain
+    if (patch.isPublic === true && !thesis.isPublic && !thesis.onChainId) {
+      const mergedThesis = { ...thesis, ...patch };
+      const hash = await registerOnChain(mergedThesis);
+      if (hash) {
+        // Store tx hash; on-chain ID will be resolved from tx receipt eventually
+        // For now we store the hash and mark it as pending on-chain registration
+        persist(trades.map((t) => t.id === id ? { ...t, ...patch, onChainTxHash: hash } : t));
+        return;
+      }
+      // If user rejected or error, don't save the isPublic change — keep it private
+      if (!hash) return;
+    }
+
+    // Closing a thesis that was registered on-chain → call closeThesis()
+    const closingStatuses = ["HIT_TP", "STOPPED_OUT", "INVALIDATED"] as const;
+    type ClosingStatus = typeof closingStatuses[number];
+    const isClosingStatus = (s: string): s is ClosingStatus => closingStatuses.includes(s as ClosingStatus);
+
+    if (
+      patch.status &&
+      isClosingStatus(patch.status) &&
+      thesis.status === "ACTIVE" &&
+      thesis.onChainId !== undefined &&
+      thesis.isPublic
+    ) {
+      await closeOnChain(thesis.onChainId, patch.status as ClosingStatus, "");
+    }
+
     persist(trades.map((t) => t.id === id ? { ...t, ...patch } : t));
   };
 

@@ -24,4 +24,6 @@ export interface ThesisTrade {
   isPublic?: boolean;
   pfp?: string;
   displayName?: string;
+  onChainId?: number;       // thesisId returned by ThesisRegistry contract on Arbitrum
+  onChainTxHash?: string;   // tx hash of the registerThesis() call
 }
