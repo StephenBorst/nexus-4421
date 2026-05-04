@@ -2,8 +2,8 @@
  * /feed — Public Thesis Feed
  *
  * Shows all theses marked isPublic=true across all wallets.
- * Each card shows: PFP + name, symbol/direction, entry/SL/TP, R:R, status, timestamp.
  * Phase 6: COPY button — pre-fills a modal so any trader can copy a thesis into their LAB.
+ * Phase 7: RANKS view — thesis leaderboard aggregated from feed data.
  */
 
 import { useState, useEffect, useMemo } from "react";
@@ -525,6 +525,234 @@ function FeedCard({
   );
 }
 
+// ─── Leaderboard ─────────────────────────────────────────────────────────────
+type TraderStats = {
+  wallet: string;
+  displayName: string | null;
+  pfp: string | null;
+  total: number;
+  wins: number;
+  losses: number;
+  active: number;
+  invalidated: number;
+  winRate: number;
+  avgRR: number;
+  bestRR: number;
+  bestTicker: string;
+};
+
+function buildLeaderboard(feed: FeedThesis[]): TraderStats[] {
+  const map = new Map<string, TraderStats>();
+
+  for (const t of feed) {
+    const key = t.wallet.toLowerCase();
+    if (!map.has(key)) {
+      map.set(key, {
+        wallet: t.wallet,
+        displayName: t.displayName,
+        pfp: t.pfp,
+        total: 0, wins: 0, losses: 0, active: 0, invalidated: 0,
+        winRate: 0, avgRR: 0, bestRR: 0, bestTicker: "",
+      });
+    }
+    const s = map.get(key)!;
+    s.total++;
+    if (t.status === "ACTIVE") s.active++;
+    else if (t.status === "HIT_TP") s.wins++;
+    else if (t.status === "STOPPED_OUT") s.losses++;
+    else if (t.status === "INVALIDATED") s.invalidated++;
+
+    if (t.riskReward > s.bestRR) {
+      s.bestRR = t.riskReward;
+      s.bestTicker = t.symbol.replace("PERP_", "").replace("_USDC", "");
+    }
+  }
+
+  // Compute derived stats
+  for (const s of map.values()) {
+    const closed = s.wins + s.losses;
+    s.winRate = closed > 0 ? (s.wins / closed) * 100 : 0;
+
+    // Avg R:R from all theses for this wallet
+    const walletTheses = feed.filter(t => t.wallet.toLowerCase() === s.wallet.toLowerCase());
+    s.avgRR = walletTheses.length > 0
+      ? walletTheses.reduce((sum, t) => sum + t.riskReward, 0) / walletTheses.length
+      : 0;
+  }
+
+  return [...map.values()].sort((a, b) => {
+    // Primary: win rate (need at least 1 closed trade)
+    const aClosed = a.wins + a.losses;
+    const bClosed = b.wins + b.losses;
+    if (aClosed === 0 && bClosed === 0) return b.total - a.total;
+    if (aClosed === 0) return 1;
+    if (bClosed === 0) return -1;
+    if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+    // Secondary: total theses
+    return b.total - a.total;
+  });
+}
+
+const RANK_MEDALS: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
+
+function LeaderboardView({ feed, walletAddress, onCopy }: {
+  feed: FeedThesis[];
+  walletAddress: string | null;
+  onCopy: (t: FeedThesis) => void;
+}) {
+  const [expandedWallet, setExpandedWallet] = useState<string | null>(null);
+  const board = useMemo(() => buildLeaderboard(feed), [feed]);
+
+  if (board.length === 0) {
+    return (
+      <div style={{ textAlign: "center", padding: "60px 0" }}>
+        <div style={{ fontSize: 20, color: "#2a4a3a", marginBottom: 8 }}>◆</div>
+        <div style={{ fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>
+          no public theses yet — rankings appear once traders publish
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {board.map((trader, i) => {
+        const rank = i + 1;
+        const closed = trader.wins + trader.losses;
+        const shortAddr = `${trader.wallet.slice(0, 6)}…${trader.wallet.slice(-4)}`;
+        const isExpanded = expandedWallet === trader.wallet.toLowerCase();
+        const traderTheses = feed.filter(t => t.wallet.toLowerCase() === trader.wallet.toLowerCase());
+        const isOwn = walletAddress?.toLowerCase() === trader.wallet.toLowerCase();
+
+        return (
+          <div key={trader.wallet} style={{
+            background: "#0d120d",
+            border: `1px solid ${rank === 1 ? "#2a4a1a" : "#1a2e1a"}`,
+            borderRadius: 4,
+            overflow: "hidden",
+          }}>
+            {/* Trader row */}
+            <div
+              onClick={() => setExpandedWallet(isExpanded ? null : trader.wallet.toLowerCase())}
+              style={{ padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}
+            >
+              {/* Rank */}
+              <div style={{ fontFamily: "monospace", fontSize: RANK_MEDALS[rank] ? 16 : 12, minWidth: 28, textAlign: "center", color: "#3a5a4a" }}>
+                {RANK_MEDALS[rank] ?? `#${rank}`}
+              </div>
+
+              {/* Avatar */}
+              <Avatar pfp={trader.pfp} displayName={trader.displayName} size={32} />
+
+              {/* Identity */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: "monospace", fontSize: 11, color: "#8aaa9a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {trader.displayName ?? shortAddr}
+                  {isOwn && <span style={{ color: "#00ff88", marginLeft: 6, fontSize: 9 }}>YOU</span>}
+                </div>
+                <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>{shortAddr}</div>
+              </div>
+
+              {/* Win rate — hero stat */}
+              <div style={{ textAlign: "center", minWidth: 60 }}>
+                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>WIN RATE</div>
+                <div style={{
+                  fontFamily: "monospace", fontSize: 16, fontWeight: "bold",
+                  color: closed === 0 ? "#3a5a4a" : trader.winRate >= 60 ? "#00ff88" : trader.winRate >= 40 ? "#fbbf24" : "#ff4444",
+                }}>
+                  {closed === 0 ? "—" : `${trader.winRate.toFixed(0)}%`}
+                </div>
+              </div>
+
+              {/* W / L */}
+              <div style={{ textAlign: "center", minWidth: 44 }}>
+                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>W / L</div>
+                <div style={{ fontFamily: "monospace", fontSize: 12 }}>
+                  <span style={{ color: "#00ff88" }}>{trader.wins}</span>
+                  <span style={{ color: "#3a5a4a" }}> / </span>
+                  <span style={{ color: "#ff4444" }}>{trader.losses}</span>
+                </div>
+              </div>
+
+              {/* Avg R:R */}
+              <div style={{ textAlign: "center", minWidth: 50 }}>
+                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>AVG R:R</div>
+                <div style={{ fontFamily: "monospace", fontSize: 12, color: trader.avgRR >= 2 ? "#00ff88" : "#fbbf24" }}>
+                  1:{trader.avgRR.toFixed(1)}
+                </div>
+              </div>
+
+              {/* Active */}
+              <div style={{ textAlign: "center", minWidth: 40 }}>
+                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>ACTIVE</div>
+                <div style={{ fontFamily: "monospace", fontSize: 12, color: trader.active > 0 ? "#4a9fff" : "#3a5a4a" }}>
+                  {trader.active}
+                </div>
+              </div>
+
+              {/* Expand chevron */}
+              <div style={{ color: "#2a4a3a", fontSize: 10, fontFamily: "monospace" }}>
+                {isExpanded ? "▲" : "▼"}
+              </div>
+            </div>
+
+            {/* Expanded: trader's theses */}
+            {isExpanded && (
+              <div style={{ borderTop: "1px solid #1a2e1a", padding: "10px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+                {traderTheses.length === 0 ? (
+                  <div style={{ fontFamily: "monospace", fontSize: 10, color: "#2a4a3a" }}>no theses</div>
+                ) : traderTheses.map((t) => {
+                  const cfg = STATUS_CONFIG[t.status];
+                  const ticker = t.symbol.replace("PERP_", "").replace("_USDC", "");
+                  return (
+                    <div key={t.id} style={{
+                      background: "#080c08", border: `1px solid ${cfg.border}`,
+                      borderRadius: 3, padding: "10px 12px",
+                      display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+                    }}>
+                      <div style={{ flex: 1, minWidth: 120 }}>
+                        <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
+                        <span style={{ fontFamily: "monospace", fontSize: 10, marginLeft: 8, color: t.direction === "LONG" ? "#00ff88" : "#ff4444" }}>
+                          {t.direction === "LONG" ? "↑" : "↓"} {t.direction}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", gap: 16 }}>
+                        {[
+                          { label: "ENTRY", val: `$${t.entryPrice.toFixed(2)}`, color: "#8aaa9a" },
+                          { label: "R:R",   val: `1:${t.riskReward.toFixed(2)}`, color: t.riskReward >= 2 ? "#00ff88" : "#fbbf24" },
+                        ].map(({ label, val, color }) => (
+                          <div key={label}>
+                            <div style={{ fontSize: 7, color: "#3a5a4a", fontFamily: "monospace" }}>{label}</div>
+                            <div style={{ fontSize: 11, color, fontFamily: "monospace" }}>{val}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{
+                        fontFamily: "monospace", fontSize: 8, padding: "2px 6px",
+                        borderRadius: 2, background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color,
+                      }}>{cfg.label}</div>
+                      {walletAddress && !isOwn && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onCopy(t); }}
+                          style={{
+                            background: "none", border: "1px solid #1a3a1a", borderRadius: 3,
+                            color: "#3a6a4a", fontFamily: "monospace", fontSize: 8,
+                            padding: "2px 6px", cursor: "pointer",
+                          }}
+                        >COPY</button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Feed Page ───────────────────────────────────────────────────────────────
 type FilterStatus = "ALL" | "ACTIVE" | "HIT_TP" | "STOPPED_OUT" | "INVALIDATED";
 
@@ -535,6 +763,7 @@ export default function FeedPage() {
   const [filter, setFilter] = useState<FilterStatus>("ALL");
   const [search, setSearch] = useState("");
   const [copyTarget, setCopyTarget] = useState<FeedThesis | null>(null);
+  const [view, setView] = useState<"feed" | "ranks">("feed");
 
   // Get connected wallet address
   const { state: accountState } = useAccount();
@@ -595,79 +824,128 @@ export default function FeedPage() {
       )}
 
       {/* Tab bar / header */}
-      <div style={{ display: "flex", gap: 2, padding: "8px 16px", borderBottom: "1px solid #1a2e1a", background: "#080c08", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ fontFamily: "monospace", fontSize: 11, color: "#00ff88", letterSpacing: "0.1em" }}>
-          ■ PUBLIC FEED
+      <div style={{ display: "flex", gap: 8, padding: "8px 16px", borderBottom: "1px solid #1a2e1a", background: "#080c08", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            onClick={() => setView("feed")}
+            style={{
+              background: view === "feed" ? "#0a1a0a" : "none",
+              border: `1px solid ${view === "feed" ? "#00ff88" : "#1a2e1a"}`,
+              color: view === "feed" ? "#00ff88" : "#4a7a5a",
+              fontFamily: "monospace", fontSize: 10,
+              padding: "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
+            }}
+          >
+            ■ FEED
+          </button>
+          <button
+            onClick={() => setView("ranks")}
+            style={{
+              background: view === "ranks" ? "#0a1a0a" : "none",
+              border: `1px solid ${view === "ranks" ? "#00ff88" : "#1a2e1a"}`,
+              color: view === "ranks" ? "#00ff88" : "#4a7a5a",
+              fontFamily: "monospace", fontSize: 10,
+              padding: "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
+            }}
+          >
+            ◆ RANKS
+          </button>
         </div>
         <div style={{ fontSize: 9, fontFamily: "monospace", color: "#3a5a4a" }}>
-          {loading ? "loading..." : `${filtered.length} thesis${filtered.length !== 1 ? "es" : ""}`}
+          {loading ? "loading..." : view === "ranks"
+            ? `${feed.length > 0 ? [...new Set(feed.map(t => t.wallet.toLowerCase()))].length : 0} trader${[...new Set(feed.map(t => t.wallet.toLowerCase()))].length !== 1 ? "s" : ""}`
+            : `${filtered.length} thesis${filtered.length !== 1 ? "es" : ""}`}
         </div>
       </div>
 
       <div style={{ padding: 16, maxWidth: 860, margin: "0 auto" }}>
-        {/* Filters */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-          {(["ALL", "ACTIVE", "HIT_TP", "STOPPED_OUT", "INVALIDATED"] as FilterStatus[]).map((f) => (
-            <button key={f} onClick={() => setFilter(f)} style={navBtnStyle(filter === f)}>
-              {f === "ALL" ? "ALL" : STATUS_CONFIG[f].label}
-            </button>
-          ))}
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="search symbol / trader..."
-            style={{
-              marginLeft: "auto",
-              background: "#080c08",
-              border: "1px solid #1a2e1a",
-              borderRadius: 3,
-              color: "#00ff88",
-              fontFamily: "monospace",
-              fontSize: 10,
-              padding: "5px 10px",
-              outline: "none",
-              width: 200,
-            }}
-          />
-        </div>
 
-        {/* Content */}
-        {loading && (
-          <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>
-            loading feed...
-          </div>
+        {/* ── RANKS VIEW ── */}
+        {view === "ranks" && (
+          <>
+            {loading && (
+              <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>
+                loading rankings...
+              </div>
+            )}
+            {error && !loading && (
+              <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "monospace", fontSize: 12, color: "#ff4444" }}>
+                failed to load feed — check connection
+              </div>
+            )}
+            {!loading && !error && (
+              <LeaderboardView feed={feed} walletAddress={walletAddress} onCopy={setCopyTarget} />
+            )}
+          </>
         )}
 
-        {error && !loading && (
-          <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "monospace", fontSize: 12, color: "#ff4444" }}>
-            failed to load feed — check connection
-          </div>
-        )}
-
-        {!loading && !error && filtered.length === 0 && (
-          <div style={{ textAlign: "center", padding: "60px 0" }}>
-            <div style={{ fontSize: 20, color: "#2a4a3a", marginBottom: 8 }}>■</div>
-            <div style={{ fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>
-              {feed.length === 0
-                ? "no public theses yet — go to LAB and hit 📡 to publish yours"
-                : "no results for this filter"}
-            </div>
-          </div>
-        )}
-
-        {!loading && !error && filtered.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {filtered.map((t) => (
-              <FeedCard
-                key={`${t.wallet}-${t.id}`}
-                thesis={t}
-                markPrice={livePrices[t.symbol] ?? null}
-                walletAddress={walletAddress}
-                onCopy={setCopyTarget}
+        {/* ── FEED VIEW ── */}
+        {view === "feed" && (
+          <>
+            {/* Filters */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+              {(["ALL", "ACTIVE", "HIT_TP", "STOPPED_OUT", "INVALIDATED"] as FilterStatus[]).map((f) => (
+                <button key={f} onClick={() => setFilter(f)} style={navBtnStyle(filter === f)}>
+                  {f === "ALL" ? "ALL" : STATUS_CONFIG[f].label}
+                </button>
+              ))}
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="search symbol / trader..."
+                style={{
+                  marginLeft: "auto",
+                  background: "#080c08",
+                  border: "1px solid #1a2e1a",
+                  borderRadius: 3,
+                  color: "#00ff88",
+                  fontFamily: "monospace",
+                  fontSize: 10,
+                  padding: "5px 10px",
+                  outline: "none",
+                  width: 200,
+                }}
               />
-            ))}
-          </div>
+            </div>
+
+            {loading && (
+              <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>
+                loading feed...
+              </div>
+            )}
+
+            {error && !loading && (
+              <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "monospace", fontSize: 12, color: "#ff4444" }}>
+                failed to load feed — check connection
+              </div>
+            )}
+
+            {!loading && !error && filtered.length === 0 && (
+              <div style={{ textAlign: "center", padding: "60px 0" }}>
+                <div style={{ fontSize: 20, color: "#2a4a3a", marginBottom: 8 }}>■</div>
+                <div style={{ fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>
+                  {feed.length === 0
+                    ? "no public theses yet — go to LAB and hit 📡 to publish yours"
+                    : "no results for this filter"}
+                </div>
+              </div>
+            )}
+
+            {!loading && !error && filtered.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {filtered.map((t) => (
+                  <FeedCard
+                    key={`${t.wallet}-${t.id}`}
+                    thesis={t}
+                    markPrice={livePrices[t.symbol] ?? null}
+                    walletAddress={walletAddress}
+                    onCopy={setCopyTarget}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
