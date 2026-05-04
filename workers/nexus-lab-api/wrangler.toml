@@ -2,6 +2,13 @@ name = "nexus-lab-api"
 main = "index.js"
 compatibility_date = "2024-01-01"
 
+# Ph20: custom domain so OG image URL is og.nexustradinglabs.com/og/trader/:wallet
+# On first deploy after this change, wrangler creates the CF DNS record automatically.
+# Requires nexustradinglabs.com to be a Cloudflare-managed zone (it is).
+[[routes]]
+pattern = "og.nexustradinglabs.com"
+custom_domain = true
+
 [[kv_namespaces]]
 binding = "LAB_STORE"
 id = "12c4fcbc04cc4211902d49b8abc2a751"

@@ -11,8 +11,35 @@
  *   PUT    /profile/:address          → save profile { pfp, displayName }
  *   GET    /feed                      → public theses feed (all wallets, isPublic=true)
  *   GET    /og/trader/:wallet         → Ph16: SVG OG image for trader profile
+ *   GET    /og/trader/:wallet.png     → Ph21: PNG OG image for Twitter (via resvg-wasm)
  *   GET    /wallets/onchain           → Ph17: on-chain wallet discovery via ThesisRegistered logs
  */
+
+// Ph21: resvg-wasm for PNG generation (Twitter support)
+// Bundled by wrangler esbuild — run `npm install` in this directory before `wrangler deploy`
+import { initWasm, Resvg } from "@resvg/resvg-wasm";
+import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
+
+let resvgReady = false;
+let fontCache = null;
+
+async function ensureResvg() {
+  if (!resvgReady) {
+    await initWasm(resvgWasm);
+    resvgReady = true;
+  }
+}
+
+// JetBrains Mono TTF — cached per Worker instance, fetched once on first PNG request
+async function getMonoFont() {
+  if (fontCache) return fontCache;
+  const resp = await fetch(
+    "https://github.com/JetBrains/JetBrainsMono/raw/v2.304/fonts/ttf/JetBrainsMono-Regular.ttf"
+  );
+  if (!resp.ok) throw new Error("font fetch failed: " + resp.status);
+  fontCache = new Uint8Array(await resp.arrayBuffer());
+  return fontCache;
+}
 
 const ALLOWED_ORIGINS = [
   "https://trade.nexustradinglabs.com",
@@ -59,7 +86,7 @@ function calcRepScore(wins, losses, avgRR) {
   return Math.max(0, Math.min(100, Math.round(winRate + rrBonus - samplePenalty)));
 }
 
-function buildOgSvg({ displayName, wallet, wins, losses, active, total, avgRR, winRate, rep }) {
+function buildOgSvg({ displayName, wallet, wins, losses, active, total, avgRR, winRate, rep, fontFamily = "'Courier New', Courier, monospace" }) {
   const shortAddr = `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
   const name = esc(displayName || shortAddr);
   const closed = wins + losses;
@@ -71,7 +98,7 @@ function buildOgSvg({ displayName, wallet, wins, losses, active, total, avgRR, w
 
   return `<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <style>text { font-family: 'Courier New', Courier, monospace; }</style>
+    <style>text { font-family: ${fontFamily}; }</style>
   </defs>
   <rect width="1200" height="630" fill="#0a0e0a"/>
   <rect width="1200" height="3" fill="#00ff88" opacity="0.5"/>
@@ -192,10 +219,15 @@ export default {
     const url = new URL(request.url);
     const parts = url.pathname.split("/").filter(Boolean);
 
-    // ── Ph16: /og/trader/:wallet → SVG preview card ────────
+    // ── Ph16/21: /og/trader/:wallet(.png)? → OG image ─────
+    // SVG endpoint: Discord, Telegram, iMessage, most crawlers
+    // PNG endpoint (.png suffix): Twitter/X (requires raster image)
     if (parts[0] === "og" && parts[1] === "trader" && parts[2]) {
       if (request.method !== "GET") return new Response("method not allowed", { status: 405 });
-      const wallet = normalizeAddress(parts[2]);
+
+      const isPng = parts[2].endsWith(".png");
+      const walletRaw = isPng ? parts[2].slice(0, -4) : parts[2];
+      const wallet = normalizeAddress(walletRaw);
 
       const [raw, profileRaw] = await Promise.all([
         env.LAB_STORE.get(`lab:${wallet}`),
@@ -216,7 +248,7 @@ export default {
           : 0;
       const rep = calcRepScore(wins, losses, avgRR);
 
-      const svg = buildOgSvg({
+      const statsPayload = {
         displayName: profile.displayName || null,
         wallet,
         wins,
@@ -226,8 +258,34 @@ export default {
         avgRR,
         winRate,
         rep,
-      });
+      };
 
+      // Ph21: PNG for Twitter
+      if (isPng) {
+        try {
+          await ensureResvg();
+          const font = await getMonoFont();
+          // Use JetBrains Mono family name since we're loading that font
+          const svg = buildOgSvg({ ...statsPayload, fontFamily: "'JetBrains Mono'" });
+          const resvg = new Resvg(svg, {
+            font: { loadSystemFonts: false, fontFiles: [font] },
+          });
+          const png = resvg.render().asPng();
+          return new Response(png, {
+            headers: {
+              "Content-Type": "image/png",
+              "Cache-Control": "public, max-age=300, stale-while-revalidate=60",
+              "Access-Control-Allow-Origin": "*",
+            },
+          });
+        } catch (e) {
+          // Graceful fallback to SVG if PNG generation fails
+          console.error("[OG PNG] failed, falling back to SVG:", String(e));
+        }
+      }
+
+      // Default / fallback: SVG
+      const svg = buildOgSvg(statsPayload);
       return new Response(svg, {
         headers: {
           "Content-Type": "image/svg+xml",
