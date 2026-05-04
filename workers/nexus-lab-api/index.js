@@ -10,6 +10,8 @@
  *   GET    /profile/:address          → fetch profile { pfp, displayName }
  *   PUT    /profile/:address          → save profile { pfp, displayName }
  *   GET    /feed                      → public theses feed (all wallets, isPublic=true)
+ *   GET    /og/trader/:wallet         → Ph16: SVG OG image for trader profile
+ *   GET    /wallets/onchain           → Ph17: on-chain wallet discovery via ThesisRegistered logs
  */
 
 const ALLOWED_ORIGINS = [
@@ -40,6 +42,146 @@ function normalizeAddress(addr) {
   return addr.toLowerCase().trim();
 }
 
+// ── Ph16: SVG OG image helpers ────────────────────────────────────────────────
+function esc(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function calcRepScore(wins, losses, avgRR) {
+  const closed = wins + losses;
+  const winRate = closed > 0 ? (wins / closed) * 100 : 0;
+  const rrBonus = Math.min(avgRR * 10, 20);
+  const samplePenalty = Math.max(0, 10 - closed) * 2;
+  return Math.max(0, Math.min(100, Math.round(winRate + rrBonus - samplePenalty)));
+}
+
+function buildOgSvg({ displayName, wallet, wins, losses, active, total, avgRR, winRate, rep }) {
+  const shortAddr = `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
+  const name = esc(displayName || shortAddr);
+  const closed = wins + losses;
+  const repColor = rep >= 70 ? "#00ff88" : rep >= 40 ? "#fbbf24" : "#ff4444";
+  const wrColor = winRate !== null
+    ? (winRate >= 60 ? "#00ff88" : winRate >= 40 ? "#fbbf24" : "#ff4444")
+    : "#3a5a4a";
+  const rrColor = avgRR >= 2 ? "#00ff88" : "#fbbf24";
+
+  return `<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>text { font-family: 'Courier New', Courier, monospace; }</style>
+  </defs>
+  <rect width="1200" height="630" fill="#0a0e0a"/>
+  <rect width="1200" height="3" fill="#00ff88" opacity="0.5"/>
+  <rect y="627" width="1200" height="3" fill="#1a3a1a"/>
+
+  <!-- Branding -->
+  <text x="48" y="54" fill="#2a4a3a" font-size="13" letter-spacing="3">NEXUS TRADING LABS</text>
+  <text x="1152" y="54" fill="#2a4a3a" font-size="13" letter-spacing="1" text-anchor="end">trade.nexustradinglabs.com</text>
+
+  <!-- Trader identity -->
+  <text x="48" y="170" fill="#ffffff" font-size="54" font-weight="bold">${name}</text>
+  <text x="48" y="210" fill="#3a5a4a" font-size="18">${esc(shortAddr)}</text>
+  <text x="48" y="240" fill="#2a4a3a" font-size="14">${total} thesis${total !== 1 ? "es" : ""} published on-chain</text>
+
+  <!-- REP Score (right column) -->
+  <text x="980" y="130" fill="#3a5a4a" font-size="13" letter-spacing="4" text-anchor="middle">REP SCORE</text>
+  <text x="980" y="265" fill="${repColor}" font-size="148" font-weight="bold" text-anchor="middle">${closed > 0 ? rep : "-"}</text>
+
+  <!-- Divider -->
+  <line x1="48" y1="310" x2="1152" y2="310" stroke="#1a2e1a" stroke-width="1"/>
+
+  <!-- Stats row -->
+  <text x="60" y="358" fill="#3a5a4a" font-size="12" letter-spacing="3">WIN RATE</text>
+  <text x="60" y="412" fill="${wrColor}" font-size="48" font-weight="bold">${winRate !== null ? winRate + "%" : "-"}</text>
+
+  <text x="310" y="358" fill="#3a5a4a" font-size="12" letter-spacing="3">W / L</text>
+  <text x="310" y="412" fill="#8aaa9a" font-size="48" font-weight="bold">${wins} / ${losses}</text>
+
+  <text x="570" y="358" fill="#3a5a4a" font-size="12" letter-spacing="3">AVG R:R</text>
+  <text x="570" y="412" fill="${rrColor}" font-size="48" font-weight="bold">1:${avgRR.toFixed(1)}</text>
+
+  <text x="830" y="358" fill="#3a5a4a" font-size="12" letter-spacing="3">ACTIVE</text>
+  <text x="830" y="412" fill="${active > 0 ? "#4a9fff" : "#3a5a4a"}" font-size="48" font-weight="bold">${active}</text>
+
+  <!-- Bottom tag -->
+  <line x1="48" y1="468" x2="1152" y2="468" stroke="#1a2e1a" stroke-width="1"/>
+  <text x="48" y="512" fill="#2a4a3a" font-size="13" letter-spacing="1">on-chain verified · arbitrum</text>
+  <text x="1152" y="512" fill="#1a3a1a" font-size="13" text-anchor="end">${esc(wallet)}</text>
+</svg>`;
+}
+
+// ── Ph17: On-chain wallet discovery ──────────────────────────────────────────
+const ARB_RPC = "https://arb1.arbitrum.io/rpc";
+const THESIS_REGISTRY = "0x2f4eda890f96a7979d6f26bcb210cedad68346bc";
+const ONCHAIN_CACHE_KEY = "cache:onchain-wallets";
+const ONCHAIN_TTL_MS = 5 * 60 * 1000; // 5 min
+
+async function getOnChainWallets(env) {
+  // Return cached if fresh
+  const cached = await env.LAB_STORE.get(ONCHAIN_CACHE_KEY);
+  if (cached) {
+    const parsed = JSON.parse(cached);
+    if (Date.now() - (parsed.updatedAt || 0) < ONCHAIN_TTL_MS) {
+      return { wallets: parsed.wallets, fromCache: true };
+    }
+  }
+
+  try {
+    // Get latest block
+    const blockResp = await fetch(ARB_RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_blockNumber", params: [] }),
+    });
+    const blockData = await blockResp.json();
+    const latestBlock = parseInt(blockData.result, 16);
+
+    // Scan last ~30M blocks (~87 days at ~4 blk/s on Arbitrum)
+    // The contract is new so this window covers all registrations
+    const fromBlock = "0x" + Math.max(0, latestBlock - 30_000_000).toString(16);
+
+    const logsResp = await fetch(ARB_RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0", id: 2, method: "eth_getLogs",
+        params: [{ address: THESIS_REGISTRY, fromBlock, toBlock: "latest" }],
+      }),
+    });
+    const logsData = await logsResp.json();
+    if (logsData.error) throw new Error(logsData.error.message);
+
+    // ThesisRegistered(uint256 indexed thesisId, address indexed trader)
+    // topics[0]=event hash, topics[1]=thesisId, topics[2]=trader (padded to 32 bytes)
+    const wallets = [
+      ...new Set(
+        (logsData.result || [])
+          .filter((log) => log.topics && log.topics.length >= 3)
+          .map((log) => "0x" + log.topics[2].slice(26).toLowerCase())
+      ),
+    ];
+
+    // Cache with TTL
+    await env.LAB_STORE.put(
+      ONCHAIN_CACHE_KEY,
+      JSON.stringify({ wallets, updatedAt: Date.now() }),
+      { expirationTtl: 300 }
+    );
+    return { wallets, fromCache: false };
+  } catch (err) {
+    // Fall back to stale cache or empty
+    const stale = await env.LAB_STORE.get(ONCHAIN_CACHE_KEY);
+    return {
+      wallets: stale ? JSON.parse(stale).wallets : [],
+      fromCache: true,
+      error: String(err),
+    };
+  }
+}
+
 export default {
   async fetch(request, env) {
     // Preflight
@@ -49,6 +191,58 @@ export default {
 
     const url = new URL(request.url);
     const parts = url.pathname.split("/").filter(Boolean);
+
+    // ── Ph16: /og/trader/:wallet → SVG preview card ────────
+    if (parts[0] === "og" && parts[1] === "trader" && parts[2]) {
+      if (request.method !== "GET") return new Response("method not allowed", { status: 405 });
+      const wallet = normalizeAddress(parts[2]);
+
+      const [raw, profileRaw] = await Promise.all([
+        env.LAB_STORE.get(`lab:${wallet}`),
+        env.LAB_STORE.get(`profile:${wallet}`),
+      ]);
+      const data = raw ? JSON.parse(raw) : { theses: [] };
+      const profile = profileRaw ? JSON.parse(profileRaw) : {};
+      const theses = data.theses || [];
+
+      const wins = theses.filter((t) => t.status === "HIT_TP").length;
+      const losses = theses.filter((t) => t.status === "STOPPED_OUT").length;
+      const active = theses.filter((t) => t.status === "ACTIVE").length;
+      const closed = wins + losses;
+      const winRate = closed > 0 ? Math.round((wins / closed) * 100) : null;
+      const avgRR =
+        theses.length > 0
+          ? theses.reduce((s, t) => s + (t.riskReward || 0), 0) / theses.length
+          : 0;
+      const rep = calcRepScore(wins, losses, avgRR);
+
+      const svg = buildOgSvg({
+        displayName: profile.displayName || null,
+        wallet,
+        wins,
+        losses,
+        active,
+        total: theses.length,
+        avgRR,
+        winRate,
+        rep,
+      });
+
+      return new Response(svg, {
+        headers: {
+          "Content-Type": "image/svg+xml",
+          "Cache-Control": "public, max-age=300, stale-while-revalidate=60",
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
+    }
+
+    // ── Ph17: /wallets/onchain → on-chain trader discovery ─
+    if (parts[0] === "wallets" && parts[1] === "onchain") {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+      const result = await getOnChainWallets(env);
+      return json(result, request);
+    }
 
     // ── /feed ──────────────────────────────────────────────
     if (parts[0] === "feed") {
@@ -107,7 +301,8 @@ export default {
         // Only allow pfp (URL string) and displayName
         const profile = {
           pfp: typeof body.pfp === "string" ? body.pfp.trim().slice(0, 500) : null,
-          displayName: typeof body.displayName === "string" ? body.displayName.trim().slice(0, 40) : null,
+          displayName:
+            typeof body.displayName === "string" ? body.displayName.trim().slice(0, 40) : null,
         };
         await env.LAB_STORE.put(profileKey, JSON.stringify(profile));
         return json({ ok: true }, request);

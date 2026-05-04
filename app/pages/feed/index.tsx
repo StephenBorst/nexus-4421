@@ -608,15 +608,11 @@ function buildLeaderboard(feed: FeedThesis[]): TraderStats[] {
       : 0;
   }
 
+  // Ph18: sort by Rep Score (composite: winRate + R:R bonus - sample penalty)
   return [...map.values()].sort((a, b) => {
-    // Primary: win rate (need at least 1 closed trade)
-    const aClosed = a.wins + a.losses;
-    const bClosed = b.wins + b.losses;
-    if (aClosed === 0 && bClosed === 0) return b.total - a.total;
-    if (aClosed === 0) return 1;
-    if (bClosed === 0) return -1;
-    if (b.winRate !== a.winRate) return b.winRate - a.winRate;
-    // Secondary: total theses
+    const aRep = calcRepScore(a.wins, a.losses, a.avgRR);
+    const bRep = calcRepScore(b.wins, b.losses, b.avgRR);
+    if (bRep !== aRep) return bRep - aRep;
     return b.total - a.total;
   });
 }
@@ -677,12 +673,9 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
         };
       })
       .sort((a, b) => {
-        const aClosed = a.wins + a.losses;
-        const bClosed = b.wins + b.losses;
-        if (aClosed === 0 && bClosed === 0) return b.total - a.total;
-        if (aClosed === 0) return 1;
-        if (bClosed === 0) return -1;
-        if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+        const aRep = calcRepScore(a.wins, a.losses, a.avgRR);
+        const bRep = calcRepScore(b.wins, b.losses, b.avgRR);
+        if (bRep !== aRep) return bRep - aRep;
         return b.total - a.total;
       });
   }, [board, onChainStats]);

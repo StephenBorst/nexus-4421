@@ -476,7 +476,8 @@ export default function TraderPage() {
 
     setMeta("og:title", title);
     setMeta("og:description", description);
-    setMeta("og:image", `https://og.nexustradinglabs.com/trader/${wallet}`);
+    // Worker endpoint — set og.nexustradinglabs.com as custom domain in CF dashboard to clean up URL
+    setMeta("og:image", `https://nexus-lab-api.stephenpatrick24.workers.dev/og/trader/${wallet}`);
     setMeta("og:url", window.location.href);
     document.title = title;
 
