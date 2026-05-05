@@ -21,3 +21,5 @@ node_modules/
 .yarn/install-state.gz
 .pnp.*
 .vercel
+
+.claude/
