@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nexus Trading Labs — Perpetual DEX on Arbitrum</title>
+  <meta name="description" content="A powerful decentralized perpetual trading platform on Arbitrum."/>
+  <meta property="og:title" content="Nexus Trading Labs — Perpetual DEX on Arbitrum"/>
+  <meta property="og:description" content="Trade crypto, RWAs and equity perpetuals on-chain. Non-custodial. Powered by Orderly Network."/>
+  <meta property="og:image" content="https://nexustradinglabs.com/preview.png"/>
+  <meta property="og:url" content="https://nexustradinglabs.com"/>
+  <meta property="og:type" content="website"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="Nexus Trading Labs — Perpetual DEX on Arbitrum"/>
+  <meta name="twitter:description" content="Trade crypto, RWAs and equity perpetuals on-chain. Non-custodial. Powered by Orderly Network."/>
+  <meta name="twitter:image" content="https://nexustradinglabs.com/preview.png"/>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#080A0E;--bg2:#0D1017;--border:rgba(255,255,255,0.07);--accent:#00E5A0;--text:#E8EDF5;--muted:#5A6478;--red:#FF4C6A;--green:#00E5A0;--mono:'IBM Plex Mono',monospace;--sans:'Syne',sans-serif}
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--text);font-family:var(--mono);overflow-x:hidden}
+    nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:60px;border-bottom:1px solid var(--border);background:rgba(8,10,14,0.9);backdrop-filter:blur(12px)}
+    .nav-logo{display:flex;align-items:center;gap:10px;font-family:var(--sans);font-weight:800;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;color:var(--text);text-decoration:none}
+    .nav-logo img{width:28px;height:28px;object-fit:contain}
+    .nav-links{display:flex;gap:28px;list-style:none}
+    .nav-links a{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color 0.2s}
+    .nav-links a:hover{color:var(--text)}
+    .nav-cta{background:var(--accent);color:#000;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;padding:9px 20px;border:none;cursor:pointer;text-decoration:none;transition:all 0.2s;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%)}
+    .nav-cta:hover{background:#00ffb3}
+    .ticker{position:relative;overflow:hidden;background:var(--bg2);border-bottom:1px solid var(--border);height:36px;margin-top:60px;display:flex;align-items:center}
+    .ticker-track{display:flex;animation:ticker 80s linear infinite;white-space:nowrap}
+    .ticker-item{display:flex;align-items:center;gap:8px;padding:0 24px;font-size:11px;border-right:1px solid var(--border)}
+    .ticker-item .sym{color:var(--text);font-weight:500}
+    .ticker-item .price{color:var(--muted)}
+    .up{color:var(--green)}
+    .dn{color:var(--red)}
+    @keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+    .hero{min-height:calc(100vh - 96px);display:grid;grid-template-columns:1fr 1fr;position:relative}
+    .hero::before{content:'';position:absolute;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 20%,transparent 100%);pointer-events:none}
+    .hero-left{padding:80px 48px 80px 80px;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:2}
+    .hero-label{font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--accent);margin-bottom:28px;display:flex;align-items:center;gap:8px}
+    .hero-label::before{content:'';width:20px;height:1px;background:var(--accent);display:block}
+    h1{font-family:var(--sans);font-size:clamp(42px,5vw,68px);font-weight:800;line-height:1.0;letter-spacing:-0.02em;margin-bottom:24px;color:var(--text)}
+    h1 em{font-style:normal;color:var(--accent)}
+    .hero-sub{font-size:14px;line-height:1.7;color:var(--muted);max-width:420px;margin-bottom:48px}
+    .hero-actions{display:flex;gap:16px;align-items:center}
+    .btn-primary{background:var(--accent);color:#000;font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;padding:14px 32px;border:none;cursor:pointer;text-decoration:none;display:inline-block;transition:all 0.2s;clip-path:polygon(10px 0%,100% 0%,calc(100% - 10px) 100%,0% 100%)}
+    .btn-primary:hover{background:#00ffb3;box-shadow:0 8px 30px rgba(0,229,160,0.3)}
+    .btn-secondary{font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color 0.2s}
+    .btn-secondary:hover{color:var(--text)}
+    .hero-right{display:flex;align-items:center;justify-content:center;padding:80px 80px 80px 48px;position:relative;z-index:2}
+    .stats-panel{width:100%;max-width:420px;border:1px solid var(--border);background:var(--bg2);position:relative}
+    .stats-panel::before{content:'LIVE_STATS.exe';position:absolute;top:-10px;left:20px;background:var(--bg);padding:0 8px;font-size:10px;letter-spacing:0.15em;color:var(--accent)}
+    .stats-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+    .stats-header span:first-child{font-size:11px;letter-spacing:0.1em;color:var(--muted)}
+    .live-dot{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--accent)}
+    .live-dot::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+    .stats-grid{display:grid;grid-template-columns:1fr 1fr}
+    .stat-cell{padding:24px 20px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .stat-cell:nth-child(even){border-right:none}
+    .stat-cell:nth-last-child(-n+2){border-bottom:none}
+    .stat-label{font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+    .stat-value{font-family:var(--sans);font-size:26px;font-weight:700;color:var(--text)}
+    .stat-value span{font-size:13px;color:var(--accent);font-family:var(--mono);font-weight:400}
+    .stats-markets{border-top:1px solid var(--border)}
+    .market-row{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:12px 20px;border-bottom:1px solid var(--border);font-size:12px}
+    .market-row:last-child{border-bottom:none}
+    .market-name{color:var(--text);font-weight:500}
+    .market-lev{font-size:10px;color:var(--accent);background:rgba(0,229,160,0.1);padding:2px 6px}
+    .section{padding:100px 80px}
+    .section-alt{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .section-label{font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent);margin-bottom:16px;display:flex;align-items:center;gap:12px}
+    .section-label::after{content:'';width:60px;height:1px;background:var(--accent)}
+    .section-title{font-family:var(--sans);font-size:clamp(28px,3vw,44px);font-weight:800;letter-spacing:-0.02em;margin-bottom:56px;max-width:560px;color:var(--text)}
+    .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border)}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border)}
+    .card{background:var(--bg);padding:40px 36px;position:relative;transition:background 0.2s}
+    .card:hover{background:var(--bg2)}
+    .card-icon{width:40px;height:40px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;margin-bottom:24px;font-size:18px;color:var(--accent)}
+    .card-tag{position:absolute;top:20px;right:20px;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);border:1px solid rgba(0,229,160,0.2);padding:3px 8px}
+    .card-title{font-family:var(--sans);font-size:18px;font-weight:700;margin-bottom:12px;color:var(--text)}
+    .card-desc{font-size:13px;line-height:1.7;color:var(--muted)}
+    .card-link{display:inline-block;margin-top:20px;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);text-decoration:none}
+    .card-link:hover{color:#00ffb3}
+    .card-num{font-family:var(--sans);font-size:40px;font-weight:800;color:var(--accent);margin-bottom:12px}
+    .markets-strip{padding:0 80px 100px}
+    .markets-table{width:100%;border-collapse:collapse;border:1px solid var(--border)}
+    .markets-table th{font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);padding:14px 20px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg2);font-weight:400}
+    .markets-table td{padding:14px 20px;font-size:13px;border-bottom:1px solid var(--border)}
+    .markets-table tr:last-child td{border-bottom:none}
+    .markets-table tr:hover td{background:rgba(255,255,255,0.02)}
+    .td-sym{display:flex;align-items:center;gap:10px}
+    .sym-dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+    .td-lev{color:var(--accent);font-size:11px}
+    .td-m{color:var(--muted)}
+    .cta-wrap{margin:0 80px 100px;background:var(--bg2);border:1px solid var(--border);padding:80px;display:grid;grid-template-columns:1fr auto;align-items:center;gap:40px;position:relative;overflow:hidden}
+    .cta-wrap::before{content:'';position:absolute;right:-100px;top:-100px;width:400px;height:400px;background:radial-gradient(circle,rgba(0,229,160,0.06) 0%,transparent 70%);pointer-events:none}
+    .cta-title{font-family:var(--sans);font-size:clamp(24px,2.5vw,38px);font-weight:800;letter-spacing:-0.02em;margin-bottom:12px;color:var(--text)}
+    .cta-sub{font-size:13px;color:var(--muted);line-height:1.6}
+    .center{text-align:center;margin-top:40px}
+    footer{border-top:1px solid var(--border);padding:40px 80px;display:flex;align-items:center;justify-content:space-between}
+    .footer-logo{font-family:var(--sans);font-weight:800;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;color:var(--text);margin-bottom:6px}
+    .footer-left{font-size:12px;color:var(--muted)}
+    .footer-links{display:flex;gap:24px;list-style:none}
+    .footer-links a{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);text-decoration:none}
+    .footer-links a:hover{color:var(--text)}
+    .footer-badge{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:6px}
+    .footer-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+    /* THE LAB — section intro text */
+    .lab-intro{font-size:14px;line-height:1.8;color:var(--muted);max-width:640px;margin-bottom:56px}
+    /* Trust callout strip */
+    .trust-callout{display:flex;align-items:flex-start;gap:14px;border:1px solid rgba(0,229,160,0.15);background:rgba(0,229,160,0.03);padding:18px 24px;margin-bottom:48px;font-size:12px;line-height:1.7;color:var(--muted)}
+    .trust-callout .trust-icon{color:var(--accent);font-size:16px;flex-shrink:0;margin-top:1px}
+    .trust-callout strong{color:var(--text);font-weight:500}
+    /* Leaderboard badge */
+    .onchain-badge{display:inline-flex;align-items:center;gap:6px;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);border:1px solid rgba(0,229,160,0.2);padding:4px 10px;margin-bottom:8px}
+    @media(max-width:900px){
+      nav{padding:0 24px}
+      .nav-links{display:none}
+      .hero{grid-template-columns:1fr;min-height:auto}
+      .hero-left{padding:60px 24px 40px}
+      .hero-right{padding:0 24px 60px}
+      .stats-panel{max-width:100%}
+      .section{padding:60px 24px}
+      .section-alt{padding:60px 24px}
+      .grid3,.grid2{grid-template-columns:1fr}
+      .markets-strip{padding:0 24px 60px}
+      .cta-wrap{margin:0 24px 60px;padding:40px 28px;grid-template-columns:1fr}
+      footer{padding:32px 24px;flex-direction:column;gap:24px;align-items:flex-start}
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="#" class="nav-logo">
+    <img src="/nexus.jpg" alt="Nexus"/>
+    Nexus Trading Labs
+  </a>
+  <ul class="nav-links">
+    <li><a href="#markets">Markets</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#lab">The Lab</a></li>
+    <li><a href="#leaderboard">Leaderboard</a></li>
+    <li><a href="#referral">Referral</a></li>
+    <li><a href="#docs">Docs</a></li>
+  </ul>
+  <a href="https://trade.nexustradinglabs.com" class="nav-cta">Launch App</a>
+</nav>
+
+<div class="ticker">
+  <div class="ticker-track" id="ticker-track">
+    <div class="ticker-item"><span class="sym">Loading markets...</span></div>
+  </div>
+</div>
+
+<section class="hero">
+  <div class="hero-left">
+    <div class="hero-label">Perpetual DEX &middot; Built on Arbitrum &middot; Powered by the Orderly Network</div>
+    <h1>Trade <em>Anything.</em><br>On-Chain.</h1>
+    <p class="hero-sub">Nexus Trading Labs delivers traders professional-grade perpetuals execution on 93+ assets.</p>
+    <div class="hero-actions">
+      <a href="https://trade.nexustradinglabs.com" class="btn-primary">Start Trading</a>
+      <a href="#markets" class="btn-secondary" style="margin-left:8px">View Markets &rarr;</a>
+    </div>
+  </div>
+  <div class="hero-right">
+    <div class="stats-panel">
+      <div class="stats-header">
+        <span>Platform Overview</span>
+        <span class="live-dot">LIVE</span>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-cell">
+          <div class="stat-label">24h Volume</div>
+          <div class="stat-value" id="stat-vol">—</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Open Interest</div>
+          <div class="stat-value" id="stat-oi">—</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">TVL</div>
+          <div class="stat-value">$18.3<span>M</span></div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Markets</div>
+          <div class="stat-value" id="stat-mkts">—</div>
+        </div>
+      </div>
+      <div class="stats-markets" id="hero-markets">
+        <div class="market-row"><span class="market-name" style="color:var(--muted)">Loading...</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ FEATURES ═══ -->
+<section class="section" id="features">
+  <div class="section-label">Why Nexus</div>
+  <h2 class="section-title">Because we believe trading should be borderless, liquidity should be shared, and markets should be unified all within one UX.</h2>
+  <div class="grid3">
+    <div class="card"><div class="card-tag">Core</div><div class="card-icon">&#9889;</div><div class="card-title">Deep On-Chain Liquidity</div><p class="card-desc">Powered by Orderly Network's shared liquidity layer. Access deep order books without trusting a centralized intermediary with your funds.</p></div>
+    <div class="card"><div class="card-tag">Unique</div><div class="card-icon">&#9672;</div><div class="card-title">Trade 93+ Assets</div><p class="card-desc">Crypto perpetuals, RWA synthetics, equity indices — all from one interface. BTC, ETH, SOL, Silver, NVDA, TSLA, SPX500 and more.</p></div>
+    <div class="card"><div class="card-tag">Live</div><div class="card-icon">&#9635;</div><div class="card-title">Pro-Grade Charting</div><p class="card-desc">TradingView-powered charts with full technical analysis tooling. The same charts professional traders rely on, directly in the DEX.</p></div>
+    <div class="card"><div class="card-tag">Security</div><div class="card-icon">&#9685;</div><div class="card-title">Non-Custodial</div><p class="card-desc">Your keys, your funds. Connect your wallet and trade directly — no deposits to a centralized exchange, no counterparty risk.</p></div>
+    <div class="card"><div class="card-tag">Network</div><div class="card-icon">&#11041;</div><div class="card-title">Arbitrum Native</div><p class="card-desc">Built on Arbitrum for low fees and fast settlement. Get execution quality you'd expect from a CEX at a fraction of the cost.</p></div>
+    <div class="card"><div class="card-tag">DeFi</div><div class="card-icon">&#9670;</div><div class="card-title">Vaults &amp; Yield</div><p class="card-desc">Put your USDC to work. Provide liquidity to the platform's vaults and earn yield from trading activity — fully on-chain.</p></div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ THE LAB ════ -->
+<section class="section section-alt" id="lab">
+  <div class="section-label">The Lab</div>
+  <h2 class="section-title">Your On-Chain Trading Journal.</h2>
+  <p class="lab-intro">Build a thesis. Set your entry, stop-loss, and take-profit. Publish it on-chain. Every call is timestamped on Arbitrum — tamper-proof, verifiable by anyone.</p>
+  <div class="grid2">
+
+    <div class="card">
+      <div class="card-tag">LAB</div>
+      <div class="card-icon">&#9999;</div>
+      <div class="card-title">Thesis Executor</div>
+      <p class="card-desc">Log trades with full context: symbol, direction, entry/SL/TP, position size, thesis notes. Private by default. Go public when you're ready.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-tag">Social</div>
+      <div class="card-icon">&#9654;</div>
+      <div class="card-title">Public Feed</div>
+      <p class="card-desc">Browse real trades from real wallets. No anonymous claims. On-chain proof or it didn't happen.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-tag">Unique</div>
+      <div class="card-icon">&#8634;</div>
+      <div class="card-title">Copy Trading</div>
+      <p class="card-desc">One-click copy of any public thesis, pre-filled with your own risk parameters. Full attribution. You own your execution.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-tag">On-Chain</div>
+      <div class="card-icon">&#9733;</div>
+      <div class="card-title">Rep Score</div>
+      <p class="card-desc">Reputation built from your verified win rate, R:R, and trade history. Can't be bought. Can't be faked.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ MARKETS ════ -->
+<div class="markets-strip" id="markets">
+  <table class="markets-table">
+    <thead>
+      <tr>
+        <th>Market</th><th>Max Leverage</th><th>24h Volume</th><th>Open Interest</th><th>24h Change</th><th>8h Funding</th>
+      </tr>
+    </thead>
+    <tbody id="markets-tbody">
+      <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px">Loading live markets...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════ LEADERBOARD ══ -->
+<section class="section section-alt" id="leaderboard">
+  <div class="section-label">Leaderboard</div>
+  <h2 class="section-title">Ranked by Rep Score. Verified on-chain.</h2>
+
+  <div class="trust-callout">
+    <span class="trust-icon">&#9741;</span>
+    <span>Every thesis registered on-chain via <strong>ThesisRegistry</strong> on Arbitrum. Stats are verifiable. No server can manipulate the leaderboard. Look for the <strong>&#9741; on-chain verified</strong> badge on traders with blockchain-confirmed track records.</span>
+  </div>
+
+  <div class="grid2" style="margin-bottom:40px">
+    <div class="card">
+      <div class="card-icon">&#127942;</div>
+      <div class="card-title">Rep Score Rankings</div>
+      <p class="card-desc">Traders are ranked by Rep Score — a composite of win rate and average R:R ratio. No volume farming. No anonymous flex. Every rank is earned in real markets and settled on Arbitrum.</p>
+      <a href="https://trade.nexustradinglabs.com/leaderboard" class="card-link">View Leaderboard &rarr;</a>
+    </div>
+    <div class="card">
+      <div class="card-icon">&#128200;</div>
+      <div class="card-title">Trader Profiles</div>
+      <p class="card-desc">Every trader gets a shareable on-chain r&eacute;sum&eacute; — a public record of their thesis history, win rate, and R:R. The leaderboard doesn't lie. Your track record lives on-chain forever.</p>
+      <a href="https://trade.nexustradinglabs.com/leaderboard" class="card-link">View Rankings &rarr;</a>
+    </div>
+  </div>
+  <div class="center">
+    <a href="https://trade.nexustradinglabs.com/leaderboard" class="btn-primary">View Full Leaderboard</a>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ REFERRAL ════ -->
+<section class="section" id="referral">
+  <div class="section-label">Referral Program</div>
+  <h2 class="section-title">Earn by growing the community.</h2>
+  <div class="grid3" style="margin-bottom:40px">
+    <div class="card"><div class="card-num">01</div><div class="card-title">Get Your Link</div><p class="card-desc">Connect your wallet and grab your unique referral link from the referral page.</p></div>
+    <div class="card"><div class="card-num">02</div><div class="card-title">Share &amp; Invite</div><p class="card-desc">Share your link with traders. Anyone who signs up through your link is your referral.</p></div>
+    <div class="card"><div class="card-num">03</div><div class="card-title">Earn Rewards</div><p class="card-desc">Earn a percentage of trading fees generated by everyone you refer. Paid on-chain.</p></div>
+  </div>
+  <div class="center">
+    <a href="https://trade.nexustradinglabs.com/referral" class="btn-primary">Start Referring</a>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ DOCS ════════ -->
+<section class="section section-alt" id="docs">
+  <div class="section-label">Documentation</div>
+  <h2 class="section-title">Everything you need to get started.</h2>
+  <div class="grid3">
+    <div class="card"><div class="card-icon">&#9678;</div><div class="card-title">Getting Started</div><p class="card-desc">Connect your wallet, deposit USDC, and place your first trade in under 2 minutes.</p><a href="https://trade.nexustradinglabs.com" class="card-link">Launch App &rarr;</a></div>
+    <div class="card"><div class="card-icon">&#9672;</div><div class="card-title">Trading Guide</div><p class="card-desc">Learn how to open and manage perpetual positions, set leverage, and read funding rates.</p><a href="https://orderly.network/docs" target="_blank" class="card-link">Orderly Docs &rarr;</a></div>
+    <div class="card"><div class="card-icon">&#9670;</div><div class="card-title">Community</div><p class="card-desc">Follow us on X for platform updates, trading competitions, and yield opportunities.</p><a href="https://twitter.com/nexustradinglab" target="_blank" class="card-link">Follow @nexustradinglab &rarr;</a></div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ CTA ═════════ -->
+<div class="cta-wrap">
+  <div>
+    <div class="cta-title">Ready to trade on-chain?</div>
+    <p class="cta-sub">Connect your wallet and access live liquidity across crypto, RWAs, and equity indices &mdash; all non-custodial on Arbitrum.</p>
+  </div>
+  <a href="https://trade.nexustradinglabs.com" class="btn-primary" style="white-space:nowrap">Launch App &rarr;</a>
+</div>
+
+<!-- ═══════════════════════════════════════ FOOTER ══════ -->
+<footer>
+  <div class="footer-left">
+    <div class="footer-logo">Nexus Trading Labs</div>
+    <div>&copy; 2026 Nexus Trading Labs LLC &middot; Denver, CO</div>
+    <div>Powered by Orderly Network &middot; Built on Arbitrum</div>
+  </div>
+  <ul class="footer-links">
+    <li><a href="https://trade.nexustradinglabs.com">Trade</a></li>
+    <li><a href="https://trade.nexustradinglabs.com/leaderboard">Leaderboard</a></li>
+    <li><a href="https://trade.nexustradinglabs.com/referral">Referral</a></li>
+    <li><a href="https://x.com/nexustradinglab">Twitter</a></li>
+    <li><a href="https://farcaster.xyz/nexustradinglab">Farcaster</a></li>
+  </ul>
+  <div class="footer-badge">Operational</div>
+</footer>
+
+<script>
+const PROXY='https://orderly-proxy.stephenpatrick24.workers.dev';
+
+function fmtPrice(n){
+  n=parseFloat(n);
+  if(!n)return'—';
+  if(n>=1000)return'$'+n.toLocaleString('en-US',{maximumFractionDigits:0});
+  if(n>=1)return'$'+n.toFixed(2);
+  return'$'+n.toPrecision(4);
+}
+function fmtM(n){
+  if(!n)return'—';
+  const m=n/1e6;
+  if(m>=1000)return'$'+(n/1e9).toFixed(1)+'<span>B</span>';
+  if(m>=1)return'$'+m.toFixed(1)+'<span>M</span>';
+  return'$'+(n/1e3).toFixed(0)+'<span>K</span>';
+}
+function fmtPct(n){
+  if(n===null||n===undefined)return'—';
+  return(n>=0?'+':'')+n.toFixed(2)+'%';
+}
+function calcChange(m){
+  const o=parseFloat(m['24h_open']);
+  const c=parseFloat(m['24h_close']);
+  if(!o||!c||o===0)return 0;
+  const p=((c-o)/o)*100;
+  return Math.abs(p)>25?0:p;
+}
+function calcLev(m){
+  if(m.max_leverage&&m.max_leverage>0)return m.max_leverage;
+  return null;
+}
+
+async function fetchData(){
+  try{
+    const res=await fetch(PROXY);
+    const json=await res.json();
+    return json.data?.rows||[];
+  }catch(e){
+    console.warn('API error:',e);
+    return[];
+  }
+}
+
+function renderTicker(ms){
+  const el=document.getElementById('ticker-track');
+  if(!el||!ms.length)return;
+  const items=ms.slice(0,20).map(m=>{
+    const sym=m.symbol.replace('PERP_','').replace('_USDC','/USDC');
+    const chg=calcChange(m);
+    const cls=chg>=0?'up':'dn';
+    return`<div class="ticker-item"><span class="sym">${sym}</span><span class="price">${fmtPrice(m.mark_price)}</span><span class="${cls}">${fmtPct(chg)}</span></div>`;
+  }).join('');
+  el.innerHTML=items+items;
+}
+
+function renderStats(ms){
+  const vol=ms.reduce((s,m)=>s+(parseFloat(m['24h_amount'])||0),0);
+  const oi=ms.reduce((s,m)=>s+(parseFloat(m.open_interest)||0),0);
+  const v=document.getElementById('stat-vol');
+  const o=document.getElementById('stat-oi');
+  const mk=document.getElementById('stat-mkts');
+  if(v)v.innerHTML=fmtM(vol);
+  if(o)o.innerHTML=fmtM(oi);
+  if(mk)mk.innerHTML=ms.length+'<span>+</span>';
+}
+
+function renderHero(ms){
+  const el=document.getElementById('hero-markets');
+  if(!el||!ms.length)return;
+  el.innerHTML=ms.slice(0,5).map(m=>{
+    const sym=m.symbol.replace('PERP_','').replace('_USDC','-PERP');
+    const chg=calcChange(m);
+    const lev=calcLev(m);
+    return`<div class="market-row"><span class="market-name">${sym}</span><span class="market-lev">${lev?lev+'x':'—'}</span><span class="${chg>=0?'up':'dn'}">${fmtPct(chg)}</span></div>`;
+  }).join('');
+}
+
+function renderTable(ms){
+  const el=document.getElementById('markets-tbody');
+  if(!el||!ms.length)return;
+  el.innerHTML=ms.slice(0,10).map(m=>{
+    const sym=m.symbol.replace('PERP_','').replace('_USDC','-PERP');
+    const chg=calcChange(m);
+    const fund=(parseFloat(m.last_funding_rate)||0)*100;
+    const lev=calcLev(m);
+    const vol=parseFloat(m['24h_amount'])||0;
+    const oi=parseFloat(m.open_interest)||0;
+    return`<tr><td><div class="td-sym"><div class="sym-dot"></div>${sym}</div></td><td class="td-lev">${lev?lev+'x':'—'}</td><td class="td-m">$${vol.toLocaleString('en-US',{maximumFractionDigits:0})}</td><td class="td-m">$${oi.toLocaleString('en-US',{maximumFractionDigits:0})}</td><td class="${chg>=0?'up':'dn'}">${fmtPct(chg)}</td><td class="${fund>=0?'up':'dn'}">${fmtPct(fund)}</td></tr>`;
+  }).join('');
+}
+
+async function refresh(){
+  const ms=await fetchData();
+  if(!ms.length)return;
+  ms.sort((a,b)=>(parseFloat(b['24h_amount'])||0)-(parseFloat(a['24h_amount'])||0));
+  renderTicker(ms);
+  renderStats(ms);
+  renderHero(ms);
+  renderTable(ms);
+}
+
+refresh();
+setInterval(refresh,30000);
+</script>
+</body>
+</html>

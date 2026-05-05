@@ -30,6 +30,7 @@ import {
 import { Link } from "react-router-dom";
 import CustomLeftNav from "@/components/CustomLeftNav";
 import ProfileAvatar from "@/components/ProfileAvatar";
+import NotificationBell from "@/components/NotificationBell";
 import { buildCampaignsUrl } from "@/components/CampaignsNavTitle";
 interface MainNavItem {
   name: string;
@@ -347,6 +348,7 @@ const allMenuItems = [...translatedEnabledMenus, ...customMenus, ...campaignsMen
             {components.subAccount}
             {components.chainMenu}
             {components.walletConnect}
+            <NotificationBell />
             <ProfileAvatar />
           </Flex>
         </Flex>

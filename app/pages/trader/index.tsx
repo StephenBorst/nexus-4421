@@ -315,7 +315,13 @@ function CopyModal({ thesis, walletAddress, onClose }: { thesis: FeedThesis; wal
       };
       await fetch(`${API_BASE}/lab/${walletAddress}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ theses: [newThesis, ...existingTheses], notes: existing.notes ?? "" }),
+        body: JSON.stringify({
+          theses: [newThesis, ...existingTheses],
+          notes: existing.notes ?? {},
+          copiedFromWallet: thesis.wallet,
+          copiedThesisSymbol: thesis.symbol,
+          copiedThesisDirection: thesis.direction,
+        }),
       });
       setSaved(true);
       setTimeout(onClose, 1200);

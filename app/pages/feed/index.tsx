@@ -162,7 +162,13 @@ function CopyModal({
       await fetch(`${API_BASE}/lab/${walletAddress}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ theses: updated, notes: existing.notes ?? "" }),
+        body: JSON.stringify({
+          theses: updated,
+          notes: existing.notes ?? {},
+          copiedFromWallet: thesis.wallet,
+          copiedThesisSymbol: thesis.symbol,
+          copiedThesisDirection: thesis.direction,
+        }),
       });
 
       setSaved(true);

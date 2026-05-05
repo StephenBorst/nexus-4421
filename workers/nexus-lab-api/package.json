@@ -1,0 +1,9 @@
+{
+  "name": "nexus-lab-api",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@resvg/resvg-wasm": "^2.6.0"
+  }
+}

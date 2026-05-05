@@ -52,7 +52,7 @@ function cors(request) {
   const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, PUT, POST, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Max-Age": "86400",
   };
@@ -67,6 +67,15 @@ function json(data, request, status = 200) {
 
 function normalizeAddress(addr) {
   return addr.toLowerCase().trim();
+}
+
+// ── Ph27: notification helpers ────────────────────────────────────────────────
+async function appendNotification(env, wallet, notif) {
+  const key = `notif:${wallet}`;
+  const raw = await env.LAB_STORE.get(key);
+  const list = raw ? JSON.parse(raw) : [];
+  list.unshift(notif);
+  await env.LAB_STORE.put(key, JSON.stringify(list.slice(0, 50)));
 }
 
 // ── Ph16: SVG OG image helpers ────────────────────────────────────────────────
@@ -137,6 +146,48 @@ function buildOgSvg({ displayName, wallet, wins, losses, active, total, avgRR, w
   <line x1="48" y1="468" x2="1152" y2="468" stroke="#1a2e1a" stroke-width="1"/>
   <text x="48" y="512" fill="#2a4a3a" font-size="13" letter-spacing="1">on-chain verified · arbitrum</text>
   <text x="1152" y="512" fill="#1a3a1a" font-size="13" text-anchor="end">${esc(wallet)}</text>
+</svg>`;
+}
+
+// ── Ph22: Thesis OG SVG ───────────────────────────────────────────────────────
+function buildThesisOgSvg({ displayName, wallet, ticker, direction, entryPrice, stopLoss, takeProfit1, riskReward, status, notes, fontFamily = "'Courier New', Courier, monospace" }) {
+  const shortAddr = `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
+  const name = esc(displayName || shortAddr);
+  const dirColor = direction === "LONG" ? "#00ff88" : "#ff4444";
+  const dirArrow = direction === "LONG" ? "↑" : "↓";
+  const rrColor = parseFloat(riskReward) >= 2 ? "#00ff88" : "#fbbf24";
+  const statusMap = { HIT_TP: "HIT TP ✓", STOPPED_OUT: "STOPPED OUT", ACTIVE: "ACTIVE", INVALIDATED: "INVALIDATED" };
+  const statusColorMap = { HIT_TP: "#00ff88", STOPPED_OUT: "#ff4444", ACTIVE: "#4a9fff", INVALIDATED: "#fbbf24" };
+  const statusLabel = statusMap[status] || status;
+  const statusColor = statusColorMap[status] || "#8aaa9a";
+  const notesLine = notes ? esc(String(notes).slice(0, 90)) : "";
+
+  return `<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+  <defs><style>text { font-family: ${fontFamily}; }</style></defs>
+  <rect width="1200" height="630" fill="#0a0e0a"/>
+  <rect width="1200" height="3" fill="#00ff88" opacity="0.5"/>
+  <rect y="627" width="1200" height="3" fill="#1a3a1a"/>
+  <text x="48" y="54" fill="#2a4a3a" font-size="13" letter-spacing="3">NEXUS TRADING LABS</text>
+  <text x="1152" y="54" fill="#2a4a3a" font-size="13" text-anchor="end">trade.nexustradinglabs.com</text>
+  <text x="48" y="180" fill="#ffffff" font-size="86" font-weight="bold">${esc(ticker)}</text>
+  <text x="48" y="232" fill="${dirColor}" font-size="32" font-weight="bold">${dirArrow} ${esc(direction)}</text>
+  <text x="1152" y="180" fill="${statusColor}" font-size="22" font-weight="bold" text-anchor="end">${statusLabel}</text>
+  <text x="1152" y="214" fill="#3a5a4a" font-size="14" text-anchor="end">${name}</text>
+  <text x="1152" y="234" fill="#2a4a3a" font-size="12" text-anchor="end">${esc(shortAddr)}</text>
+  <line x1="48" y1="270" x2="1152" y2="270" stroke="#1a2e1a" stroke-width="1"/>
+  <text x="60" y="312" fill="#3a5a4a" font-size="12" letter-spacing="3">ENTRY</text>
+  <text x="60" y="374" fill="#8aaa9a" font-size="52" font-weight="bold">$${parseFloat(entryPrice).toFixed(2)}</text>
+  <text x="360" y="312" fill="#3a5a4a" font-size="12" letter-spacing="3">STOP</text>
+  <text x="360" y="374" fill="#ff4444" font-size="52" font-weight="bold">$${parseFloat(stopLoss).toFixed(2)}</text>
+  <text x="660" y="312" fill="#3a5a4a" font-size="12" letter-spacing="3">TP1</text>
+  <text x="660" y="374" fill="#00ff88" font-size="52" font-weight="bold">$${parseFloat(takeProfit1).toFixed(2)}</text>
+  <text x="960" y="312" fill="#3a5a4a" font-size="12" letter-spacing="3">R:R</text>
+  <text x="960" y="374" fill="${rrColor}" font-size="52" font-weight="bold">1:${parseFloat(riskReward).toFixed(2)}</text>
+  <line x1="48" y1="420" x2="1152" y2="420" stroke="#1a2e1a" stroke-width="1"/>
+  ${notesLine ? `<text x="48" y="464" fill="#5a8a6a" font-size="16" font-style="italic">"${notesLine}"</text>` : ""}
+  <line x1="48" y1="530" x2="1152" y2="530" stroke="#1a2e1a" stroke-width="1"/>
+  <text x="48" y="572" fill="#2a4a3a" font-size="13" letter-spacing="1">on-chain thesis · arbitrum</text>
+  <text x="1152" y="572" fill="#1a3a1a" font-size="13" text-anchor="end">${esc(wallet)}</text>
 </svg>`;
 }
 
@@ -302,6 +353,209 @@ export default {
       return json(result, request);
     }
 
+    // ── Ph22: /og/thesis/:wallet/:id(.png)? → thesis OG image ─
+    if (parts[0] === "og" && parts[1] === "thesis" && parts[2] && parts[3]) {
+      if (request.method !== "GET") return new Response("method not allowed", { status: 405 });
+      const isPng = parts[3].endsWith(".png");
+      const thesisId = isPng ? parts[3].slice(0, -4) : parts[3];
+      const wallet = normalizeAddress(parts[2]);
+      const [raw, profileRaw] = await Promise.all([
+        env.LAB_STORE.get(`lab:${wallet}`),
+        env.LAB_STORE.get(`profile:${wallet}`),
+      ]);
+      if (!raw) return new Response("not found", { status: 404 });
+      const data = JSON.parse(raw);
+      const thesis = (data.theses || []).find((t) => t.id === thesisId);
+      if (!thesis) return new Response("not found", { status: 404 });
+      const profile = profileRaw ? JSON.parse(profileRaw) : {};
+      const ticker = thesis.symbol.replace("PERP_", "").replace("_USDC", "");
+      const payload = {
+        displayName: profile.displayName || null, wallet, ticker,
+        direction: thesis.direction, entryPrice: thesis.entryPrice,
+        stopLoss: thesis.stopLoss, takeProfit1: thesis.takeProfit1,
+        riskReward: thesis.riskReward, status: thesis.status, notes: thesis.notes || "",
+      };
+      if (isPng) {
+        try {
+          await ensureResvg();
+          const font = await getMonoFont();
+          const svg = buildThesisOgSvg({ ...payload, fontFamily: "'JetBrains Mono'" });
+          const resvg = new Resvg(svg, { font: { loadSystemFonts: false, fontFiles: [font] } });
+          const png = resvg.render().asPng();
+          return new Response(png, { headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=300", "Access-Control-Allow-Origin": "*" } });
+        } catch (e) { console.error("[OG PNG thesis]", String(e)); }
+      }
+      const svg = buildThesisOgSvg(payload);
+      return new Response(svg, { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=300", "Access-Control-Allow-Origin": "*" } });
+    }
+
+    // ── Ph22: /thesis/:wallet/:id → single thesis data ─────
+    if (parts[0] === "thesis" && parts[1] && parts[2]) {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+      const wallet = normalizeAddress(parts[1]);
+      const thesisId = parts[2];
+      const [raw, profileRaw] = await Promise.all([
+        env.LAB_STORE.get(`lab:${wallet}`),
+        env.LAB_STORE.get(`profile:${wallet}`),
+      ]);
+      if (!raw) return json({ error: "not found" }, request, 404);
+      const data = JSON.parse(raw);
+      const thesis = (data.theses || []).find((t) => t.id === thesisId && t.isPublic);
+      if (!thesis) return json({ error: "not found" }, request, 404);
+      const profile = profileRaw ? JSON.parse(profileRaw) : {};
+      return json({ thesis: { ...thesis, wallet, pfp: profile.pfp || null, displayName: profile.displayName || null } }, request);
+    }
+
+    // ── Ph24: /follows/:wallet → follow graph ──────────────
+    if (parts[0] === "follows" && parts[1]) {
+      const wallet = normalizeAddress(parts[1]);
+      const followKey = `follows:${wallet}`;
+      if (request.method === "GET") {
+        const raw = await env.LAB_STORE.get(followKey);
+        return json({ following: raw ? JSON.parse(raw) : [] }, request);
+      }
+      if (request.method === "PUT") {
+        let body;
+        try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        if (!Array.isArray(body.following)) return json({ error: "expected { following: [] }" }, request, 400);
+        const newFollowing = body.following.map((a) => normalizeAddress(a)).slice(0, 500);
+
+        // Detect newly followed wallets to trigger notifications
+        const oldRaw = await env.LAB_STORE.get(followKey);
+        const oldSet = new Set(oldRaw ? JSON.parse(oldRaw) : []);
+        const newlyAdded = newFollowing.filter((a) => !oldSet.has(a));
+
+        await env.LAB_STORE.put(followKey, JSON.stringify(newFollowing));
+
+        // Notify each newly followed wallet
+        const followerShort = `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
+        await Promise.all(
+          newlyAdded.map((followedWallet) =>
+            appendNotification(env, followedWallet, {
+              id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              type: "follow",
+              message: `${followerShort} started following you`,
+              fromWallet: wallet,
+              createdAt: Date.now(),
+            })
+          )
+        );
+
+        return json({ ok: true }, request);
+      }
+      return json({ error: "method not allowed" }, request, 405);
+    }
+
+    // ── Ph25: /verify/:wallet/:id → price-verify thesis outcome ─
+    if (parts[0] === "verify" && parts[1] && parts[2]) {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+      const wallet = normalizeAddress(parts[1]);
+      const thesisId = parts[2];
+      const raw = await env.LAB_STORE.get(`lab:${wallet}`);
+      if (!raw) return json({ error: "not found" }, request, 404);
+      const data = JSON.parse(raw);
+      const thesis = (data.theses || []).find((t) => t.id === thesisId);
+      if (!thesis) return json({ error: "not found" }, request, 404);
+
+      const COINGECKO_IDS = {
+        BTC: "bitcoin", ETH: "ethereum", SOL: "solana", ARB: "arbitrum", OP: "optimism",
+        AVAX: "avalanche-2", LINK: "chainlink", UNI: "uniswap", AAVE: "aave",
+        MATIC: "matic-network", SUI: "sui", SEI: "sei-network", TIA: "celestia",
+        INJ: "injective-protocol", WIF: "dogwifcoin", DOGE: "dogecoin", PEPE: "pepe",
+        SHIB: "shiba-inu", XRP: "ripple", ADA: "cardano", DOT: "polkadot",
+        LTC: "litecoin", BCH: "bitcoin-cash", ATOM: "cosmos", FTM: "fantom",
+        NEAR: "near", APT: "aptos", JUP: "jupiter-exchange-solana", WLD: "worldcoin-wld",
+        TON: "the-open-network", POL: "matic-network", STRK: "starknet",
+      };
+      const ticker = thesis.symbol.replace("PERP_", "").replace("_USDC", "");
+      const coinId = COINGECKO_IDS[ticker];
+      if (!coinId) return json({ error: "unsupported asset", ticker }, request, 422);
+
+      const daysSince = Math.min(Math.ceil((Date.now() - thesis.createdAt) / 86400000) + 1, 365);
+      try {
+        const cgResp = await fetch(
+          `https://api.coingecko.com/api/v3/coins/${coinId}/ohlc?vs_currency=usd&days=${daysSince}`,
+          { headers: { Accept: "application/json" } }
+        );
+        if (!cgResp.ok) throw new Error(`CoinGecko ${cgResp.status}`);
+        const ohlc = await cgResp.json();
+        const { entryPrice, stopLoss, takeProfit1, direction, createdAt } = thesis;
+        const relevant = ohlc.filter(([ts]) => ts >= createdAt);
+        let hitTP = false;
+        let hitSL = false;
+        for (const [, , high, low] of relevant) {
+          if (direction === "LONG") {
+            if (high >= takeProfit1) { hitTP = true; break; }
+            if (low <= stopLoss) { hitSL = true; break; }
+          } else {
+            if (low <= takeProfit1) { hitTP = true; break; }
+            if (high >= stopLoss) { hitSL = true; break; }
+          }
+        }
+        const priceConfirms =
+          (thesis.status === "HIT_TP" && hitTP) ||
+          (thesis.status === "STOPPED_OUT" && hitSL) ||
+          (thesis.status === "ACTIVE" && !hitTP && !hitSL);
+        return json({
+          verified: priceConfirms, hitTP, hitSL,
+          status: thesis.status, direction, entryPrice, stopLoss, takeProfit1,
+          method: "coingecko_ohlc", candlesChecked: relevant.length,
+        }, request);
+      } catch (e) {
+        return json({ error: "price fetch failed", detail: String(e) }, request, 502);
+      }
+    }
+
+    // ── Ph27: /notifications/:wallet ──────────────────────
+    if (parts[0] === "notifications" && parts[1]) {
+      const wallet = normalizeAddress(parts[1]);
+      const notifKey = `notif:${wallet}`;
+
+      // GET /notifications/:wallet
+      if (request.method === "GET" && parts.length === 2) {
+        const raw = await env.LAB_STORE.get(notifKey);
+        return json(raw ? JSON.parse(raw) : [], request);
+      }
+
+      // POST /notifications/:wallet — append (internal)
+      if (request.method === "POST" && parts.length === 2) {
+        let body;
+        try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        if (!body.type || !body.message) return json({ error: "missing type or message" }, request, 400);
+        await appendNotification(env, wallet, {
+          id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          type: body.type,
+          message: String(body.message).slice(0, 200),
+          fromWallet: body.fromWallet || undefined,
+          thesisId: body.thesisId || undefined,
+          createdAt: Date.now(),
+        });
+        return json({ ok: true }, request);
+      }
+
+      // PUT /notifications/:wallet/read — mark all read
+      if (request.method === "PUT" && parts.length === 3 && parts[2] === "read") {
+        const raw = await env.LAB_STORE.get(notifKey);
+        if (!raw) return json({ ok: true }, request);
+        const now = Date.now();
+        const list = JSON.parse(raw).map((n) => n.readAt ? n : { ...n, readAt: now });
+        await env.LAB_STORE.put(notifKey, JSON.stringify(list));
+        return json({ ok: true }, request);
+      }
+
+      // DELETE /notifications/:wallet/:id
+      if (request.method === "DELETE" && parts.length === 3) {
+        const id = parts[2];
+        const raw = await env.LAB_STORE.get(notifKey);
+        if (!raw) return json({ ok: true }, request);
+        const list = JSON.parse(raw).filter((n) => n.id !== id);
+        await env.LAB_STORE.put(notifKey, JSON.stringify(list));
+        return json({ ok: true }, request);
+      }
+
+      return json({ error: "method not allowed" }, request, 405);
+    }
+
     // ── /feed ──────────────────────────────────────────────
     if (parts[0] === "feed") {
       if (request.method !== "GET") {
@@ -399,7 +653,27 @@ export default {
         return json({ error: "expected { theses: [], notes: {} }" }, request, 400);
       }
 
-      await env.LAB_STORE.put(kvKey, JSON.stringify(body));
+      // Ph27: notify original author when a thesis is copied
+      if (body.copiedFromWallet && typeof body.copiedFromWallet === "string") {
+        const originalWallet = normalizeAddress(body.copiedFromWallet);
+        if (originalWallet !== address) {
+          const symbol = typeof body.copiedThesisSymbol === "string"
+            ? body.copiedThesisSymbol.replace("PERP_", "").replace("_USDC", "")
+            : "unknown";
+          const direction = typeof body.copiedThesisDirection === "string" ? ` ${body.copiedThesisDirection}` : "";
+          await appendNotification(env, originalWallet, {
+            id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            type: "copy",
+            message: `Someone copied your ${symbol}${direction} thesis`,
+            fromWallet: address,
+            createdAt: Date.now(),
+          });
+        }
+      }
+
+      // Strip copy metadata fields before persisting
+      const { copiedFromWallet: _cfw, copiedThesisSymbol: _cts, copiedThesisDirection: _ctd, ...dataToSave } = body;
+      await env.LAB_STORE.put(kvKey, JSON.stringify(dataToSave));
       return json({ ok: true }, request);
     }
 
