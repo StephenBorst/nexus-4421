@@ -653,7 +653,7 @@ export default {
         return json({ error: "expected { theses: [], notes: {} }" }, request, 400);
       }
 
-      // Ph27: notify original author when a thesis is copied
+      // Ph27/28: notify original author and increment copyCount when a thesis is copied
       if (body.copiedFromWallet && typeof body.copiedFromWallet === "string") {
         const originalWallet = normalizeAddress(body.copiedFromWallet);
         if (originalWallet !== address) {
@@ -661,6 +661,20 @@ export default {
             ? body.copiedThesisSymbol.replace("PERP_", "").replace("_USDC", "")
             : "unknown";
           const direction = typeof body.copiedThesisDirection === "string" ? ` ${body.copiedThesisDirection}` : "";
+
+          // Ph28: increment copyCount on the original thesis
+          if (body.copiedThesisId && typeof body.copiedThesisId === "string") {
+            const origRaw = await env.LAB_STORE.get(`lab:${originalWallet}`);
+            if (origRaw) {
+              const origData = JSON.parse(origRaw);
+              const origThesis = (origData.theses || []).find((t) => t.id === body.copiedThesisId);
+              if (origThesis) {
+                origThesis.copyCount = (origThesis.copyCount || 0) + 1;
+                await env.LAB_STORE.put(`lab:${originalWallet}`, JSON.stringify(origData));
+              }
+            }
+          }
+
           await appendNotification(env, originalWallet, {
             id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
             type: "copy",
@@ -672,7 +686,7 @@ export default {
       }
 
       // Strip copy metadata fields before persisting
-      const { copiedFromWallet: _cfw, copiedThesisSymbol: _cts, copiedThesisDirection: _ctd, ...dataToSave } = body;
+      const { copiedFromWallet: _cfw, copiedThesisSymbol: _cts, copiedThesisDirection: _ctd, copiedThesisId: _cti, ...dataToSave } = body;
       await env.LAB_STORE.put(kvKey, JSON.stringify(dataToSave));
       return json({ ok: true }, request);
     }

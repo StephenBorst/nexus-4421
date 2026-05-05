@@ -44,6 +44,7 @@ type FeedThesis = {
   fundingCost72h?: number;
   riskPercent?: number;
   accountSize?: number;
+  copyCount?: number;
 };
 
 const STATUS_CONFIG = {
@@ -144,14 +145,23 @@ function ThesisRow({
         style={{ padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
       >
         {/* Ticker + direction */}
-        <div style={{ minWidth: 100 }}>
+        <div style={{ minWidth: 100, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontFamily: "monospace", fontSize: 15, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
           <span style={{
-            fontFamily: "monospace", fontSize: 10, marginLeft: 8,
+            fontFamily: "monospace", fontSize: 10,
             color: thesis.direction === "LONG" ? "#00ff88" : "#ff4444",
           }}>
             {thesis.direction === "LONG" ? "↑" : "↓"} {thesis.direction}
           </span>
+          {(thesis.copyCount ?? 0) > 0 && (
+            <span style={{
+              fontFamily: "monospace", fontSize: 8, color: "#5a8a6a",
+              background: "#0a1a0a", border: "1px solid #1a3a1a",
+              borderRadius: 3, padding: "1px 5px",
+            }}>
+              📋 {thesis.copyCount}
+            </span>
+          )}
         </div>
 
         {/* Levels */}
@@ -261,18 +271,40 @@ function ThesisRow({
   );
 }
 
+const COPY_PREFS_KEY = "nexus-copy-prefs";
+
 // ─── Copy Modal (inline, same logic as feed) ──────────────────────────────────
 function CopyModal({ thesis, walletAddress, onClose }: { thesis: FeedThesis; walletAddress: string; onClose: () => void }) {
   const ticker = thesis.symbol.replace("PERP_", "").replace("_USDC", "");
   const traderName = thesis.displayName ?? `${thesis.wallet.slice(0, 6)}…${thesis.wallet.slice(-4)}`;
-  const [accountSize, setAccountSize] = useState("");
-  const [riskPct, setRiskPct] = useState("1.5");
+
+  const [accountSize, setAccountSize] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(COPY_PREFS_KEY) ?? "{}").accountSize ?? ""; }
+    catch { return ""; }
+  });
+  const [riskPct, setRiskPct] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(COPY_PREFS_KEY) ?? "{}").riskPct ?? "1.5"; }
+    catch { return "1.5"; }
+  });
   const [fundingRate, setFundingRate] = useState("0.01");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState("");
 
+  // Persist prefs on change
+  useEffect(() => {
+    try { localStorage.setItem(COPY_PREFS_KEY, JSON.stringify({ accountSize, riskPct })); }
+    catch { /* ignore */ }
+  }, [accountSize, riskPct]);
+
+  const accNum = parseFloat(accountSize);
+  const riskNum = parseFloat(riskPct);
+  const accErr = accountSize !== "" && (isNaN(accNum) || accNum <= 0) ? "must be > 0" : "";
+  const riskErr = riskPct !== "" && (isNaN(riskNum) || riskNum < 0.1 || riskNum > 100) ? "must be 0.1–100" : "";
+  const hasValidationErr = !!accErr || !!riskErr;
+
   const calc = useMemo(() => {
+    if (hasValidationErr) return null;
     const acc = parseFloat(accountSize);
     const risk = parseFloat(riskPct);
     const fund = parseFloat(fundingRate);
@@ -286,7 +318,7 @@ function CopyModal({ thesis, walletAddress, onClose }: { thesis: FeedThesis; wal
     const riskReward = rewardDist / stopDist;
     const fundingPerPeriod = positionSize * (Math.abs(fund) / 100);
     return { positionSize, leverage, riskReward, riskAmount, fundingPerPeriod };
-  }, [accountSize, riskPct, fundingRate, thesis]);
+  }, [accountSize, riskPct, fundingRate, thesis, hasValidationErr]);
 
   const inputStyle: React.CSSProperties = {
     background: "#080c08", border: "1px solid #1a2e1a", borderRadius: 3,
@@ -295,11 +327,11 @@ function CopyModal({ thesis, walletAddress, onClose }: { thesis: FeedThesis; wal
   };
 
   async function handleSave() {
-    if (!calc) { setErr("fill in account size and risk %"); return; }
+    if (!calc || hasValidationErr) { setErr("check inputs"); return; }
     setSaving(true); setErr("");
     try {
       const resp = await fetch(`${API_BASE}/lab/${walletAddress}`);
-      const existing = resp.ok ? await resp.json() : { theses: [], notes: "" };
+      const existing = resp.ok ? await resp.json() : { theses: [], notes: {} };
       const existingTheses: ThesisTrade[] = existing.theses ?? [];
       const newThesis: ThesisTrade = {
         id: `copy_${Date.now()}`, symbol: thesis.symbol, direction: thesis.direction,
@@ -312,6 +344,7 @@ function CopyModal({ thesis, walletAddress, onClose }: { thesis: FeedThesis; wal
         fundingCost72h: calc.fundingPerPeriod * 9,
         notes: `📋 Copied from ${traderName}${thesis.notes ? `\n\n${thesis.notes}` : ""}`,
         createdAt: Date.now(), status: "ACTIVE", actualPnl: null, isPublic: false,
+        copiedFromWallet: thesis.wallet,
       };
       await fetch(`${API_BASE}/lab/${walletAddress}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
@@ -321,6 +354,7 @@ function CopyModal({ thesis, walletAddress, onClose }: { thesis: FeedThesis; wal
           copiedFromWallet: thesis.wallet,
           copiedThesisSymbol: thesis.symbol,
           copiedThesisDirection: thesis.direction,
+          copiedThesisId: thesis.id,
         }),
       });
       setSaved(true);
@@ -344,48 +378,63 @@ function CopyModal({ thesis, walletAddress, onClose }: { thesis: FeedThesis; wal
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#3a5a4a", cursor: "pointer", fontSize: 16 }}>✕</button>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
-          {[
-            { label: "ACCOUNT SIZE ($)", val: accountSize, set: setAccountSize, ph: "10000", step: undefined },
-            { label: "RISK %", val: riskPct, set: setRiskPct, ph: "1.5", step: "0.1" },
-            { label: "FUNDING %", val: fundingRate, set: setFundingRate, ph: "0.01", step: "0.001" },
-          ].map(({ label, val, set, ph, step }) => (
-            <div key={label}>
-              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace", marginBottom: 4 }}>{label}</div>
-              <input style={inputStyle} type="number" placeholder={ph} step={step} value={val} onChange={(e) => set(e.target.value)} />
-            </div>
-          ))}
+
+        {/* Inputs */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 4 }}>
+          <div>
+            <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace", marginBottom: 4 }}>ACCOUNT SIZE ($)</div>
+            <input style={{ ...inputStyle, borderColor: accErr ? "#4a1a1a" : "#1a2e1a" }} type="number" placeholder="10000" value={accountSize} onChange={(e) => setAccountSize(e.target.value)} />
+            {accErr && <div style={{ fontFamily: "monospace", fontSize: 8, color: "#ff4444", marginTop: 3 }}>{accErr}</div>}
+          </div>
+          <div>
+            <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace", marginBottom: 4 }}>RISK %</div>
+            <input style={{ ...inputStyle, borderColor: riskErr ? "#4a1a1a" : "#1a2e1a" }} type="number" placeholder="1.5" step="0.1" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} />
+            {riskErr && <div style={{ fontFamily: "monospace", fontSize: 8, color: "#ff4444", marginTop: 3 }}>{riskErr}</div>}
+          </div>
+          <div>
+            <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace", marginBottom: 4 }}>FUNDING %</div>
+            <input style={inputStyle} type="number" placeholder="0.01" step="0.001" value={fundingRate} onChange={(e) => setFundingRate(e.target.value)} />
+          </div>
         </div>
-        {calc ? (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px 12px", marginBottom: 12, padding: 10, background: "#0a1a0a", borderRadius: 4, border: "1px solid #1a3a1a" }}>
-            <div>
-              <div style={{ fontSize: 7, color: "#3a5a4a", fontFamily: "monospace" }}>YOUR SIZE</div>
-              <div style={{ fontFamily: "monospace", fontSize: 14, color: "#00ff88", fontWeight: "bold" }}>${calc.positionSize.toFixed(0)}</div>
+
+        {/* Calc output */}
+        <div style={{ marginTop: 10, marginBottom: 12 }}>
+          {calc ? (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px 10px", padding: 10, background: "#0a1a0a", borderRadius: 4, border: "1px solid #1a3a1a" }}>
+              <div>
+                <div style={{ fontSize: 7, color: "#3a5a4a", fontFamily: "monospace" }}>YOUR SIZE</div>
+                <div style={{ fontFamily: "monospace", fontSize: 13, color: "#00ff88", fontWeight: "bold" }}>${calc.positionSize.toFixed(0)}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 7, color: "#3a5a4a", fontFamily: "monospace" }}>LEVERAGE</div>
+                <div style={{ fontFamily: "monospace", fontSize: 13, fontWeight: "bold", color: calc.leverage > 25 ? "#ff4444" : calc.leverage > 10 ? "#fbbf24" : "#00ff88" }}>{calc.leverage.toFixed(1)}x</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 7, color: "#3a5a4a", fontFamily: "monospace" }}>R:R</div>
+                <div style={{ fontFamily: "monospace", fontSize: 13, fontWeight: "bold", color: calc.riskReward >= 2 ? "#00ff88" : "#fbbf24" }}>1:{calc.riskReward.toFixed(2)}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 7, color: "#3a5a4a", fontFamily: "monospace" }}>MAX LOSS</div>
+                <div style={{ fontFamily: "monospace", fontSize: 13, color: "#ff4444", fontWeight: "bold" }}>${calc.riskAmount.toFixed(2)}</div>
+              </div>
             </div>
-            <div>
-              <div style={{ fontSize: 7, color: "#3a5a4a", fontFamily: "monospace" }}>LEVERAGE</div>
-              <div style={{ fontFamily: "monospace", fontSize: 14, fontWeight: "bold", color: calc.leverage > 25 ? "#ff4444" : calc.leverage > 10 ? "#fbbf24" : "#00ff88" }}>{calc.leverage.toFixed(1)}x</div>
+          ) : (
+            <div style={{ padding: 10, background: "#080c08", borderRadius: 4, border: "1px solid #1a2e1a", fontFamily: "monospace", fontSize: 9, color: "#2a4a3a", textAlign: "center" }}>
+              enter account size + risk % to calculate
             </div>
-            <div>
-              <div style={{ fontSize: 7, color: "#3a5a4a", fontFamily: "monospace" }}>RISK $</div>
-              <div style={{ fontFamily: "monospace", fontSize: 14, color: "#ff4444", fontWeight: "bold" }}>${calc.riskAmount.toFixed(2)}</div>
-            </div>
-          </div>
-        ) : (
-          <div style={{ marginBottom: 12, padding: 10, background: "#080c08", borderRadius: 4, border: "1px solid #1a2e1a", fontFamily: "monospace", fontSize: 9, color: "#2a4a3a", textAlign: "center" }}>
-            enter account size + risk % to calculate
-          </div>
-        )}
+          )}
+        </div>
+
         {err && <div style={{ fontFamily: "monospace", fontSize: 10, color: "#ff4444", marginBottom: 10 }}>{err}</div>}
         <button
           onClick={handleSave}
-          disabled={saving || saved || !calc}
+          disabled={saving || saved || !calc || hasValidationErr}
           style={{
-            width: "100%", background: saved ? "#0a2a0a" : calc ? "#0a1a0a" : "#080c08",
-            border: `1px solid ${saved ? "#00ff88" : calc ? "#00ff88" : "#1a2e1a"}`,
-            color: saved ? "#00ff88" : calc ? "#00ff88" : "#2a4a3a",
+            width: "100%", background: saved ? "#0a2a0a" : calc && !hasValidationErr ? "#0a1a0a" : "#080c08",
+            border: `1px solid ${saved ? "#00ff88" : calc && !hasValidationErr ? "#00ff88" : "#1a2e1a"}`,
+            color: saved ? "#00ff88" : calc && !hasValidationErr ? "#00ff88" : "#2a4a3a",
             fontFamily: "monospace", fontSize: 11, letterSpacing: "0.1em",
-            padding: "10px 0", borderRadius: 4, cursor: calc && !saving && !saved ? "pointer" : "default",
+            padding: "10px 0", borderRadius: 4, cursor: calc && !saving && !saved && !hasValidationErr ? "pointer" : "default",
           }}
         >
           {saved ? "✓ SAVED TO LAB" : saving ? "saving..." : "SAVE TO LAB →"}
