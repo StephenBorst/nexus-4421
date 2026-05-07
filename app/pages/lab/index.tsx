@@ -256,7 +256,7 @@ function TradingScoreSection({ orders, winRate }: { orders: ProcessedTrade[]; wi
   return (
     <div style={{ ...cardStyle, marginTop: 12 }}>
       <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 16, fontFamily: "monospace", display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ color: "#3a5a4a" }}>&#9632;</span> SYSTEM/TRADING_SCORE
+        <span style={{ color: "#3a5a4a" }}>&#9632;</span> TRADING SCORE
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 24, alignItems: "center" }}>
         <RadarChart scores={metrics.scores} />
@@ -480,8 +480,7 @@ function PerformanceAnalysis({ orders }: { orders: ProcessedTrade[] }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
       <div style={cardStyle}>
-        <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "monospace" }}>&#9632; SYSTEM/PERFORMANCE_ANALYSIS</div>
-        <div style={{ fontSize: 9, color: "#2a4a3a", fontFamily: "monospace", marginBottom: 12 }}>$ ./analyze_best_worst.sh --detailed</div>
+        <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "monospace" }}>&#9632; PERFORMANCE ANALYSIS</div>
         <div style={{ marginBottom: 8 }}>
           <div style={{ fontSize: 9, color: "#00ff88", fontFamily: "monospace", marginBottom: 4 }}>Best Trade</div>
           <div style={{ background: "#0a150a", border: "1px solid #1a3a1a", borderRadius: 4, padding: "10px 12px" }}>
@@ -545,25 +544,21 @@ function AnalyticsView({ orders, totalPnl, winRate, collateral }: { orders: Proc
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 8 }}>
         <div style={cardStyle}>
           <div style={labelStyle}>TOTAL PNL</div>
-          <div style={{ fontSize: 10, color: "#2a4a3a", marginBottom: 4, fontFamily: "monospace" }}>$ ./calculate_pnl.sh</div>
           <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "monospace", color: totalPnl >= 0 ? "#00ff88" : "#ff4444" }}>{formatPnl(totalPnl)}</div>
           <div style={{ fontSize: 10, color: "#3a5a4a", marginTop: 4, fontFamily: "monospace" }}>realized</div>
         </div>
         <div style={cardStyle}>
           <div style={labelStyle}>WIN RATE</div>
-          <div style={{ fontSize: 10, color: "#2a4a3a", marginBottom: 4, fontFamily: "monospace" }}>$ ./analyze_performance.sh</div>
           <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "monospace", color: "#4a9fff" }}>{orders.length ? `${winRate.toFixed(1)}%` : "—"}</div>
           <div style={{ height: 4, background: "#1a2e1a", borderRadius: 2, marginTop: 8 }}><div style={{ height: 4, background: "#4a9fff", borderRadius: 2, width: `${winRate}%` }} /></div>
         </div>
         <div style={cardStyle}>
           <div style={labelStyle}>TRADES</div>
-          <div style={{ fontSize: 10, color: "#2a4a3a", marginBottom: 4, fontFamily: "monospace" }}>$ ./count_trades.sh</div>
           <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "monospace", color: "#a855f7" }}>{orders.length}</div>
           <div style={{ fontSize: 10, color: "#3a5a4a", marginTop: 4, fontFamily: "monospace" }}>closed</div>
         </div>
         <div style={cardStyle}>
-          <div style={labelStyle}>ACCOUNT EQUITY</div>
-          <div style={{ fontSize: 10, color: "#2a4a3a", marginBottom: 4, fontFamily: "monospace" }}>$ ./get_balance.sh</div>
+          <div style={labelStyle}>BALANCE</div>
           <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "monospace", color: "#fbbf24" }}>{collateral > 0 ? `$${collateral.toFixed(2)}` : "—"}</div>
           <div style={{ fontSize: 10, color: "#3a5a4a", marginTop: 4, fontFamily: "monospace" }}>usdc</div>
         </div>
@@ -571,8 +566,7 @@ function AnalyticsView({ orders, totalPnl, winRate, collateral }: { orders: Proc
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 240px", gap: 8, marginBottom: 8 }}>
         <div style={cardStyle}>
-          <div style={labelStyle}>&#9632; SYSTEM/PNL_OVER_TIME</div>
-          <div style={{ fontSize: 10, color: "#2a4a3a", marginBottom: 10, fontFamily: "monospace" }}>$ ./plot_cumulative_pnl.sh --live</div>
+          <div style={labelStyle}>&#9632; P&amp;L OVER TIME</div>
           {orders.length ? <PnlChart points={cumulativePnl} /> : <EmptyState message="connect wallet + make trades to see curve" />}
         </div>
         <div style={cardStyle}>
@@ -980,7 +974,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
       {/* Breakdown Card */}
       <div style={{ ...cardStyle, marginBottom: 8 }}>
         <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 16, fontFamily: "monospace" }}>
-          <span style={{ color: "#3a5a4a" }}>&#9632;</span> THESIS/ACCURACY_BREAKDOWN
+          <span style={{ color: "#3a5a4a" }}>&#9632;</span> ACCURACY BREAKDOWN
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
           <div style={{ background: "#0a150a", border: "1px solid #1a4a2a", borderRadius: 4, padding: "10px 12px" }}>
@@ -1073,8 +1067,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
 
           {/* Cumulative Thesis P&L Chart */}
           <div style={cardStyle}>
-            <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 4, fontFamily: "monospace" }}>&#9632; THESIS/CUMULATIVE_PNL</div>
-            <div style={{ fontSize: 10, color: "#2a4a3a", marginBottom: 8, fontFamily: "monospace" }}>$ ./plot_thesis_pnl.sh --closed</div>
+            <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 4, fontFamily: "monospace" }}>&#9632; THESIS P&amp;L</div>
             <PnlChart points={cumulativePoints} />
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
               <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>{sortedByDate.length} results plotted</div>
@@ -1515,10 +1508,9 @@ function ThesisView() {
       <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #1a2e1a", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <div style={{ fontSize: 10, color: "#00ff88", fontFamily: "monospace", letterSpacing: "0.12em", marginBottom: 4 }}>
-            &#9632; SYSTEM/THESIS_EXECUTOR — PAPER MODE
+            &#9632; THESIS EXECUTOR
           </div>
           <div style={{ fontSize: 11, color: "#3a5a4a", fontFamily: "monospace" }}>
-            $ ./compile_thesis.sh --mode=paper --risk-managed
           </div>
         </div>
         {thesisAccuracy !== null && (
@@ -1828,10 +1820,9 @@ function CopiesView() {
     <div>
       <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #1a2e1a" }}>
         <div style={{ fontSize: 10, color: "#00ff88", fontFamily: "monospace", letterSpacing: "0.12em", marginBottom: 4 }}>
-          &#9632; COPY_HISTORY — {copiedTheses.length} {copiedTheses.length === 1 ? "thesis" : "theses"} copied
+          &#9632; COPY HISTORY — {copiedTheses.length} {copiedTheses.length === 1 ? "thesis" : "theses"} copied
         </div>
         <div style={{ fontSize: 11, color: "#3a5a4a", fontFamily: "monospace" }}>
-          $ ./list_copies.sh --mode=all
         </div>
       </div>
 
@@ -1855,183 +1846,4 @@ function CopiesView() {
               }}>
                 {/* Header row */}
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-                  <span style={{ fontFamily: "monospace", fontSize: 15, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
-                  <span style={{
-                    fontFamily: "monospace", fontSize: 11,
-                    color: t.direction === "LONG" ? "#00ff88" : "#ff4444",
-                  }}>
-                    {t.direction === "LONG" ? "↑" : "↓"} {t.direction}
-                  </span>
-                  <div style={{
-                    fontFamily: "monospace", fontSize: 9, padding: "2px 8px", borderRadius: 3,
-                    background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color,
-                  }}>
-                    {cfg.label}
-                  </div>
-                  {t.actualPnl !== null && t.status !== "ACTIVE" && (
-                    <span style={{
-                      fontFamily: "monospace", fontSize: 12, fontWeight: "bold",
-                      color: t.actualPnl >= 0 ? "#00ff88" : "#ff4444",
-                    }}>
-                      {t.actualPnl >= 0 ? "+" : ""}${t.actualPnl.toFixed(2)}
-                    </span>
-                  )}
-                  {shortWallet && (
-                    <button
-                      onClick={() => navigate(`/feed/trader/${t.copiedFromWallet}`)}
-                      style={{
-                        background: "none", border: "1px solid #1a2e1a", borderRadius: 3,
-                        color: "#3a5a4a", fontFamily: "monospace", fontSize: 9,
-                        padding: "2px 8px", cursor: "pointer", letterSpacing: "0.04em",
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLButtonElement).style.color = "#4a9fff";
-                        (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a3a5a";
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLButtonElement).style.color = "#3a5a4a";
-                        (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a2e1a";
-                      }}
-                    >
-                      📋 {shortWallet} ↗
-                    </button>
-                  )}
-                </div>
-
-                {/* Levels grid */}
-                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(5, 1fr)", gap: "8px 12px" }}>
-                  {[
-                    { label: "ENTRY",  val: `$${t.entryPrice.toFixed(2)}`,    color: "#8aaa9a" as const },
-                    { label: "STOP",   val: `$${t.stopLoss.toFixed(2)}`,      color: "#ff4444" as const },
-                    { label: "TP1",    val: `$${t.takeProfit1.toFixed(2)}`,   color: "#00ff88" as const },
-                    { label: "R:R",    val: `1:${t.riskReward.toFixed(2)}`,   color: (t.riskReward >= 2 ? "#00ff88" : "#fbbf24") as string },
-                    { label: "MAX LOSS", val: `${t.riskPercent}% · $${(t.accountSize * t.riskPercent / 100).toFixed(0)}`, color: "#8aaa9a" as const },
-                  ].map(({ label, val, color }) => (
-                    <div key={label}>
-                      <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>{label}</div>
-                      <div style={{ fontSize: 11, color, fontFamily: "monospace" }}>{val}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Main Page ───────────────────────────────────────────
-export default function TheLabPage() {
-  const [activeTab, setActiveTab] = useState<TabId>("analytics");
-  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const today = new Date();
-
-  // ── Persistence (KV + localStorage) ─────────────────────
-  const { state: rootAccountState } = useAccount();
-  const rootWalletAddress = (rootAccountState as { address?: string })?.address ?? null;
-  const { notes, saveNote, syncing, synced } = useLabStorage(rootWalletAddress);
-  const [viewMonth, setViewMonth] = useState(today.getMonth());
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-
-  const { data: positionHistory } = usePrivateQuery("/v1/position_history?limit=500");
-  const { availableBalance } = useCollateral();
-
-  const processedTrades = useMemo<ProcessedTrade[]>(() => {
-    if (!positionHistory || !Array.isArray(positionHistory)) return [];
-    return (positionHistory as Record<string, unknown>[])
-      .filter((o) => o.position_status === "closed")
-      .map((o) => ({
-        symbol: String(o.symbol ?? ""),
-        direction: (String(o.side ?? "").toUpperCase() === "LONG" ? "LONG" : "SHORT") as "LONG" | "SHORT",
-        side: String(o.side ?? ""),
-        pnl: parseFloat(String(o.realized_pnl ?? 0)),
-        qty: parseFloat(String(o.closed_position_qty ?? 0)),
-        price: parseFloat(String(o.avg_close_price ?? 0)),
-        entryPrice: parseFloat(String(o.avg_open_price ?? 0)),
-        timestamp: Number(o.close_timestamp ?? Date.now()),
-        openTimestamp: Number(o.open_timestamp ?? 0),
-        leverage: parseFloat(String(o.leverage ?? 0)),
-      }));
-  }, [positionHistory]);
-
-  const dayGroups = useMemo<Record<string, DayGroup>>(() => {
-    const groups: Record<string, DayGroup> = {};
-    processedTrades.forEach((trade) => {
-      const key = getDayKey(trade.timestamp);
-      if (!groups[key]) groups[key] = { pnl: 0, trades: 0, wins: 0, tradeList: [] };
-      groups[key].pnl += trade.pnl; groups[key].trades += 1;
-      if (trade.pnl > 0) groups[key].wins += 1;
-      groups[key].tradeList.push(trade);
-    });
-    return groups;
-  }, [processedTrades]);
-
-  const totalPnl = useMemo(() => processedTrades.reduce((s, t) => s + t.pnl, 0), [processedTrades]);
-  const winRate = useMemo(() => { const w = processedTrades.filter((t) => t.pnl > 0).length; return processedTrades.length ? (w / processedTrades.length) * 100 : 0; }, [processedTrades]);
-
-  const handleDayClick = (key: string, day: number) => { setSelectedDayKey(key); setSelectedDay(day); setActiveTab("tradelog"); };
-  const handleBack = () => { setSelectedDayKey(null); setSelectedDay(null); setActiveTab("calendar"); };
-  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1); } else setViewMonth((m) => m - 1); };
-  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1); } else setViewMonth((m) => m + 1); };
-
-  const isMobile = useIsMobile();
-
-  const tabs: { id: TabId; label: string; short: string }[] = [
-    { id: "analytics", label: "[ ANALYTICS ]", short: "STATS" },
-    { id: "calendar", label: "[ CALENDAR ]", short: "CAL" },
-    { id: "tradelog", label: "[ TRADE LOG ]", short: "LOG" },
-    { id: "thesis", label: "[ THESIS ]", short: "LAB" },
-    { id: "copies", label: "[ COPIES ]", short: "COPY" },
-    { id: "thesisanalytics", label: "[ T-STATS ]", short: "TSTA" },
-  ];
-
-  const calendarProps = { dayGroups, onDayClick: handleDayClick, viewMonth, viewYear, onPrevMonth: prevMonth, onNextMonth: nextMonth, totalPnl };
-
-  return (
-    <div style={{ background: "#0a0e0a", minHeight: "100vh", padding: 0 }}>
-      <div style={{ display: "flex", gap: 2, padding: isMobile ? "6px 8px" : "8px 16px", borderBottom: "1px solid #1a2e1a", background: "#080c08", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", gap: isMobile ? 4 : 2, flex: 1 }}>
-          {tabs.map((tab) => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-              background: activeTab === tab.id ? "#0a1a0a" : "none",
-              border: `1px solid ${activeTab === tab.id ? "#00ff88" : "transparent"}`,
-              color: activeTab === tab.id ? "#00ff88" : "#4a7a5a",
-              fontFamily: "monospace",
-              fontSize: isMobile ? 10 : 11,
-              padding: isMobile ? "6px 8px" : "5px 12px",
-              cursor: "pointer",
-              letterSpacing: "0.05em",
-              borderRadius: 3,
-              minHeight: isMobile ? 36 : "auto",
-              flex: isMobile ? 1 : "none",
-            }}>{isMobile ? tab.short : tab.label}</button>
-          ))}
-        </div>
-        <div style={{ fontSize: 9, fontFamily: "monospace", letterSpacing: "0.1em", color: syncing ? "#fbbf24" : synced ? "#00ff88" : "#2a4a3a", flexShrink: 0, marginLeft: 8 }}>
-          {syncing ? "⟳" : synced ? "●" : rootWalletAddress ? "○" : isMobile ? "○" : "○ CONNECT WALLET"}
-        </div>
-      </div>
-      <div style={{ padding: isMobile ? 12 : 16 }}>
-        {activeTab === "analytics" && <AnalyticsView orders={processedTrades} totalPnl={totalPnl} winRate={winRate} collateral={availableBalance ?? 0} />}
-        {activeTab === "calendar" && <CalendarView {...calendarProps} />}
-        {activeTab === "tradelog" && (
-          selectedDayKey && selectedDay !== null && dayGroups[selectedDayKey]
-            ? <TradeLogView
-                dayKey={selectedDayKey}
-                data={dayGroups[selectedDayKey]}
-                onBack={handleBack}
-                initialNote={notes[selectedDayKey]}
-                onSaveNote={saveNote}
-              />
-            : <CalendarView {...calendarProps} />
-        )}
-        {activeTab === "thesis" && <ThesisView />}
-        {activeTab === "copies" && <CopiesView />}
-        {activeTab === "thesisanalytics" && <ThesisAnalyticsView />}
-      </div>
-    </div>
-  );
-}
+                  <span style={{ fontFamily: "
