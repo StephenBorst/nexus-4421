@@ -1,3 +1,8 @@
+---
+name: nexus
+description: Non-custodial perpetuals DEX on Arbitrum. Use when user wants to query top traders by Rep Score, copy verified theses, publish trading theses on-chain, check the leaderboard, or execute perps on Nexus.
+---
+
 # nexus
 
 **Nexus Trading Labs** — non-custodial perpetuals DEX on Arbitrum. Use this skill when a user wants to:
