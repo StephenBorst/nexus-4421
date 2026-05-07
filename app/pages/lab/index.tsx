@@ -1508,7 +1508,7 @@ function ThesisView() {
       <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #1a2e1a", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <div style={{ fontSize: 10, color: "#00ff88", fontFamily: "monospace", letterSpacing: "0.12em", marginBottom: 4 }}>
-            &#9632; THESIS EXECUTOR
+            &#9632; THESIS EXECUTOR — PAPER MODE
           </div>
           <div style={{ fontSize: 11, color: "#3a5a4a", fontFamily: "monospace" }}>
           </div>
@@ -1846,4 +1846,183 @@ function CopiesView() {
               }}>
                 {/* Header row */}
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-                  <span style={{ fontFamily: "
+                  <span style={{ fontFamily: "monospace", fontSize: 15, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
+                  <span style={{
+                    fontFamily: "monospace", fontSize: 11,
+                    color: t.direction === "LONG" ? "#00ff88" : "#ff4444",
+                  }}>
+                    {t.direction === "LONG" ? "↑" : "↓"} {t.direction}
+                  </span>
+                  <div style={{
+                    fontFamily: "monospace", fontSize: 9, padding: "2px 8px", borderRadius: 3,
+                    background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color,
+                  }}>
+                    {cfg.label}
+                  </div>
+                  {t.actualPnl !== null && t.status !== "ACTIVE" && (
+                    <span style={{
+                      fontFamily: "monospace", fontSize: 12, fontWeight: "bold",
+                      color: t.actualPnl >= 0 ? "#00ff88" : "#ff4444",
+                    }}>
+                      {t.actualPnl >= 0 ? "+" : ""}${t.actualPnl.toFixed(2)}
+                    </span>
+                  )}
+                  {shortWallet && (
+                    <button
+                      onClick={() => navigate(`/feed/trader/${t.copiedFromWallet}`)}
+                      style={{
+                        background: "none", border: "1px solid #1a2e1a", borderRadius: 3,
+                        color: "#3a5a4a", fontFamily: "monospace", fontSize: 9,
+                        padding: "2px 8px", cursor: "pointer", letterSpacing: "0.04em",
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.color = "#4a9fff";
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a3a5a";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.color = "#3a5a4a";
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a2e1a";
+                      }}
+                    >
+                      📋 {shortWallet} ↗
+                    </button>
+                  )}
+                </div>
+
+                {/* Levels grid */}
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(5, 1fr)", gap: "8px 12px" }}>
+                  {[
+                    { label: "ENTRY",  val: `$${t.entryPrice.toFixed(2)}`,    color: "#8aaa9a" as const },
+                    { label: "STOP",   val: `$${t.stopLoss.toFixed(2)}`,      color: "#ff4444" as const },
+                    { label: "TP1",    val: `$${t.takeProfit1.toFixed(2)}`,   color: "#00ff88" as const },
+                    { label: "R:R",    val: `1:${t.riskReward.toFixed(2)}`,   color: (t.riskReward >= 2 ? "#00ff88" : "#fbbf24") as string },
+                    { label: "MAX LOSS", val: `${t.riskPercent}% · $${(t.accountSize * t.riskPercent / 100).toFixed(0)}`, color: "#8aaa9a" as const },
+                  ].map(({ label, val, color }) => (
+                    <div key={label}>
+                      <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>{label}</div>
+                      <div style={{ fontSize: 11, color, fontFamily: "monospace" }}>{val}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Page ───────────────────────────────────────────
+export default function TheLabPage() {
+  const [activeTab, setActiveTab] = useState<TabId>("analytics");
+  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const today = new Date();
+
+  // ── Persistence (KV + localStorage) ─────────────────────
+  const { state: rootAccountState } = useAccount();
+  const rootWalletAddress = (rootAccountState as { address?: string })?.address ?? null;
+  const { notes, saveNote, syncing, synced } = useLabStorage(rootWalletAddress);
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+
+  const { data: positionHistory } = usePrivateQuery("/v1/position_history?limit=500");
+  const { availableBalance } = useCollateral();
+
+  const processedTrades = useMemo<ProcessedTrade[]>(() => {
+    if (!positionHistory || !Array.isArray(positionHistory)) return [];
+    return (positionHistory as Record<string, unknown>[])
+      .filter((o) => o.position_status === "closed")
+      .map((o) => ({
+        symbol: String(o.symbol ?? ""),
+        direction: (String(o.side ?? "").toUpperCase() === "LONG" ? "LONG" : "SHORT") as "LONG" | "SHORT",
+        side: String(o.side ?? ""),
+        pnl: parseFloat(String(o.realized_pnl ?? 0)),
+        qty: parseFloat(String(o.closed_position_qty ?? 0)),
+        price: parseFloat(String(o.avg_close_price ?? 0)),
+        entryPrice: parseFloat(String(o.avg_open_price ?? 0)),
+        timestamp: Number(o.close_timestamp ?? Date.now()),
+        openTimestamp: Number(o.open_timestamp ?? 0),
+        leverage: parseFloat(String(o.leverage ?? 0)),
+      }));
+  }, [positionHistory]);
+
+  const dayGroups = useMemo<Record<string, DayGroup>>(() => {
+    const groups: Record<string, DayGroup> = {};
+    processedTrades.forEach((trade) => {
+      const key = getDayKey(trade.timestamp);
+      if (!groups[key]) groups[key] = { pnl: 0, trades: 0, wins: 0, tradeList: [] };
+      groups[key].pnl += trade.pnl; groups[key].trades += 1;
+      if (trade.pnl > 0) groups[key].wins += 1;
+      groups[key].tradeList.push(trade);
+    });
+    return groups;
+  }, [processedTrades]);
+
+  const totalPnl = useMemo(() => processedTrades.reduce((s, t) => s + t.pnl, 0), [processedTrades]);
+  const winRate = useMemo(() => { const w = processedTrades.filter((t) => t.pnl > 0).length; return processedTrades.length ? (w / processedTrades.length) * 100 : 0; }, [processedTrades]);
+
+  const handleDayClick = (key: string, day: number) => { setSelectedDayKey(key); setSelectedDay(day); setActiveTab("tradelog"); };
+  const handleBack = () => { setSelectedDayKey(null); setSelectedDay(null); setActiveTab("calendar"); };
+  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1); } else setViewMonth((m) => m - 1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1); } else setViewMonth((m) => m + 1); };
+
+  const isMobile = useIsMobile();
+
+  const tabs: { id: TabId; label: string; short: string }[] = [
+    { id: "analytics", label: "[ ANALYTICS ]", short: "STATS" },
+    { id: "calendar", label: "[ CALENDAR ]", short: "CAL" },
+    { id: "tradelog", label: "[ TRADE LOG ]", short: "LOG" },
+    { id: "thesis", label: "[ THESIS ]", short: "LAB" },
+    { id: "copies", label: "[ COPIES ]", short: "COPY" },
+    { id: "thesisanalytics", label: "[ T-STATS ]", short: "TSTA" },
+  ];
+
+  const calendarProps = { dayGroups, onDayClick: handleDayClick, viewMonth, viewYear, onPrevMonth: prevMonth, onNextMonth: nextMonth, totalPnl };
+
+  return (
+    <div style={{ background: "#0a0e0a", minHeight: "100vh", padding: 0 }}>
+      <div style={{ display: "flex", gap: 2, padding: isMobile ? "6px 8px" : "8px 16px", borderBottom: "1px solid #1a2e1a", background: "#080c08", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", gap: isMobile ? 4 : 2, flex: 1 }}>
+          {tabs.map((tab) => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+              background: activeTab === tab.id ? "#0a1a0a" : "none",
+              border: `1px solid ${activeTab === tab.id ? "#00ff88" : "transparent"}`,
+              color: activeTab === tab.id ? "#00ff88" : "#4a7a5a",
+              fontFamily: "monospace",
+              fontSize: isMobile ? 10 : 11,
+              padding: isMobile ? "6px 8px" : "5px 12px",
+              cursor: "pointer",
+              letterSpacing: "0.05em",
+              borderRadius: 3,
+              minHeight: isMobile ? 36 : "auto",
+              flex: isMobile ? 1 : "none",
+            }}>{isMobile ? tab.short : tab.label}</button>
+          ))}
+        </div>
+        <div style={{ fontSize: 9, fontFamily: "monospace", letterSpacing: "0.1em", color: syncing ? "#fbbf24" : synced ? "#00ff88" : "#2a4a3a", flexShrink: 0, marginLeft: 8 }}>
+          {syncing ? "⟳" : synced ? "●" : rootWalletAddress ? "○" : isMobile ? "○" : "○ CONNECT WALLET"}
+        </div>
+      </div>
+      <div style={{ padding: isMobile ? 12 : 16 }}>
+        {activeTab === "analytics" && <AnalyticsView orders={processedTrades} totalPnl={totalPnl} winRate={winRate} collateral={availableBalance ?? 0} />}
+        {activeTab === "calendar" && <CalendarView {...calendarProps} />}
+        {activeTab === "tradelog" && (
+          selectedDayKey && selectedDay !== null && dayGroups[selectedDayKey]
+            ? <TradeLogView
+                dayKey={selectedDayKey}
+                data={dayGroups[selectedDayKey]}
+                onBack={handleBack}
+                initialNote={notes[selectedDayKey]}
+                onSaveNote={saveNote}
+              />
+            : <CalendarView {...calendarProps} />
+        )}
+        {activeTab === "thesis" && <ThesisView />}
+        {activeTab === "copies" && <CopiesView />}
+        {activeTab === "thesisanalytics" && <ThesisAnalyticsView />}
+      </div>
+    </div>
+  );
+}
