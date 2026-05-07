@@ -506,6 +506,85 @@ export default {
       }
     }
 
+    // ── Ph29: /comments/:thesisId ─────────────────────────
+    if (parts[0] === "comments" && parts[1]) {
+      const thesisId = parts[1];
+      const commentKey = `comments:${thesisId}`;
+
+      if (request.method === "GET" && parts.length === 2) {
+        const raw = await env.LAB_STORE.get(commentKey);
+        return json(raw ? JSON.parse(raw) : [], request);
+      }
+
+      if (request.method === "POST" && parts.length === 2) {
+        let body;
+        try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        const wallet = typeof body.wallet === "string" ? body.wallet.toLowerCase().trim() : null;
+        const text = typeof body.text === "string" ? body.text.trim().slice(0, 280) : null;
+        if (!wallet || !text) return json({ error: "missing wallet or text" }, request, 400);
+        const raw = await env.LAB_STORE.get(commentKey);
+        const list = raw ? JSON.parse(raw) : [];
+        list.unshift({
+          id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          wallet,
+          text,
+          createdAt: Date.now(),
+        });
+        await env.LAB_STORE.put(commentKey, JSON.stringify(list.slice(0, 50)));
+        return json({ ok: true }, request);
+      }
+
+      if (request.method === "DELETE" && parts.length === 3) {
+        const commentId = parts[2];
+        let body;
+        try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        const wallet = typeof body.wallet === "string" ? body.wallet.toLowerCase().trim() : null;
+        if (!wallet) return json({ error: "missing wallet" }, request, 400);
+        const raw = await env.LAB_STORE.get(commentKey);
+        if (!raw) return json({ ok: true }, request);
+        const list = JSON.parse(raw);
+        const target = list.find((c) => c.id === commentId);
+        if (!target) return json({ error: "not found" }, request, 404);
+        if (target.wallet !== wallet) return json({ error: "forbidden" }, request, 403);
+        await env.LAB_STORE.put(commentKey, JSON.stringify(list.filter((c) => c.id !== commentId)));
+        return json({ ok: true }, request);
+      }
+
+      return json({ error: "method not allowed" }, request, 405);
+    }
+
+    // ── Ph29: /reactions/:thesisId ────────────────────────
+    if (parts[0] === "reactions" && parts[1]) {
+      const thesisId = parts[1];
+      const reactionKey = `reactions:${thesisId}`;
+      const ALLOWED_EMOJIS = ["🔥", "💎", "📉", "✅", "❌"];
+
+      if (request.method === "GET" && parts.length === 2) {
+        const raw = await env.LAB_STORE.get(reactionKey);
+        return json(raw ? JSON.parse(raw) : {}, request);
+      }
+
+      if (request.method === "PUT" && parts.length === 3) {
+        const emoji = decodeURIComponent(parts[2]);
+        if (!ALLOWED_EMOJIS.includes(emoji)) return json({ error: "emoji not allowed" }, request, 400);
+        let body;
+        try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        const wallet = typeof body.wallet === "string" ? body.wallet.toLowerCase().trim() : null;
+        if (!wallet) return json({ error: "missing wallet" }, request, 400);
+        const raw = await env.LAB_STORE.get(reactionKey);
+        const reactions = raw ? JSON.parse(raw) : {};
+        const reactors = reactions[emoji] ?? [];
+        const idx = reactors.indexOf(wallet);
+        if (idx >= 0) reactors.splice(idx, 1);
+        else reactors.push(wallet);
+        reactions[emoji] = reactors;
+        await env.LAB_STORE.put(reactionKey, JSON.stringify(reactions));
+        return json({ ok: true }, request);
+      }
+
+      return json({ error: "method not allowed" }, request, 405);
+    }
+
     // ── Ph27: /notifications/:wallet ──────────────────────
     if (parts[0] === "notifications" && parts[1]) {
       const wallet = normalizeAddress(parts[1]);
@@ -551,6 +630,88 @@ export default {
         const list = JSON.parse(raw).filter((n) => n.id !== id);
         await env.LAB_STORE.put(notifKey, JSON.stringify(list));
         return json({ ok: true }, request);
+      }
+
+      return json({ error: "method not allowed" }, request, 405);
+    }
+
+    // ── Ph29: /comments/:thesisId ────────────────────────────────────────────
+    if (parts[0] === "comments" && parts[1]) {
+      const thesisId = parts[1];
+      const commentsKey = `comments:${thesisId}`;
+
+      if (request.method === "GET" && parts.length === 2) {
+        const raw = await env.LAB_STORE.get(commentsKey);
+        return json(raw ? JSON.parse(raw) : [], request);
+      }
+
+      if (request.method === "POST" && parts.length === 2) {
+        let body;
+        try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        if (typeof body.wallet !== "string" || !body.wallet) return json({ error: "missing wallet" }, request, 400);
+        if (typeof body.text !== "string" || !body.text.trim()) return json({ error: "text required" }, request, 400);
+        const text = body.text.trim().slice(0, 280);
+        const raw = await env.LAB_STORE.get(commentsKey);
+        const list = raw ? JSON.parse(raw) : [];
+        const newComment = {
+          id: crypto.randomUUID(),
+          wallet: normalizeAddress(body.wallet),
+          text,
+          createdAt: Date.now(),
+        };
+        await env.LAB_STORE.put(commentsKey, JSON.stringify([newComment, ...list].slice(0, 50)));
+        return json(newComment, request, 201);
+      }
+
+      if (request.method === "DELETE" && parts.length === 3) {
+        const commentId = parts[2];
+        let body;
+        try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        if (typeof body.wallet !== "string" || !body.wallet) return json({ error: "missing wallet" }, request, 400);
+        const walletNorm = normalizeAddress(body.wallet);
+        const raw = await env.LAB_STORE.get(commentsKey);
+        if (!raw) return json({ error: "not found" }, request, 404);
+        const list = JSON.parse(raw);
+        const comment = list.find((c) => c.id === commentId);
+        if (!comment) return json({ error: "not found" }, request, 404);
+        if (comment.wallet !== walletNorm) return json({ error: "forbidden" }, request, 403);
+        await env.LAB_STORE.put(commentsKey, JSON.stringify(list.filter((c) => c.id !== commentId)));
+        return json({ ok: true }, request);
+      }
+
+      return json({ error: "method not allowed" }, request, 405);
+    }
+
+    // ── Ph29: /reactions/:thesisId ────────────────────────────────────────────
+    if (parts[0] === "reactions" && parts[1]) {
+      const thesisId = parts[1];
+      const reactionsKey = `reactions:${thesisId}`;
+      const ALLOWED_EMOJIS = new Set(["🔥", "💎", "📉", "✅", "❌"]);
+
+      if (request.method === "GET" && parts.length === 2) {
+        const raw = await env.LAB_STORE.get(reactionsKey);
+        return json(raw ? JSON.parse(raw) : {}, request);
+      }
+
+      if (request.method === "PUT" && parts.length === 3) {
+        const emoji = decodeURIComponent(parts[2]);
+        if (!ALLOWED_EMOJIS.has(emoji)) return json({ error: "emoji not allowed" }, request, 400);
+        let body;
+        try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        if (typeof body.wallet !== "string" || !body.wallet) return json({ error: "missing wallet" }, request, 400);
+        const wallet = normalizeAddress(body.wallet);
+        const raw = await env.LAB_STORE.get(reactionsKey);
+        const reactions = raw ? JSON.parse(raw) : {};
+        const wallets = reactions[emoji] || [];
+        const idx = wallets.indexOf(wallet);
+        if (idx === -1) {
+          reactions[emoji] = [...wallets, wallet];
+        } else {
+          reactions[emoji] = wallets.filter((w) => w !== wallet);
+          if (reactions[emoji].length === 0) delete reactions[emoji];
+        }
+        await env.LAB_STORE.put(reactionsKey, JSON.stringify(reactions));
+        return json(reactions, request);
       }
 
       return json({ error: "method not allowed" }, request, 405);

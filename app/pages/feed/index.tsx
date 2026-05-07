@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 import { fetchOnChainRepScore } from "@/hooks/useThesisRegistry";
 import type { ThesisTrade } from "@/pages/lab/types";
+import CommentsPanel from "@/components/CommentsPanel";
 
 const API_BASE = "https://nexus-lab-api.stephenpatrick24.workers.dev";
 
@@ -435,15 +436,18 @@ function FeedCard({
     if (h > 0) return `${h}h ago`;
     return "just now";
   })();
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentCount, setCommentCount] = useState(0);
 
   return (
     <div style={{
       background: "#0d120d",
       border: `1px solid ${cfg.border}`,
       borderRadius: 4,
-      padding: "14px 16px",
+      overflow: "hidden",
       opacity: thesis.status === "INVALIDATED" ? 0.65 : 1,
     }}>
+      <div style={{ padding: "14px 16px" }}>
       {/* Header: avatar + identity + status + time + copy */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
         <Avatar pfp={thesis.pfp} displayName={thesis.displayName} size={34} />
@@ -532,6 +536,23 @@ function FeedCard({
             COPY
           </button>
         )}
+        {/* Comments toggle */}
+        <button
+          onClick={() => setCommentsOpen((o) => !o)}
+          style={{
+            background: commentsOpen ? "#0a1a0a" : "none",
+            border: `1px solid ${commentsOpen ? "#00ff88" : "#1a2e1a"}`,
+            borderRadius: 3,
+            color: commentsOpen ? "#00ff88" : "#3a5a4a",
+            fontFamily: "monospace",
+            fontSize: 9,
+            padding: "3px 7px",
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          💬 {commentCount}
+        </button>
       </div>
 
       {/* Symbol + direction */}
@@ -620,6 +641,13 @@ function FeedCard({
           {thesis.notes}
         </div>
       )}
+      </div>
+      <CommentsPanel
+        thesisId={thesis.id}
+        walletAddress={walletAddress}
+        isOpen={commentsOpen}
+        onCountChange={setCommentCount}
+      />
     </div>
   );
 }

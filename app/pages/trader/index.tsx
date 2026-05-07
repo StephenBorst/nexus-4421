@@ -11,6 +11,7 @@ import { useAccount } from "@orderly.network/hooks";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 import { fetchOnChainRepScore } from "@/hooks/useThesisRegistry";
 import type { ThesisTrade } from "@/pages/lab/types";
+import CommentsPanel from "@/components/CommentsPanel";
 
 const API_BASE = "https://nexus-lab-api.stephenpatrick24.workers.dev";
 
@@ -116,6 +117,8 @@ function ThesisRow({
   walletAddress: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentCount, setCommentCount] = useState(0);
   const cfg = STATUS_CONFIG[thesis.status];
   const ticker = thesis.symbol.replace("PERP_", "").replace("_USDC", "");
   const timeAgo = (() => {
@@ -228,6 +231,23 @@ function ThesisRow({
           >COPY</button>
         )}
 
+        {/* Comments toggle */}
+        <button
+          onClick={(e) => { e.stopPropagation(); setCommentsOpen((o) => !o); }}
+          style={{
+            background: commentsOpen ? "#0a1a0a" : "none",
+            border: `1px solid ${commentsOpen ? "#00ff88" : "#1a2e1a"}`,
+            borderRadius: 3,
+            color: commentsOpen ? "#00ff88" : "#3a5a4a",
+            fontFamily: "monospace",
+            fontSize: 9,
+            padding: "3px 7px",
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          💬 {commentCount}
+        </button>
         <div style={{ color: "#2a4a3a", fontSize: 10 }}>{expanded ? "▲" : "▼"}</div>
       </div>
 
@@ -267,6 +287,12 @@ function ThesisRow({
           )}
         </div>
       )}
+      <CommentsPanel
+        thesisId={thesis.id}
+        walletAddress={walletAddress}
+        isOpen={commentsOpen}
+        onCountChange={setCommentCount}
+      />
     </div>
   );
 }
