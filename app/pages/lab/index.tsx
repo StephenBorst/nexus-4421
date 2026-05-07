@@ -22,7 +22,7 @@ import { useThesisRegistry } from "@/hooks/useThesisRegistry";
 import type { ThesisTrade, ThesisStatus } from "./types";
 
 // ─── Types ───────────────────────────────────────────────
-type TabId = "analytics" | "calendar" | "tradelog" | "thesis" | "copies";
+type TabId = "analytics" | "calendar" | "tradelog" | "thesis" | "copies" | "thesisanalytics";
 
 interface DayGroup {
   pnl: number;
@@ -1087,6 +1087,229 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
   );
 }
 
+// ─── Thesis Analytics View ───────────────────────────────
+function ThesisAnalyticsView() {
+  const { state: accountState } = useAccount();
+  const walletAddress = (accountState as { address?: string })?.address ?? null;
+  const { theses } = useLabStorage(walletAddress);
+
+  const closed = useMemo(
+    () => theses.filter((t) => t.status === "HIT_TP" || t.status === "STOPPED_OUT"),
+    [theses]
+  );
+
+  const summaryStats = useMemo(() => {
+    const wins = closed.filter((t) => t.status === "HIT_TP").length;
+    const winRate = closed.length > 0 ? (wins / closed.length) * 100 : 0;
+    const avgRR = theses.length > 0 ? theses.reduce((s, t) => s + t.riskReward, 0) / theses.length : 0;
+    const totalPnl = closed.reduce((s, t) => s + (t.actualPnl ?? 0), 0);
+    return { total: theses.length, winRate, avgRR, totalPnl };
+  }, [theses, closed]);
+
+  const equityPoints = useMemo(() => {
+    const sorted = [...closed].sort((a, b) => a.createdAt - b.createdAt);
+    let running = 0;
+    return sorted.map((t) => { running += (t.actualPnl ?? 0); return running; });
+  }, [closed]);
+
+  const streaks = useMemo(() => {
+    const sortedDesc = [...closed].sort((a, b) => b.createdAt - a.createdAt);
+    let current = 0;
+    for (const t of sortedDesc) {
+      if (t.status === "HIT_TP") current++;
+      else break;
+    }
+    const sortedAsc = [...closed].sort((a, b) => a.createdAt - b.createdAt);
+    let best = 0;
+    let streak = 0;
+    for (const t of sortedAsc) {
+      if (t.status === "HIT_TP") { streak++; if (streak > best) best = streak; }
+      else streak = 0;
+    }
+    return { current, best };
+  }, [closed]);
+
+  const assetStats = useMemo(() => {
+    const map = new Map<string, { wins: number; total: number; rrSum: number }>();
+    for (const t of closed) {
+      const sym = t.symbol.replace("PERP_", "").replace("_USDC", "");
+      if (!map.has(sym)) map.set(sym, { wins: 0, total: 0, rrSum: 0 });
+      const s = map.get(sym)!;
+      s.total++;
+      if (t.status === "HIT_TP") s.wins++;
+      s.rrSum += t.riskReward;
+    }
+    return [...map.entries()]
+      .map(([sym, s]) => ({
+        sym,
+        winRate: (s.wins / s.total) * 100,
+        total: s.total,
+        avgRR: s.rrSum / s.total,
+      }))
+      .sort((a, b) => b.winRate - a.winRate);
+  }, [closed]);
+
+  const bestAssets = assetStats.slice(0, 5);
+  const worstAssets = [...assetStats].reverse().slice(0, 3);
+
+  if (!walletAddress) {
+    return <EmptyState message="connect wallet to view thesis analytics" />;
+  }
+
+  const endVal = equityPoints.length > 0 ? equityPoints[equityPoints.length - 1] : 0;
+  const lineColor = endVal >= 0 ? "#00ff88" : "#ff4444";
+
+  const renderEquityCurve = () => {
+    if (equityPoints.length < 2) {
+      return (
+        <div style={{ padding: "20px 0", fontFamily: "monospace", fontSize: 11, color: "#2a4a3a" }}>
+          Not enough data yet.
+        </div>
+      );
+    }
+    const w = 500; const svgH = 120;
+    const allPoints = [0, ...equityPoints];
+    const minV = Math.min(...allPoints);
+    const maxV = Math.max(...allPoints);
+    const range = maxV - minV || 1;
+    const n = allPoints.length;
+    const toY = (v: number) => svgH - ((v - minV) / range) * svgH * 0.85 + svgH * 0.075;
+    const pts = allPoints.map((v, i) => `${(i / (n - 1)) * w},${toY(v)}`).join(" ");
+    const zeroY = toY(0);
+    const lastY = toY(equityPoints[equityPoints.length - 1]);
+    return (
+      <svg viewBox={`0 0 ${w} ${svgH}`} style={{ width: "100%", height: 120 }}>
+        <line x1="0" y1={zeroY} x2={w} y2={zeroY} stroke="#1a2e1a" strokeWidth="1" strokeDasharray="4,4" />
+        <polyline points={pts} fill="none" stroke={lineColor} strokeWidth="2" />
+        <circle cx={w} cy={lastY} r="4" fill={lineColor} />
+      </svg>
+    );
+  };
+
+  const assetRow = (a: { sym: string; winRate: number; total: number; avgRR: number }, i: number, maxIdx: number) => (
+    <div
+      key={a.sym}
+      style={{
+        display: "grid", gridTemplateColumns: "1fr 54px 40px 54px", gap: 8,
+        padding: "5px 0",
+        borderBottom: i < maxIdx ? "1px solid #0f1f0f" : "none",
+        alignItems: "center",
+      }}
+    >
+      <span style={{ fontFamily: "monospace", fontSize: 11, color: "#fff" }}>{a.sym}</span>
+      <span style={{ fontFamily: "monospace", fontSize: 11, textAlign: "right", color: a.winRate >= 50 ? "#00ff88" : "#ff4444" }}>
+        {a.winRate.toFixed(0)}%
+      </span>
+      <span style={{ fontFamily: "monospace", fontSize: 10, textAlign: "right", color: "#3a5a4a" }}>{a.total}</span>
+      <span style={{ fontFamily: "monospace", fontSize: 10, textAlign: "right", color: a.avgRR >= 2 ? "#00ff88" : "#fbbf24" }}>
+        1:{a.avgRR.toFixed(1)}
+      </span>
+    </div>
+  );
+
+  const tableHeader = () => (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 54px 40px 54px", gap: 8, marginBottom: 6 }}>
+      {["SYMBOL", "WR", "N", "AVG R:R"].map((col) => (
+        <span key={col} style={{ fontSize: 8, color: "#2a4a3a", fontFamily: "monospace", textAlign: col !== "SYMBOL" ? "right" : "left" }}>
+          {col}
+        </span>
+      ))}
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* Summary stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+        {[
+          { label: "TOTAL THESES", val: summaryStats.total.toString(), color: "#8aaa9a" as string },
+          {
+            label: "WIN RATE",
+            val: closed.length > 0 ? `${summaryStats.winRate.toFixed(1)}%` : "—",
+            color: (closed.length > 0 ? (summaryStats.winRate >= 50 ? "#00ff88" : "#ff4444") : "#3a5a4a") as string,
+          },
+          {
+            label: "AVG R:R",
+            val: theses.length > 0 ? `1:${summaryStats.avgRR.toFixed(2)}` : "—",
+            color: (theses.length > 0 ? (summaryStats.avgRR >= 2 ? "#00ff88" : "#fbbf24") : "#3a5a4a") as string,
+          },
+          {
+            label: "TOTAL P&L",
+            val: closed.length > 0 ? `${summaryStats.totalPnl >= 0 ? "+" : ""}$${Math.abs(summaryStats.totalPnl).toFixed(2)}` : "—",
+            color: (closed.length > 0 ? (summaryStats.totalPnl >= 0 ? "#00ff88" : "#ff4444") : "#3a5a4a") as string,
+          },
+        ].map(({ label, val, color }) => (
+          <div key={label} style={cardStyle}>
+            <div style={labelStyle}>{label}</div>
+            <div style={{ fontFamily: "monospace", fontSize: 22, fontWeight: "bold", color }}>{val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Equity curve */}
+      <div style={cardStyle}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <span style={{ fontFamily: "monospace", fontSize: 10, color: "#00ff88", letterSpacing: "0.1em" }}>◆ EQUITY CURVE</span>
+          {equityPoints.length >= 2 && (
+            <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: "bold", color: lineColor }}>
+              {summaryStats.totalPnl >= 0 ? "+" : ""}${Math.abs(summaryStats.totalPnl).toFixed(2)}
+            </span>
+          )}
+        </div>
+        {renderEquityCurve()}
+      </div>
+
+      {/* Streak + best/worst markets */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+        {/* Win streak */}
+        <div style={cardStyle}>
+          <div style={{ fontFamily: "monospace", fontSize: 10, color: "#fbbf24", letterSpacing: "0.1em", marginBottom: 14 }}>◆ WIN STREAK</div>
+          <div style={{ marginBottom: 14 }}>
+            <div style={labelStyle}>CURRENT STREAK</div>
+            <div style={{ fontFamily: "monospace", fontSize: 28, fontWeight: "bold", color: streaks.current > 0 ? "#00ff88" : "#2a4a3a" }}>
+              {streaks.current}
+              <span style={{ fontFamily: "monospace", fontSize: 12, color: "#3a5a4a", marginLeft: 6 }}>wins</span>
+            </div>
+          </div>
+          <div>
+            <div style={labelStyle}>BEST STREAK</div>
+            <div style={{ fontFamily: "monospace", fontSize: 22, fontWeight: "bold", color: streaks.best > 0 ? "#00ff88" : "#2a4a3a" }}>
+              {streaks.best}
+              <span style={{ fontFamily: "monospace", fontSize: 12, color: "#3a5a4a", marginLeft: 6 }}>wins</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Best markets */}
+        <div style={cardStyle}>
+          <div style={{ fontFamily: "monospace", fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 10 }}>◆ BEST MARKETS</div>
+          {bestAssets.length === 0 ? (
+            <div style={{ fontFamily: "monospace", fontSize: 10, color: "#2a4a3a" }}>no closed theses yet</div>
+          ) : (
+            <>
+              {tableHeader()}
+              {bestAssets.map((a, i) => assetRow(a, i, bestAssets.length - 1))}
+            </>
+          )}
+        </div>
+
+        {/* Worst markets */}
+        <div style={cardStyle}>
+          <div style={{ fontFamily: "monospace", fontSize: 10, color: "#ff4444", letterSpacing: "0.1em", marginBottom: 10 }}>◆ WORST MARKETS</div>
+          {worstAssets.length === 0 ? (
+            <div style={{ fontFamily: "monospace", fontSize: 10, color: "#2a4a3a" }}>no closed theses yet</div>
+          ) : (
+            <>
+              {tableHeader()}
+              {worstAssets.map((a, i) => assetRow(a, i, worstAssets.length - 1))}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Thesis View ──────────────────────────────────────────
 function ThesisView() {
   const isMobile = useIsMobile();
@@ -1762,6 +1985,7 @@ export default function TheLabPage() {
     { id: "tradelog", label: "[ TRADE LOG ]", short: "LOG" },
     { id: "thesis", label: "[ THESIS ]", short: "LAB" },
     { id: "copies", label: "[ COPIES ]", short: "COPY" },
+    { id: "thesisanalytics", label: "[ T-STATS ]", short: "TSTA" },
   ];
 
   const calendarProps = { dayGroups, onDayClick: handleDayClick, viewMonth, viewYear, onPrevMonth: prevMonth, onNextMonth: nextMonth, totalPnl };
@@ -1806,6 +2030,7 @@ export default function TheLabPage() {
         )}
         {activeTab === "thesis" && <ThesisView />}
         {activeTab === "copies" && <CopiesView />}
+        {activeTab === "thesisanalytics" && <ThesisAnalyticsView />}
       </div>
     </div>
   );

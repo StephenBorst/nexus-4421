@@ -573,6 +573,15 @@ function FeedCard({
             📋 {thesis.copyCount} {thesis.copyCount === 1 ? "copy" : "copies"}
           </span>
         )}
+        {(thesis.copyCount ?? 0) >= 3 && (
+          <span style={{
+            fontFamily: "monospace", fontSize: 9, color: "#f97316",
+            background: "#1a0800", border: "1px solid #3a1800",
+            borderRadius: 3, padding: "2px 6px",
+          }}>
+            🔥 HOT
+          </span>
+        )}
       </div>
 
       {/* Key levels grid */}
@@ -1004,6 +1013,7 @@ export default function FeedPage() {
   const [search, setSearch] = useState("");
   const [copyTarget, setCopyTarget] = useState<FeedThesis | null>(null);
   const [view, setView] = useState<"feed" | "ranks" | "following">("feed");
+  const [sortMode, setSortMode] = useState<"latest" | "trending">("latest");
   // Ph19: on-chain trader count (trustless roster from ThesisRegistered logs)
   const [onChainCount, setOnChainCount] = useState<number | null>(null);
   // Ph24: follow graph
@@ -1088,6 +1098,13 @@ export default function FeedPage() {
     return true;
   });
 
+  const sortedFiltered = sortMode === "trending"
+    ? [...filtered].sort((a, b) => {
+        const diff = (b.copyCount ?? 0) - (a.copyCount ?? 0);
+        return diff !== 0 ? diff : b.createdAt - a.createdAt;
+      })
+    : [...filtered].sort((a, b) => b.createdAt - a.createdAt);
+
   const navBtnStyle = (active: boolean): React.CSSProperties => ({
     background: active ? "#0a1a0a" : "none",
     border: `1px solid ${active ? "#00ff88" : "#1a2e1a"}`,
@@ -1147,6 +1164,26 @@ export default function FeedPage() {
               }}
             >◈ FOLLOWING{following.size > 0 ? ` (${following.size})` : ""}</button>
           )}
+          {view !== "ranks" && (
+            <>
+              <div style={{ width: 1, height: 18, background: "#1a2e1a", alignSelf: "center" }} />
+              {(["latest", "trending"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setSortMode(mode)}
+                  style={{
+                    background: sortMode === mode ? "#0a1a0a" : "none",
+                    border: `1px solid ${sortMode === mode ? "#00ff88" : "#1a2e1a"}`,
+                    color: sortMode === mode ? "#00ff88" : "#4a7a5a",
+                    fontFamily: "monospace", fontSize: 10,
+                    padding: "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
+                  }}
+                >
+                  {mode === "latest" ? "LATEST" : "TRENDING"}
+                </button>
+              ))}
+            </>
+          )}
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
           <div style={{ fontSize: 9, fontFamily: "monospace", color: "#3a5a4a" }}>
@@ -1192,7 +1229,7 @@ export default function FeedPage() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {filtered.map((t) => (
+                {sortedFiltered.map((t) => (
                   <FeedCard
                     key={`${t.wallet}-${t.id}`}
                     thesis={t}
@@ -1297,7 +1334,7 @@ export default function FeedPage() {
 
             {!loading && !error && filtered.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {filtered.map((t) => (
+                {sortedFiltered.map((t) => (
                   <FeedCard
                     key={`${t.wallet}-${t.id}`}
                     thesis={t}
