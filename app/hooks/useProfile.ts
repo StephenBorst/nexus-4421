@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-const API_BASE = "https://nexus-lab-api.stephenpatrick24.workers.dev";
+const API_BASE = "https://og.nexustradinglabs.com";
 
 export type Profile = {
   pfp: string | null;

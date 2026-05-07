@@ -1,4 +1,4 @@
-const API_BASE = "https://nexus-lab-api.stephenpatrick24.workers.dev";
+const API_BASE = "https://og.nexustradinglabs.com";
 
 export interface Comment {
   id: string;

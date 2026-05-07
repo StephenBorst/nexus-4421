@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const API_BASE = "https://nexus-lab-api.stephenpatrick24.workers.dev";
+const API_BASE = "https://og.nexustradinglabs.com";
 
 export interface Notification {
   id: string;

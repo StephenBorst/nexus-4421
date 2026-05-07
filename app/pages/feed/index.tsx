@@ -14,7 +14,7 @@ import { fetchOnChainRepScore } from "@/hooks/useThesisRegistry";
 import type { ThesisTrade } from "@/pages/lab/types";
 import CommentsPanel from "@/components/CommentsPanel";
 
-const API_BASE = "https://nexus-lab-api.stephenpatrick24.workers.dev";
+const API_BASE = "https://og.nexustradinglabs.com";
 
 type FeedThesis = {
   id: string;

@@ -11,7 +11,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { ThesisTrade } from "@/pages/lab/types";
 
-const API_BASE = "https://nexus-lab-api.stephenpatrick24.workers.dev";
+const API_BASE = "https://og.nexustradinglabs.com";
 const LOCAL_THESIS_KEY = "lab_thesis_trades";
 const LOCAL_NOTES_PREFIX = "lab_note_";
 
