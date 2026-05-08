@@ -722,9 +722,22 @@ export default {
       let body;
       try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
 
-      const { wallet, amount, accountId } = body;
-      if (!wallet || !amount || !accountId) {
-        return json({ error: "wallet, amount (USDC), and accountId required" }, request, 400);
+      const { wallet, amount } = body;
+      if (!wallet || !amount) {
+        return json({ error: "wallet and amount (USDC) required" }, request, 400);
+      }
+
+      // Fetch the real accountId from Orderly API — always, never trust client-supplied value
+      let accountId;
+      try {
+        const orderlyRes = await fetch(
+          `https://api.orderly.org/v1/client/account?address=${wallet}&broker_id=nexus_trading`
+        );
+        const orderlyData = await orderlyRes.json();
+        accountId = orderlyData?.data?.account_id;
+        if (!accountId) throw new Error("account_id missing in response");
+      } catch (e) {
+        return json({ error: "failed to fetch Orderly account ID", detail: String(e) }, request, 500);
       }
 
       // Orderly vault constants (Arbitrum One)
