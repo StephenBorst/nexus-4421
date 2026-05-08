@@ -4,6 +4,9 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@resvg/resvg-wasm": "^2.6.0"
+    "@noble/ed25519": "^3.1.0",
+    "@noble/hashes": "^2.2.0",
+    "@resvg/resvg-wasm": "^2.6.0",
+    "bs58": "^6.0.0"
   }
 }
