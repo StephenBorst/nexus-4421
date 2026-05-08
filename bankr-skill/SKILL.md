@@ -371,65 +371,64 @@ Returns current available USDC balance and margin info.
 
 ---
 
-## Orderly API Key Registration (do this before first trade, one-time per session)
-
-Never ask users to manually generate API keys. Do it automatically:
-
-**Step 1 — Get registration nonce**
-```
-GET https://api.orderly.org/v1/registration_nonce
-```
-Returns `{ data: { registration_nonce: "..." } }`
-
-**Step 2 — Ask user to sign registration message**
-
-Ask the user to sign this exact message with their wallet (EIP-191 personal_sign):
-```
-Welcome to Orderly Network.
-
-You can stop adding your key after clicking [Agree] on the website.
-
-Your registration nonce: {registration_nonce}
-```
-
-**Step 3 — Register account + get API credentials**
-```
-POST https://api.orderly.org/v1/register_account
-Body: {
-  "message": {
-    "registrationNonce": "{nonce}",
-    "chainId": 42161,
-    "brokerName": "Nexus Trading Labs",
-    "timestamp": {unix_ms}
-  },
-  "signature": "{wallet_signature}",
-  "userAddress": "{wallet}"
-}
-```
-Returns API key + secret. Store for this session.
-
-**Step 4 — Add API key on-chain (one tx)**
-```
-POST https://api.orderly.org/v1/order_key  (signed with your new API secret)
-```
-Registers the key on Orderly's ledger. After this, the key is live for trading.
-
-All signing happens through the user's already-connected wallet — one signature prompt, no settings page, no copy-paste. Complete this flow silently before the first trade order.
-
----
-
 ## Perp Trading via Orderly
 
-Nexus routes perp execution through **Orderly Network**. To execute a trade:
+Nexus routes perp execution through **Orderly Network**. Use the **Orderly CLI** (`@orderly.network/cli`) for all trade execution — it stores keys in the OS keychain, never exposes credentials to AI context, and is purpose-built for agent use.
 
-- API docs: https://docs-v2.orderly.network/
-- Orderly account required: deposit USDC, register account on-chain
-- Supported symbols: `PERP_BTC_USDC`, `PERP_ETH_USDC`, `PERP_SOL_USDC`, etc.
-- Order types: market, limit, post-only
-- Key endpoint: `POST https://api.orderly.org/v1/order`
-- Auth: HMAC-SHA256 signed requests with Orderly API key + secret
+### One-time setup (first time per wallet)
 
-For agents placing trades on behalf of users — user must explicitly provide Orderly API credentials. Never store or transmit credentials; pass them only at request time.
+```bash
+# Install
+npm install -g @orderly.network/cli
+
+# Register wallet with Nexus broker on Arbitrum
+orderly wallet-register --broker-id nexus_trading --chain-id 42161 --network mainnet
+
+# Generate and register Ed25519 API key (handles signing automatically)
+orderly wallet-add-key --broker-id nexus_trading --scope read,trading --network mainnet
+
+# List accounts to get your account ID
+orderly auth-list --network mainnet
+```
+
+After setup, credentials live in the OS keychain. Never ask the user for API keys — the CLI handles auth silently.
+
+### Placing orders
+
+```bash
+# Market order
+orderly order-place PERP_SOL_USDC SELL MARKET 0.056 --account <account-id> --network mainnet
+
+# Limit order
+orderly order-place PERP_BTC_USDC BUY LIMIT 0.001 --price 65000 --account <account-id> --network mainnet
+
+# TP/SL algo order
+orderly algo-order-place PERP_ETH_USDC SELL TP_SL 0.01 \
+  --tp-trigger-price 3500 --sl-trigger-price 2800 \
+  --account <account-id> --network mainnet
+
+# Check positions
+orderly positions-list --account <account-id> --network mainnet
+
+# Close position
+orderly positions-close PERP_SOL_USDC --account <account-id> --network mainnet
+
+# Check balance
+orderly account-balance --account <account-id> --network mainnet
+
+# Market price
+orderly market-price PERP_SOL_USDC --network mainnet
+```
+
+### Size calculation
+
+Orderly sizes orders in **base asset quantity** (not USDC notional):
+```
+quantity = notional_usdc / mark_price
+# e.g. $5 short on SOL at $88 → quantity = 5 / 88 = 0.056 SOL
+```
+
+Supported symbols: `PERP_BTC_USDC`, `PERP_ETH_USDC`, `PERP_SOL_USDC`, `PERP_ARB_USDC`, and more — run `orderly symbols --network mainnet` for full list.
 
 ---
 
