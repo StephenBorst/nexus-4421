@@ -718,128 +718,146 @@ export default {
     }
 
     // ── /trade — execute perp order via Orderly REST API ─────────────────────
+    // Multi-user: body includes walletSig + walletAddress; single-user: env secrets
     if (parts[0] === "trade" && request.method === "POST") {
       let body;
       try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
 
-      const { symbol, side, notional, leverage = 1, orderType = "MARKET" } = body;
+      const { symbol, side, notional, leverage = 1, orderType = "MARKET", walletSig, walletAddress } = body;
       if (!symbol || !side || !notional) {
         return json({ error: "symbol, side, and notional (USDC) required" }, request, 400);
       }
-      // Debug: surface which secrets are missing without exposing values
-      const secretDebug = {
-        ORDERLY_API_SECRET: typeof env.ORDERLY_API_SECRET === "string" ? `set(${env.ORDERLY_API_SECRET.length}chars)` : String(env.ORDERLY_API_SECRET),
-        ORDERLY_API_KEY:    typeof env.ORDERLY_API_KEY    === "string" ? `set(${env.ORDERLY_API_KEY.length}chars)`    : String(env.ORDERLY_API_KEY),
-        ORDERLY_ACCOUNT_ID: typeof env.ORDERLY_ACCOUNT_ID === "string" ? `set(${env.ORDERLY_ACCOUNT_ID.length}chars)` : String(env.ORDERLY_ACCOUNT_ID),
-      };
-      if (!env.ORDERLY_API_SECRET || !env.ORDERLY_API_KEY || !env.ORDERLY_ACCOUNT_ID) {
-        return json({ error: "Orderly credentials not configured", debug: secretDebug }, request, 500);
-      }
 
       const ORDERLY_BASE = "https://api-evm.orderly.org";
-      const accountId = env.ORDERLY_ACCOUNT_ID;
+      const PKCS8_HDR = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
+      let accountId, orderlyApiKey, signingKey;
 
-      // Ed25519 sign using Web Crypto API (native in CF Workers)
-      async function orderlySign(method, path, bodyStr) {
-        const timestamp = Date.now();
-        const message = `${timestamp}${method.toUpperCase()}${path}${bodyStr || ""}`;
-        const msgBytes = new TextEncoder().encode(message);
+      if (walletSig && walletAddress) {
+        // Multi-user: derive ed25519 seed from sha256(walletSig)
+        const walletNorm = walletAddress.toLowerCase().trim();
+        const userRaw = await env.LAB_STORE.get("user:" + walletNorm);
+        if (!userRaw) {
+          return json({
+            error: "Wallet not registered for Nexus trading.",
+            hint: "Visit og.nexustradinglabs.com/register-orderly-key to connect your wallet.",
+            walletAddress: walletNorm,
+          }, request, 401);
+        }
+        const userRecord = JSON.parse(userRaw);
+        accountId     = userRecord.accountId;
+        orderlyApiKey = userRecord.orderlyKey;
 
-        // Private key — supports both raw 32-byte seed and full 48-byte PKCS8
+        const hexSig   = walletSig.startsWith("0x") ? walletSig.slice(2) : walletSig;
+        const sigBytes = new Uint8Array(hexSig.match(/.{2}/g).map(b => parseInt(b, 16)));
+        const seed     = new Uint8Array(await crypto.subtle.digest("SHA-256", sigBytes));
+        const pkcs8    = new Uint8Array(48);
+        pkcs8.set(PKCS8_HDR, 0);
+        pkcs8.set(seed, 16);
+        signingKey = await crypto.subtle.importKey("pkcs8", pkcs8, { name: "Ed25519" }, false, ["sign"]);
+
+      } else {
+        // Single-user: use env secrets
+        const secretDebug = {
+          ORDERLY_API_SECRET: typeof env.ORDERLY_API_SECRET === "string" ? "set(" + env.ORDERLY_API_SECRET.length + "chars)" : String(env.ORDERLY_API_SECRET),
+          ORDERLY_API_KEY:    typeof env.ORDERLY_API_KEY    === "string" ? "set(" + env.ORDERLY_API_KEY.length + "chars)"    : String(env.ORDERLY_API_KEY),
+          ORDERLY_ACCOUNT_ID: typeof env.ORDERLY_ACCOUNT_ID === "string" ? "set(" + env.ORDERLY_ACCOUNT_ID.length + "chars)" : String(env.ORDERLY_ACCOUNT_ID),
+        };
+        if (!env.ORDERLY_API_SECRET || !env.ORDERLY_API_KEY || !env.ORDERLY_ACCOUNT_ID) {
+          return json({ error: "Orderly credentials not configured", debug: secretDebug }, request, 500);
+        }
+        accountId     = env.ORDERLY_ACCOUNT_ID;
+        orderlyApiKey = env.ORDERLY_API_KEY;
         let pkcs8Bytes = Uint8Array.from(atob(env.ORDERLY_API_SECRET), c => c.charCodeAt(0));
         if (pkcs8Bytes.length === 32) {
-          // Wrap raw seed into PKCS8 DER: 16-byte header + 32-byte seed
-          const hdr = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
           const full = new Uint8Array(48);
-          full.set(hdr, 0);
+          full.set(PKCS8_HDR, 0);
           full.set(pkcs8Bytes, 16);
           pkcs8Bytes = full;
         }
-        const key = await crypto.subtle.importKey("pkcs8", pkcs8Bytes, { name: "Ed25519" }, false, ["sign"]);
-        const sigBytes = new Uint8Array(await crypto.subtle.sign("Ed25519", key, msgBytes));
+        signingKey = await crypto.subtle.importKey("pkcs8", pkcs8Bytes, { name: "Ed25519" }, false, ["sign"]);
+      }
 
-        // Base64url encode signature
-        const sig = btoa(String.fromCharCode(...sigBytes))
-          .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
+      async function orderlySign(method, path, bodyStr) {
+        const timestamp = Date.now();
+        const msgBytes  = new TextEncoder().encode(timestamp + method.toUpperCase() + path + (bodyStr || ""));
+        const sigBuf    = new Uint8Array(await crypto.subtle.sign("Ed25519", signingKey, msgBytes));
+        const sig       = btoa(String.fromCharCode(...sigBuf)).replace(/[+]/g,"-").replace(/[/]/g,"_").replace(/=+$/,"");
         return {
-          "Content-Type": "application/json",
-          "orderly-timestamp": timestamp.toString(),
+          "Content-Type":       "application/json",
+          "orderly-timestamp":  String(timestamp),
           "orderly-account-id": accountId,
-          "orderly-key": env.ORDERLY_API_KEY,   // format: ed25519:base58pubkey
-          "orderly-signature": sig,
+          "orderly-key":        orderlyApiKey,
+          "orderly-signature":  sig,
         };
       }
 
       async function orderlyRequest(method, path, data) {
         const bodyStr = data ? JSON.stringify(data) : undefined;
         const headers = await orderlySign(method, path, bodyStr);
-        const res = await fetch(`${ORDERLY_BASE}${path}`, { method, headers, body: bodyStr });
+        const res = await fetch(ORDERLY_BASE + path, { method, headers, body: bodyStr });
         return res.json();
       }
 
       try {
-        // 1. Get mark price + instrument info (public endpoint)
-        const priceRes = await fetch(`${ORDERLY_BASE}/v1/public/futures/${symbol}`);
-        const priceData = await priceRes.json();
+        const priceData   = await (await fetch(ORDERLY_BASE + "/v1/public/futures/" + symbol)).json();
         const futuresInfo = priceData?.data || {};
-        const markPrice  = futuresInfo.mark_price;
+        const markPrice   = futuresInfo.mark_price;
         if (!markPrice) return json({ error: "failed to fetch mark price", symbol, raw: priceData }, request, 502);
 
-        // qty_step: try known field names, fallback to 0.01
-        const qtyStep = futuresInfo.base_tick ?? futuresInfo.qty_step ?? futuresInfo.base_min ?? 0.01;
+        const qtyStep       = futuresInfo.base_tick ?? futuresInfo.qty_step ?? futuresInfo.base_min ?? 0.01;
+        const minNotional   = futuresInfo.min_notional ?? futuresInfo.notional_step ?? 1;
+        const validNotional = minNotional > 1 ? Math.floor(notional / minNotional) * minNotional : notional;
+        const quantity      = Math.floor((validNotional / markPrice) * Math.round(1 / qtyStep)) / Math.round(1 / qtyStep);
 
-        // min_notional: Orderly enforces notional steps per symbol (e.g. $15 for SOL)
-        // Round notional DOWN to nearest valid step
-        const minNotional = futuresInfo.min_notional ?? futuresInfo.notional_step ?? 1;
-        const validNotional = minNotional > 1
-          ? Math.floor(notional / minNotional) * minNotional
-          : notional;
-
-        // 2. Compute quantity rounded to symbol's qty step
-        const rawQty = validNotional / markPrice;
-        const stepDivisor = Math.round(1 / qtyStep);
-        const quantity = Math.floor(rawQty * stepDivisor) / stepDivisor;
-
-        // 3. Verify auth — GET /v1/client/holding (read-only, signed)
         const authCheck = await orderlyRequest("GET", "/v1/client/holding", null);
         if (!authCheck.success) {
-          return json({ error: "auth failed", detail: authCheck, hint: "check ORDERLY_API_KEY/SECRET match" }, request, 401);
+          return json({ error: "auth failed", detail: authCheck, hint: "key/secret mismatch" }, request, 401);
         }
 
-        // 4. Set leverage — Orderly EVM uses /v1/client/leverage (account-level)
-        const lev = Math.max(1, Number(leverage) || 1);
-        let leverageResult = await orderlyRequest("POST", "/v1/client/leverage", {
-          leverage: lev,
+        const lev            = Math.max(1, Number(leverage) || 1);
+        const leverageResult = await orderlyRequest("POST", "/v1/client/leverage", { leverage: lev });
+        const orderResult    = await orderlyRequest("POST", "/v1/order", {
+          symbol, order_type: orderType.toUpperCase(), side: side.toUpperCase(), order_quantity: quantity,
         });
 
-        // 5. Place order
-        const orderPayload = {
-          symbol,
-          order_type: orderType.toUpperCase(),
-          side: side.toUpperCase(),
-          order_quantity: quantity,
-        };
-
-        const orderResult = await orderlyRequest("POST", "/v1/order", orderPayload);
-
         return json({
-          ok: true,
-          symbol,
-          side: side.toUpperCase(),
-          markPrice,
-          qtyStep,
-          minNotional,
-          validNotional,
-          quantity,
-          notional,
-          leverage: lev,
-          leverageResult,
-          order: orderResult,
+          ok: true, symbol, side: side.toUpperCase(), markPrice, qtyStep, minNotional,
+          validNotional, quantity, notional, leverage: lev, leverageResult, order: orderResult,
+          mode: walletSig ? "multi-user" : "single-user",
         }, request);
 
       } catch (e) {
         return json({ error: "trade execution failed", detail: String(e) }, request, 500);
+      }
+    }
+
+    // ── /derive-key — derive ed25519 public key from wallet signature ──────────
+    // Browser sends walletSig from personal_sign, gets back orderlyKey (public only)
+    if (parts[0] === "derive-key" && request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const { walletSig } = body;
+      if (!walletSig) return json({ error: "walletSig required" }, request, 400);
+      try {
+        const HDR  = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
+        const B58C = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+        const hex  = walletSig.startsWith("0x") ? walletSig.slice(2) : walletSig;
+        const seed = new Uint8Array(await crypto.subtle.digest("SHA-256",
+          new Uint8Array(hex.match(/.{2}/g).map(b => parseInt(b, 16)))));
+        const pk8  = new Uint8Array(48); pk8.set(HDR,0); pk8.set(seed,16);
+        const priv = await crypto.subtle.importKey("pkcs8", pk8, { name: "Ed25519" }, true, ["sign"]);
+        const jwk  = await crypto.subtle.exportKey("jwk", priv);
+        const raw  = Uint8Array.from(atob(jwk.x.replace(/-/g,"+").replace(/_/g,"/")), c => c.charCodeAt(0));
+        let n = BigInt("0x" + [...raw].map(b => b.toString(16).padStart(2,"0")).join(""));
+        let s = ""; while (n > 0n) { s = B58C[Number(n%58n)] + s; n = n/58n; }
+        for (const b of raw) { if (b===0) s="1"+s; else break; }
+        return new Response(JSON.stringify({ orderlyKey: "ed25519:" + s }), {
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: String(e) }), {
+          status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        });
       }
     }
 
@@ -934,24 +952,33 @@ export default {
       });
     }
 
-    // ── /proxy/register-key — server-side proxy to Orderly (avoids browser CORS) ──
+    // ── /proxy/register-key — server-side proxy to Orderly (multi-user) ──────────
     if (parts[0] === "proxy" && parts[1] === "register-key" && request.method === "POST") {
       let body;
       try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
-
-      // Correct Orderly EVM endpoint (verified from @orderly.network/core source)
-      const ACCOUNT_ID_HDR = "0x3b9986c6410a4b7649abd071c5ba367862578d8aafd8d4794060fbb91f592ae2";
+      const { userAddress, orderlyKey: userOrderlyKey } = body;
+      const walletNorm = userAddress ? userAddress.toLowerCase().trim() : null;
       try {
+        let accountId = null;
+        if (walletNorm) {
+          try {
+            const ar = await fetch("https://api-evm.orderly.org/v1/get_account?address=" + walletNorm + "&broker_id=nexus_trading");
+            accountId = (await ar.json())?.data?.account_id ?? null;
+          } catch (_) {}
+        }
+        const rh = { "Content-Type": "application/json" };
+        if (accountId) rh["X-Account-Id"] = accountId;
         const r = await fetch("https://api-evm.orderly.org/v1/orderly_key", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Account-Id": ACCOUNT_ID_HDR,
-          },
-          body: JSON.stringify(body),
+          method: "POST", headers: rh, body: JSON.stringify(body),
         });
         const d = await r.json();
-        return new Response(JSON.stringify(d), {
+        if (!accountId) accountId = d?.data?.account_id ?? null;
+        if ((d.success || d.data) && walletNorm && accountId && userOrderlyKey) {
+          await env.LAB_STORE.put("user:" + walletNorm, JSON.stringify({
+            accountId, orderlyKey: userOrderlyKey, registeredAt: Date.now(),
+          }));
+        }
+        return new Response(JSON.stringify({ ...d, accountId }), {
           status: 200,
           headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         });
@@ -963,162 +990,85 @@ export default {
       }
     }
 
-    // ── /register-orderly-key — browser-based Orderly key registration ───────
+    // ── /register-orderly-key — deterministic wallet registration ───────────────
+    // Flow: personal_sign("nexus-trading-key-v1") -> /derive-key -> EIP-712 sign -> /proxy/register-key
+    // No private keys stored anywhere. Same wallet = same trading key every session.
     if (parts[0] === "register-orderly-key" && request.method === "GET") {
       const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nexus — Register Orderly Trading Key</title>
+<title>Nexus - Connect Trading Wallet</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:monospace;background:#0a0a0a;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.wrap{max-width:660px;width:100%}
-h1{color:#00ff88;font-size:1.1rem;letter-spacing:2px;margin-bottom:4px}
-p.sub{color:#555;font-size:.75rem;margin-bottom:20px}
-.card{background:#111;border:1px solid #222;border-radius:8px;padding:16px;margin:12px 0}
-.label{color:#555;font-size:.7rem;letter-spacing:2px;margin-bottom:6px;text-transform:uppercase}
-.value{color:#00ff88;word-break:break-all;font-size:.82rem;line-height:1.5}
-.secret{color:#ff9966;word-break:break-all;font-size:.82rem;line-height:1.5}
-button{width:100%;background:#00ff88;color:#000;border:none;padding:13px;border-radius:6px;font-family:monospace;font-size:.9rem;font-weight:bold;cursor:pointer;margin:8px 0;letter-spacing:1px;transition:opacity .2s}
+.wrap{max-width:560px;width:100%}
+h1{color:#00ff88;font-size:1.1rem;letter-spacing:2px;margin-bottom:6px}
+p.sub{color:#555;font-size:.75rem;margin-bottom:24px;line-height:1.7}
+button{width:100%;background:#00ff88;color:#000;border:none;padding:14px;border-radius:6px;font-family:monospace;font-size:.9rem;font-weight:bold;cursor:pointer;margin:8px 0;letter-spacing:1px}
 button:disabled{opacity:.3;cursor:not-allowed}
-.status{padding:12px 14px;border-radius:6px;font-size:.82rem;margin:8px 0;line-height:1.5}
+.status{padding:13px 16px;border-radius:6px;font-size:.82rem;margin:10px 0;line-height:1.7}
 .ok{background:#001a0e;border:1px solid #00ff88;color:#00ff88}
 .err{background:#1a0000;border:1px solid #ff4444;color:#ff4444}
-.cmd{background:#0d0d0d;border:1px solid #2a2a2a;border-radius:6px;padding:12px 14px;margin:6px 0;color:#ffcc00;font-size:.78rem;word-break:break-all;line-height:1.6}
-.step{color:#555;font-size:.72rem;letter-spacing:1px;margin:16px 0 4px}
+.info{background:#0a0d1a;border:1px solid #2a4a7f;color:#7ab3ff}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>⚡ NEXUS — REGISTER ORDERLY TRADING KEY</h1>
-  <p class="sub">Generates an ed25519 keypair in-browser. Private key never leaves this page. Registers with MetaMask signature.</p>
-
-  <div class="card" id="keypair-card">
-    <div class="label">Status</div>
-    <div class="value" id="gen-status">Generating keypair…</div>
-  </div>
-
-  <div id="keys-section" style="display:none">
-    <div class="card">
-      <div class="label">Orderly Key — Public (safe to share)</div>
-      <textarea id="pub-key" readonly onclick="this.select()" style="width:100%;background:#0d0d0d;border:none;color:#00ff88;font-family:monospace;font-size:.82rem;resize:none;padding:4px;outline:none;cursor:pointer;line-height:1.5" rows="2"></textarea>
-      <button onclick="navigator.clipboard.writeText(document.getElementById('pub-key').value)" style="width:auto;padding:6px 16px;font-size:.75rem;margin:4px 0 0">Copy Public Key</button>
-    </div>
-    <div class="card">
-      <div class="label">⚠️ Private Key — Base64 (secret — copy this BEFORE signing)</div>
-      <textarea id="priv-key" readonly onclick="this.select()" style="width:100%;background:#0d0d0d;border:none;color:#ff9966;font-family:monospace;font-size:.82rem;resize:none;padding:4px;outline:none;cursor:pointer;line-height:1.5" rows="2"></textarea>
-      <button onclick="navigator.clipboard.writeText(document.getElementById('priv-key').value)" style="width:auto;padding:6px 16px;font-size:.75rem;margin:4px 0 0">Copy Private Key</button>
-    </div>
-  </div>
-
-  <button id="register-btn" disabled>Connect MetaMask &amp; Register</button>
-
-  <div id="status-area"></div>
-
-  <div id="commands-area" style="display:none">
-    <div class="step">RUN THESE 3 COMMANDS IN YOUR TERMINAL (nexus-lab-api dir):</div>
-    <div class="cmd" id="cmd1"></div>
-    <div class="cmd" id="cmd2"></div>
-    <div class="cmd" id="cmd3"></div>
-    <div class="cmd" id="cmd4" style="margin-top:12px;border-color:#00ff88">npx wrangler deploy</div>
-  </div>
+  <h1>NEXUS - CONNECT TRADING WALLET</h1>
+  <p class="sub">Links your wallet to Nexus via Orderly Network.<br>
+  Two MetaMask prompts. No private keys stored anywhere.<br>
+  Same wallet always derives the same trading key.</p>
+  <button id="btn">Connect MetaMask &amp; Register</button>
+  <div id="out"></div>
 </div>
-
 <script>
-const ORDERLY_BASE   = "https://api-evm.orderly.org";
-const BROKER_ID      = "nexus_trading";
-const CHAIN_ID       = 42161;
-const ACCOUNT_ID     = "0x3b9986c6410a4b7649abd071c5ba367862578d8aafd8d4794060fbb91f592ae2";
-const VERIFYING_CONTRACT = "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC";
-
-const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-function toBase58(buf){
-  const bytes = new Uint8Array(buf);
-  let n = BigInt("0x"+[...bytes].map(b=>b.toString(16).padStart(2,"0")).join(""));
-  let r=""; while(n>0n){r=B58[Number(n%58n)]+r;n=n/58n;}
-  for(const b of bytes){if(b===0)r="1"+r;else break;}
-  return r;
-}
-function toB64(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
-
-let privKeyB64="", orderlyKey="", _privCryptoKey;
-
-async function gen(){
+const BROKER = "nexus_trading", CHAIN = 42161;
+const VC = "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC";
+const MSG = "nexus-trading-key-v1";
+function st(h,c){document.getElementById("out").innerHTML='<div class="status '+c+'">'+h+'</div>';}
+async function go(){
+  const btn=document.getElementById("btn");
+  btn.disabled=true;
   try{
-    const kp = await crypto.subtle.generateKey({name:"Ed25519"},true,["sign","verify"]);
-    const pkcs8 = await crypto.subtle.exportKey("pkcs8", kp.privateKey);
-    const raw   = await crypto.subtle.exportKey("raw",   kp.publicKey);
-    // Store full PKCS8 (48 bytes) — CF Workers requires pkcs8 format for Ed25519 signing
-    privKeyB64 = toB64(pkcs8);
-    orderlyKey = "ed25519:" + toBase58(raw);
-    _privCryptoKey = kp.privateKey;
-    document.getElementById("gen-status").textContent = "✅ Keypair ready — copy your private key before signing!";
-    document.getElementById("keys-section").style.display="block";
-    document.getElementById("pub-key").value = orderlyKey;
-    document.getElementById("priv-key").value = privKeyB64;
-    document.getElementById("register-btn").disabled = false;
-  }catch(e){
-    document.getElementById("gen-status").textContent = "❌ "+e.message;
-  }
-}
+    if(!window.ethereum) throw new Error("MetaMask not found.");
+    st("Step 1 / 3 - Connecting wallet...","info");
+    const [wallet] = await ethereum.request({method:"eth_requestAccounts"});
+    try{await ethereum.request({method:"wallet_switchEthereumChain",params:[{chainId:"0xa4b1"}]});}catch(_){}
 
-async function register(){
-  const btn = document.getElementById("register-btn");
-  btn.disabled=true; btn.textContent="Connecting…";
-  try{
-    if(!window.ethereum) throw new Error("MetaMask not found — open this page in a browser with MetaMask installed");
-    const accounts = await ethereum.request({method:"eth_requestAccounts"});
-    const wallet = accounts[0];
+    st("Step 2 / 3 - Sign to derive your trading key (MetaMask)...","info");
+    const deriveSig = await ethereum.request({method:"personal_sign",params:[MSG,wallet]});
+    const dk = await (await fetch("/derive-key",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({walletSig:deriveSig})})).json();
+    if(!dk.orderlyKey) throw new Error("Derivation failed: "+JSON.stringify(dk));
+    const ok = dk.orderlyKey;
 
-    // Switch to Arbitrum if needed
-    try{ await ethereum.request({method:"wallet_switchEthereumChain",params:[{chainId:"0xa4b1"}]}); }catch(_){}
-
-    btn.textContent="Sign with MetaMask…";
-    const ts  = Date.now();
-    const exp = ts + 365*24*60*60*1000;
-    const message = {brokerId:BROKER_ID,chainId:CHAIN_ID,orderlyKey:orderlyKey,scope:"read,trading",timestamp:ts,expiration:exp};
-    const typedData = {
+    st("Step 3 / 3 - Register key with Orderly (MetaMask)...","info");
+    const ts=Date.now(), exp=ts+365*24*60*60*1000;
+    const msg={brokerId:BROKER,chainId:CHAIN,orderlyKey:ok,scope:"read,trading",timestamp:ts,expiration:exp};
+    const td={
       types:{
         EIP712Domain:[{name:"name",type:"string"},{name:"version",type:"string"},{name:"chainId",type:"uint256"},{name:"verifyingContract",type:"address"}],
-        AddOrderlyKey:[
-          {name:"brokerId",type:"string"},{name:"chainId",type:"uint256"},{name:"orderlyKey",type:"string"},
-          {name:"scope",type:"string"},{name:"timestamp",type:"uint64"},{name:"expiration",type:"uint64"}
-        ]
+        AddOrderlyKey:[{name:"brokerId",type:"string"},{name:"chainId",type:"uint256"},{name:"orderlyKey",type:"string"},{name:"scope",type:"string"},{name:"timestamp",type:"uint64"},{name:"expiration",type:"uint64"}]
       },
       primaryType:"AddOrderlyKey",
-      domain:{name:"Orderly",version:"1",chainId:CHAIN_ID,verifyingContract:VERIFYING_CONTRACT},
-      message
+      domain:{name:"Orderly",version:"1",chainId:CHAIN,verifyingContract:VC},
+      message:msg
     };
-    const sig = await ethereum.request({method:"eth_signTypedData_v4",params:[wallet,JSON.stringify(typedData)]});
-
-    btn.textContent="Registering with Orderly…";
-    const res = await fetch("/proxy/register-key",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({message,signature:sig,userAddress:wallet})
-    });
-    const data = await res.json();
-    console.log("Orderly response:",data);
-
-    if(data.success||data.data){
-      document.getElementById("status-area").innerHTML='<div class="status ok">✅ Key registered with Orderly! Run the commands below.</div>';
-      document.getElementById("commands-area").style.display="block";
-      document.getElementById("cmd1").textContent="npx wrangler secret put ORDERLY_API_SECRET\\n  → paste: "+privKeyB64;
-      document.getElementById("cmd2").textContent="npx wrangler secret put ORDERLY_API_KEY\\n  → paste: "+orderlyKey;
-      document.getElementById("cmd3").textContent="npx wrangler secret put ORDERLY_ACCOUNT_ID\\n  → paste: "+ACCOUNT_ID;
-      btn.textContent="✅ Registered";
+    const sig = await ethereum.request({method:"eth_signTypedData_v4",params:[wallet,JSON.stringify(td)]});
+    const res = await (await fetch("/proxy/register-key",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg,signature:sig,userAddress:wallet,orderlyKey:ok})})).json();
+    console.log("Orderly:",res);
+    if(res.success||res.data){
+      st("Wallet connected to Nexus!<br><br>Wallet: <b>"+wallet+"</b><br>Key: <b>"+ok.slice(0,30)+"...</b><br><br>Open Bankr terminal in wallet mode, install the Nexus skill, and start trading.","ok");
+      btn.textContent="Registered";
     } else {
-      throw new Error(JSON.stringify(data));
+      throw new Error(JSON.stringify(res));
     }
   }catch(e){
-    document.getElementById("status-area").innerHTML='<div class="status err">❌ '+e.message+'</div>';
+    st("Error: "+e.message,"err");
     btn.disabled=false; btn.textContent="Retry";
   }
 }
-
-gen();
-document.getElementById("register-btn").addEventListener("click",register);
+document.getElementById("btn").addEventListener("click",go);
 </script>
 </body>
 </html>`;
