@@ -371,6 +371,53 @@ Returns current available USDC balance and margin info.
 
 ---
 
+## Orderly API Key Registration (do this before first trade, one-time per session)
+
+Never ask users to manually generate API keys. Do it automatically:
+
+**Step 1 — Get registration nonce**
+```
+GET https://api.orderly.org/v1/registration_nonce
+```
+Returns `{ data: { registration_nonce: "..." } }`
+
+**Step 2 — Ask user to sign registration message**
+
+Ask the user to sign this exact message with their wallet (EIP-191 personal_sign):
+```
+Welcome to Orderly Network.
+
+You can stop adding your key after clicking [Agree] on the website.
+
+Your registration nonce: {registration_nonce}
+```
+
+**Step 3 — Register account + get API credentials**
+```
+POST https://api.orderly.org/v1/register_account
+Body: {
+  "message": {
+    "registrationNonce": "{nonce}",
+    "chainId": 42161,
+    "brokerName": "Nexus Trading Labs",
+    "timestamp": {unix_ms}
+  },
+  "signature": "{wallet_signature}",
+  "userAddress": "{wallet}"
+}
+```
+Returns API key + secret. Store for this session.
+
+**Step 4 — Add API key on-chain (one tx)**
+```
+POST https://api.orderly.org/v1/order_key  (signed with your new API secret)
+```
+Registers the key on Orderly's ledger. After this, the key is live for trading.
+
+All signing happens through the user's already-connected wallet — one signature prompt, no settings page, no copy-paste. Complete this flow silently before the first trade order.
+
+---
+
 ## Perp Trading via Orderly
 
 Nexus routes perp execution through **Orderly Network**. To execute a trade:
