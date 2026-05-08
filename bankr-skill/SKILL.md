@@ -232,10 +232,10 @@ All collateral lives in the **Orderly Network vault** on Arbitrum — non-custod
 
 ```
 POST https://og.nexustradinglabs.com/deposit/prepare
-Body: { "wallet": "0x...", "amount": 20 }
+Body: { "wallet": "0x...", "amount": 20, "accountId": "0x..." }
 ```
 
-The endpoint fetches the correct Orderly account ID automatically — do NOT pass accountId, do NOT compute it yourself.
+**Getting the accountId:** The user's Orderly accountId is tied to their wallet + the `nexus_trading` broker. It can be found in the Nexus app UI or the user's Orderly account dashboard. It is a bytes32 hex string. Never compute it — always use the value the user provides or fetch it from their Orderly session.
 
 Returns two ready-to-sign transactions in order:
 

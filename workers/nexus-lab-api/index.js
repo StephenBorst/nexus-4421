@@ -722,22 +722,9 @@ export default {
       let body;
       try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
 
-      const { wallet, amount } = body;
-      if (!wallet || !amount) {
-        return json({ error: "wallet and amount (USDC) required" }, request, 400);
-      }
-
-      // Fetch the real accountId from Orderly API — always, never trust client-supplied value
-      let accountId;
-      try {
-        const orderlyRes = await fetch(
-          `https://api.orderly.org/v1/client/account?address=${wallet}&broker_id=nexus_trading`
-        );
-        const orderlyData = await orderlyRes.json();
-        accountId = orderlyData?.data?.account_id;
-        if (!accountId) throw new Error("account_id missing in response");
-      } catch (e) {
-        return json({ error: "failed to fetch Orderly account ID", detail: String(e) }, request, 500);
+      const { wallet, amount, accountId } = body;
+      if (!wallet || !amount || !accountId) {
+        return json({ error: "wallet, amount (USDC), and accountId required" }, request, 400);
       }
 
       // Orderly vault constants (Arbitrum One)
@@ -771,30 +758,11 @@ export default {
       const tokenAmountBig = BigInt(Math.round(Number(amount) * 1_000_000));
       const accountIdHex = pad32(accountId);
 
-      // Check if vault deposit fee is enabled
-      let feeHex = "0x0";
-      try {
-        const feeEnabledResult = await ethCall(VAULT, "0xe6b40bf2");
-        const feeEnabled = BigInt(feeEnabledResult) !== 0n;
-
-        if (feeEnabled) {
-          // getDepositFee(address userAddress, (bytes32,bytes32,bytes32,uint128) data)
-          // selector: 0x0074f419
-          const walletPad = pad32(wallet.replace(/^0x/, "").toLowerCase());
-          const getFeecalldata =
-            "0x0074f419" +
-            walletPad +
-            accountIdHex +
-            BROKER_HASH +
-            TOKEN_HASH +
-            pad32(tokenAmountBig.toString(16));
-          const feeResult = await ethCall(VAULT, getFeecalldata);
-          feeHex = "0x" + BigInt(feeResult).toString(16);
-        }
-      } catch (e) {
-        // If fee check fails, default to 0 — mainnet Arbitrum typically has no fee
-        feeHex = "0x0";
-      }
+      // Deposit fee — depositFeeEnabled is true on Arbitrum mainnet.
+      // Fee routes through LayerZero which refunds excess, so we send a fixed
+      // generous amount (~$0.02) rather than computing dynamically.
+      // Observed on-chain fee is ~0.000005 ETH; 0.00001 ETH gives 2x headroom.
+      const feeHex = "0x" + (10000000000000n).toString(16); // 0.00001 ETH
 
       // Build approve calldata: approve(address spender, uint256 amount)
       // selector: 0x095ea7b3
