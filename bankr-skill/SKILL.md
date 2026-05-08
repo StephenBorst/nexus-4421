@@ -226,7 +226,47 @@ Price encoding: `Math.round(price * 1e8)` — e.g. BTC at $65,432.10 → `654321
 
 ## Depositing USDC Collateral
 
-All collateral lives in the **Orderly Network vault** on Arbitrum — non-custodial, withdraw anytime. This is the complete flow an agent can execute on behalf of a user.
+All collateral lives in the **Orderly Network vault** on Arbitrum — non-custodial, withdraw anytime.
+
+### Simple path — use the Nexus deposit API (recommended for agents)
+
+```
+POST https://og.nexustradinglabs.com/deposit/prepare
+Body: { "wallet": "0x...", "amount": 20, "accountId": "0x..." }
+```
+
+Returns two ready-to-sign transactions in order:
+
+```json
+{
+  "chainId": 42161,
+  "depositFee": "0x0",
+  "steps": [
+    {
+      "step": 1,
+      "description": "Approve 20 USDC to Orderly vault",
+      "to": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+      "data": "0x...",
+      "value": "0x0"
+    },
+    {
+      "step": 2,
+      "description": "Deposit 20 USDC to Nexus trading account",
+      "to": "0x816f722424B49Cf1275cc86DA9840Fbd5a6167e9",
+      "data": "0x...",
+      "value": "0x0"
+    }
+  ]
+}
+```
+
+Sign and submit step 1, wait for confirmation, then sign and submit step 2. Done.
+
+**To get `accountId`:** `GET https://api.orderly.org/v1/client/account?address={wallet}&broker_id=nexus_trading`
+
+---
+
+### Manual path — raw contract details (advanced)
 
 ### Contract addresses (Arbitrum One, chainId: 42161)
 
@@ -237,10 +277,14 @@ All collateral lives in the **Orderly Network vault** on Arbitrum — non-custod
 
 ### Pre-computed hashes (Nexus broker)
 
+These are hardcoded — do NOT recompute, use exactly as-is:
+
 ```
-brokerHash = keccak256("nexus_trading")
-tokenHash  = keccak256("USDC")
+brokerHash = 0x69729be60357fd58653e988388922e200193543b4328eda1b9b9bdaaef2f1a70
+tokenHash  = 0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa
 ```
+
+Both derived via `solidityPackedKeccak256(["string"], [input])` from the Orderly SDK.
 
 ### Step 1 — Approve USDC to the vault
 

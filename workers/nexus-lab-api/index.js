@@ -717,6 +717,116 @@ export default {
       return json({ error: "method not allowed" }, request, 405);
     }
 
+    // ── /deposit/prepare — build signed tx data for Orderly vault deposit ────
+    if (parts[0] === "deposit" && parts[1] === "prepare" && request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+
+      const { wallet, amount, accountId } = body;
+      if (!wallet || !amount || !accountId) {
+        return json({ error: "wallet, amount (USDC), and accountId required" }, request, 400);
+      }
+
+      // Orderly vault constants (Arbitrum One)
+      const VAULT    = "0x816f722424B49Cf1275cc86DA9840Fbd5a6167e9";
+      const USDC     = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
+      const ARB_RPC  = "https://arb1.arbitrum.io/rpc";
+
+      // Pre-computed hashes via solidityPackedKeccak256(["string"], [input])
+      const BROKER_HASH = "69729be60357fd58653e988388922e200193543b4328eda1b9b9bdaaef2f1a70";
+      const TOKEN_HASH  = "d6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa";
+
+      // Pad a hex string (with or without 0x) to 32 bytes (64 hex chars)
+      function pad32(hex) {
+        const h = hex.startsWith("0x") ? hex.slice(2) : hex;
+        return h.padStart(64, "0");
+      }
+
+      // Make an eth_call to Arbitrum RPC
+      async function ethCall(to, data) {
+        const res = await fetch(ARB_RPC, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to, data }, "latest"] }),
+        });
+        const out = await res.json();
+        if (out.error) throw new Error(out.error.message);
+        return out.result;
+      }
+
+      // USDC has 6 decimals on Arbitrum
+      const tokenAmountBig = BigInt(Math.round(Number(amount) * 1_000_000));
+      const accountIdHex = pad32(accountId);
+
+      // Check if vault deposit fee is enabled
+      let feeHex = "0x0";
+      try {
+        const feeEnabledResult = await ethCall(VAULT, "0xe6b40bf2");
+        const feeEnabled = BigInt(feeEnabledResult) !== 0n;
+
+        if (feeEnabled) {
+          // getDepositFee(address userAddress, (bytes32,bytes32,bytes32,uint128) data)
+          // selector: 0x0074f419
+          const walletPad = pad32(wallet.replace(/^0x/, "").toLowerCase());
+          const getFeecalldata =
+            "0x0074f419" +
+            walletPad +
+            accountIdHex +
+            BROKER_HASH +
+            TOKEN_HASH +
+            pad32(tokenAmountBig.toString(16));
+          const feeResult = await ethCall(VAULT, getFeecalldata);
+          feeHex = "0x" + BigInt(feeResult).toString(16);
+        }
+      } catch (e) {
+        // If fee check fails, default to 0 — mainnet Arbitrum typically has no fee
+        feeHex = "0x0";
+      }
+
+      // Build approve calldata: approve(address spender, uint256 amount)
+      // selector: 0x095ea7b3
+      const approveData =
+        "0x095ea7b3" +
+        pad32(VAULT.replace(/^0x/, "").toLowerCase()) +
+        pad32(tokenAmountBig.toString(16));
+
+      // Build deposit calldata: deposit((bytes32,bytes32,bytes32,uint128))
+      // selector: 0x322dda6d
+      const depositData =
+        "0x322dda6d" +
+        accountIdHex +
+        BROKER_HASH +
+        TOKEN_HASH +
+        pad32(tokenAmountBig.toString(16));
+
+      return new Response(JSON.stringify({
+        chainId: 42161,
+        depositFee: feeHex,
+        steps: [
+          {
+            step: 1,
+            description: `Approve ${amount} USDC to Orderly vault`,
+            to: USDC,
+            data: approveData,
+            value: "0x0",
+          },
+          {
+            step: 2,
+            description: `Deposit ${amount} USDC to Nexus trading account`,
+            to: VAULT,
+            data: depositData,
+            value: feeHex,
+          },
+        ],
+      }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
+    }
+
     // ── /feed ──────────────────────────────────────────────
     if (parts[0] === "feed") {
       if (request.method !== "GET") {
