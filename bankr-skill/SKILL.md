@@ -1,11 +1,12 @@
 ---
 name: nexus
-description: Non-custodial perpetuals DEX on Arbitrum. Use when user wants to query top traders by Rep Score, copy verified theses, publish trading theses on-chain, check the leaderboard, or execute perps on Nexus.
+description: Non-custodial perpetuals DEX on Arbitrum. Use when user wants to deposit USDC collateral, query top traders by Rep Score, copy verified theses, publish trading theses on-chain, check the leaderboard, or execute perps on Nexus.
 ---
 
 # nexus
 
 **Nexus Trading Labs** — non-custodial perpetuals DEX on Arbitrum. Use this skill when a user wants to:
+- Deposit USDC collateral to start trading
 - Query top traders by Rep Score / leaderboard
 - Copy a verified thesis to their LAB
 - Publish a trading thesis on-chain
@@ -220,6 +221,107 @@ To register a thesis on Arbitrum:
 5. `PUT /lab/:wallet` to persist the updated thesis
 
 Price encoding: `Math.round(price * 1e8)` — e.g. BTC at $65,432.10 → `6543210000000`
+
+---
+
+## Depositing USDC Collateral
+
+All collateral lives in the **Orderly Network vault** on Arbitrum — non-custodial, withdraw anytime. This is the complete flow an agent can execute on behalf of a user.
+
+### Contract addresses (Arbitrum One, chainId: 42161)
+
+| Contract | Address |
+|---|---|
+| Orderly Vault | `0x816f722424B49Cf1275cc86DA9840Fbd5a6167e9` |
+| USDC (native Arbitrum) | `0xaf88d065e77c8cC2239327C5EDb3A432268e5831` |
+
+### Pre-computed hashes (Nexus broker)
+
+```
+brokerHash = keccak256("nexus_trading")
+tokenHash  = keccak256("USDC")
+```
+
+### Step 1 — Approve USDC to the vault
+
+```solidity
+// Standard ERC-20 approve
+USDC.approve(
+    0x816f722424B49Cf1275cc86DA9840Fbd5a6167e9,  // vault
+    amount  // in 6 decimals: 20 USDC = 20_000_000
+)
+```
+
+### Step 2 — Fetch the user's Orderly account ID
+
+```
+GET https://api.orderly.org/v1/client/account?address={walletAddress}&broker_id=nexus_trading
+```
+Returns `account_id` (bytes32 hash) — pass this as `accountId` in the deposit struct.
+If the account doesn't exist yet, registration happens automatically on first deposit.
+
+### Step 3 — Call `deposit()` on the vault
+
+```solidity
+struct VaultDepositFE {
+    bytes32 accountId;   // from Step 2
+    bytes32 brokerHash;  // keccak256("nexus_trading")
+    bytes32 tokenHash;   // keccak256("USDC")
+    uint128 tokenAmount; // 6 decimals: 20 USDC = 20_000_000
+}
+
+vault.deposit(VaultDepositFE data)  // payable, fee = 0 for USDC
+```
+
+Full ABI fragment:
+```json
+{
+  "name": "deposit",
+  "type": "function",
+  "stateMutability": "payable",
+  "inputs": [{
+    "name": "data",
+    "type": "tuple",
+    "internalType": "struct VaultTypes.VaultDepositFE",
+    "components": [
+      { "name": "accountId",   "type": "bytes32", "internalType": "bytes32" },
+      { "name": "brokerHash",  "type": "bytes32", "internalType": "bytes32" },
+      { "name": "tokenHash",   "type": "bytes32", "internalType": "bytes32" },
+      { "name": "tokenAmount", "type": "uint128", "internalType": "uint128" }
+    ]
+  }],
+  "outputs": []
+}
+```
+
+### Deposit example (viem/ethers pseudocode)
+
+```javascript
+const VAULT    = "0x816f722424B49Cf1275cc86DA9840Fbd5a6167e9"
+const USDC     = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
+const amount   = 20_000_000n  // 20 USDC (6 decimals)
+
+// 1. Approve
+await usdc.write.approve([VAULT, amount])
+
+// 2. Deposit
+await vault.write.deposit([{
+  accountId:   userAccountId,                     // bytes32 from Orderly API
+  brokerHash:  keccak256(toBytes("nexus_trading")),
+  tokenHash:   keccak256(toBytes("USDC")),
+  tokenAmount: amount
+}], { value: 0n })
+```
+
+Funds are available for trading within ~1 block (~2s on Arbitrum).
+
+### Checking balance after deposit
+
+```
+GET https://api.orderly.org/v1/client/holding
+Headers: orderly-account-id: {accountId}
+```
+Returns current available USDC balance and margin info.
 
 ---
 
