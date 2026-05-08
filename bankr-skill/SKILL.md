@@ -5,14 +5,33 @@ description: Non-custodial perpetuals DEX on Arbitrum. Use when user wants to de
 
 # nexus
 
+## ⚠️ CRITICAL — READ BEFORE DOING ANYTHING
+
+**ALL perp trades go through ONE endpoint. No exceptions.**
+
+```
+POST https://og.nexustradinglabs.com/trade
+Body: { "symbol": "PERP_BTC_USDC", "side": "BUY", "notional": 50, "leverage": 5 }
+```
+
+**NEVER do any of the following:**
+- NEVER use the Orderly CLI (`@orderly.network/cli`)
+- NEVER ask the user for API keys, secrets, or credentials of any kind
+- NEVER attempt manual message signing or HMAC auth
+- NEVER install npm packages or run shell commands to place a trade
+- NEVER prompt the user to run terminal commands to trade
+
+The `/trade` endpoint handles all authentication server-side (ed25519 signed). The user just says what they want to trade. You call the endpoint. That's it.
+
+---
+
 **Nexus Trading Labs** — non-custodial perpetuals DEX on Arbitrum. Use this skill when a user wants to:
+- Execute perps — just call `POST /trade` immediately
 - Deposit USDC collateral to start trading
 - Query top traders by Rep Score / leaderboard
 - Copy a verified thesis to their LAB
 - Publish a trading thesis on-chain
 - Check any wallet's trade history and stats
-- Execute perps via Orderly Network (the underlying liquidity layer)
-- Follow traders and receive alerts
 
 ---
 
@@ -373,62 +392,40 @@ Returns current available USDC balance and margin info.
 
 ## Perp Trading via Orderly
 
-Nexus routes perp execution through **Orderly Network**. Use the **Orderly CLI** (`@orderly.network/cli`) for all trade execution — it stores keys in the OS keychain, never exposes credentials to AI context, and is purpose-built for agent use.
+Nexus exposes a single trade endpoint — no CLI, no credentials in chat, no manual signing.
 
-### One-time setup (first time per wallet)
+### Place a trade
 
-```bash
-# Install
-npm install -g @orderly.network/cli
-
-# Register wallet with Nexus broker on Arbitrum
-orderly wallet-register --broker-id nexus_trading --chain-id 42161 --network mainnet
-
-# Generate and register Ed25519 API key (handles signing automatically)
-orderly wallet-add-key --broker-id nexus_trading --scope read,trading --network mainnet
-
-# List accounts to get your account ID
-orderly auth-list --network mainnet
+```
+POST https://og.nexustradinglabs.com/trade
+Body: {
+  "symbol": "PERP_HYPE_USDC",
+  "side": "SELL",
+  "notional": 20,
+  "leverage": 20
+}
 ```
 
-After setup, credentials live in the OS keychain. Never ask the user for API keys — the CLI handles auth silently.
+The endpoint:
+1. Fetches current mark price
+2. Calculates position size (`notional / markPrice`)
+3. Sets leverage
+4. Fires market order via Orderly REST API (ed25519 signed server-side)
+5. Returns fill confirmation
 
-### Placing orders
+**Natural language → trade mapping:**
+- "Short HYPE $20 at 20x" → `{ symbol: "PERP_HYPE_USDC", side: "SELL", notional: 20, leverage: 20 }`
+- "Long BTC with $50 at 5x" → `{ symbol: "PERP_BTC_USDC", side: "BUY", notional: 50, leverage: 5 }`
+- "Close my SOL short" → `POST /trade/close { symbol: "PERP_SOL_USDC" }`
 
-```bash
-# Market order
-orderly order-place PERP_SOL_USDC SELL MARKET 0.056 --account <account-id> --network mainnet
+**Supported symbols:** `PERP_BTC_USDC`, `PERP_ETH_USDC`, `PERP_SOL_USDC`, `PERP_HYPE_USDC`, `PERP_ARB_USDC`, and more.
 
-# Limit order
-orderly order-place PERP_BTC_USDC BUY LIMIT 0.001 --price 65000 --account <account-id> --network mainnet
+### Check positions / balance
 
-# TP/SL algo order
-orderly algo-order-place PERP_ETH_USDC SELL TP_SL 0.01 \
-  --tp-trigger-price 3500 --sl-trigger-price 2800 \
-  --account <account-id> --network mainnet
-
-# Check positions
-orderly positions-list --account <account-id> --network mainnet
-
-# Close position
-orderly positions-close PERP_SOL_USDC --account <account-id> --network mainnet
-
-# Check balance
-orderly account-balance --account <account-id> --network mainnet
-
-# Market price
-orderly market-price PERP_SOL_USDC --network mainnet
 ```
-
-### Size calculation
-
-Orderly sizes orders in **base asset quantity** (not USDC notional):
+GET https://og.nexustradinglabs.com/positions?wallet={address}
+GET https://og.nexustradinglabs.com/balance?wallet={address}
 ```
-quantity = notional_usdc / mark_price
-# e.g. $5 short on SOL at $88 → quantity = 5 / 88 = 0.056 SOL
-```
-
-Supported symbols: `PERP_BTC_USDC`, `PERP_ETH_USDC`, `PERP_SOL_USDC`, `PERP_ARB_USDC`, and more — run `orderly symbols --network mainnet` for full list.
 
 ---
 
