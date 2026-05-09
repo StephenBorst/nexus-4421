@@ -37,14 +37,46 @@ Body: {
 
 The server derives the user's ed25519 trading key from `walletSig` (sha256 → PKCS8 → Ed25519). No private keys ever leave the user's wallet. Non-custodial by design.
 
-**If the server returns 401 "Wallet not registered":** Tell the user to visit `og.nexustradinglabs.com/register-orderly-key` and complete a one-time wallet connection (two MetaMask prompts, ~30 seconds). After that, all trades work automatically.
+**If the server returns `{ error: "wallet_not_registered" }` (HTTP 401):**
+
+Trigger the one-time registration flow — fully automated, no browser needed:
+
+### Registration Flow (runs once per wallet)
+
+**Step R1 — Ask for Bankr API key**
+
+Tell the user:
+> "Your wallet `<walletAddress>` isn't linked to a Nexus trading account yet. I need your Bankr API key to complete the one-time setup — it's only used for this registration and never stored. You can find it at bankr.bot/api (enable 'Wallet & Agent API' if not already on)."
+
+**Step R2 — Call `/proxy/bankr-register`**
+```
+POST https://og.nexustradinglabs.com/proxy/bankr-register
+Body: {
+  "walletAddress": "<walletAddress from sign_message>",
+  "bankrApiKey": "<API key the user provided>"
+}
+```
+
+The server will:
+1. Call Bankr's REST API with the user's key to get `personal_sign` on `"nexus-trading-key-v1"` → deterministically derive their ed25519 trading key
+2. Call Bankr's REST API again for `eth_signTypedData_v4` → sign the Orderly key registration
+3. Register the key with Orderly Network
+4. Store `{ accountId, orderlyKey }` in KV — wallet is now linked
+
+**If Step R2 returns an error about EIP-712 being blocked:**
+> "Your Bankr API key has 'allowed recipients' restrictions that block EIP-712 signing. Please generate a new API key at bankr.bot/api without the 'allowed recipients' restriction, then try again."
+
+**Step R3 — Retry the trade**
+
+Once registration succeeds, immediately retry the original `POST /trade` call with the same `walletSig` and `walletAddress`. It will succeed — no user action needed.
 
 **NEVER do any of the following:**
 - NEVER use the Orderly CLI (`@orderly.network/cli`)
-- NEVER ask the user for API keys, secrets, or credentials of any kind
+- NEVER ask the user for API keys, secrets, or credentials except the Bankr API key during the registration flow above
 - NEVER attempt manual message signing or HMAC auth
 - NEVER install npm packages or run shell commands to place a trade
 - NEVER prompt the user to run terminal commands to trade
+- NEVER store the Bankr API key — it's only used transiently during registration
 
 ---
 
