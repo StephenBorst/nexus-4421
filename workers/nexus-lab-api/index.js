@@ -973,7 +973,7 @@ export default {
       let body;
       try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
 
-      const { walletAddress, bankrApiKey, depositAmount = 5 } = body;
+      const { walletAddress, bankrApiKey } = body;
       if (!walletAddress || !bankrApiKey) {
         return json({ error: "walletAddress and bankrApiKey required" }, request, 400);
       }
@@ -981,87 +981,73 @@ export default {
       const walletNorm   = walletAddress.toLowerCase().trim();
       const ORDERLY_BASE = "https://api-evm.orderly.org";
       const BANKR_API    = "https://api.bankr.bot";
-      const ARB_RPC      = "https://arb1.arbitrum.io/rpc";
       const BROKER       = "nexus_trading";
       const CHAIN        = 42161;
       const VC           = "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC";
-      const VAULT        = "0x816f722424B49Cf1275cc86DA9840Fbd5a6167e9";
-      const USDC_ADDR    = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
-      const BROKER_HASH  = "69729be60357fd58653e988388922e200193543b4328eda1b9b9bdaaef2f1a70";
-      const TOKEN_HASH   = "d6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa";
-      const FEE_HEX      = "0x" + (10000000000000n).toString(16); // 0.00001 ETH LayerZero fee
       const HDR          = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
       const B58C         = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-
-      function pad32(hex) {
-        return (hex.startsWith("0x") ? hex.slice(2) : hex).padStart(64, "0");
-      }
-
-      async function bankrSubmit(transaction, description) {
-        const res = await fetch(`${BANKR_API}/wallet/submit`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-API-Key": bankrApiKey },
-          body: JSON.stringify({ transaction, description, waitForConfirmation: true }),
-        });
-        return res.json();
-      }
 
       try {
         // ── Check if Orderly account exists ──
         let accountId = null;
-        let deposited = false;
         try {
           const ar = await fetch(`${ORDERLY_BASE}/v1/get_account?address=${walletNorm}&broker_id=${BROKER}`);
           accountId = (await ar.json())?.data?.account_id ?? null;
         } catch (_) {}
 
-        // ── No account: deposit USDC to create it ──
+        // ── No account: register via REST (no on-chain tx needed) ──
         if (!accountId) {
-          // Compute accountId = keccak256(abi.encode(address, bytes32)) via web3_sha3 RPC
-          const encoded = "0x" + walletNorm.replace(/^0x/, "").padStart(64, "0") + BROKER_HASH;
-          const sha3Res  = await fetch(ARB_RPC, {
+          // Step A: Get registration nonce
+          const nonceRes  = await fetch(`${ORDERLY_BASE}/v1/registration_nonce`);
+          const nonceData = await nonceRes.json();
+          const registrationNonce = nonceData?.data?.registration_nonce;
+          if (!registrationNonce) {
+            return json({ error: "Failed to get registration nonce", detail: nonceData }, request, 500);
+          }
+
+          // Step B: EIP-712 sign the Registration typed data
+          const regTs  = Date.now();
+          const regMsg = { brokerId: BROKER, chainId: CHAIN, timestamp: regTs, registrationNonce: String(registrationNonce) };
+          const regTypedData = {
+            types: {
+              EIP712Domain: [
+                { name: "name",              type: "string"  },
+                { name: "version",           type: "string"  },
+                { name: "chainId",           type: "uint256" },
+                { name: "verifyingContract", type: "address" },
+              ],
+              Registration: [
+                { name: "brokerId",           type: "string"  },
+                { name: "chainId",            type: "uint256" },
+                { name: "timestamp",          type: "uint64"  },
+                { name: "registrationNonce",  type: "uint256" },
+              ],
+            },
+            primaryType: "Registration",
+            domain: { name: "Orderly", version: "1", chainId: CHAIN, verifyingContract: VC },
+            message: regMsg,
+          };
+          const regSignRes  = await fetch(`${BANKR_API}/wallet/sign`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-API-Key": bankrApiKey },
+            body: JSON.stringify({ signatureType: "eth_signTypedData_v4", typedData: regTypedData }),
+          });
+          const regSignData = await regSignRes.json();
+          if (!regSignData.success || !regSignData.signature) {
+            return json({ error: "Bankr Registration EIP-712 sign failed", detail: regSignData }, request, 400);
+          }
+
+          // Step C: Register account with Orderly
+          const acctRes  = await fetch(`${ORDERLY_BASE}/v1/register_account`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "web3_sha3", params: [encoded] }),
+            body: JSON.stringify({ message: regMsg, signature: regSignData.signature, userAddress: walletNorm }),
           });
-          const sha3Data = await sha3Res.json();
-          const computedId = sha3Data.result; // "0x..."
-          if (!computedId) return json({ error: "Failed to compute accountId via web3_sha3", detail: sha3Data }, request, 500);
-
-          const tokenAmount = BigInt(Math.round(Number(depositAmount) * 1_000_000));
-
-          // Step A: Approve USDC to vault
-          const approveData = "0x095ea7b3" + pad32(VAULT.replace(/^0x/, "").toLowerCase()) + pad32(tokenAmount.toString(16));
-          const approveTx   = await bankrSubmit(
-            { to: USDC_ADDR, chainId: CHAIN, data: approveData, value: "0x0" },
-            `Approve ${depositAmount} USDC to Orderly vault`
-          );
-          if (!approveTx.success) {
-            return json({ error: "USDC approve failed", detail: approveTx, hint: "Ensure API key has no allowed-recipients restriction" }, request, 400);
+          const acctData = await acctRes.json();
+          if (!acctData.success && !acctData.data?.account_id) {
+            return json({ error: "Orderly account registration failed", detail: acctData }, request, 400);
           }
-
-          // Step B: Deposit to vault (creates Orderly account on-chain)
-          const accountIdHex = pad32(computedId);
-          const depositData  = "0x322dda6d" + accountIdHex + BROKER_HASH + TOKEN_HASH + pad32(tokenAmount.toString(16));
-          const depositTx    = await bankrSubmit(
-            { to: VAULT, chainId: CHAIN, data: depositData, value: FEE_HEX },
-            `Deposit ${depositAmount} USDC to Nexus/Orderly account`
-          );
-          if (!depositTx.success) {
-            return json({ error: "Vault deposit failed", detail: depositTx }, request, 400);
-          }
-
-          deposited  = true;
-          accountId  = computedId;
-
-          // Give Orderly 4s to index the deposit before key registration
-          await new Promise(r => setTimeout(r, 4000));
-
-          // Re-fetch accountId from Orderly (may differ from computed)
-          try {
-            const ar2 = await fetch(`${ORDERLY_BASE}/v1/get_account?address=${walletNorm}&broker_id=${BROKER}`);
-            accountId = (await ar2.json())?.data?.account_id ?? accountId;
-          } catch (_) {}
+          accountId = acctData?.data?.account_id ?? null;
         }
 
         // ── personal_sign → derive ed25519 key ──
@@ -1145,7 +1131,7 @@ export default {
           await env.LAB_STORE.put("user:" + walletNorm, JSON.stringify({
             accountId, orderlyKey, registeredAt: Date.now(),
           }));
-          return json({ ok: true, walletAddress: walletNorm, orderlyKey, accountId, deposited, depositedUsdc: deposited ? depositAmount : 0 }, request);
+          return json({ ok: true, walletAddress: walletNorm, orderlyKey, accountId }, request);
         } else {
           return json({ error: "Orderly registration failed", detail: regData }, request, 400);
         }

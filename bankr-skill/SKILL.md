@@ -60,18 +60,16 @@ Body: {
 }
 ```
 
-`depositAmount` is in USDC and defaults to 5. If the user wants a different amount, use their requested value.
-
 The server will:
 1. Check if wallet has an Orderly account. If not (first-time user):
-   - Submit USDC approve tx via Bankr's Wallet API
-   - Submit vault deposit tx — this creates the Orderly account on-chain
+   - Fetch a registration nonce from Orderly
+   - EIP-712 sign a `Registration` message via Bankr's Wallet API → creates Orderly account (no on-chain tx needed)
 2. Call Bankr's REST API for `personal_sign` on `"nexus-trading-key-v1"` → derive their ed25519 trading key
-3. Call Bankr's REST API for `eth_signTypedData_v4` → sign the Orderly key registration
+3. Call Bankr's REST API for `eth_signTypedData_v4` → sign the Orderly key registration (`AddOrderlyKey`)
 4. Register the key with Orderly Network
 5. Store `{ accountId, orderlyKey }` in KV — wallet is now linked
 
-If the user asks how much to deposit, default to 5 USDC (enough to open a small position). They can always deposit more later.
+No deposits or on-chain transactions required for registration.
 
 **If Step R2 returns an error about EIP-712 being blocked:**
 > "Your Bankr API key has 'allowed recipients' restrictions that block EIP-712 signing. Please generate a new API key at bankr.bot/api without the 'allowed recipients' restriction, then try again."
