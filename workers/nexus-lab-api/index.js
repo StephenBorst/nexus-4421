@@ -966,29 +966,105 @@ export default {
       });
     }
 
-    // ── /proxy/bankr-register — fully server-side Orderly registration via Bankr Wallet API ──
-    // Flow: Bankr personal_sign → derive ed25519 key → Bankr EIP-712 sign → Orderly register → KV store
-    // User provides their Bankr API key once; key is used only during this call, never stored.
+    // ── /proxy/bankr-register — fully server-side onboarding via Bankr Wallet API ──
+    // Flow: check account → deposit if new → personal_sign → derive ed25519 → EIP-712 → register → KV
+    // depositAmount defaults to 5 USDC. key is used transiently, never stored.
     if (parts[0] === "proxy" && parts[1] === "bankr-register" && request.method === "POST") {
       let body;
       try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
 
-      const { walletAddress, bankrApiKey } = body;
+      const { walletAddress, bankrApiKey, depositAmount = 5 } = body;
       if (!walletAddress || !bankrApiKey) {
         return json({ error: "walletAddress and bankrApiKey required" }, request, 400);
       }
 
-      const walletNorm  = walletAddress.toLowerCase().trim();
+      const walletNorm   = walletAddress.toLowerCase().trim();
       const ORDERLY_BASE = "https://api-evm.orderly.org";
-      const BANKR_API   = "https://api.bankr.bot";
-      const BROKER      = "nexus_trading";
-      const CHAIN       = 42161;
-      const VC          = "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC";
-      const HDR         = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
-      const B58C        = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+      const BANKR_API    = "https://api.bankr.bot";
+      const ARB_RPC      = "https://arb1.arbitrum.io/rpc";
+      const BROKER       = "nexus_trading";
+      const CHAIN        = 42161;
+      const VC           = "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC";
+      const VAULT        = "0x816f722424B49Cf1275cc86DA9840Fbd5a6167e9";
+      const USDC_ADDR    = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
+      const BROKER_HASH  = "69729be60357fd58653e988388922e200193543b4328eda1b9b9bdaaef2f1a70";
+      const TOKEN_HASH   = "d6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa";
+      const FEE_HEX      = "0x" + (10000000000000n).toString(16); // 0.00001 ETH LayerZero fee
+      const HDR          = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
+      const B58C         = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+      function pad32(hex) {
+        return (hex.startsWith("0x") ? hex.slice(2) : hex).padStart(64, "0");
+      }
+
+      async function bankrSubmit(transaction, description) {
+        const res = await fetch(`${BANKR_API}/wallet/submit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-API-Key": bankrApiKey },
+          body: JSON.stringify({ transaction, description, waitForConfirmation: true }),
+        });
+        return res.json();
+      }
 
       try {
-        // ── Step 1: personal_sign via Bankr to derive deterministic ed25519 key ──
+        // ── Check if Orderly account exists ──
+        let accountId = null;
+        let deposited = false;
+        try {
+          const ar = await fetch(`${ORDERLY_BASE}/v1/get_account?address=${walletNorm}&broker_id=${BROKER}`);
+          accountId = (await ar.json())?.data?.account_id ?? null;
+        } catch (_) {}
+
+        // ── No account: deposit USDC to create it ──
+        if (!accountId) {
+          // Compute accountId = keccak256(abi.encode(address, bytes32)) via web3_sha3 RPC
+          const encoded = "0x" + walletNorm.replace(/^0x/, "").padStart(64, "0") + BROKER_HASH;
+          const sha3Res  = await fetch(ARB_RPC, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "web3_sha3", params: [encoded] }),
+          });
+          const sha3Data = await sha3Res.json();
+          const computedId = sha3Data.result; // "0x..."
+          if (!computedId) return json({ error: "Failed to compute accountId via web3_sha3", detail: sha3Data }, request, 500);
+
+          const tokenAmount = BigInt(Math.round(Number(depositAmount) * 1_000_000));
+
+          // Step A: Approve USDC to vault
+          const approveData = "0x095ea7b3" + pad32(VAULT.replace(/^0x/, "").toLowerCase()) + pad32(tokenAmount.toString(16));
+          const approveTx   = await bankrSubmit(
+            { to: USDC_ADDR, chainId: CHAIN, data: approveData, value: "0x0" },
+            `Approve ${depositAmount} USDC to Orderly vault`
+          );
+          if (!approveTx.success) {
+            return json({ error: "USDC approve failed", detail: approveTx, hint: "Ensure API key has no allowed-recipients restriction" }, request, 400);
+          }
+
+          // Step B: Deposit to vault (creates Orderly account on-chain)
+          const accountIdHex = pad32(computedId);
+          const depositData  = "0x322dda6d" + accountIdHex + BROKER_HASH + TOKEN_HASH + pad32(tokenAmount.toString(16));
+          const depositTx    = await bankrSubmit(
+            { to: VAULT, chainId: CHAIN, data: depositData, value: FEE_HEX },
+            `Deposit ${depositAmount} USDC to Nexus/Orderly account`
+          );
+          if (!depositTx.success) {
+            return json({ error: "Vault deposit failed", detail: depositTx }, request, 400);
+          }
+
+          deposited  = true;
+          accountId  = computedId;
+
+          // Give Orderly 4s to index the deposit before key registration
+          await new Promise(r => setTimeout(r, 4000));
+
+          // Re-fetch accountId from Orderly (may differ from computed)
+          try {
+            const ar2 = await fetch(`${ORDERLY_BASE}/v1/get_account?address=${walletNorm}&broker_id=${BROKER}`);
+            accountId = (await ar2.json())?.data?.account_id ?? accountId;
+          } catch (_) {}
+        }
+
+        // ── personal_sign → derive ed25519 key ──
         const s1 = await fetch(`${BANKR_API}/wallet/sign`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-API-Key": bankrApiKey },
@@ -1002,36 +1078,35 @@ export default {
           return json({ error: "Signer mismatch", expected: walletNorm, got: d1.signer.toLowerCase() }, request, 400);
         }
 
-        // ── Step 2: Derive ed25519 keypair from signature ──
-        const hex  = d1.signature.startsWith("0x") ? d1.signature.slice(2) : d1.signature;
-        const seed = new Uint8Array(await crypto.subtle.digest("SHA-256",
-          new Uint8Array(hex.match(/.{2}/g).map(b => parseInt(b, 16)))));
-        const pk8  = new Uint8Array(48); pk8.set(HDR, 0); pk8.set(seed, 16);
-        const priv = await crypto.subtle.importKey("pkcs8", pk8, { name: "Ed25519" }, true, ["sign"]);
-        const jwk  = await crypto.subtle.exportKey("jwk", priv);
+        const sigHex = d1.signature.startsWith("0x") ? d1.signature.slice(2) : d1.signature;
+        const seed   = new Uint8Array(await crypto.subtle.digest("SHA-256",
+          new Uint8Array(sigHex.match(/.{2}/g).map(b => parseInt(b, 16)))));
+        const pk8    = new Uint8Array(48); pk8.set(HDR, 0); pk8.set(seed, 16);
+        const priv   = await crypto.subtle.importKey("pkcs8", pk8, { name: "Ed25519" }, true, ["sign"]);
+        const jwk    = await crypto.subtle.exportKey("jwk", priv);
         const rawPub = Uint8Array.from(atob(jwk.x.replace(/-/g,"+").replace(/_/g,"/")), c => c.charCodeAt(0));
         let n = BigInt("0x" + [...rawPub].map(b => b.toString(16).padStart(2,"0")).join(""));
         let b58 = ""; while (n > 0n) { b58 = B58C[Number(n%58n)] + b58; n = n/58n; }
         for (const b of rawPub) { if (b === 0) b58 = "1" + b58; else break; }
         const orderlyKey = "ed25519:" + b58;
 
-        // ── Step 3: Build EIP-712 typed data for Orderly registration ──
+        // ── EIP-712 typed data for Orderly key registration ──
         const ts  = Date.now();
         const exp = ts + 365 * 24 * 60 * 60 * 1000;
         const msg = { brokerId: BROKER, chainId: CHAIN, orderlyKey, scope: "read,trading", timestamp: ts, expiration: exp };
         const typedData = {
           types: {
             EIP712Domain: [
-              { name: "name",             type: "string"  },
-              { name: "version",          type: "string"  },
-              { name: "chainId",          type: "uint256" },
-              { name: "verifyingContract",type: "address" },
+              { name: "name",              type: "string"  },
+              { name: "version",           type: "string"  },
+              { name: "chainId",           type: "uint256" },
+              { name: "verifyingContract", type: "address" },
             ],
             AddOrderlyKey: [
-              { name: "brokerId",   type: "string" },
+              { name: "brokerId",   type: "string"  },
               { name: "chainId",    type: "uint256" },
-              { name: "orderlyKey", type: "string" },
-              { name: "scope",      type: "string" },
+              { name: "orderlyKey", type: "string"  },
+              { name: "scope",      type: "string"  },
               { name: "timestamp",  type: "uint64"  },
               { name: "expiration", type: "uint64"  },
             ],
@@ -1041,7 +1116,7 @@ export default {
           message: msg,
         };
 
-        // ── Step 4: EIP-712 sign via Bankr ──
+        // ── EIP-712 sign via Bankr ──
         const s2 = await fetch(`${BANKR_API}/wallet/sign`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-API-Key": bankrApiKey },
@@ -1051,18 +1126,11 @@ export default {
         if (!d2.success || !d2.signature) {
           return json({
             error: "Bankr EIP-712 sign failed", detail: d2,
-            hint: "Your API key may have 'allowed recipients' restrictions blocking EIP-712. Generate a key without that restriction at bankr.bot/api",
+            hint: "API key may have 'allowed recipients' restrictions blocking EIP-712 — generate a clean key at bankr.bot/api",
           }, request, 400);
         }
 
-        // ── Step 5: Fetch Orderly accountId ──
-        let accountId = null;
-        try {
-          const ar = await fetch(`${ORDERLY_BASE}/v1/get_account?address=${walletNorm}&broker_id=${BROKER}`);
-          accountId = (await ar.json())?.data?.account_id ?? null;
-        } catch (_) {}
-
-        // ── Step 6: Register key with Orderly ──
+        // ── Register key with Orderly ──
         const rh = { "Content-Type": "application/json" };
         if (accountId) rh["X-Account-Id"] = accountId;
         const regRes  = await fetch(`${ORDERLY_BASE}/v1/orderly_key`, {
@@ -1072,12 +1140,12 @@ export default {
         const regData = await regRes.json();
         if (!accountId) accountId = regData?.data?.account_id ?? null;
 
-        // ── Step 7: Store in KV ──
+        // ── Store in KV ──
         if (regData.success || regData.data) {
           await env.LAB_STORE.put("user:" + walletNorm, JSON.stringify({
             accountId, orderlyKey, registeredAt: Date.now(),
           }));
-          return json({ ok: true, walletAddress: walletNorm, orderlyKey, accountId }, request);
+          return json({ ok: true, walletAddress: walletNorm, orderlyKey, accountId, deposited, depositedUsdc: deposited ? depositAmount : 0 }, request);
         } else {
           return json({ error: "Orderly registration failed", detail: regData }, request, 400);
         }
