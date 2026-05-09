@@ -723,10 +723,18 @@ export default {
       let body;
       try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
 
-      const { symbol, side, notional, leverage = 1, orderType = "MARKET", walletSig, walletAddress } = body;
-      if (!symbol || !side || !notional) {
+      if (!body.symbol || !body.side || !body.notional) {
         return json({ error: "symbol, side, and notional (USDC) required" }, request, 400);
       }
+      // Normalize symbol: "BTC" → "PERP_BTC_USDC", "ETH-PERP" → "PERP_ETH_USDC", "PERP_SOL_USDC" → unchanged
+      const normalizeSymbol = (s) => {
+        s = s.toUpperCase().trim();
+        if (s.startsWith("PERP_")) return s;
+        s = s.replace(/[-_]?(PERP|USDC|USD|USDT)$/i, "").replace(/[^A-Z0-9]/g, "");
+        return "PERP_" + s + "_USDC";
+      };
+      const symbol    = normalizeSymbol(body.symbol);
+      const { side, notional, leverage = 1, orderType = "MARKET", walletSig, walletAddress } = body;
 
       const ORDERLY_BASE = "https://api-evm.orderly.org";
       const PKCS8_HDR = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
@@ -800,7 +808,7 @@ export default {
         const priceData   = await (await fetch(ORDERLY_BASE + "/v1/public/futures/" + symbol)).json();
         const futuresInfo = priceData?.data || {};
         const markPrice   = futuresInfo.mark_price;
-        if (!markPrice) return json({ error: "failed to fetch mark price", symbol, raw: priceData }, request, 502);
+        if (!markPrice) return json({ error: "failed to fetch mark price", symbol, hint: "Symbol may not be listed on Orderly Network. Try PERP_BTC_USDC, PERP_ETH_USDC, PERP_SOL_USDC, PERP_ARB_USDC, PERP_HYPE_USDC.", raw: priceData }, request, 502);
 
         const qtyStep       = futuresInfo.base_tick ?? futuresInfo.qty_step ?? futuresInfo.base_min ?? 0.01;
         const minNotional   = futuresInfo.min_notional ?? futuresInfo.notional_step ?? 1;

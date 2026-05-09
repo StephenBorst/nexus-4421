@@ -476,7 +476,7 @@ The endpoint:
 - "Short HYPE $20 at 20x" → `{ symbol: "PERP_HYPE_USDC", side: "SELL", notional: 20, leverage: 20 }`
 - "Long BTC with $50 at 5x" → `{ symbol: "PERP_BTC_USDC", side: "BUY", notional: 50, leverage: 5 }`
 
-**Supported symbols:** `PERP_BTC_USDC`, `PERP_ETH_USDC`, `PERP_SOL_USDC`, `PERP_HYPE_USDC`, `PERP_ARB_USDC`, and more.
+**Supported symbols:** `PERP_BTC_USDC`, `PERP_ETH_USDC`, `PERP_SOL_USDC`, `PERP_HYPE_USDC`, `PERP_ARB_USDC`, `PERP_XMR_USDC`, and more. The Worker auto-normalizes shorthand — "BTC", "ETH", "SOL", "XMR" all work.
 
 ### Check positions / balance
 
