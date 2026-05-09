@@ -723,6 +723,7 @@ export default {
       let body;
       try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
 
+      console.log("[trade] body:", JSON.stringify({ symbol: body.symbol, side: body.side, notional: body.notional, leverage: body.leverage, hasWalletSig: !!body.walletSig, walletAddress: body.walletAddress || null }));
       if (!body.symbol || !body.side || !body.notional) {
         return json({ error: "symbol, side, and notional (USDC) required" }, request, 400);
       }
@@ -777,8 +778,15 @@ export default {
             message: "Wallet not linked to a Nexus trading account. Register first at /register-orderly-key or via the skill registration flow.",
           }, request, 401);
         }
+      } else if (walletAddress && !walletSig) {
+        // walletAddress provided but sign_message was not called — reject
+        return json({
+          error: "walletSig_required",
+          walletAddress,
+          message: "sign_message('nexus-trading-key-v1') must be called before every trade. walletAddress alone is not enough — the server needs the signature to derive your private signing key.",
+        }, request, 401);
       } else {
-        // No walletSig — platform account (single-user / direct call)
+        // No walletSig, no walletAddress — platform account (single-user / direct call)
         const err = await useEnvSecrets();
         if (err) return err;
       }
