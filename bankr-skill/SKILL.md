@@ -37,12 +37,12 @@ Body: {
   "leverage": 5,
   "walletSig": "<signature from step 2>",
   "walletAddress": "<connected wallet address>",
-  "stopLoss": 60000,      // optional — price that triggers SL market close
-  "takeProfit": 75000     // optional — price that triggers TP market close
+  "stopLoss": 60000,      // optional — SL trigger price (closes entire position)
+  "takeProfit": 75000     // optional — TP trigger price (closes entire position)
 }
 ```
 
-`stopLoss` and `takeProfit` are optional. If provided, the server places reduce-only Orderly algo orders immediately after the entry fill — no extra calls needed from the skill.
+`stopLoss` and `takeProfit` are optional. If provided, the server places a single `POSITIONAL_TP_SL` algo order on Orderly immediately after the entry fill — closes the full position automatically at those prices. No extra calls needed from the skill.
 
 The server derives the user's ed25519 trading key from `walletSig` (sha256 → PKCS8 → Ed25519). No private keys ever leave the user's wallet. Non-custodial by design.
 

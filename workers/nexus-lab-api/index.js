@@ -834,38 +834,21 @@ export default {
           symbol, order_type: orderType.toUpperCase(), side: side.toUpperCase(), order_quantity: quantity,
         });
 
-        // ── SL/TP algo orders (optional) ────────────────────────────────────────
-        const closeSide = side.toUpperCase() === "BUY" ? "SELL" : "BUY";
-        let slResult = null, tpResult = null;
-
-        if (stopLoss) {
-          slResult = await orderlyRequest("POST", "/v1/algo/order", {
-            symbol,
-            algo_type: "STOP_LOSS",
-            type: "MARKET",
-            side: closeSide,
-            quantity,
-            trigger_price: Number(stopLoss),
-            reduce_only: true,
-          });
-        }
-
-        if (takeProfit) {
-          tpResult = await orderlyRequest("POST", "/v1/algo/order", {
-            symbol,
-            algo_type: "TAKE_PROFIT",
-            type: "MARKET",
-            side: closeSide,
-            quantity,
-            trigger_price: Number(takeProfit),
-            reduce_only: true,
-          });
+        // ── SL/TP via POSITIONAL_TP_SL algo order (optional) ───────────────────
+        // POSITIONAL_TP_SL closes the entire position — no side/quantity/type needed.
+        // tp_trigger_price and sl_trigger_price are top-level fields, not child_orders.
+        let slTpResult = null;
+        if (stopLoss || takeProfit) {
+          const algoBody = { symbol, algo_type: "POSITIONAL_TP_SL" };
+          if (takeProfit) algoBody.tp_trigger_price = Number(takeProfit);
+          if (stopLoss)   algoBody.sl_trigger_price = Number(stopLoss);
+          slTpResult = await orderlyRequest("POST", "/v1/algo/order", algoBody);
         }
 
         return json({
           ok: true, symbol, side: side.toUpperCase(), markPrice, qtyStep, minNotional,
           validNotional, quantity, notional, leverage: lev, leverageResult, order: orderResult,
-          stopLoss: slResult, takeProfit: tpResult,
+          slTp: slTpResult,
           mode: walletSig ? "multi-user" : "single-user",
         }, request);
 
