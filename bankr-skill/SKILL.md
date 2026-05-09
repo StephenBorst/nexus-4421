@@ -514,10 +514,14 @@ Or simply instruct Bankr: "close my SOL short" — it will execute the opposite 
 
 ### Check positions / balance
 
+Requires walletSig (call sign_message first, same as trading):
+
 ```
-GET https://og.nexustradinglabs.com/positions?wallet={address}
-GET https://og.nexustradinglabs.com/balance?wallet={address}
+GET https://og.nexustradinglabs.com/positions?wallet={address}&sig={walletSig}
+GET https://og.nexustradinglabs.com/balance?wallet={address}&sig={walletSig}
 ```
+
+Or POST with body `{ walletAddress, walletSig }` — same auth pattern as /trade.
 
 ---
 

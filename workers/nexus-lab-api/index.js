@@ -887,6 +887,42 @@ export default {
       }
     }
 
+    // ── /positions and /balance — proxy to Orderly private API ─────────────
+    // Accepts walletSig as query param ?wallet=&sig= or POST body { walletAddress, walletSig }
+    if ((parts[0] === "positions" || parts[0] === "balance") && (request.method === "GET" || request.method === "POST")) {
+      const qp = new URL(request.url).searchParams;
+      let wAddr = qp.get("wallet");
+      let wSig  = qp.get("sig");
+      if (request.method === "POST") {
+        let pb; try { pb = await request.json(); } catch { pb = {}; }
+        wAddr = wAddr || pb.walletAddress;
+        wSig  = wSig  || pb.walletSig;
+      }
+      if (!wAddr || !wSig) return json({ error: "wallet and sig required" }, request, 400);
+      const wNorm = wAddr.toLowerCase().trim();
+      const uRaw  = await env.LAB_STORE.get("user:" + wNorm);
+      if (!uRaw) return json({ error: "wallet_not_registered" }, request, 401);
+      const urec  = JSON.parse(uRaw);
+      const PHDR  = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
+      const phex  = wSig.startsWith("0x") ? wSig.slice(2) : wSig;
+      const pseed = new Uint8Array(await crypto.subtle.digest("SHA-256",
+        new Uint8Array(phex.match(/.{1,2}/g).map(b => parseInt(b, 16)))));
+      const ppk8  = new Uint8Array(48); ppk8.set(PHDR, 0); ppk8.set(pseed, 16);
+      const psk   = await crypto.subtle.importKey("pkcs8", ppk8, { name: "Ed25519" }, false, ["sign"]);
+      const OBASE = "https://api-evm.orderly.org";
+      const psign = async (method, path) => {
+        const ts  = Date.now();
+        const msg = new TextEncoder().encode(ts + method + path);
+        const s   = new Uint8Array(await crypto.subtle.sign("Ed25519", psk, msg));
+        const b64 = btoa(String.fromCharCode(...s)).replace(/[+]/g,"-").replace(/[/]/g,"_").replace(/=+$/,"");
+        return { "orderly-timestamp": String(ts), "orderly-account-id": urec.accountId, "orderly-key": urec.orderlyKey, "orderly-signature": b64 };
+      };
+      const opath = parts[0] === "positions" ? "/v1/positions" : "/v1/client/holding";
+      const ohdrs = await psign("GET", opath);
+      const ores  = await fetch(OBASE + opath, { headers: ohdrs });
+      return json(await ores.json(), request);
+    }
+
     // ── /deposit/prepare — build signed tx data for Orderly vault deposit ────
     if (parts[0] === "deposit" && parts[1] === "prepare" && request.method === "POST") {
       let body;
