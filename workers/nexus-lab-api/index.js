@@ -835,11 +835,11 @@ export default {
         });
 
         // ── SL/TP via POSITIONAL_TP_SL algo order (optional) ───────────────────
-        // POSITIONAL_TP_SL closes the entire position — no side/quantity/type needed.
-        // tp_trigger_price and sl_trigger_price are top-level fields, not child_orders.
+        // quantity is required — Orderly creates internal child orders and validates size.
+        // trigger_price_type defaults to MARK_PRICE.
         let slTpResult = null;
         if (stopLoss || takeProfit) {
-          const algoBody = { symbol, algo_type: "POSITIONAL_TP_SL" };
+          const algoBody = { symbol, algo_type: "POSITIONAL_TP_SL", quantity };
           if (takeProfit) algoBody.tp_trigger_price = Number(takeProfit);
           if (stopLoss)   algoBody.sl_trigger_price = Number(stopLoss);
           slTpResult = await orderlyRequest("POST", "/v1/algo/order", algoBody);
