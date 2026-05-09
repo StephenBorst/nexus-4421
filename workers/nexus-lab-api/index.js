@@ -732,49 +732,45 @@ export default {
       const PKCS8_HDR = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
       let accountId, orderlyApiKey, signingKey;
 
-      if (walletSig && walletAddress) {
-        // Multi-user: derive ed25519 seed from sha256(walletSig)
-        const walletNorm = walletAddress.toLowerCase().trim();
-        const userRaw = await env.LAB_STORE.get("user:" + walletNorm);
-        if (!userRaw) {
-          return json({
-            error: "Wallet not registered for Nexus trading.",
-            hint: "Visit og.nexustradinglabs.com/register-orderly-key to connect your wallet.",
-            walletAddress: walletNorm,
-          }, request, 401);
-        }
-        const userRecord = JSON.parse(userRaw);
-        accountId     = userRecord.accountId;
-        orderlyApiKey = userRecord.orderlyKey;
-
-        const hexSig   = walletSig.startsWith("0x") ? walletSig.slice(2) : walletSig;
-        const sigBytes = new Uint8Array(hexSig.match(/.{2}/g).map(b => parseInt(b, 16)));
-        const seed     = new Uint8Array(await crypto.subtle.digest("SHA-256", sigBytes));
-        const pkcs8    = new Uint8Array(48);
-        pkcs8.set(PKCS8_HDR, 0);
-        pkcs8.set(seed, 16);
-        signingKey = await crypto.subtle.importKey("pkcs8", pkcs8, { name: "Ed25519" }, false, ["sign"]);
-
-      } else {
-        // Single-user: use env secrets
-        const secretDebug = {
-          ORDERLY_API_SECRET: typeof env.ORDERLY_API_SECRET === "string" ? "set(" + env.ORDERLY_API_SECRET.length + "chars)" : String(env.ORDERLY_API_SECRET),
-          ORDERLY_API_KEY:    typeof env.ORDERLY_API_KEY    === "string" ? "set(" + env.ORDERLY_API_KEY.length + "chars)"    : String(env.ORDERLY_API_KEY),
-          ORDERLY_ACCOUNT_ID: typeof env.ORDERLY_ACCOUNT_ID === "string" ? "set(" + env.ORDERLY_ACCOUNT_ID.length + "chars)" : String(env.ORDERLY_ACCOUNT_ID),
-        };
+      // Resolve accountId, orderlyApiKey, signingKey
+      // Priority: per-user KV record > env secrets (platform account fallback)
+      const useEnvSecrets = async () => {
         if (!env.ORDERLY_API_SECRET || !env.ORDERLY_API_KEY || !env.ORDERLY_ACCOUNT_ID) {
-          return json({ error: "Orderly credentials not configured", debug: secretDebug }, request, 500);
+          return json({ error: "Orderly credentials not configured" }, request, 500);
         }
         accountId     = env.ORDERLY_ACCOUNT_ID;
         orderlyApiKey = env.ORDERLY_API_KEY;
-        let pkcs8Bytes = Uint8Array.from(atob(env.ORDERLY_API_SECRET), c => c.charCodeAt(0));
-        if (pkcs8Bytes.length === 32) {
-          const full = new Uint8Array(48);
-          full.set(PKCS8_HDR, 0);
-          full.set(pkcs8Bytes, 16);
-          pkcs8Bytes = full;
+        let pb = Uint8Array.from(atob(env.ORDERLY_API_SECRET), c => c.charCodeAt(0));
+        if (pb.length === 32) {
+          const full = new Uint8Array(48); full.set(PKCS8_HDR, 0); full.set(pb, 16); pb = full;
         }
-        signingKey = await crypto.subtle.importKey("pkcs8", pkcs8Bytes, { name: "Ed25519" }, false, ["sign"]);
+        signingKey = await crypto.subtle.importKey("pkcs8", pb, { name: "Ed25519" }, false, ["sign"]);
+      };
+
+      if (walletSig && walletAddress) {
+        // Check KV for a registered per-user Orderly key
+        const walletNorm = walletAddress.toLowerCase().trim();
+        const userRaw    = await env.LAB_STORE.get("user:" + walletNorm);
+        if (userRaw) {
+          // Registered user: derive their private key from walletSig, use stored accountId/orderlyKey
+          const rec  = JSON.parse(userRaw);
+          accountId     = rec.accountId;
+          orderlyApiKey = rec.orderlyKey;
+          const hex  = walletSig.startsWith("0x") ? walletSig.slice(2) : walletSig;
+          const seed = new Uint8Array(await crypto.subtle.digest("SHA-256",
+            new Uint8Array(hex.match(/.{2}/g).map(b => parseInt(b, 16)))));
+          const pk8  = new Uint8Array(48); pk8.set(PKCS8_HDR, 0); pk8.set(seed, 16);
+          signingKey = await crypto.subtle.importKey("pkcs8", pk8, { name: "Ed25519" }, false, ["sign"]);
+        } else {
+          // Wallet not in KV yet — fall back to platform env secrets
+          // walletSig proves identity but trade goes through platform account
+          const err = await useEnvSecrets();
+          if (err) return err;
+        }
+      } else {
+        // No walletSig — platform account (single-user / direct call)
+        const err = await useEnvSecrets();
+        if (err) return err;
       }
 
       async function orderlySign(method, path, bodyStr) {
