@@ -735,7 +735,7 @@ export default {
         return "PERP_" + s + "_USDC";
       };
       const symbol    = normalizeSymbol(body.symbol);
-      const { side, notional, leverage = 1, orderType = "MARKET", walletSig, walletAddress } = body;
+      const { side, notional, leverage = 1, orderType = "MARKET", walletSig, walletAddress, stopLoss, takeProfit } = body;
 
       const ORDERLY_BASE = "https://api-evm.orderly.org";
       const PKCS8_HDR = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
@@ -834,9 +834,38 @@ export default {
           symbol, order_type: orderType.toUpperCase(), side: side.toUpperCase(), order_quantity: quantity,
         });
 
+        // ── SL/TP algo orders (optional) ────────────────────────────────────────
+        const closeSide = side.toUpperCase() === "BUY" ? "SELL" : "BUY";
+        let slResult = null, tpResult = null;
+
+        if (stopLoss) {
+          slResult = await orderlyRequest("POST", "/v1/algo/order", {
+            symbol,
+            algo_type: "STOP_LOSS",
+            type: "MARKET",
+            side: closeSide,
+            quantity,
+            trigger_price: Number(stopLoss),
+            reduce_only: true,
+          });
+        }
+
+        if (takeProfit) {
+          tpResult = await orderlyRequest("POST", "/v1/algo/order", {
+            symbol,
+            algo_type: "TAKE_PROFIT",
+            type: "MARKET",
+            side: closeSide,
+            quantity,
+            trigger_price: Number(takeProfit),
+            reduce_only: true,
+          });
+        }
+
         return json({
           ok: true, symbol, side: side.toUpperCase(), markPrice, qtyStep, minNotional,
           validNotional, quantity, notional, leverage: lev, leverageResult, order: orderResult,
+          stopLoss: slResult, takeProfit: tpResult,
           mode: walletSig ? "multi-user" : "single-user",
         }, request);
 

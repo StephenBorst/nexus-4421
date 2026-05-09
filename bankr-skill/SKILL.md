@@ -36,9 +36,13 @@ Body: {
   "notional": 50,
   "leverage": 5,
   "walletSig": "<signature from step 2>",
-  "walletAddress": "<connected wallet address>"
+  "walletAddress": "<connected wallet address>",
+  "stopLoss": 60000,      // optional — price that triggers SL market close
+  "takeProfit": 75000     // optional — price that triggers TP market close
 }
 ```
+
+`stopLoss` and `takeProfit` are optional. If provided, the server places reduce-only Orderly algo orders immediately after the entry fill — no extra calls needed from the skill.
 
 The server derives the user's ed25519 trading key from `walletSig` (sha256 → PKCS8 → Ed25519). No private keys ever leave the user's wallet. Non-custodial by design.
 
@@ -486,8 +490,27 @@ The endpoint:
 **Natural language → trade mapping:**
 - "Short HYPE $20 at 20x" → `{ symbol: "PERP_HYPE_USDC", side: "SELL", notional: 20, leverage: 20 }`
 - "Long BTC with $50 at 5x" → `{ symbol: "PERP_BTC_USDC", side: "BUY", notional: 50, leverage: 5 }`
+- "Short SOL $15 at 5x, SL 100, TP 80" → `{ symbol: "PERP_SOL_USDC", side: "SELL", notional: 15, leverage: 5, stopLoss: 100, takeProfit: 80 }`
 
 **Supported symbols:** `PERP_BTC_USDC`, `PERP_ETH_USDC`, `PERP_SOL_USDC`, `PERP_HYPE_USDC`, `PERP_ARB_USDC`, `PERP_XMR_USDC`, and more. The Worker auto-normalizes shorthand — "BTC", "ETH", "SOL", "XMR" all work.
+
+### Close a position
+
+To close an open position, place the opposite side trade with `reduce_only: true` and no `notional` — use the exact quantity from the open position:
+
+```
+POST https://og.nexustradinglabs.com/trade
+Body: {
+  "symbol": "PERP_SOL_USDC",
+  "side": "BUY",           // opposite of the open position
+  "notional": 15,          // match original notional — server will compute qty and close
+  "leverage": 5,
+  "walletSig": "<from sign_message>",
+  "walletAddress": "<wallet>"
+}
+```
+
+Or simply instruct Bankr: "close my SOL short" — it will execute the opposite side automatically.
 
 ### Check positions / balance
 
@@ -503,23 +526,31 @@ GET https://og.nexustradinglabs.com/balance?wallet={address}
 ```
 Show me the top 5 traders on Nexus by Rep Score
 ```
-→ Fetch /feed, compute repScore per wallet, return ranked table with win rate / W/L / avg R:R / active trades
+→ `GET /feed` → group theses by wallet → for each wallet compute `wins` (HIT_TP), `losses` (STOPPED_OUT), `avgRR` (mean of `(tp1-entry)/(entry-sl)` on wins) → apply repScore formula → sort desc → return top 5 with wallet, repScore, winRate, W/L, avgRR, active count
 
 ```
 Who has the highest win rate on Nexus with at least 5 closed trades?
 ```
-→ Filter feed for wallets with (HIT_TP + STOPPED_OUT) >= 5, sort by win rate
+→ `GET /feed` → filter wallets where `(HIT_TP + STOPPED_OUT) >= 5` → sort by `wins/(wins+losses)` desc → return top result
+
+```
+What's my Rep Score?
+```
+→ `GET /feed` → filter by user's `walletAddress` → compute repScore using formula in Rep Score section → return score, win rate, W/L, avg R:R, active trades, sample penalty if < 5 closed
 
 ```
 Copy the #1 Nexus trader's latest active BTC thesis with 2% of my stack
 ```
-→ Get leaderboard → find top wallet → get their active BTC thesis → compute size → PUT to user's lab
+→ Build leaderboard (above) → get top wallet → find their active `PERP_BTC_USDC` thesis from `/feed` → compute size: `(accountSize * 0.02) / (entry - sl)` → `GET /lab/:userWallet` → append copied thesis with `copiedFromWallet`, `copiedThesisId`, `isPublic: false` → `PUT /lab/:userWallet`
 
 ```
 Publish my ETH short thesis: entry 3200, SL 3350, TP 2800
 ```
-→ Call registerThesis() on Arbitrum, store onChainId in lab entry, set isPublic: true
+→ `GET /lab/:userWallet` → find or create thesis object: `{ symbol: "PERP_ETH_USDC", direction: "SHORT", entryPrice: 3200, stopLoss: 3350, takeProfit1: 2800, status: "ACTIVE", isPublic: false }` → call `registerThesis("PERP_ETH_USDC", "SHORT", 320000000000, 335000000000, 280000000000)` on ThesisRegistry → parse `ThesisRegistered` event for `thesisId` → update thesis with `onChainId`, `onChainTxHash`, `isPublic: true` → `PUT /lab/:userWallet`
 
 ```
-What's my Rep Score?
+Show me all active theses on Nexus right now
+```
+→ `GET /feed` → filter `status === "ACTIVE"` → sort by `timestamp` desc → return symbol, direction, entry/SL/TP, trader wallet, copyCount
+
 ```
