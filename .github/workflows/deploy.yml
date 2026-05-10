@@ -41,4 +41,4 @@ jobs:
 
       - name: Deploy Worker (nexus-lab-api)
         working-directory: workers/nexus-lab-api
-        run: npx wrangler@3 deploy
+        run: npm ci && npx wrangler@3 deploy
