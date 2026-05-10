@@ -979,6 +979,99 @@ export default {
       return json({ ok: algoRes?.success ?? false, symbol: sym2, stopLoss: sl, takeProfit: tp, quantity: posQty, closeSide: closeSide2, raw: algoRes }, request);
     }
 
+
+    // ── /mark-price — get current mark price for a symbol ───────────────────
+    // Public endpoint, no auth required. Symbol: BTC, ETH, SOL, or PERP suffix.
+    // Returns { symbol, markPrice, indexPrice, lastPrice }
+    if (parts[0] === "mark-price" && request.method === "GET") {
+      const qp2 = new URL(request.url).searchParams;
+      const rawSym = qp2.get("symbol") || qp2.get("sym") || "";
+      if (!rawSym) return json({ error: "symbol required — GET /mark-price?symbol=BTC" }, request, 400);
+      const symMap = { BTC:"PERP_BTC_USDC", ETH:"PERP_ETH_USDC", SOL:"PERP_SOL_USDC", ARB:"PERP_ARB_USDC", LINK:"PERP_LINK_USDC", WIF:"PERP_WIF_USDC" };
+      const mpSym = symMap[rawSym.toUpperCase()] || (rawSym.toUpperCase().startsWith("PERP_") ? rawSym.toUpperCase() : "PERP_" + rawSym.toUpperCase() + "_USDC");
+      try {
+        const mpRes = await fetch(`https://api-evm.orderly.org/v1/public/futures/${mpSym}`);
+        const mpData = await mpRes.json();
+        if (!mpData?.data) return json({ error: "symbol not found", symbol: mpSym }, request, 404);
+        const d = mpData.data;
+        return json({ symbol: mpSym, markPrice: d.mark_price, indexPrice: d.index_price, lastPrice: d.last_price, openInterest: d.open_interest, volume24h: d.volume }, request);
+      } catch (e) {
+        return json({ error: "price fetch failed", detail: String(e) }, request, 500);
+      }
+    }
+
+    // ── /cancel — cancel an open (unfilled) order ────────────────────────────
+    // POST { walletAddress, walletSig, orderId, symbol }
+    // orderId from the original /trade response raw.data.order_id
+    if (parts[0] === "cancel" && request.method === "POST") {
+      let cbody; try { cbody = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const { walletAddress: cwa, walletSig: cws, orderId: coid, symbol: csym } = cbody;
+      if (!cwa || !cws) return json({ error: "walletSig_required", hint: "POST { walletAddress, walletSig, orderId, symbol }" }, request, 401);
+      if (!coid) return json({ error: "orderId required" }, request, 400);
+      const cwNorm = cwa.toLowerCase().trim();
+      const cuRaw = await env.LAB_STORE.get("user:" + cwNorm);
+      if (!cuRaw) return json({ error: "wallet_not_registered" }, request, 401);
+      const curec = JSON.parse(cuRaw);
+      const CPHDR = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
+      const chex  = cws.startsWith("0x") ? cws.slice(2) : cws;
+      const cseed = new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(chex.match(/.{1,2}/g).map(b => parseInt(b, 16)))));
+      const cpk8  = new Uint8Array(48); cpk8.set(CPHDR, 0); cpk8.set(cseed, 16);
+      const csk   = await crypto.subtle.importKey("pkcs8", cpk8, { name: "Ed25519" }, false, ["sign"]);
+      const csign = async (method, path, body2) => {
+        const ts  = Date.now();
+        const bs2 = body2 ? JSON.stringify(body2) : "";
+        const msg = new TextEncoder().encode(ts + method + path + bs2);
+        const s   = new Uint8Array(await crypto.subtle.sign("Ed25519", csk, msg));
+        const b64 = btoa(String.fromCharCode(...s)).replace(/[+]/g,"-").replace(/[/]/g,"_").replace(/=+$/,"");
+        return { "Content-Type": "application/json", "orderly-timestamp": String(ts), "orderly-account-id": curec.accountId, "orderly-key": curec.orderlyKey, "orderly-signature": b64 };
+      };
+      const cancelSym = csym ? (csym.toUpperCase().startsWith("PERP_") ? csym.toUpperCase() : "PERP_" + csym.toUpperCase() + "_USDC") : undefined;
+      const cancelPath = cancelSym ? `/v1/order?order_id=${coid}&symbol=${cancelSym}` : `/v1/order?order_id=${coid}`;
+      const cancelHdrs = await csign("DELETE", cancelPath);
+      const cancelRes  = await fetch("https://api-evm.orderly.org" + cancelPath, { method: "DELETE", headers: cancelHdrs });
+      const cancelData = await cancelRes.json();
+      return json({ ok: cancelData?.success ?? false, orderId: coid, raw: cancelData }, request);
+    }
+
+    // ── /order-status — check fill status of a specific order ────────────────
+    // POST { walletAddress, walletSig, orderId }
+    // Returns order status: NEW, PARTIAL_FILLED, FILLED, CANCELLED, REJECTED
+    if (parts[0] === "order-status" && request.method === "POST") {
+      let osbody; try { osbody = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const { walletAddress: oswa, walletSig: osws, orderId: osoid } = osbody;
+      if (!oswa || !osws) return json({ error: "walletSig_required", hint: "POST { walletAddress, walletSig, orderId }" }, request, 401);
+      if (!osoid) return json({ error: "orderId required" }, request, 400);
+      const osNorm = oswa.toLowerCase().trim();
+      const osRaw  = await env.LAB_STORE.get("user:" + osNorm);
+      if (!osRaw) return json({ error: "wallet_not_registered" }, request, 401);
+      const osrec  = JSON.parse(osRaw);
+      const OSPHDR = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
+      const oshex  = osws.startsWith("0x") ? osws.slice(2) : osws;
+      const osseed = new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(oshex.match(/.{1,2}/g).map(b => parseInt(b, 16)))));
+      const ospk8  = new Uint8Array(48); ospk8.set(OSPHDR, 0); ospk8.set(osseed, 16);
+      const ossk   = await crypto.subtle.importKey("pkcs8", ospk8, { name: "Ed25519" }, false, ["sign"]);
+      const ossign = async (method, path) => {
+        const ts  = Date.now();
+        const msg = new TextEncoder().encode(ts + method + path);
+        const s   = new Uint8Array(await crypto.subtle.sign("Ed25519", ossk, msg));
+        const b64 = btoa(String.fromCharCode(...s)).replace(/[+]/g,"-").replace(/[/]/g,"_").replace(/=+$/,"");
+        return { "orderly-timestamp": String(ts), "orderly-account-id": osrec.accountId, "orderly-key": osrec.orderlyKey, "orderly-signature": b64 };
+      };
+      const osPath = `/v1/order/${osoid}`;
+      const osHdrs = await ossign("GET", osPath);
+      const osRes  = await fetch("https://api-evm.orderly.org" + osPath, { headers: osHdrs });
+      const osData = await osRes.json();
+      if (!osData?.data) return json({ error: "order not found", orderId: osoid, raw: osData }, request, 404);
+      const od = osData.data;
+      return json({
+        orderId: od.order_id, symbol: od.symbol, status: od.status,
+        side: od.side, type: od.type, price: od.price, quantity: od.quantity,
+        executedQty: od.executed, avgPrice: od.average_executed_price,
+        filled: od.status === "FILLED", cancelled: od.status === "CANCELLED",
+        raw: od,
+      }, request);
+    }
+
     // ── /derive-key — derive ed25519 public key from wallet signature ──────────
     // Browser sends walletSig from personal_sign, gets back orderlyKey (public only)
     if (parts[0] === "derive-key" && request.method === "POST") {

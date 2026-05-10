@@ -345,7 +345,16 @@ Returns `{ ok: true, amount, withdrawNonce }` on success.
 
 All collateral lives in the **Orderly Network vault** on Arbitrum — non-custodial, withdraw anytime.
 
-### Agent path — POST /proxy/bankr-deposit (recommended for agents)
+### Current status — deposit requires user wallet action
+
+**Bankr Wallet API does not yet support on-chain transaction submission** (this is Bankr's "stage 2", under development as of May 2026). The agent cannot submit the two required Arbitrum transactions on behalf of the user.
+
+**Agent behavior for deposit requests:**
+1. Call `/proxy/bankr-deposit` to get pre-built calldata
+2. Tell the user: "Deposit requires two on-chain transactions that must be signed from your wallet. Please go to https://trade.nexustradinglabs.com to deposit — connect your wallet and use the Deposit button. Once Bankr ships transaction support, this will be fully automated."
+3. Do NOT attempt to submit the transactions via Bankr API — it will fail
+
+### Get pre-built deposit calldata (informational)
 
 ```
 POST https://og.nexustradinglabs.com/proxy/bankr-deposit
@@ -356,21 +365,9 @@ Body: {
 }
 ```
 
-The server:
-1. Fetches the user's Orderly accountId automatically
-2. Builds USDC `approve` calldata (approve vault to spend USDC)
-3. Submits approve tx via Bankr `eth_sendTransaction`
-4. Polls Arbitrum RPC for approve receipt (up to 20s)
-5. Builds `vault.deposit()` calldata with accountId + broker/token hashes
-6. Submits deposit tx via Bankr `eth_sendTransaction`
+Returns `{ ok: false, reason: "deposit_requires_wallet_execution", message: "...", steps: [...] }` with pre-built calldata for both transactions. The `steps[]` array contains ready-to-sign tx data if the user wants to submit manually via their wallet app.
 
-Returns `{ ok: true, amount, accountId, approveTxHash, depositTxHash }` on success.
-
-Funds available in Nexus/Orderly within ~1-2 Arbitrum blocks (~2s after deposit tx confirms).
-
-**When to ask for Bankr API key:** Same as registration/withdrawal. Tell the user: "I need your Bankr API key to submit the deposit transactions. Find it at bankr.bot/api."
-
-**Requires:** User wallet must have sufficient USDC on Arbitrum and a small ETH balance (~0.00001 ETH) for the LayerZero fee on the deposit tx.
+**Requires:** User wallet must have sufficient USDC on Arbitrum and ~0.00001 ETH for the LayerZero fee.
 
 ---
 
@@ -378,17 +375,16 @@ Funds available in Nexus/Orderly within ~1-2 Arbitrum blocks (~2s after deposit 
 
 ```
 POST https://og.nexustradinglabs.com/deposit/prepare
-Body: { "wallet": "0x...", "amount": 20, "accountId": "0x..." }
+Body: { "wallet": "0x...", "amount": 20 }
 ```
 
-**Getting the accountId:** The user's Orderly accountId is tied to their wallet + the `nexus_trading` broker. It can be found in the Nexus app UI or the user's Orderly account dashboard. It is a bytes32 hex string. Never compute it — always use the value the user provides or fetch it from their Orderly session.
+**accountId is fetched automatically** — never pass it in the body. The server calls `https://api.orderly.org/v1/client/account?address={wallet}&broker_id=nexus_trading` to get it.
 
 Returns two ready-to-sign transactions in order:
 
 ```json
 {
   "chainId": 42161,
-  "depositFee": "0x0",
   "steps": [
     {
       "step": 1,
@@ -402,15 +398,14 @@ Returns two ready-to-sign transactions in order:
       "description": "Deposit 20 USDC to Nexus trading account",
       "to": "0x816f722424B49Cf1275cc86DA9840Fbd5a6167e9",
       "data": "0x...",
-      "value": "0x0"
+      "value": "0x2386F26FC10000",
+      "note": "Requires ~0.00001 ETH for LayerZero fee"
     }
   ]
 }
 ```
 
-Sign and submit step 1, wait for confirmation, then sign and submit step 2. Done.
-
-**accountId is fetched automatically** from `https://api.orderly.org/v1/client/account?address={wallet}&broker_id=nexus_trading` — never compute or pass it manually.
+Sign and submit step 1, wait for confirmation, then sign and submit step 2.
 
 ---
 
@@ -611,36 +606,20 @@ GET with query params also accepted: `?wallet={address}&sig={walletSig}`
 
 ---
 
-## Example Agent Prompts
+### Get mark price (current price before trading)
+
+No auth required — public endpoint.
 
 ```
-Show me the top 5 traders on Nexus by Rep Score
+GET https://og.nexustradinglabs.com/mark-price?symbol=BTC
 ```
-→ `GET /feed` → group theses by wallet → for each wallet compute `wins` (HIT_TP), `losses` (STOPPED_OUT), `avgRR` (mean of `(tp1-entry)/(entry-sl)` on wins) → apply repScore formula → sort desc → return top 5 with wallet, repScore, winRate, W/L, avgRR, active count
 
-```
-Who has the highest win rate on Nexus with at least 5 closed trades?
-```
-→ `GET /feed` → filter wallets where `(HIT_TP + STOPPED_OUT) >= 5` → sort by `wins/(wins+losses)` desc → return top result
+Returns `{ symbol, markPrice, indexPrice, lastPrice, openInterest, volume24h }`.
 
-```
-What's my Rep Score?
-```
-→ `GET /feed` → filter by user's `walletAddress` → compute repScore using formula in Rep Score section → return score, win rate, W/L, avg R:R, active trades, sample penalty if < 5 closed
+Use this before placing a trade when the user asks "what's BTC at?" or to size a position. Supports shorthand: `BTC`, `ETH`, `SOL`, `ARB`, `LINK`, `WIF` — or full `PERP_BTC_USDC` form.
 
-```
-Copy the #1 Nexus trader's latest active BTC thesis with 2% of my stack
-```
-→ Build leaderboard (above) → get top wallet → find their active `PERP_BTC_USDC` thesis from `/feed` → compute size: `(accountSize * 0.02) / (entry - sl)` → `GET /lab/:userWallet` → append copied thesis with `copiedFromWallet`, `copiedThesisId`, `isPublic: false` → `PUT /lab/:userWallet`
+---
 
-```
-Publish my ETH short thesis: entry 3200, SL 3350, TP 2800
-```
-→ `GET /lab/:userWallet` → find or create thesis object: `{ symbol: "PERP_ETH_USDC", direction: "SHORT", entryPrice: 3200, stopLoss: 3350, takeProfit1: 2800, status: "ACTIVE", isPublic: false }` → call `registerThesis("PERP_ETH_USDC", "SHORT", 320000000000, 335000000000, 280000000000)` on ThesisRegistry → parse `ThesisRegistered` event for `thesisId` → update thesis with `onChainId`, `onChainTxHash`, `isPublic: true` → `PUT /lab/:userWallet`
+### Cancel an open (unfilled) order
 
-```
-Show me all active theses on Nexus right now
-```
-→ `GET /feed` → filter `status === "ACTIVE"` → sort by `timestamp` desc → return symbol, direction, entry/SL/TP, trader wallet, copyCount
-
-```
+Use when a limit order hasn't filled and the 
