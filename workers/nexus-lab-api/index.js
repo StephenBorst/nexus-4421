@@ -267,6 +267,7 @@ export default {
       return new Response(null, { status: 204, headers: cors(request) });
     }
 
+    try {
     const url = new URL(request.url);
     const parts = url.pathname.split("/").filter(Boolean);
 
@@ -1673,5 +1674,11 @@ document.getElementById("btn").addEventListener("click",go);
     }
 
     return json({ error: "method not allowed" }, request, 405);
+    } catch (topErr) {
+      return new Response(JSON.stringify({ error: "worker unhandled exception", detail: String(topErr), stack: topErr?.stack }), {
+        status: 500,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
   },
 };
