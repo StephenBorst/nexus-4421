@@ -1124,7 +1124,7 @@ export default {
         const BANKR_API_W    = "https://api.bankr.bot";
         const BROKER_W       = "nexus_trading";
         const CHAIN_W        = 42161;
-        const VC_W           = "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC";
+        const VC_W           = "0x8794E7260517B1766fc7b55cAfcd56e6bf08600e"; // Orderly mainnet verifying contract
         const HDR_W          = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
 
         // 1. Derive ed25519 key from Bankr personal_sign (for Orderly REST auth)
