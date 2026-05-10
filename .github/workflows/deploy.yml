@@ -38,6 +38,7 @@ jobs:
 
       - name: Deploy to Cloudflare Pages
         run: npx wrangler@3 pages deploy build/client --project-name=nexus-trading-lab --branch=main --commit-dirty=true
-- name: Deploy Worker (nexus-lab-api)
+
+      - name: Deploy Worker (nexus-lab-api)
         working-directory: workers/nexus-lab-api
         run: npx wrangler@3 deploy
