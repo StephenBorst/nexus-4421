@@ -1209,11 +1209,12 @@ export default {
         if (!wSignData.signature) return json({ error: "Bankr EIP-712 sign returned no signature", detail: wSignData }, request, 502);
 
         // 5. Submit withdrawal request to Orderly
-        // NOTE: verifyingContract must NOT be in the POST body — only in the EIP-712 domain for signing
+        // verifyingContract IS required in the POST body (Orderly error -1005 if missing)
         const withdrawRes = await oReq("POST", "/v1/withdraw_request", {
           message: withdrawMsg,
           signature: wSignData.signature,
           userAddress: walletNorm,
+          verifyingContract: VC_W,
         });
 
         return json({
