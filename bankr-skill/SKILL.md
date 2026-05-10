@@ -345,16 +345,7 @@ Returns `{ ok: true, amount, withdrawNonce }` on success.
 
 All collateral lives in the **Orderly Network vault** on Arbitrum — non-custodial, withdraw anytime.
 
-### Current status — deposit requires user wallet action
-
-**Bankr Wallet API does not yet support on-chain transaction submission** (this is Bankr's "stage 2", under development as of May 2026). The agent cannot submit the two required Arbitrum transactions on behalf of the user.
-
-**Agent behavior for deposit requests:**
-1. Call `/proxy/bankr-deposit` to get pre-built calldata
-2. Tell the user: "Deposit requires two on-chain transactions that must be signed from your wallet. Please go to https://trade.nexustradinglabs.com to deposit — connect your wallet and use the Deposit button. Once Bankr ships transaction support, this will be fully automated."
-3. Do NOT attempt to submit the transactions via Bankr API — it will fail
-
-### Get pre-built deposit calldata (informational)
+### Agent path — fully automated via Bankr /wallet/submit (recommended)
 
 ```
 POST https://og.nexustradinglabs.com/proxy/bankr-deposit
@@ -365,9 +356,21 @@ Body: {
 }
 ```
 
-Returns `{ ok: false, reason: "deposit_requires_wallet_execution", message: "...", steps: [...] }` with pre-built calldata for both transactions. The `steps[]` array contains ready-to-sign tx data if the user wants to submit manually via their wallet app.
+The server:
+1. Fetches accountId from Orderly automatically
+2. Builds USDC `approve` calldata
+3. Submits approve tx via `POST https://api.bankr.bot/wallet/submit` — signs + broadcasts in one step
+4. Waits for on-chain confirmation
+5. Builds `vault.deposit()` calldata
+6. Submits deposit tx via `/wallet/submit`
 
-**Requires:** User wallet must have sufficient USDC on Arbitrum and ~0.00001 ETH for the LayerZero fee.
+Returns `{ ok: true, amount, accountId, approveTxHash, depositTxHash }` on success. Funds live in Nexus within ~2 Arbitrum blocks (~4s).
+
+**Requires:** Wallet & Agent API enabled on bankrApiKey, wallet has USDC on Arbitrum, wallet has ~0.00001 ETH for LayerZero fee.
+
+**⚠️ allowedRecipients blocker:** If the Bankr API key has `allowedRecipients` configured, `/wallet/submit` blocks all raw tx submission. The server returns a `403` with a clear hint. Fix: go to `bankr.bot/api`, clear the `allowedRecipients` list, retry. Or use the manual path below.
+
+**When to ask for Bankr API key:** Tell the user: "I need your Bankr API key to submit the deposit. Find it at bankr.bot/api — same key used for trading."
 
 ---
 
@@ -622,4 +625,4 @@ Use this before placing a trade when the user asks "what's BTC at?" or to size a
 
 ### Cancel an open (unfilled) order
 
-Use when a limit order hasn't filled and the 
+Use when a limit order hasn't filled and the user wants to cancel it. Requires the `order_id`
