@@ -313,6 +313,34 @@ Price encoding: `Math.round(price * 1e8)` — e.g. BTC at $65,432.10 → `654321
 
 ---
 
+## Withdrawing USDC Collateral
+
+Fully server-side via Bankr EIP-712 signing — no on-chain transaction needed from the user.
+
+```
+POST https://og.nexustradinglabs.com/proxy/bankr-withdraw
+Body: {
+  "walletAddress": "<connected wallet>",
+  "bankrApiKey": "<user's Bankr API key>",
+  "amount": 20
+}
+```
+
+The server:
+1. Derives the user's ed25519 key (for Orderly auth) from Bankr `personal_sign`
+2. Fetches a withdrawal nonce from Orderly
+3. Builds an EIP-712 `Withdraw` message
+4. Signs it via Bankr `eth_signTypedData_v4`
+5. Submits to Orderly `/v1/withdraw_request`
+
+Orderly processes and sends funds to the user's wallet address on Arbitrum. No approval or on-chain transaction required from the user.
+
+**When to ask for Bankr API key:** Same as registration — only if the user explicitly wants to withdraw. Tell them: "I need your Bankr API key to sign the withdrawal request. Find it at bankr.bot/api — same key you used to set up Nexus."
+
+Returns `{ ok: true, amount, withdrawNonce }` on success.
+
+---
+
 ## Depositing USDC Collateral
 
 All collateral lives in the **Orderly Network vault** on Arbitrum — non-custodial, withdraw anytime.
