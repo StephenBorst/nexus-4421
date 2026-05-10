@@ -852,6 +852,7 @@ export default {
           });
           const algoBody = {
             symbol, algo_type: "POSITIONAL_TP_SL",
+            quantity,                  // position qty required at parent level
             trigger_price_type: "MARK_PRICE",
             child_orders: childOrders,
           };
@@ -922,17 +923,19 @@ export default {
       };
       // Fetch actual position quantity and direction from Orderly
       let posQty = null;
-      let closeSide2 = "BUY"; // default; overridden by actual position below
+      let closeSide2 = "BUY";
       try {
         const pd = await req2("GET", "/v1/positions", null);
         const pos2 = (pd?.data?.rows || []).find(p => p.symbol === sym2);
         if (pos2) {
           const rawQty = Number(pos2.position_qty);
           posQty = Math.abs(rawQty);
-          // positive qty = LONG → close with SELL; negative qty = SHORT → close with BUY
-          closeSide2 = rawQty >= 0 ? "SELL" : "BUY";
+          closeSide2 = rawQty >= 0 ? "SELL" : "BUY"; // LONG → SELL to close; SHORT → BUY to close
         }
       } catch (_) {}
+      if (!posQty) {
+        return json({ error: "no_open_position", symbol: sym2, hint: "No open position found for this symbol — open a position first" }, request, 400);
+      }
       const childOrders2 = [];
       if (tp) childOrders2.push({
         symbol: sym2, algo_type: "TAKE_PROFIT", side: closeSide2, type: "CLOSE_POSITION",
@@ -944,6 +947,7 @@ export default {
       });
       const algoB = {
         symbol: sym2, algo_type: "POSITIONAL_TP_SL",
+        quantity: posQty,              // position qty required at parent level
         trigger_price_type: "MARK_PRICE",
         child_orders: childOrders2,
       };
@@ -982,17 +986,17 @@ export default {
     }
 
     // ── /positions and /balance — proxy to Orderly private API ─────────────
-    // Accepts walletSig as query param ?wallet=&sig= or POST body { walletAddress, walletSig }
+    // POST body { walletAddress, walletSig } preferred; GET ?wallet=&sig= also accepted
     if ((parts[0] === "positions" || parts[0] === "balance") && (request.method === "GET" || request.method === "POST")) {
       const qp = new URL(request.url).searchParams;
-      let wAddr = qp.get("wallet");
-      let wSig  = qp.get("sig");
+      let wAddr = qp.get("wallet") || qp.get("walletAddress");
+      let wSig  = qp.get("sig")    || qp.get("walletSig");
       if (request.method === "POST") {
         let pb; try { pb = await request.json(); } catch { pb = {}; }
-        wAddr = wAddr || pb.walletAddress;
-        wSig  = wSig  || pb.walletSig;
+        wAddr = wAddr || pb.walletAddress || pb.wallet;
+        wSig  = wSig  || pb.walletSig    || pb.sig;
       }
-      if (!wAddr || !wSig) return json({ error: "wallet and sig required" }, request, 400);
+      if (!wAddr || !wSig) return json({ error: "wallet and sig required — POST { walletAddress, walletSig } or GET ?wallet=&sig=" }, request, 400);
       const wNorm = wAddr.toLowerCase().trim();
       const uRaw  = await env.LAB_STORE.get("user:" + wNorm);
       if (!uRaw) return json({ error: "wallet_not_registered" }, request, 401);
