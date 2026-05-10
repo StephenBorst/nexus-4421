@@ -1358,6 +1358,53 @@ export default {
       }
     }
 
+    // ── /settle-pnl — settle unrealized PnL so it clears margin for withdrawal ──
+    // POST { walletAddress, walletSig, symbol? }
+    // symbol is optional — omit to settle all positions, or pass e.g. "SOL" to settle one.
+    // Must be called before withdrawing if unsettled_pnl is negative (code 78).
+    // After calling, wait ~5s for Orderly to process, then retry withdrawal.
+    if (parts[0] === "settle-pnl" && request.method === "POST") {
+      let spbody; try { spbody = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const { walletAddress: spwa, walletSig: spws, symbol: spsym } = spbody;
+      if (!spwa || !spws) return json({ error: "walletSig_required", hint: "POST { walletAddress, walletSig, symbol? }" }, request, 401);
+      const spNorm = spwa.toLowerCase().trim();
+      const spRaw  = await env.LAB_STORE.get("user:" + spNorm);
+      if (!spRaw) return json({ error: "wallet_not_registered" }, request, 401);
+      const sprec  = JSON.parse(spRaw);
+      const SPHDR  = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
+      const sphex  = spws.startsWith("0x") ? spws.slice(2) : spws;
+      const spseed = new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(sphex.match(/.{1,2}/g).map(b => parseInt(b, 16)))));
+      const sppk8  = new Uint8Array(48); sppk8.set(SPHDR, 0); sppk8.set(spseed, 16);
+      const spsk   = await crypto.subtle.importKey("pkcs8", sppk8, { name: "Ed25519" }, false, ["sign"]);
+      const spsign = async (method, path, bodyObj) => {
+        const ts  = Date.now();
+        const bs  = bodyObj ? JSON.stringify(bodyObj) : "";
+        const msg = new TextEncoder().encode(ts + method + path + bs);
+        const s   = new Uint8Array(await crypto.subtle.sign("Ed25519", spsk, msg));
+        const b64 = btoa(String.fromCharCode(...s)).replace(/[+]/g,"-").replace(/[/]/g,"_").replace(/=+$/,"");
+        return { "Content-Type": "application/json", "orderly-timestamp": String(ts), "orderly-account-id": sprec.accountId, "orderly-key": sprec.orderlyKey, "orderly-signature": b64 };
+      };
+      // Optionally scope to a single symbol
+      const settleBody = spsym
+        ? { symbol: spsym.toUpperCase().startsWith("PERP_") ? spsym.toUpperCase() : "PERP_" + spsym.toUpperCase() + "_USDC" }
+        : {};
+      const spHdrs = await spsign("POST", "/v1/settle_pnl", settleBody);
+      const spRes  = await fetch("https://api-evm.orderly.org/v1/settle_pnl", {
+        method: "POST", headers: spHdrs,
+        body: JSON.stringify(settleBody),
+      });
+      const spData = await spRes.json();
+      return json({
+        ok: spData?.success ?? false,
+        settled: spData?.success ?? false,
+        symbol: spsym ?? "all",
+        hint: spData?.success
+          ? "PnL settled. Wait ~5 seconds then retry withdrawal with free_collateral amount."
+          : "Settlement request sent — Orderly processes async. Wait 5-10s then check /balance before withdrawing.",
+        raw: spData,
+      }, request);
+    }
+
     // ── /proxy/bankr-withdraw — server-side withdrawal via Bankr Wallet API ────
     // Flow: get nonce → EIP-712 Withdraw → Bankr eth_signTypedData_v4 → POST /v1/withdraw_request
     // Bankr API key is only used transiently — never stored.

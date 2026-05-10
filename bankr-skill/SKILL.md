@@ -321,10 +321,12 @@ Fully server-side via Bankr EIP-712 signing — no on-chain transaction needed f
 POST https://og.nexustradinglabs.com/proxy/bankr-withdraw
 Body: {
   "walletAddress": "<connected wallet>",
-  "bankrApiKey": "<user's Bankr API key>",
+  "bankrApiKey": "<Bankr API key — REQUIRED, agent must always include this>",
   "amount": 20
 }
 ```
+
+**⚠️ `bankrApiKey` is MANDATORY in the request body.** The server uses it transiently to call Bankr's signing endpoint — it is never stored. If the agent omits it, the server returns 401 "invalid api key". Always include the user's Bankr API key in every withdrawal call. Same key as used for deposit and registration.
 
 The server:
 1. Derives the user's ed25519 key (for Orderly auth) from Bankr `personal_sign`
@@ -335,9 +337,46 @@ The server:
 
 Orderly processes and sends funds to the user's wallet address on Arbitrum. No approval or on-chain transaction required from the user.
 
-**When to ask for Bankr API key:** Same as registration — only if the user explicitly wants to withdraw. Tell them: "I need your Bankr API key to sign the withdrawal request. Find it at bankr.bot/api — same key you used to set up Nexus."
+**When to ask for Bankr API key:** Always ask before withdrawal. Tell the user: "I need your Bankr API key to sign the withdrawal. Find it at bankr.bot/api — Wallet & Agent API must be enabled."
 
 Returns `{ ok: true, amount, withdrawNonce }` on success.
+
+### Withdrawal fails with code 78 — "margin is occupied"
+
+This means there is unsettled negative PnL blocking the withdrawal. Fix: settle PnL first, then withdraw a smaller amount that accounts for the loss.
+
+**Step 1 — settle PnL:**
+```
+POST https://og.nexustradinglabs.com/settle-pnl
+Body: {
+  "walletAddress": "<wallet>",
+  "walletSig": "<from sign_message('nexus-trading-key-v1')>",
+  "symbol": "SOL"   // optional — omit to settle all positions
+}
+```
+
+Returns `{ ok: true, hint: "Wait ~5s then retry withdrawal with free_collateral amount." }`
+
+**Step 2 — check free collateral:**
+```
+POST https://og.nexustradinglabs.com/balance
+Body: { "walletAddress": "<wallet>", "walletSig": "<sig>" }
+```
+
+Look for `free_collateral` in the response. Withdraw that amount (not total balance).
+
+**Step 3 — withdraw free_collateral amount:**
+```
+POST https://og.nexustradinglabs.com/proxy/bankr-withdraw
+Body: { "walletAddress": "...", "bankrApiKey": "...", "amount": <free_collateral> }
+```
+
+**Full automated flow for withdrawal with unsettled PnL:**
+1. `sign_message({ message: "nexus-trading-key-v1" })` → walletSig
+2. `POST /settle-pnl` with walletSig
+3. Wait 5 seconds
+4. `POST /balance` → get free_collateral
+5. `POST /proxy/bankr-withdraw` with free_collateral amount and bankrApiKey
 
 ---
 
@@ -580,49 +619,4 @@ To close an open position, place the opposite side trade with `reduce_only: true
 ```
 POST https://og.nexustradinglabs.com/trade
 Body: {
-  "symbol": "PERP_SOL_USDC",
-  "side": "BUY",           // opposite of the open position
-  "notional": 15,          // match original notional — server will compute qty and close
-  "leverage": 5,
-  "walletSig": "<from sign_message>",
-  "walletAddress": "<wallet>"
-}
-```
-
-Or simply instruct Bankr: "close my SOL short" — it will execute the opposite side automatically.
-
-### Check positions / balance
-
-Requires walletSig (call sign_message first, same as trading). **Use POST — more reliable than GET with long hex params:**
-
-```
-POST https://og.nexustradinglabs.com/positions
-Body: { "walletAddress": "<wallet>", "walletSig": "<sig from sign_message>" }
-
-POST https://og.nexustradinglabs.com/balance
-Body: { "walletAddress": "<wallet>", "walletSig": "<sig from sign_message>" }
-```
-
-GET with query params also accepted: `?wallet={address}&sig={walletSig}`
-
-**Always check /positions before opening a trade** — overlapping positions consume all available margin. If `position_qty > 0`, close or account for it before opening a new position on the same symbol.
-
----
-
-### Get mark price (current price before trading)
-
-No auth required — public endpoint.
-
-```
-GET https://og.nexustradinglabs.com/mark-price?symbol=BTC
-```
-
-Returns `{ symbol, markPrice, indexPrice, lastPrice, openInterest, volume24h }`.
-
-Use this before placing a trade when the user asks "what's BTC at?" or to size a position. Supports shorthand: `BTC`, `ETH`, `SOL`, `ARB`, `LINK`, `WIF` — or full `PERP_BTC_USDC` form.
-
----
-
-### Cancel an open (unfilled) order
-
-Use when a limit order hasn't filled and the user wants to cancel it. Requires the `order_id`
+  "symbol": "PERP_S
