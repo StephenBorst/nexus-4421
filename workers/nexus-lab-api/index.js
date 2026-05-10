@@ -1111,6 +1111,8 @@ export default {
     // Flow: get nonce → EIP-712 Withdraw → Bankr eth_signTypedData_v4 → POST /v1/withdraw_request
     // Bankr API key is only used transiently — never stored.
     if (parts[0] === "proxy" && parts[1] === "bankr-withdraw" && request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
       const { walletAddress, bankrApiKey, amount } = body;
       if (!walletAddress || !bankrApiKey || !amount) {
         return json({ error: "walletAddress, bankrApiKey, and amount (USDC) required" }, request, 400);
