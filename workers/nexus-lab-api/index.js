@@ -1124,7 +1124,7 @@ export default {
         const BANKR_API_W    = "https://api.bankr.bot";
         const BROKER_W       = "nexus_trading";
         const CHAIN_W        = 42161;
-        const VC_W           = "0x8794E7260517B1766fc7b55cAfcd56e6bf08600e"; // Orderly mainnet verifying contract
+        const VC_W           = "0x6F7a338F2aA472838dEFD3283eB360d4Dff5D203"; // Orderly mainnet verifyingContract (mainnetVerifyAddress)
         const HDR_W          = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
 
         // 1. Derive ed25519 key from Bankr personal_sign (for Orderly REST auth)
@@ -1679,7 +1679,4 @@ document.getElementById("btn").addEventListener("click",go);
       return new Response(JSON.stringify({ error: "worker unhandled exception", detail: String(topErr), stack: topErr?.stack }), {
         status: 500,
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-      });
-    }
-  },
-};
+  
