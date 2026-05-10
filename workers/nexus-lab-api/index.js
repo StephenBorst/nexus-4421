@@ -1679,4 +1679,7 @@ document.getElementById("btn").addEventListener("click",go);
       return new Response(JSON.stringify({ error: "worker unhandled exception", detail: String(topErr), stack: topErr?.stack }), {
         status: 500,
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-  
+        });
+    }
+  },
+};
