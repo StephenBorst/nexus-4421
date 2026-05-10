@@ -490,9 +490,33 @@ The endpoint:
 **Natural language → trade mapping:**
 - "Short HYPE $20 at 20x" → `{ symbol: "PERP_HYPE_USDC", side: "SELL", notional: 20, leverage: 20 }`
 - "Long BTC with $50 at 5x" → `{ symbol: "PERP_BTC_USDC", side: "BUY", notional: 50, leverage: 5 }`
-- "Short SOL $15 at 5x, SL 100, TP 80" → `{ symbol: "PERP_SOL_USDC", side: "SELL", notional: 15, leverage: 5, stopLoss: 100, takeProfit: 80 }`
+- "Short SOL $15 at 5x, SL 100, TP 80" → trade first, then call `/set-sl-tp` (see below)
 
 **Supported symbols:** `PERP_BTC_USDC`, `PERP_ETH_USDC`, `PERP_SOL_USDC`, `PERP_HYPE_USDC`, `PERP_ARB_USDC`, `PERP_XMR_USDC`, and more. The Worker auto-normalizes shorthand — "BTC", "ETH", "SOL", "XMR" all work.
+
+### Attach SL/TP to an open position (ALWAYS a separate step after trade confirmation)
+
+**⛔ DO NOT embed stopLoss/takeProfit in the /trade call.** Always call `/set-sl-tp` as a distinct step AFTER the trade fills.
+
+```
+POST https://og.nexustradinglabs.com/set-sl-tp
+Body: {
+  "symbol": "PERP_SOL_USDC",
+  "stopLoss": 100,        // optional
+  "takeProfit": 80,       // optional
+  "walletSig": "<from sign_message('nexus-trading-key-v1')>",
+  "walletAddress": "<connected wallet>"
+}
+```
+
+The server fetches the current position size from Orderly, then places a `POSITIONAL_TP_SL` algo order that closes the entire position when either price is hit. Returns `{ ok: true, quantity, stopLoss, takeProfit }` on success.
+
+**Full SL/TP flow:**
+1. `sign_message({ message: "nexus-trading-key-v1" })` — get walletSig (once per session)
+2. `POST /trade` — open position, wait for fill confirmation
+3. `POST /set-sl-tp` — attach SL/TP using same walletSig
+
+---
 
 ### Close a position
 

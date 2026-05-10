@@ -857,6 +857,71 @@ export default {
       }
     }
 
+    // ── /set-sl-tp — attach POSITIONAL_TP_SL to an existing open position ──────
+    // Called after trade confirms. Looks up position qty from Orderly, then places algo order.
+    // Same walletSig/walletAddress auth as /trade.
+    if (parts[0] === "set-sl-tp" && request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const { symbol: rawSym, stopLoss: sl, takeProfit: tp, walletSig: wSig2, walletAddress: wAddr2 } = body;
+      if (!rawSym || (!sl && !tp)) {
+        return json({ error: "symbol and at least one of stopLoss or takeProfit required" }, request, 400);
+      }
+      const normSym2 = (s) => {
+        s = s.toUpperCase().trim();
+        if (s.startsWith("PERP_")) return s;
+        s = s.replace(/[-_]?(PERP|USDC|USD|USDT)$/i, "").replace(/[^A-Z0-9]/g, "");
+        return "PERP_" + s + "_USDC";
+      };
+      const sym2 = normSym2(rawSym);
+      const OBASE2 = "https://api-evm.orderly.org";
+      const HDR2 = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
+      let acctId2, apiKey2, signKey2;
+      if (wSig2 && wAddr2) {
+        const wn2 = wAddr2.toLowerCase().trim();
+        const ur2 = await env.LAB_STORE.get("user:" + wn2);
+        if (!ur2) return json({ error: "wallet_not_registered" }, request, 401);
+        const rec2 = JSON.parse(ur2);
+        acctId2 = rec2.accountId; apiKey2 = rec2.orderlyKey;
+        const hex2 = wSig2.startsWith("0x") ? wSig2.slice(2) : wSig2;
+        const seed2 = new Uint8Array(await crypto.subtle.digest("SHA-256",
+          new Uint8Array(hex2.match(/.{2}/g).map(b => parseInt(b, 16)))));
+        const pk82 = new Uint8Array(48); pk82.set(HDR2, 0); pk82.set(seed2, 16);
+        signKey2 = await crypto.subtle.importKey("pkcs8", pk82, { name: "Ed25519" }, false, ["sign"]);
+      } else {
+        if (!env.ORDERLY_API_SECRET || !env.ORDERLY_API_KEY || !env.ORDERLY_ACCOUNT_ID) {
+          return json({ error: "credentials not configured" }, request, 500);
+        }
+        acctId2 = env.ORDERLY_ACCOUNT_ID; apiKey2 = env.ORDERLY_API_KEY;
+        let pb2 = Uint8Array.from(atob(env.ORDERLY_API_SECRET), c => c.charCodeAt(0));
+        if (pb2.length === 32) { const f2 = new Uint8Array(48); f2.set(HDR2,0); f2.set(pb2,16); pb2 = f2; }
+        signKey2 = await crypto.subtle.importKey("pkcs8", pb2, { name: "Ed25519" }, false, ["sign"]);
+      }
+      const req2 = async (method, path, data) => {
+        const bs = data ? JSON.stringify(data) : undefined;
+        const ts2 = Date.now();
+        const mb = new TextEncoder().encode(ts2 + method.toUpperCase() + path + (bs || ""));
+        const sb = new Uint8Array(await crypto.subtle.sign("Ed25519", signKey2, mb));
+        const b64 = btoa(String.fromCharCode(...sb)).replace(/[+]/g,"-").replace(/[/]/g,"_").replace(/=+$/,"");
+        const h = { "Content-Type":"application/json", "orderly-timestamp":String(ts2),
+          "orderly-account-id":acctId2, "orderly-key":apiKey2, "orderly-signature":b64 };
+        return (await fetch(OBASE2 + path, { method, headers: h, body: bs })).json();
+      };
+      // Fetch actual position quantity from Orderly
+      let posQty = null;
+      try {
+        const pd = await req2("GET", "/v1/positions", null);
+        const pos2 = (pd?.data?.rows || []).find(p => p.symbol === sym2);
+        if (pos2) posQty = Math.abs(Number(pos2.position_qty));
+      } catch (_) {}
+      const algoB = { symbol: sym2, algo_type: "POSITIONAL_TP_SL" };
+      if (posQty) algoB.quantity = posQty;
+      if (tp) algoB.tp_trigger_price = Number(tp);
+      if (sl) algoB.sl_trigger_price = Number(sl);
+      const algoRes = await req2("POST", "/v1/algo/order", algoB);
+      return json({ ok: algoRes?.success ?? false, symbol: sym2, stopLoss: sl, takeProfit: tp, quantity: posQty, raw: algoRes }, request);
+    }
+
     // ── /derive-key — derive ed25519 public key from wallet signature ──────────
     // Browser sends walletSig from personal_sign, gets back orderlyKey (public only)
     if (parts[0] === "derive-key" && request.method === "POST") {
