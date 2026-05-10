@@ -1170,7 +1170,7 @@ export default {
         chainId: CHAIN_W,
         receiver: walletNorm,
         token: "USDC",
-        amount: String(amountUnits),
+        amount: amountUnits,           // uint256 — must be number, not string
         withdrawNonce: Number(withdrawNonce),
         timestamp: ts2,
       };
