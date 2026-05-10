@@ -835,13 +835,25 @@ export default {
         });
 
         // ── SL/TP via POSITIONAL_TP_SL algo order (optional) ───────────────────
-        // quantity is required — Orderly creates internal child orders and validates size.
-        // trigger_price_type defaults to MARK_PRICE.
+        // Orderly requires child_orders array with CLOSE_POSITION type — NOT flat tp/sl fields.
+        // Close side: LONG position (entry BUY) → SELL to close; SHORT (entry SELL) → BUY to close.
         let slTpResult = null;
         if (stopLoss || takeProfit) {
-          const algoBody = { symbol, algo_type: "POSITIONAL_TP_SL", quantity };
-          if (takeProfit) algoBody.tp_trigger_price = Number(takeProfit);
-          if (stopLoss)   algoBody.sl_trigger_price = Number(stopLoss);
+          const closeSide = side.toUpperCase() === "BUY" ? "SELL" : "BUY";
+          const childOrders = [];
+          if (takeProfit) childOrders.push({
+            symbol, algo_type: "TAKE_PROFIT", side: closeSide, type: "CLOSE_POSITION",
+            trigger_price_type: "MARK_PRICE", trigger_price: Number(takeProfit), reduce_only: true,
+          });
+          if (stopLoss) childOrders.push({
+            symbol, algo_type: "STOP_LOSS", side: closeSide, type: "CLOSE_POSITION",
+            trigger_price_type: "MARK_PRICE", trigger_price: Number(stopLoss), reduce_only: true,
+          });
+          const algoBody = {
+            symbol, algo_type: "POSITIONAL_TP_SL",
+            trigger_price_type: "MARK_PRICE",
+            child_orders: childOrders,
+          };
           slTpResult = await orderlyRequest("POST", "/v1/algo/order", algoBody);
         }
 
@@ -907,19 +919,35 @@ export default {
           "orderly-account-id":acctId2, "orderly-key":apiKey2, "orderly-signature":b64 };
         return (await fetch(OBASE2 + path, { method, headers: h, body: bs })).json();
       };
-      // Fetch actual position quantity from Orderly
+      // Fetch actual position quantity and direction from Orderly
       let posQty = null;
+      let closeSide2 = "BUY"; // default; overridden by actual position below
       try {
         const pd = await req2("GET", "/v1/positions", null);
         const pos2 = (pd?.data?.rows || []).find(p => p.symbol === sym2);
-        if (pos2) posQty = Math.abs(Number(pos2.position_qty));
+        if (pos2) {
+          const rawQty = Number(pos2.position_qty);
+          posQty = Math.abs(rawQty);
+          // positive qty = LONG → close with SELL; negative qty = SHORT → close with BUY
+          closeSide2 = rawQty >= 0 ? "SELL" : "BUY";
+        }
       } catch (_) {}
-      const algoB = { symbol: sym2, algo_type: "POSITIONAL_TP_SL" };
-      if (posQty) algoB.quantity = posQty;
-      if (tp) algoB.tp_trigger_price = Number(tp);
-      if (sl) algoB.sl_trigger_price = Number(sl);
+      const childOrders2 = [];
+      if (tp) childOrders2.push({
+        symbol: sym2, algo_type: "TAKE_PROFIT", side: closeSide2, type: "CLOSE_POSITION",
+        trigger_price_type: "MARK_PRICE", trigger_price: Number(tp), reduce_only: true,
+      });
+      if (sl) childOrders2.push({
+        symbol: sym2, algo_type: "STOP_LOSS", side: closeSide2, type: "CLOSE_POSITION",
+        trigger_price_type: "MARK_PRICE", trigger_price: Number(sl), reduce_only: true,
+      });
+      const algoB = {
+        symbol: sym2, algo_type: "POSITIONAL_TP_SL",
+        trigger_price_type: "MARK_PRICE",
+        child_orders: childOrders2,
+      };
       const algoRes = await req2("POST", "/v1/algo/order", algoB);
-      return json({ ok: algoRes?.success ?? false, symbol: sym2, stopLoss: sl, takeProfit: tp, quantity: posQty, raw: algoRes }, request);
+      return json({ ok: algoRes?.success ?? false, symbol: sym2, stopLoss: sl, takeProfit: tp, quantity: posQty, closeSide: closeSide2, raw: algoRes }, request);
     }
 
     // ── /derive-key — derive ed25519 public key from wallet signature ──────────
@@ -1174,11 +1202,11 @@ export default {
       if (!wSignData.signature) return json({ error: "Bankr EIP-712 sign failed", detail: wSignData }, request, 502);
 
       // 5. Submit withdrawal request to Orderly
+      // NOTE: verifyingContract must NOT be in the POST body — only in the EIP-712 domain for signing
       const withdrawRes = await oReq("POST", "/v1/withdraw_request", {
         message: withdrawMsg,
         signature: wSignData.signature,
         userAddress: walletNorm,
-        verifyingContract: VC_W,
       });
 
       return json({
