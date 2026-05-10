@@ -345,7 +345,36 @@ Returns `{ ok: true, amount, withdrawNonce }` on success.
 
 All collateral lives in the **Orderly Network vault** on Arbitrum — non-custodial, withdraw anytime.
 
-### Simple path — use the Nexus deposit API (recommended for agents)
+### Agent path — POST /proxy/bankr-deposit (recommended for agents)
+
+```
+POST https://og.nexustradinglabs.com/proxy/bankr-deposit
+Body: {
+  "walletAddress": "<connected wallet>",
+  "bankrApiKey": "<user's Bankr API key>",
+  "amount": 20
+}
+```
+
+The server:
+1. Fetches the user's Orderly accountId automatically
+2. Builds USDC `approve` calldata (approve vault to spend USDC)
+3. Submits approve tx via Bankr `eth_sendTransaction`
+4. Polls Arbitrum RPC for approve receipt (up to 20s)
+5. Builds `vault.deposit()` calldata with accountId + broker/token hashes
+6. Submits deposit tx via Bankr `eth_sendTransaction`
+
+Returns `{ ok: true, amount, accountId, approveTxHash, depositTxHash }` on success.
+
+Funds available in Nexus/Orderly within ~1-2 Arbitrum blocks (~2s after deposit tx confirms).
+
+**When to ask for Bankr API key:** Same as registration/withdrawal. Tell the user: "I need your Bankr API key to submit the deposit transactions. Find it at bankr.bot/api."
+
+**Requires:** User wallet must have sufficient USDC on Arbitrum and a small ETH balance (~0.00001 ETH) for the LayerZero fee on the deposit tx.
+
+---
+
+### Prepare-only path — returns calldata for manual signing
 
 ```
 POST https://og.nexustradinglabs.com/deposit/prepare

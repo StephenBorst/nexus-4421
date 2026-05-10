@@ -1108,6 +1108,124 @@ export default {
       });
     }
 
+
+    // ── /proxy/bankr-deposit — server-side deposit via Bankr Wallet API ──────
+    // Flow: fetch accountId → build calldata → Bankr eth_sendTransaction (approve) →
+    //       poll receipt → Bankr eth_sendTransaction (vault.deposit) → return tx hashes
+    if (parts[0] === "proxy" && parts[1] === "bankr-deposit" && request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const { walletAddress, bankrApiKey, amount } = body;
+      if (!walletAddress || !bankrApiKey || !amount) {
+        return json({ error: "walletAddress, bankrApiKey, and amount (USDC) required" }, request, 400);
+      }
+      try {
+        const walletNorm  = walletAddress.toLowerCase().trim();
+        const BANKR_API_D = "https://api.bankr.bot";
+        const VAULT_D     = "0x816f722424B49Cf1275cc86DA9840Fbd5a6167e9";
+        const USDC_D      = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
+        const ARB_RPC_D   = "https://arb1.arbitrum.io/rpc";
+        const BROKER_HASH_D = "69729be60357fd58653e988388922e200193543b4328eda1b9b9bdaaef2f1a70";
+        const TOKEN_HASH_D  = "d6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa";
+
+        function pad32D(hex) {
+          const h = hex.startsWith("0x") ? hex.slice(2) : hex;
+          return h.padStart(64, "0");
+        }
+        async function waitMs(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        const tokenAmountBig = BigInt(Math.round(Number(amount) * 1_000_000));
+        // Small ETH fee for LayerZero bridging on Arbitrum mainnet (~0.000005 ETH observed, 2x headroom)
+        const feeHex = "0x" + (10000000000000n).toString(16); // 0.00001 ETH
+
+        // 1. Fetch accountId
+        const acctRes = await fetch(
+          `https://api-evm.orderly.org/v1/get_account?address=${walletNorm}&broker_id=nexus_trading`
+        );
+        const acctData = await acctRes.json();
+        const accountId = acctData?.data?.account_id ?? null;
+        if (!accountId) {
+          return json({
+            error: "No Orderly account for this wallet — register first via bankr-register or nexus.trade",
+            detail: acctData,
+          }, request, 400);
+        }
+
+        // 2. Build calldata
+        const approveCalldata =
+          "0x095ea7b3" +
+          pad32D(VAULT_D.replace(/^0x/, "").toLowerCase()) +
+          pad32D(tokenAmountBig.toString(16));
+
+        const depositCalldata =
+          "0x322dda6d" +
+          pad32D(accountId.replace(/^0x/, "")) +
+          BROKER_HASH_D +
+          TOKEN_HASH_D +
+          pad32D(tokenAmountBig.toString(16));
+
+        // 3. Submit approve tx via Bankr Wallet API
+        const approveRes = await fetch(`${BANKR_API_D}/wallet/sign`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-API-Key": bankrApiKey },
+          body: JSON.stringify({
+            signatureType: "eth_sendTransaction",
+            transaction: { to: USDC_D, data: approveCalldata, value: "0x0", chainId: 42161 },
+          }),
+        });
+        if (!approveRes.ok) {
+          return json({ error: "Bankr approve tx failed", status: approveRes.status, body: await approveRes.text() }, request, 502);
+        }
+        const approveResp = await approveRes.json();
+        const approveTxHash = approveResp.txHash || approveResp.transactionHash || approveResp.hash || null;
+        if (!approveTxHash) {
+          return json({ error: "Bankr approve returned no txHash", detail: approveResp }, request, 502);
+        }
+
+        // 4. Poll approve receipt (up to 20s, Arbitrum ~250ms blocks)
+        let approved = false;
+        for (let i = 0; i < 10; i++) {
+          await waitMs(2000);
+          const rcptRes = await fetch(ARB_RPC_D, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionReceipt", params: [approveTxHash] }),
+          });
+          const rcpt = (await rcptRes.json()).result;
+          if (rcpt && rcpt.status === "0x1") { approved = true; break; }
+        }
+        if (!approved) {
+          return json({ error: "Approve tx not confirmed within 20s — retry deposit", approveTxHash }, request, 504);
+        }
+
+        // 5. Submit vault.deposit tx via Bankr Wallet API
+        const depositRes = await fetch(`${BANKR_API_D}/wallet/sign`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-API-Key": bankrApiKey },
+          body: JSON.stringify({
+            signatureType: "eth_sendTransaction",
+            transaction: { to: VAULT_D, data: depositCalldata, value: feeHex, chainId: 42161 },
+          }),
+        });
+        if (!depositRes.ok) {
+          return json({ error: "Bankr deposit tx failed", status: depositRes.status, body: await depositRes.text() }, request, 502);
+        }
+        const depositResp = await depositRes.json();
+        const depositTxHash = depositResp.txHash || depositResp.transactionHash || depositResp.hash || null;
+
+        return json({
+          ok: true,
+          amount: Number(amount),
+          accountId,
+          approveTxHash,
+          depositTxHash,
+          note: "Funds available in Nexus/Orderly within ~1-2 Arbitrum blocks (~2s)",
+        }, request);
+      } catch (e) {
+        return json({ error: "bankr-deposit internal error", detail: String(e), stack: e?.stack }, request, 500);
+      }
+    }
+
     // ── /proxy/bankr-withdraw — server-side withdrawal via Bankr Wallet API ────
     // Flow: get nonce → EIP-712 Withdraw → Bankr eth_signTypedData_v4 → POST /v1/withdraw_request
     // Bankr API key is only used transiently — never stored.
