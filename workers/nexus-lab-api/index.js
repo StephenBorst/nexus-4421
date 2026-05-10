@@ -1507,12 +1507,60 @@ export default {
 
         // 5. Submit withdrawal request to Orderly
         // verifyingContract IS required in the POST body (Orderly error -1005 if missing)
-        const withdrawRes = await oReq("POST", "/v1/withdraw_request", {
+        let withdrawRes = await oReq("POST", "/v1/withdraw_request", {
           message: withdrawMsg,
           signature: wSignData.signature,
           userAddress: walletNorm,
           verifyingContract: VC_W,
         });
+
+        // Auto-handle code 78 (margin occupied by unsettled PnL):
+        // settle all positions, wait 4s, fetch free_collateral, retry with safe amount.
+        const code78 = withdrawRes?.code === 78 || String(withdrawRes?.message ?? "").includes("occupied");
+        if (code78) {
+          // Settle PnL
+          await oReq("POST", "/v1/settle_pnl", {});
+          // Wait for Orderly to process (~4s)
+          await new Promise(r => setTimeout(r, 4000));
+          // Fetch free_collateral
+          const holdingRes = await oReq("GET", "/v1/client/holding", null);
+          const holdings   = holdingRes?.data?.holding ?? [];
+          const usdcRow    = holdings.find(h => h.token === "USDC");
+          const freeCol    = Number(usdcRow?.holding ?? usdcRow?.available ?? 0);
+          // Leave 0.5 USDC buffer; cap at original requested amount
+          const safeAmount = Math.min(Number(amount), Math.max(0, freeCol - 0.5));
+          if (safeAmount <= 0) {
+            return json({ ok: false, error: "insufficient_free_collateral", freeCollateral: freeCol,
+              hint: "After settlement, free collateral is too low to withdraw. Wait for the daily Orderly settlement cycle or close open positions." }, request, 400);
+          }
+          const safeUnits = Math.round(safeAmount * 1e6);
+          // Rebuild message with safe amount + fresh nonce
+          const nonceData2 = await oReq("GET", "/v1/withdraw_nonce", null);
+          const nonce2 = nonceData2?.data?.withdraw_nonce;
+          const ts3    = Date.now();
+          const msg2   = { brokerId: BROKER_W, chainId: CHAIN_W, receiver: walletNorm, token: "USDC",
+            amount: safeUnits, withdrawNonce: Number(nonce2), timestamp: ts3 };
+          const td2    = { ...typedData, message: msg2 };
+          const sig2Res = await fetch(`${BANKR_API_W}/wallet/sign`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-API-Key": bankrApiKey },
+            body: JSON.stringify({ signatureType: "eth_signTypedData_v4", typedData: td2 }),
+          });
+          const sig2Data = await sig2Res.json();
+          if (!sig2Data.signature) return json({ error: "re-sign after settle failed", detail: sig2Data }, request, 502);
+          withdrawRes = await oReq("POST", "/v1/withdraw_request", {
+            message: msg2, signature: sig2Data.signature, userAddress: walletNorm, verifyingContract: VC_W,
+          });
+          return json({
+            ok: withdrawRes?.success ?? false,
+            autoSettled: true,
+            originalAmount: amount,
+            withdrawnAmount: safeAmount,
+            freeCollateral: freeCol,
+            hint: safeAmount < Number(amount) ? `Withdrew ${safeAmount} USDC (adjusted from ${amount} to account for unsettled PnL of ~${(freeCol - safeAmount).toFixed(2)} USDC)` : undefined,
+            raw: withdrawRes,
+          }, request);
+        }
 
         return json({
           ok: withdrawRes?.success ?? false,
