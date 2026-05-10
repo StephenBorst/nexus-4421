@@ -824,12 +824,36 @@ export default {
         const validNotional = minNotional > 1 ? Math.floor(notional / minNotional) * minNotional : notional;
         const quantity      = Math.floor((validNotional / markPrice) * Math.round(1 / qtyStep)) / Math.round(1 / qtyStep);
 
+        // ── Minimum notional guard ────────────────────────────────────────────
+        if (validNotional < minNotional || quantity <= 0) {
+          return json({
+            error: "below_min_notional",
+            notional: validNotional,
+            minNotional,
+            hint: `Minimum order size for ${symbol} is $${minNotional}. Requested: $${validNotional}.`,
+          }, request, 400);
+        }
+
         const authCheck = await orderlyRequest("GET", "/v1/client/holding", null);
         if (!authCheck.success) {
           return json({ error: "auth failed", detail: authCheck, hint: "key/secret mismatch" }, request, 401);
         }
 
-        const lev            = Math.max(1, Number(leverage) || 1);
+        // ── Margin check ─────────────────────────────────────────────────────
+        const lev = Math.max(1, Number(leverage) || 1);
+        const holdingRows    = authCheck?.data?.holding ?? [];
+        const usdcHolding    = holdingRows.find(h => h.token === "USDC");
+        const freeCollateral = Number(usdcHolding?.holding ?? usdcHolding?.available ?? 0);
+        const requiredMargin = validNotional / lev;
+        if (freeCollateral > 0 && requiredMargin > freeCollateral * 0.95) {
+          return json({
+            error: "insufficient_margin",
+            freeCollateral,
+            requiredMargin,
+            hint: `Trade requires ~$${requiredMargin.toFixed(2)} margin at ${lev}x but only $${freeCollateral.toFixed(2)} free collateral available. Reduce size or add collateral via /proxy/bankr-deposit.`,
+          }, request, 400);
+        }
+
         const leverageResult = await orderlyRequest("POST", "/v1/client/leverage", { leverage: lev });
         const orderResult    = await orderlyRequest("POST", "/v1/order", {
           symbol, order_type: orderType.toUpperCase(), side: side.toUpperCase(), order_quantity: quantity,
