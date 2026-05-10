@@ -1143,9 +1143,17 @@ export default {
       let body;
       try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
 
-      const { wallet, amount, accountId } = body;
-      if (!wallet || !amount || !accountId) {
-        return json({ error: "wallet, amount (USDC), and accountId required" }, request, 400);
+      const { wallet, amount } = body;
+      if (!wallet || !amount) {
+        return json({ error: "wallet and amount (USDC) required — accountId is fetched automatically" }, request, 400);
+      }
+
+      // Fetch accountId from Orderly (never require caller to pass it)
+      const prepAcctRes  = await fetch(`https://api-evm.orderly.org/v1/get_account?address=${wallet.toLowerCase().trim()}&broker_id=nexus_trading`);
+      const prepAcctData = await prepAcctRes.json();
+      const accountId    = prepAcctData?.data?.account_id ?? null;
+      if (!accountId) {
+        return json({ error: "no_orderly_account", hint: "Register first via /proxy/bankr-register" }, request, 400);
       }
 
       // Orderly vault constants (Arbitrum One)
@@ -1230,16 +1238,18 @@ export default {
     }
 
 
-    // ── /proxy/bankr-deposit — returns pre-built deposit tx calldata ──────────
-    // Bankr Wallet API does not yet support on-chain tx submission (eth_signTransaction is stage 2).
-    // This endpoint builds and returns the correct approve + vault.deposit calldata so the user
-    // can execute them via nexus.trade or MetaMask directly.
+    // ── /proxy/bankr-deposit — execute USDC deposit via Bankr /wallet/submit ────
+    // Flow: fetch accountId → build approve calldata → /wallet/submit (approve)
+    //       → build deposit calldata → /wallet/submit (deposit) → done
+    // Requires Wallet & Agent API enabled on bankrApiKey, and NO allowedRecipients set.
+    // If allowedRecipients is set on the key, /wallet/submit blocks raw tx — user must
+    // clear it in bankr.bot/api settings or deposit manually at trade.nexustradinglabs.com.
     if (parts[0] === "proxy" && parts[1] === "bankr-deposit" && request.method === "POST") {
       let body;
       try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
-      const { walletAddress, amount } = body;
-      if (!walletAddress || !amount) {
-        return json({ error: "walletAddress and amount (USDC) required" }, request, 400);
+      const { walletAddress, bankrApiKey, amount } = body;
+      if (!walletAddress || !bankrApiKey || !amount) {
+        return json({ error: "walletAddress, bankrApiKey, and amount (USDC) required" }, request, 400);
       }
       try {
         const walletNorm    = walletAddress.toLowerCase().trim();
@@ -1247,14 +1257,16 @@ export default {
         const USDC_D        = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
         const BROKER_HASH_D = "69729be60357fd58653e988388922e200193543b4328eda1b9b9bdaaef2f1a70";
         const TOKEN_HASH_D  = "d6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa";
-        const feeHex        = "0x" + (10000000000000n).toString(16); // 0.00001 ETH LayerZero fee
+        const feeWei        = "10000000000000"; // 0.00001 ETH LayerZero fee in wei (string for submit)
+        const BANKR_SUBMIT  = "https://api.bankr.bot/wallet/submit";
+        const CHAIN_D       = 42161; // Arbitrum One
 
         function pad32D(hex) {
           const h = hex.startsWith("0x") ? hex.slice(2) : hex;
           return h.padStart(64, "0");
         }
 
-        // Fetch accountId from Orderly
+        // 1. Fetch accountId from Orderly
         const acctRes = await fetch(
           `https://api-evm.orderly.org/v1/get_account?address=${walletNorm}&broker_id=nexus_trading`
         );
@@ -1263,12 +1275,13 @@ export default {
         if (!accountId) {
           return json({
             error: "no_orderly_account",
-            hint: "Wallet has no Orderly account. Register first via /proxy/bankr-register, then deposit at https://trade.nexustradinglabs.com",
+            hint: "Wallet not registered. Call /proxy/bankr-register first.",
           }, request, 400);
         }
 
         const tokenAmountBig = BigInt(Math.round(Number(amount) * 1_000_000));
 
+        // 2. Build calldata
         const approveCalldata =
           "0x095ea7b3" +
           pad32D(VAULT_D.replace(/^0x/, "").toLowerCase()) +
@@ -1281,32 +1294,65 @@ export default {
           TOKEN_HASH_D +
           pad32D(tokenAmountBig.toString(16));
 
-        // Return the pre-built tx objects — user must execute at nexus.trade
-        // (Bankr Wallet API currently supports signing only, not tx submission)
+        const bankrHeaders = { "X-API-Key": bankrApiKey, "Content-Type": "application/json" };
+
+        // 3. Submit approve tx via Bankr /wallet/submit
+        const approveRes = await fetch(BANKR_SUBMIT, {
+          method: "POST",
+          headers: bankrHeaders,
+          body: JSON.stringify({
+            transaction: { to: USDC_D, chainId: CHAIN_D, value: "0", data: approveCalldata },
+            description: `Approve ${amount} USDC to Orderly vault`,
+            waitForConfirmation: true,
+          }),
+        });
+        const approveData = await approveRes.json();
+        if (!approveData?.success) {
+          // If blocked due to allowedRecipients, give clear guidance
+          const isBlocked = approveRes.status === 403 || String(approveData?.error ?? "").includes("recipient");
+          return json({
+            ok: false,
+            step: "approve",
+            error: approveData?.error ?? "approve_failed",
+            hint: isBlocked
+              ? "Your Bankr API key has allowedRecipients set, which blocks raw tx submission. Go to bankr.bot/api and clear the allowedRecipients list, then retry. Or deposit manually at https://trade.nexustradinglabs.com"
+              : "Approve transaction failed. Check your ETH balance on Arbitrum and try again.",
+            raw: approveData,
+          }, request, 400);
+        }
+
+        // 4. Submit deposit tx via Bankr /wallet/submit
+        const depositRes = await fetch(BANKR_SUBMIT, {
+          method: "POST",
+          headers: bankrHeaders,
+          body: JSON.stringify({
+            transaction: { to: VAULT_D, chainId: CHAIN_D, value: feeWei, data: depositCalldata },
+            description: `Deposit ${amount} USDC to Nexus trading account`,
+            waitForConfirmation: true,
+          }),
+        });
+        const depositData2 = await depositRes.json();
+        if (!depositData2?.success) {
+          return json({
+            ok: false,
+            step: "deposit",
+            error: depositData2?.error ?? "deposit_failed",
+            hint: "Approve succeeded but deposit tx failed. Ensure wallet has ~0.00001 ETH on Arbitrum for LayerZero fee.",
+            approveTxHash: approveData.transactionHash,
+            raw: depositData2,
+          }, request, 400);
+        }
+
+        // 5. Success
         return json({
-          ok: false,
-          reason: "deposit_requires_wallet_execution",
-          message: `Deposit requires two on-chain transactions on Arbitrum. The Bankr Wallet API does not yet support transaction submission. Please deposit at https://trade.nexustradinglabs.com — connect your wallet, enter ${amount} USDC, and confirm both transactions.`,
+          ok: true,
+          amount,
           accountId,
-          chainId: 42161,
-          steps: [
-            {
-              step: 1,
-              description: `Approve ${amount} USDC to Orderly vault`,
-              to: USDC_D,
-              data: approveCalldata,
-              value: "0x0",
-            },
-            {
-              step: 2,
-              description: `Deposit ${amount} USDC to Nexus trading account`,
-              to: VAULT_D,
-              data: depositCalldata,
-              value: feeHex,
-              note: "Requires ~0.00001 ETH for LayerZero fee",
-            },
-          ],
+          approveTxHash: approveData.transactionHash,
+          depositTxHash: depositData2.transactionHash,
+          message: `${amount} USDC deposited to Nexus. Funds available in ~2 Arbitrum blocks (~4s).`,
         }, request);
+
       } catch (e) {
         return json({ error: "bankr-deposit internal error", detail: String(e) }, request, 500);
       }
