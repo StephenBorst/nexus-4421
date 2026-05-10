@@ -1117,108 +1117,115 @@ export default {
       if (!walletAddress || !bankrApiKey || !amount) {
         return json({ error: "walletAddress, bankrApiKey, and amount (USDC) required" }, request, 400);
       }
-      const walletNorm = walletAddress.toLowerCase().trim();
-      const ORDERLY_BASE_W = "https://api-evm.orderly.org";
-      const BANKR_API_W    = "https://api.bankr.bot";
-      const BROKER_W       = "nexus_trading";
-      const CHAIN_W        = 42161;
-      const VC_W           = "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC";
-      const HDR_W          = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
+      try {
+        const walletNorm = walletAddress.toLowerCase().trim();
+        const ORDERLY_BASE_W = "https://api-evm.orderly.org";
+        const BANKR_API_W    = "https://api.bankr.bot";
+        const BROKER_W       = "nexus_trading";
+        const CHAIN_W        = 42161;
+        const VC_W           = "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC";
+        const HDR_W          = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
 
-      // 1. Derive ed25519 key from Bankr personal_sign (for Orderly REST auth)
-      const sigRes = await fetch(`${BANKR_API_W}/wallet/sign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-API-Key": bankrApiKey },
-        body: JSON.stringify({ signatureType: "personal_sign", message: "nexus-trading-key-v1" }),
-      });
-      const sigData = await sigRes.json();
-      if (!sigData.signature) return json({ error: "Bankr sign failed", detail: sigData }, request, 502);
-      const sHex  = sigData.signature.startsWith("0x") ? sigData.signature.slice(2) : sigData.signature;
-      const seed  = new Uint8Array(await crypto.subtle.digest("SHA-256",
-        new Uint8Array(sHex.match(/.{2}/g).map(b => parseInt(b, 16)))));
-      const pk8   = new Uint8Array(48); pk8.set(HDR_W, 0); pk8.set(seed, 16);
-      const sk    = await crypto.subtle.importKey("pkcs8", pk8, { name: "Ed25519" }, false, ["sign"]);
+        // 1. Derive ed25519 key from Bankr personal_sign (for Orderly REST auth)
+        const sigRes = await fetch(`${BANKR_API_W}/wallet/sign`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-API-Key": bankrApiKey },
+          body: JSON.stringify({ signatureType: "personal_sign", message: "nexus-trading-key-v1" }),
+        });
+        if (!sigRes.ok) return json({ error: "Bankr personal_sign HTTP error", status: sigRes.status, body: await sigRes.text() }, request, 502);
+        const sigData = await sigRes.json();
+        if (!sigData.signature) return json({ error: "Bankr personal_sign returned no signature", detail: sigData }, request, 502);
+        const sHex  = sigData.signature.startsWith("0x") ? sigData.signature.slice(2) : sigData.signature;
+        const seed  = new Uint8Array(await crypto.subtle.digest("SHA-256",
+          new Uint8Array(sHex.match(/.{2}/g).map(b => parseInt(b, 16)))));
+        const pk8   = new Uint8Array(48); pk8.set(HDR_W, 0); pk8.set(seed, 16);
+        const sk    = await crypto.subtle.importKey("pkcs8", pk8, { name: "Ed25519" }, false, ["sign"]);
 
-      // Orderly REST signing helper
-      const userRaw = await env.LAB_STORE.get("user:" + walletNorm);
-      if (!userRaw) return json({ error: "wallet_not_registered" }, request, 401);
-      const urec = JSON.parse(userRaw);
-      const oSign = async (method, path, bodyStr) => {
-        const ts  = Date.now();
-        const msg = new TextEncoder().encode(ts + method.toUpperCase() + path + (bodyStr || ""));
-        const sb  = new Uint8Array(await crypto.subtle.sign("Ed25519", sk, msg));
-        const b64 = btoa(String.fromCharCode(...sb)).replace(/[+]/g,"-").replace(/[/]/g,"_").replace(/=+$/,"");
-        return { "Content-Type": "application/json", "orderly-timestamp": String(ts),
-          "orderly-account-id": urec.accountId, "orderly-key": urec.orderlyKey, "orderly-signature": b64 };
-      };
-      const oReq = async (method, path, data) => {
-        const bs  = data ? JSON.stringify(data) : undefined;
-        const hdrs = await oSign(method, path, bs);
-        return (await fetch(ORDERLY_BASE_W + path, { method, headers: hdrs, body: bs })).json();
-      };
+        // Orderly REST signing helper
+        const userRaw = await env.LAB_STORE.get("user:" + walletNorm);
+        if (!userRaw) return json({ error: "wallet_not_registered" }, request, 401);
+        const urec = JSON.parse(userRaw);
+        const oSign = async (method, path, bodyStr) => {
+          const ts  = Date.now();
+          const msg = new TextEncoder().encode(ts + method.toUpperCase() + path + (bodyStr || ""));
+          const sb  = new Uint8Array(await crypto.subtle.sign("Ed25519", sk, msg));
+          const b64 = btoa(String.fromCharCode(...sb)).replace(/[+]/g,"-").replace(/[/]/g,"_").replace(/=+$/,"");
+          return { "Content-Type": "application/json", "orderly-timestamp": String(ts),
+            "orderly-account-id": urec.accountId, "orderly-key": urec.orderlyKey, "orderly-signature": b64 };
+        };
+        const oReq = async (method, path, data) => {
+          const bs   = data ? JSON.stringify(data) : undefined;
+          const hdrs = await oSign(method, path, bs);
+          const res  = await fetch(ORDERLY_BASE_W + path, { method, headers: hdrs, body: bs });
+          return res.json();
+        };
 
-      // 2. Get withdrawal nonce
-      const nonceData = await oReq("GET", "/v1/withdraw_nonce", null);
-      const withdrawNonce = nonceData?.data?.withdraw_nonce;
-      if (!withdrawNonce && withdrawNonce !== 0) {
-        return json({ error: "failed to get withdraw nonce", detail: nonceData }, request, 502);
+        // 2. Get withdrawal nonce
+        const nonceData = await oReq("GET", "/v1/withdraw_nonce", null);
+        const withdrawNonce = nonceData?.data?.withdraw_nonce;
+        if (!withdrawNonce && withdrawNonce !== 0) {
+          return json({ error: "failed to get withdraw nonce", detail: nonceData }, request, 502);
+        }
+
+        // 3. Build EIP-712 Withdraw message
+        const ts2 = Date.now();
+        const amountUnits = Math.round(Number(amount) * 1e6); // USDC 6 decimals
+        const withdrawMsg = {
+          brokerId: BROKER_W,
+          chainId: CHAIN_W,
+          receiver: walletNorm,
+          token: "USDC",
+          amount: amountUnits,           // uint256 — must be number, not string
+          withdrawNonce: Number(withdrawNonce),
+          timestamp: ts2,
+        };
+        const typedData = {
+          types: {
+            EIP712Domain: [
+              { name: "name", type: "string" }, { name: "version", type: "string" },
+              { name: "chainId", type: "uint256" }, { name: "verifyingContract", type: "address" },
+            ],
+            Withdraw: [
+              { name: "brokerId", type: "string" }, { name: "chainId", type: "uint256" },
+              { name: "receiver", type: "address" }, { name: "token", type: "string" },
+              { name: "amount", type: "uint256" }, { name: "withdrawNonce", type: "uint64" },
+              { name: "timestamp", type: "uint64" },
+            ],
+          },
+          primaryType: "Withdraw",
+          domain: { name: "Orderly", version: "1", chainId: CHAIN_W, verifyingContract: VC_W },
+          message: withdrawMsg,
+        };
+
+        // 4. EIP-712 sign via Bankr
+        const wSignRes = await fetch(`${BANKR_API_W}/wallet/sign`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-API-Key": bankrApiKey },
+          body: JSON.stringify({ signatureType: "eth_signTypedData_v4", typedData }),
+        });
+        if (!wSignRes.ok) return json({ error: "Bankr EIP-712 HTTP error", status: wSignRes.status, body: await wSignRes.text() }, request, 502);
+        const wSignData = await wSignRes.json();
+        if (!wSignData.signature) return json({ error: "Bankr EIP-712 sign returned no signature", detail: wSignData }, request, 502);
+
+        // 5. Submit withdrawal request to Orderly
+        // NOTE: verifyingContract must NOT be in the POST body — only in the EIP-712 domain for signing
+        const withdrawRes = await oReq("POST", "/v1/withdraw_request", {
+          message: withdrawMsg,
+          signature: wSignData.signature,
+          userAddress: walletNorm,
+        });
+
+        return json({
+          ok: withdrawRes?.success ?? false,
+          walletAddress: walletNorm,
+          amount,
+          amountUnits,
+          withdrawNonce,
+          raw: withdrawRes,
+        }, request);
+      } catch (e) {
+        return json({ error: "bankr-withdraw internal error", detail: String(e), stack: e?.stack }, request, 500);
       }
-
-      // 3. Build EIP-712 Withdraw message
-      const ts2 = Date.now();
-      const amountUnits = Math.round(Number(amount) * 1e6); // USDC 6 decimals
-      const withdrawMsg = {
-        brokerId: BROKER_W,
-        chainId: CHAIN_W,
-        receiver: walletNorm,
-        token: "USDC",
-        amount: amountUnits,           // uint256 — must be number, not string
-        withdrawNonce: Number(withdrawNonce),
-        timestamp: ts2,
-      };
-      const typedData = {
-        types: {
-          EIP712Domain: [
-            { name: "name", type: "string" }, { name: "version", type: "string" },
-            { name: "chainId", type: "uint256" }, { name: "verifyingContract", type: "address" },
-          ],
-          Withdraw: [
-            { name: "brokerId", type: "string" }, { name: "chainId", type: "uint256" },
-            { name: "receiver", type: "address" }, { name: "token", type: "string" },
-            { name: "amount", type: "uint256" }, { name: "withdrawNonce", type: "uint64" },
-            { name: "timestamp", type: "uint64" },
-          ],
-        },
-        primaryType: "Withdraw",
-        domain: { name: "Orderly", version: "1", chainId: CHAIN_W, verifyingContract: VC_W },
-        message: withdrawMsg,
-      };
-
-      // 4. EIP-712 sign via Bankr
-      const wSignRes = await fetch(`${BANKR_API_W}/wallet/sign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-API-Key": bankrApiKey },
-        body: JSON.stringify({ signatureType: "eth_signTypedData_v4", typedData }),
-      });
-      const wSignData = await wSignRes.json();
-      if (!wSignData.signature) return json({ error: "Bankr EIP-712 sign failed", detail: wSignData }, request, 502);
-
-      // 5. Submit withdrawal request to Orderly
-      // NOTE: verifyingContract must NOT be in the POST body — only in the EIP-712 domain for signing
-      const withdrawRes = await oReq("POST", "/v1/withdraw_request", {
-        message: withdrawMsg,
-        signature: wSignData.signature,
-        userAddress: walletNorm,
-      });
-
-      return json({
-        ok: withdrawRes?.success ?? false,
-        walletAddress: walletNorm,
-        amount,
-        amountUnits,
-        withdrawNonce,
-        raw: withdrawRes,
-      }, request);
     }
 
     // ── /proxy/bankr-register — fully server-side onboarding via Bankr Wallet API ──
