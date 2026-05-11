@@ -432,10 +432,10 @@ Returns `{ ok: true, amount, accountId, approveTxHash, depositTxHash }` on succe
 
 ```
 POST https://og.nexustradinglabs.com/deposit/prepare
-Body: { "wallet": "0x...", "amount": 20 }
+Body: { "walletAddress": "0x...", "amount": 20 }
 ```
 
-**accountId is fetched automatically** — never pass it in the body. The server calls `https://api.orderly.org/v1/client/account?address={wallet}&broker_id=nexus_trading` to get it.
+**accountId is fetched automatically** — never pass it in the body. The server calls `https://api.orderly.org/v1/client/account?address={walletAddress}&broker_id=nexus_trading` to get it.
 
 Returns two ready-to-sign transactions in order:
 
@@ -722,7 +722,7 @@ Body: {
   "walletAddress": "<wallet>",
   "walletSig": "<from sign_message('nexus-trading-key-v1')>",
   "orderId": 123456789,
-  "symbol": "BTC"    // optional but recommended for speed
+  "symbol": "PERP_BTC_USDC"   // optional but recommended for speed — shorthand "BTC" also accepted
 }
 ```
 
