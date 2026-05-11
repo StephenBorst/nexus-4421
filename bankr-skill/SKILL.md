@@ -619,4 +619,117 @@ To close an open position, place the opposite side trade with `reduce_only: true
 ```
 POST https://og.nexustradinglabs.com/trade
 Body: {
-  "symbol": "PERP_S
+  "symbol": "PERP_SOL_USDC",
+  "side": "BUY",           // opposite of the open position
+  "notional": 15,          // match original notional — server will compute qty and close
+  "leverage": 5,
+  "walletSig": "<from sign_message>",
+  "walletAddress": "<wallet>"
+}
+```
+
+Or simply instruct Bankr: "close my SOL short" — it will execute the opposite side automatically.
+
+### Check positions / balance
+
+Requires walletSig (call sign_message first, same as trading). **Use POST — more reliable than GET with long hex params:**
+
+```
+POST https://og.nexustradinglabs.com/positions
+Body: { "walletAddress": "<wallet>", "walletSig": "<sig from sign_message>" }
+
+POST https://og.nexustradinglabs.com/balance
+Body: { "walletAddress": "<wallet>", "walletSig": "<sig from sign_message>" }
+```
+
+GET with query params also accepted: `?wallet={address}&sig={walletSig}`
+
+**Always check /positions before opening a trade** — overlapping positions consume all available margin. If `position_qty > 0`, close or account for it before opening a new position on the same symbol.
+
+---
+
+## Example Agent Prompts
+
+```
+Show me the top 5 traders on Nexus by Rep Score
+```
+→ `GET /feed` → group theses by wallet → for each wallet compute `wins` (HIT_TP), `losses` (STOPPED_OUT), `avgRR` (mean of `(tp1-entry)/(entry-sl)` on wins) → apply repScore formula → sort desc → return top 5 with wallet, repScore, winRate, W/L, avgRR, active count
+
+```
+Who has the highest win rate on Nexus with at least 5 closed trades?
+```
+→ `GET /feed` → filter wallets where `(HIT_TP + STOPPED_OUT) >= 5` → sort by `wins/(wins+losses)` desc → return top result
+
+```
+What's my Rep Score?
+```
+→ `GET /feed` → filter by user's `walletAddress` → compute repScore using formula in Rep Score section → return score, win rate, W/L, avg R:R, active trades, sample penalty if < 5 closed
+
+```
+Copy the #1 Nexus trader's latest active BTC thesis with 2% of my stack
+```
+→ Build leaderboard (above) → get top wallet → find their active `PERP_BTC_USDC` thesis from `/feed` → compute size: `(accountSize * 0.02) / (entry - sl)` → `GET /lab/:userWallet` → append copied thesis with `copiedFromWallet`, `copiedThesisId`, `isPublic: false` → `PUT /lab/:userWallet`
+
+```
+Publish my ETH short thesis: entry 3200, SL 3350, TP 2800
+```
+→ `GET /lab/:userWallet` → find or create thesis object: `{ symbol: "PERP_ETH_USDC", direction: "SHORT", entryPrice: 3200, stopLoss: 3350, takeProfit1: 2800, status: "ACTIVE", isPublic: false }` → call `registerThesis("PERP_ETH_USDC", "SHORT", 320000000000, 335000000000, 280000000000)` on ThesisRegistry → parse `ThesisRegistered` event for `thesisId` → update thesis with `onChainId`, `onChainTxHash`, `isPublic: true` → `PUT /lab/:userWallet`
+
+```
+Show me all active theses on Nexus right now
+```
+→ `GET /feed` → filter `status === "ACTIVE"` → sort by `timestamp` desc → return symbol, direction, entry/SL/TP, trader wallet, copyCount
+
+```
+---
+
+### Get mark price (current price before trading)
+
+No auth required — public endpoint.
+
+```
+GET https://og.nexustradinglabs.com/mark-price?symbol=BTC
+```
+
+Returns `{ symbol, markPrice, indexPrice, lastPrice, openInterest, volume24h }`.
+
+Use this before placing a trade when the user asks "what's BTC at?" or to size a position. Supports shorthand: `BTC`, `ETH`, `SOL`, `ARB`, `LINK`, `WIF` — or full `PERP_BTC_USDC` form.
+
+---
+
+### Cancel an open (unfilled) order
+
+Use when a limit order hasn't filled and the user wants to cancel it. Requires the `order_id` from the original `/trade` response (`raw.data.order_id`).
+
+```
+POST https://og.nexustradinglabs.com/cancel
+Body: {
+  "walletAddress": "<wallet>",
+  "walletSig": "<from sign_message('nexus-trading-key-v1')>",
+  "orderId": 123456789,
+  "symbol": "BTC"    // optional but recommended for speed
+}
+```
+
+Returns `{ ok: true, orderId }` on success.
+
+---
+
+### Check order fill status
+
+Poll to confirm a trade filled before attaching SL/TP. Use the `order_id` from `/trade` response.
+
+```
+POST https://og.nexustradinglabs.com/order-status
+Body: {
+  "walletAddress": "<wallet>",
+  "walletSig": "<from sign_message('nexus-trading-key-v1')>",
+  "orderId": 123456789
+}
+```
+
+Returns `{ orderId, symbol, status, filled, executedQty, avgPrice }`.
+
+`status` values: `NEW` (pending), `PARTIAL_FILLED`, `FILLED`, `CANCELLED`, `REJECTED`.
+
+Market orders fill instantly — only poll for limit orders before calling `/set-sl-tp`.
