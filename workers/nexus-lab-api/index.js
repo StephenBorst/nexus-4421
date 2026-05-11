@@ -1000,6 +1000,100 @@ export default {
       }
     }
 
+
+    // ── /funding-rate — current funding rate for a symbol ────────────────────
+    // Public endpoint, no auth. Returns current funding rate + next funding time.
+    if (parts[0] === "funding-rate" && request.method === "GET") {
+      const frSym = new URL(request.url).searchParams.get("symbol") || "";
+      if (!frSym) return json({ error: "symbol required — GET /funding-rate?symbol=BTC" }, request, 400);
+      const symMap2 = { BTC:"PERP_BTC_USDC", ETH:"PERP_ETH_USDC", SOL:"PERP_SOL_USDC", ARB:"PERP_ARB_USDC", LINK:"PERP_LINK_USDC", WIF:"PERP_WIF_USDC", HYPE:"PERP_HYPE_USDC", XMR:"PERP_XMR_USDC" };
+      const frFull = symMap2[frSym.toUpperCase()] || (frSym.toUpperCase().startsWith("PERP_") ? frSym.toUpperCase() : "PERP_" + frSym.toUpperCase() + "_USDC");
+      try {
+        const frRes  = await fetch(`https://api-evm.orderly.org/v1/public/funding_rate/${frFull}`);
+        const frData = await frRes.json();
+        if (!frData?.data) return json({ error: "symbol not found or no funding data", symbol: frFull }, request, 404);
+        const fd = frData.data;
+        return json({
+          symbol: frFull,
+          fundingRate: fd.last_funding_rate,         // annualized rate as decimal (e.g. 0.0001 = 0.01%)
+          fundingRatePct: (fd.last_funding_rate * 100).toFixed(6) + "%",
+          nextFundingTime: fd.next_funding_time,     // unix ms
+          estFundingRate: fd.est_funding_rate,
+        }, request);
+      } catch (e) {
+        return json({ error: "funding rate fetch failed", detail: String(e) }, request, 500);
+      }
+    }
+
+    // ── /24h-stats — 24h volume, OI, price stats for a symbol ───────────────
+    // Public endpoint, no auth.
+    if ((parts[0] === "24h-stats" || parts[0] === "stats") && request.method === "GET") {
+      const stSym = new URL(request.url).searchParams.get("symbol") || "";
+      if (!stSym) return json({ error: "symbol required — GET /24h-stats?symbol=BTC" }, request, 400);
+      const symMap3 = { BTC:"PERP_BTC_USDC", ETH:"PERP_ETH_USDC", SOL:"PERP_SOL_USDC", ARB:"PERP_ARB_USDC", LINK:"PERP_LINK_USDC", WIF:"PERP_WIF_USDC", HYPE:"PERP_HYPE_USDC", XMR:"PERP_XMR_USDC" };
+      const stFull = symMap3[stSym.toUpperCase()] || (stSym.toUpperCase().startsWith("PERP_") ? stSym.toUpperCase() : "PERP_" + stSym.toUpperCase() + "_USDC");
+      try {
+        const stRes  = await fetch(`https://api-evm.orderly.org/v1/public/futures/${stFull}`);
+        const stData = await stRes.json();
+        if (!stData?.data) return json({ error: "symbol not found", symbol: stFull }, request, 404);
+        const sd = stData.data;
+        return json({
+          symbol: stFull,
+          markPrice: sd.mark_price,
+          indexPrice: sd.index_price,
+          lastPrice: sd.last_price,
+          change24h: sd.change,                      // % price change 24h
+          high24h: sd["24h_high"] || sd.high,
+          low24h: sd["24h_low"] || sd.low,
+          volume24h: sd.volume,                      // USDC volume
+          openInterest: sd.open_interest,
+          fundingRate: sd.last_funding_rate,
+          nextFundingTime: sd.next_funding_time,
+        }, request);
+      } catch (e) {
+        return json({ error: "stats fetch failed", detail: String(e) }, request, 500);
+      }
+    }
+
+    // ── /order-history — recent filled/cancelled orders ──────────────────────
+    // POST { walletAddress, walletSig, symbol?, limit? }
+    // Returns last N orders (default 20, max 100). Requires walletSig auth.
+    if (parts[0] === "order-history" && request.method === "POST") {
+      let ohbody; try { ohbody = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const { walletAddress: ohwa, walletSig: ohws, symbol: ohsym, limit: ohlim } = ohbody;
+      if (!ohwa || !ohws) return json({ error: "walletSig_required", hint: "POST { walletAddress, walletSig, symbol?, limit? }" }, request, 401);
+      const ohNorm = ohwa.toLowerCase().trim();
+      const ohRaw  = await env.LAB_STORE.get("user:" + ohNorm);
+      if (!ohRaw) return json({ error: "wallet_not_registered" }, request, 401);
+      const ohrec  = JSON.parse(ohRaw);
+      const OHHDR  = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
+      const ohhex  = ohws.startsWith("0x") ? ohws.slice(2) : ohws;
+      const ohseed = new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(ohhex.match(/.{1,2}/g).map(b => parseInt(b, 16)))));
+      const ohpk8  = new Uint8Array(48); ohpk8.set(OHHDR, 0); ohpk8.set(ohseed, 16);
+      const ohsk   = await crypto.subtle.importKey("pkcs8", ohpk8, { name: "Ed25519" }, false, ["sign"]);
+      const ohsign = async (method, path) => {
+        const ts  = Date.now();
+        const msg = new TextEncoder().encode(ts + method + path);
+        const s   = new Uint8Array(await crypto.subtle.sign("Ed25519", ohsk, msg));
+        const b64 = btoa(String.fromCharCode(...s)).replace(/[+]/g,"-").replace(/[/]/g,"_").replace(/=+$/,"");
+        return { "orderly-timestamp": String(ts), "orderly-account-id": ohrec.accountId, "orderly-key": ohrec.orderlyKey, "orderly-signature": b64 };
+      };
+      const pageSize = Math.min(Number(ohlim) || 20, 100);
+      const symParam = ohsym ? `&symbol=${ohsym.toUpperCase().startsWith("PERP_") ? ohsym.toUpperCase() : "PERP_" + ohsym.toUpperCase() + "_USDC"}` : "";
+      const ohPath   = `/v1/orders?size=${pageSize}&page=1${symParam}`;
+      const ohHdrs   = await ohsign("GET", ohPath);
+      const ohRes    = await fetch("https://api-evm.orderly.org" + ohPath, { headers: ohHdrs });
+      const ohData   = await ohRes.json();
+      const orders   = (ohData?.data?.rows ?? []).map(o => ({
+        orderId: o.order_id, symbol: o.symbol, side: o.side, type: o.type,
+        status: o.status, price: o.price, quantity: o.quantity,
+        executedQty: o.executed, avgPrice: o.average_executed_price,
+        fee: o.total_fee, feeCurrency: o.fee_asset,
+        createdAt: o.created_time, updatedAt: o.updated_time,
+      }));
+      return json({ count: orders.length, orders }, request);
+    }
+
     // ── /cancel — cancel an open (unfilled) order ────────────────────────────
     // POST { walletAddress, walletSig, orderId, symbol }
     // orderId from the original /trade response raw.data.order_id

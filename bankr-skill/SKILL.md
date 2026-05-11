@@ -733,3 +733,109 @@ Returns `{ orderId, symbol, status, filled, executedQty, avgPrice }`.
 `status` values: `NEW` (pending), `PARTIAL_FILLED`, `FILLED`, `CANCELLED`, `REJECTED`.
 
 Market orders fill instantly — only poll for limit orders before calling `/set-sl-tp`.
+
+---
+
+### Funding Rate
+
+No auth required.
+
+```
+GET https://og.nexustradinglabs.com/funding-rate?symbol=BTC
+```
+
+Returns `{ symbol, fundingRate, fundingRatePct, nextFundingTime, estFundingRate }`. Use before sizing a trade — high funding rates favor the opposite side.
+
+---
+
+### 24h Market Stats
+
+No auth required. Returns all price + market data for a symbol in one call.
+
+```
+GET https://og.nexustradinglabs.com/24h-stats?symbol=BTC
+```
+
+Returns `{ symbol, markPrice, indexPrice, lastPrice, change24h, high24h, low24h, volume24h, openInterest, fundingRate, nextFundingTime }`.
+
+---
+
+### Order History
+
+Returns last N orders for a wallet. Requires walletSig auth.
+
+```
+POST https://og.nexustradinglabs.com/order-history
+Body: {
+  "walletAddress": "<wallet>",
+  "walletSig": "<from sign_message('nexus-trading-key-v1')>",
+  "symbol": "BTC",   // optional — filter by symbol
+  "limit": 20        // optional — max 100, default 20
+}
+```
+
+Returns `{ count, orders: [{ orderId, symbol, side, type, status, price, quantity, executedQty, avgPrice, fee, createdAt }] }`.
+
+
+---
+
+## Error Reference
+
+All endpoints return JSON with an `error` field and optional `hint`. HTTP status codes:
+
+| Code | Meaning |
+|---|---|
+| 400 | Bad request — missing params, validation failed, or Orderly-side error |
+| 401 | Auth failure — missing walletSig, wallet not registered, or invalid Bankr API key |
+| 403 | Forbidden — Bankr key has `allowedRecipients` set (blocks raw tx submission) |
+| 404 | Not found — symbol, order, or resource doesn't exist |
+| 500 | Worker internal error |
+| 502 | Upstream failure — Orderly or Bankr API returned an error |
+
+### Common error codes
+
+| `error` field | Cause | Fix |
+|---|---|---|
+| `walletSig_required` | Missing walletSig or walletAddress in body | Call `sign_message("nexus-trading-key-v1")` first |
+| `wallet_not_registered` | Wallet has no Orderly account in KV | Call `/proxy/bankr-register` |
+| `no_orderly_account` | Wallet not found in Orderly | Register first |
+| `insufficient_margin` | Not enough free collateral | Reduce size, add leverage, or deposit |
+| `below_min_notional` | Order size below Orderly minimum | Increase notional |
+| `no_open_position` | `/set-sl-tp` called with no open position | Open a position first |
+| `order not found` | Invalid orderId in `/order-status` or `/cancel` | Check orderId from `/trade` response |
+| `deposit_requires_wallet_execution` | `/proxy/bankr-deposit` can't submit tx (allowedRecipients set) | Clear allowedRecipients in bankr.bot/api |
+| Orderly code 78 | Withdrawal blocked by unsettled PnL | Server auto-handles: settles PnL, retries with free_collateral |
+| Orderly code 29 | EIP-712 signature invalid | Internal — contact Nexus if this surfaces |
+
+### Retry strategy
+
+- **401 wallet_not_registered** → trigger registration flow, then retry
+- **400 insufficient_margin** → check `/balance`, reduce size or prompt deposit, then retry
+- **400 below_min_notional** → minimum is typically $10 notional — increase size
+- **502** → retry once after 2s; if persistent, Orderly may be degraded
+- **500** → do not retry; surface error to user
+
+---
+
+## Rate Limits
+
+| Layer | Limit |
+|---|---|
+| Nexus Worker (Cloudflare) | No hard cap — governed by Cloudflare plan (100k req/day free tier, unlimited on paid) |
+| Orderly private API | ~10 req/s per account. Sustained bursts will return 429 from Orderly |
+| Orderly public API | ~20 req/s |
+| Bankr `/wallet/sign` | Subject to Bankr API limits — avoid calling more than once per trade |
+
+**Best practice:** One `sign_message` per session. Reuse the walletSig for all endpoints in a session — don't re-sign before each call.
+
+---
+
+## Staging / Testnet
+
+Orderly runs a full testnet on Arbitrum Sepolia (chainId 421614).
+
+- Testnet API: `https://testnet-api-evm.orderly.org`
+- Faucet: Request testnet USDC in Orderly Discord (`#testnet-faucet`)
+- Nexus Worker: The production Worker (`og.nexustradinglabs.com`) targets Orderly mainnet only. For testnet testing, point directly to the Orderly testnet API with a testnet-registered account.
+- ThesisRegistry testnet: `0x6eE20a021F83c7ddD9FA3d15ed6798fCF6A6f468` (Arbitrum Sepolia)
+
