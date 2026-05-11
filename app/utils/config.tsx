@@ -30,7 +30,6 @@ import {
 import { Link } from "react-router-dom";
 import CustomLeftNav from "@/components/CustomLeftNav";
 import ProfileAvatar from "@/components/ProfileAvatar";
-import NotificationBell from "@/components/NotificationBell";
 import { buildCampaignsUrl } from "@/components/CampaignsNavTitle";
 interface MainNavItem {
   name: string;
@@ -268,10 +267,11 @@ export const useOrderlyConfig = () => {
   ? [{ name: "Campaigns", href: buildCampaignsUrl(), target: "_blank" as const }]
   : [];
 
-  const labMenu = [{ name: "LAB", href: "/lab" }];
-  const feedMenu = [{ name: "FEED", href: "/feed" }];
+  const labMenu   = [{ name: "LAB",   href: "/lab"   }];
+  const feedMenu  = [{ name: "FEED",  href: "/feed"  }];
+  const intelMenu = [{ name: "INTEL", href: "/intel" }];
 
-const allMenuItems = [...translatedEnabledMenus, ...customMenus, ...campaignsMenu, ...labMenu, ...feedMenu];
+const allMenuItems = [...translatedEnabledMenus, ...customMenus, ...campaignsMenu, ...labMenu, ...feedMenu, ...intelMenu];
 
     const supportedBottomNavMenus = [
       "Trading",
@@ -321,7 +321,7 @@ const allMenuItems = [...translatedEnabledMenus, ...customMenus, ...campaignsMen
           >
             {isMobile && (
               <CustomLeftNav
-                menus={[...translatedEnabledMenus, ...labMenu, ...feedMenu]}
+                menus={[...translatedEnabledMenus, ...labMenu, ...feedMenu, ...intelMenu]}
                 externalLinks={customMenus}
               />
             )}
@@ -348,7 +348,6 @@ const allMenuItems = [...translatedEnabledMenus, ...customMenus, ...campaignsMen
             {components.subAccount}
             {components.chainMenu}
             {components.walletConnect}
-            <NotificationBell />
             <ProfileAvatar />
           </Flex>
         </Flex>

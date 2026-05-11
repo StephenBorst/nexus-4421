@@ -50,6 +50,10 @@ const TraderPage = lazy(() => import('./pages/trader'));
 // ✅ THESIS PERMALINK PAGE (Ph22)
 const ThesisPage = lazy(() => import('./pages/thesis'));
 
+// ✅ INTEL PAGE
+const IntelPage   = lazy(() => import('./pages/intel'));
+const IntelLayout = lazy(() => import('./pages/intel/Layout'));
+
 async function loadRuntimeConfig() {
   return new Promise<void>((resolve) => {
     const script = document.createElement('script');
@@ -183,6 +187,15 @@ const router = createBrowserRouter([
         element: <PointsLayout />,
         children: [
           { index: true, element: <PointsIndex /> },
+        ],
+      },
+
+      // ✅ INTEL ROUTE
+      {
+        path: 'intel',
+        element: <IntelLayout />,
+        children: [
+          { index: true, element: <IntelPage /> },
         ],
       },
     ],
