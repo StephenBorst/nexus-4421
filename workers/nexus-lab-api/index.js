@@ -1452,7 +1452,46 @@ export default {
       }
     }
 
-    // ── /settle-pnl — settle unrealized PnL so it clears margin for withdrawal ──
+    // ── /set-leverage — set account-level max leverage ──────────────────────────
+    // POST { walletAddress, walletSig, leverage }
+    // leverage: integer 1–100. Sets the account-wide max leverage on Orderly.
+    if (parts[0] === "set-leverage" && request.method === "POST") {
+      let slbody; try { slbody = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const { walletAddress: slwa, walletSig: slws, leverage: slev } = slbody;
+      if (!slwa || !slws || slev == null) return json({ error: "walletSig_required", hint: "POST { walletAddress, walletSig, leverage }" }, request, 401);
+      if (typeof slev !== "number" || slev < 1 || slev > 100) return json({ error: "leverage must be a number between 1 and 100" }, request, 400);
+      const slNorm = slwa.toLowerCase().trim();
+      const slRaw  = await env.LAB_STORE.get("user:" + slNorm);
+      if (!slRaw) return json({ error: "wallet_not_registered" }, request, 401);
+      const slrec  = JSON.parse(slRaw);
+      const SLHDR  = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
+      const slhex  = slws.startsWith("0x") ? slws.slice(2) : slws;
+      const slseed = new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(slhex.match(/.{1,2}/g).map(b => parseInt(b, 16)))));
+      const slpk8  = new Uint8Array(48); slpk8.set(SLHDR, 0); slpk8.set(slseed, 16);
+      const slsk   = await crypto.subtle.importKey("pkcs8", slpk8, { name: "Ed25519" }, false, ["sign"]);
+      const slsign = async (method, path, bodyObj) => {
+        const ts  = Date.now();
+        const bs  = bodyObj ? JSON.stringify(bodyObj) : "";
+        const msg = new TextEncoder().encode(ts + method + path + bs);
+        const s   = new Uint8Array(await crypto.subtle.sign("Ed25519", slsk, msg));
+        const b64 = btoa(String.fromCharCode(...s)).replace(/[+]/g,"-").replace(/[/]/g,"_").replace(/=+$/,"");
+        return { "Content-Type": "application/json", "orderly-timestamp": String(ts), "orderly-account-id": slrec.accountId, "orderly-key": slrec.orderlyKey, "orderly-signature": b64 };
+      };
+      const levBody = { leverage: slev };
+      const slHdrs = await slsign("POST", "/v1/client/leverage", levBody);
+      const slRes  = await fetch("https://api-evm.orderly.org/v1/client/leverage", {
+        method: "POST", headers: slHdrs,
+        body: JSON.stringify(levBody),
+      });
+      const slData = await slRes.json();
+      return json({
+        ok: slData?.success ?? false,
+        leverage: slev,
+        raw: slData,
+      }, request);
+    }
+
+        // ── /settle-pnl — settle unrealized PnL so it clears margin for withdrawal ──
     // POST { walletAddress, walletSig, symbol? }
     // symbol is optional — omit to settle all positions, or pass e.g. "SOL" to settle one.
     // Must be called before withdrawing if unsettled_pnl is negative (code 78).

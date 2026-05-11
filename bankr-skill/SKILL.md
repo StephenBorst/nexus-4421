@@ -36,13 +36,11 @@ Body: {
   "notional": 50,
   "leverage": 5,
   "walletSig": "<signature from step 2>",
-  "walletAddress": "<connected wallet address>",
-  "stopLoss": 60000,      // optional — SL trigger price (closes entire position)
-  "takeProfit": 75000     // optional — TP trigger price (closes entire position)
+  "walletAddress": "<connected wallet address>"
 }
 ```
 
-`stopLoss` and `takeProfit` are optional. If provided, the server places a single `POSITIONAL_TP_SL` algo order on Orderly immediately after the entry fill — closes the full position automatically at those prices. No extra calls needed from the skill.
+⛔ **DO NOT add `stopLoss` or `takeProfit` to the `/trade` body.** SL/TP are placed as a separate `POSITIONAL_TP_SL` algo order via `/trade` with `orderType: "POSITIONAL_TP_SL"` after the entry fills. See the SL/TP section below for the correct flow.
 
 The server derives the user's ed25519 trading key from `walletSig` (sha256 → PKCS8 → Ed25519). No private keys ever leave the user's wallet. Non-custodial by design.
 
@@ -377,6 +375,23 @@ Body: { "walletAddress": "...", "bankrApiKey": "...", "amount": <free_collateral
 3. Wait 5 seconds
 4. `POST /balance` → get free_collateral
 5. `POST /proxy/bankr-withdraw` with free_collateral amount and bankrApiKey
+
+---
+
+## Setting Account Leverage
+
+Adjust the account-wide maximum leverage (1–100x). Applies to all new positions opened after the change.
+
+```
+POST https://og.nexustradinglabs.com/set-leverage
+Body: {
+  "walletAddress": "<wallet>",
+  "walletSig": "<from sign_message('nexus-trading-key-v1')>",
+  "leverage": 10
+}
+```
+
+Returns `{ ok: true, leverage: 10 }` on success. The default Orderly leverage is 10x; increase with caution.
 
 ---
 
