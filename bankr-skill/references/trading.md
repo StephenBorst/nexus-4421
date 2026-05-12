@@ -4,6 +4,8 @@
 
 Trigger when `/trade` returns `{ error: "wallet_not_registered" }`.
 
+(Full URL: `POST https://og.nexustradinglabs.com/trade`) `{ error: "wallet_not_registered" }`.
+
 **Step R1 — Ask for Bankr API key**
 > "Your wallet `<walletAddress>` isn't linked to a Nexus account yet. I need your Bankr API key for one-time setup — find it at bankr.bot/api (enable 'Wallet & Agent API'). It's used only for registration and never stored."
 
@@ -30,7 +32,7 @@ If R2 returns EIP-712 blocked error:
 Always get walletSig first (see SKILL.md CRITICAL). Then:
 
 ```
-POST /trade
+POST https://og.nexustradinglabs.com/trade
 {
   "symbol":        "PERP_BTC_USDC",   // shorthand "BTC" also works
   "side":          "BUY",             // "SELL" for short
@@ -44,7 +46,7 @@ POST /trade
 Natural language mapping:
 - "Long BTC $50 at 5x" → `{ symbol: "PERP_BTC_USDC", side: "BUY", notional: 50, leverage: 5 }`
 - "Short HYPE $20 20x" → `{ symbol: "PERP_HYPE_USDC", side: "SELL", notional: 20, leverage: 20 }`
-- "Short SOL $15 5x, SL 100, TP 80" → trade first, then `/set-sl-tp` separately
+- "Short SOL $15 5x, SL 100, TP 80" → trade first, then `https://og.nexustradinglabs.com/set-sl-tp` separately
 
 Supported symbols: `PERP_BTC_USDC`, `PERP_ETH_USDC`, `PERP_SOL_USDC`, `PERP_HYPE_USDC`, `PERP_ARB_USDC`, `PERP_XMR_USDC`, and more. Shorthand "BTC", "ETH", "SOL" etc. auto-normalized by the Worker.
 
@@ -52,10 +54,10 @@ Server flow: derive ed25519 key from walletSig → look up accountId from KV →
 
 ---
 
-## Attach SL/TP (ALWAYS after trade fills — never inside /trade body)
+## Attach SL/TP (ALWAYS after trade fills — never in the /trade body)
 
 ```
-POST /set-sl-tp
+POST https://og.nexustradinglabs.com/set-sl-tp
 {
   "symbol":        "PERP_SOL_USDC",
   "stopLoss":      100,    // optional
@@ -67,7 +69,7 @@ POST /set-sl-tp
 
 Server fetches current position size, places a `POSITIONAL_TP_SL` algo order. Returns `{ ok: true, quantity, stopLoss, takeProfit }`.
 
-Full flow: sign_message → POST /trade → wait for fill → POST /set-sl-tp (same walletSig).
+Full flow: sign_message → POST https://og.nexustradinglabs.com/trade → wait for fill → POST https://og.nexustradinglabs.com/set-sl-tp (same walletSig).
 
 ---
 
@@ -76,7 +78,7 @@ Full flow: sign_message → POST /trade → wait for fill → POST /set-sl-tp (s
 Send the opposite side at the same notional:
 
 ```
-POST /trade
+POST https://og.nexustradinglabs.com/trade
 {
   "symbol":        "PERP_SOL_USDC",
   "side":          "BUY",    // opposite of the open SELL position
@@ -92,7 +94,7 @@ POST /trade
 ## Check Positions
 
 ```
-POST /positions
+POST https://og.nexustradinglabs.com/positions
 { "walletAddress": "<wallet>", "walletSig": "<sig>" }
 ```
 
@@ -105,7 +107,7 @@ POST /positions
 Use when a limit order hasn't filled. Requires `order_id` from the `/trade` response (`raw.data.order_id`).
 
 ```
-POST /cancel
+POST https://og.nexustradinglabs.com/cancel
 {
   "walletAddress": "<wallet>",
   "walletSig":     "<sig>",
@@ -123,7 +125,7 @@ Returns `{ ok: true, orderId }`.
 Poll before attaching SL/TP on limit orders (market orders fill instantly).
 
 ```
-POST /order-status
+POST https://og.nexustradinglabs.com/order-status
 {
   "walletAddress": "<wallet>",
   "walletSig":     "<sig>",
@@ -140,7 +142,7 @@ Status values: `NEW` (pending), `PARTIAL_FILLED`, `FILLED`, `CANCELLED`, `REJECT
 ## Order History
 
 ```
-POST /order-history
+POST https://og.nexustradinglabs.com/order-history
 {
   "walletAddress": "<wallet>",
   "walletSig":     "<sig>",
@@ -158,7 +160,7 @@ Returns `{ count, orders: [{ orderId, symbol, side, type, status, price, quantit
 Applies to all new positions. Default is 10x.
 
 ```
-POST /set-leverage
+POST https://og.nexustradinglabs.com/set-leverage
 {
   "walletAddress": "<wallet>",
   "walletSig":     "<sig>",

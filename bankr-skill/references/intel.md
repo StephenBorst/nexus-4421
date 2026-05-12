@@ -81,7 +81,7 @@ OUTLIERS:
 
 ## Combine with User's Open Positions
 
-If the user has open positions (from `POST /positions`), cross-reference:
+If the user has open positions (from `POST https://og.nexustradinglabs.com/positions`), cross-reference:
 - If user is LONG BTC and funding is extremely positive → warn: "You're aligned with the crowd — high squeeze risk, funding cost eating P&L"
 - If user is SHORT SOL and funding is negative → confirm: "Trend is with you — shorts being paid"
 - If user is positioned against the regime signal → flag the tension

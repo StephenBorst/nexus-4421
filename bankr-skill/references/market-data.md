@@ -3,7 +3,7 @@
 ## Mark Price
 
 ```
-GET /mark-price?symbol=BTC
+GET https://og.nexustradinglabs.com/mark-price?symbol=BTC
 ```
 
 Returns `{ symbol, markPrice, indexPrice, lastPrice, openInterest, volume24h }`.
@@ -15,7 +15,7 @@ Use before placing a trade when the user asks "what's BTC at?" or to size a posi
 ## Funding Rate
 
 ```
-GET /funding-rate?symbol=BTC
+GET https://og.nexustradinglabs.com/funding-rate?symbol=BTC
 ```
 
 Returns `{ symbol, fundingRate, fundingRatePct, nextFundingTime, estFundingRate }`.
@@ -27,7 +27,7 @@ High positive funding → longs pay shorts → bearish signal. High negative →
 ## 24h Market Stats
 
 ```
-GET /24h-stats?symbol=BTC
+GET https://og.nexustradinglabs.com/24h-stats?symbol=BTC
 ```
 
 Returns `{ symbol, markPrice, indexPrice, lastPrice, change24h, high24h, low24h, volume24h, openInterest, fundingRate, nextFundingTime }`.
@@ -53,7 +53,7 @@ All price + market data for a symbol in one call.
 | `wallet_not_registered` | No Orderly account in KV | Run registration flow |
 | `insufficient_margin` | Not enough free collateral | Reduce size, add leverage, or deposit |
 | `below_min_notional` | Order below Orderly minimum (~$10) | Increase notional |
-| `no_open_position` | /set-sl-tp with no position | Open position first |
+| `no_open_position` | https://og.nexustradinglabs.com/set-sl-tp with no position | Open position first |
 | `deposit_requires_wallet_execution` | allowedRecipients blocking tx | Clear at bankr.bot/api |
 | Orderly code 78 | Unsettled negative PnL blocking withdrawal | Server auto-handles; manual: settle-pnl then re-check free_collateral |
 | Orderly code 29 | EIP-712 signature invalid | Internal error — contact Nexus |

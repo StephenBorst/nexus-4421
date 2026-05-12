@@ -23,7 +23,10 @@ Step 3 — sign_message({ message: "nexus-trading-key-v1" }) → save as walletS
 
 ## ⛔ FORBIDDEN
 
-- NEVER embed `stopLoss` / `takeProfit` in `/trade` body — place them via `/set-sl-tp` after fill
+- NEVER call `trade.nexustradinglabs.com` for API requests — that is the static frontend app. It returns 405 on all POSTs.
+- NEVER prepend `/api/` or `/api/v1/` to endpoint paths — there is no such prefix on this API.
+- NEVER construct URLs from relative paths — always use the full URL from the quick reference table.
+- NEVER embed `stopLoss` / `takeProfit` in the `/trade` body — place them via `/set-sl-tp` after fill
 - NEVER store or log the Bankr API key — use it transiently per call, never persist
 - NEVER ask the user to run terminal commands, install packages, or sign messages manually
 - NEVER use the Orderly CLI (`@orderly.network/cli`)
@@ -53,32 +56,32 @@ To attach SL/TP after fill: `POST /set-sl-tp` (see references/trading.md — nev
 
 ## Quick Reference
 
-| Action | Endpoint | Auth |
+⚠️ **ALWAYS use the full URL: `https://og.nexustradinglabs.com`**
+Do NOT use relative paths. Do NOT prepend `/api/`. Do NOT use the app domain (`trade.nexustradinglabs.com`).
+
+| Action | Full URL | Auth |
 |---|---|---|
-| Place trade | `POST /trade` | walletSig |
-| Attach SL/TP | `POST /set-sl-tp` | walletSig |
-| Close position | `POST /trade` opposite side | walletSig |
-| Cancel order | `POST /cancel` | walletSig |
-| Order status | `POST /order-status` | walletSig |
-| Order history | `POST /order-history` | walletSig |
-| Positions | `POST /positions` | walletSig |
-| Balance | `POST /balance` | walletSig |
-| Set leverage | `POST /set-leverage` | walletSig |
-| Deposit USDC | `POST /proxy/bankr-deposit` | Bankr API key |
-| Withdraw USDC | `POST /proxy/bankr-withdraw` | Bankr API key + walletSig |
-| Settle PnL | `POST /settle-pnl` | walletSig |
-| Register wallet | `POST /proxy/bankr-register` | Bankr API key |
-| Mark price | `GET /mark-price?symbol=BTC` | public |
-| Funding rate | `GET /funding-rate?symbol=BTC` | public |
-| 24h stats | `GET /24h-stats?symbol=BTC` | public |
-| Public feed | `GET /feed` | public |
-| Trader lab | `GET /lab/:wallet` | public read |
-| Trader profile | `GET /profile/:wallet` | public read |
-| Leaderboard | derive from `/feed` + `getTraderStats()` | public |
+| Place trade | `POST https://og.nexustradinglabs.com/trade` | walletSig |
+| Attach SL/TP | `POST https://og.nexustradinglabs.com/set-sl-tp` | walletSig |
+| Cancel order | `POST https://og.nexustradinglabs.com/cancel` | walletSig |
+| Order status | `POST https://og.nexustradinglabs.com/order-status` | walletSig |
+| Order history | `POST https://og.nexustradinglabs.com/order-history` | walletSig |
+| Positions | `POST https://og.nexustradinglabs.com/positions` | walletSig |
+| Balance | `POST https://og.nexustradinglabs.com/balance` | walletSig |
+| Set leverage | `POST https://og.nexustradinglabs.com/set-leverage` | walletSig |
+| Deposit USDC | `POST https://og.nexustradinglabs.com/proxy/bankr-deposit` | Bankr API key |
+| Withdraw USDC | `POST https://og.nexustradinglabs.com/proxy/bankr-withdraw` | Bankr API key + walletSig |
+| Settle PnL | `POST https://og.nexustradinglabs.com/settle-pnl` | walletSig |
+| Register wallet | `POST https://og.nexustradinglabs.com/proxy/bankr-register` | Bankr API key |
+| Mark price | `GET https://og.nexustradinglabs.com/mark-price?symbol=BTC` | public |
+| Funding rate | `GET https://og.nexustradinglabs.com/funding-rate?symbol=BTC` | public |
+| 24h stats | `GET https://og.nexustradinglabs.com/24h-stats?symbol=BTC` | public |
+| Public feed | `GET https://og.nexustradinglabs.com/feed` | public |
+| Trader lab | `GET https://og.nexustradinglabs.com/lab/:wallet` | public read |
+| Trader profile | `GET https://og.nexustradinglabs.com/profile/:wallet` | public read |
+| Leaderboard | derive from `GET https://og.nexustradinglabs.com/feed` + `getTraderStats()` | public |
 | Market intel | `GET https://api-evm.orderly.org/v1/public/futures` | public |
 | Crypto news | rss2json proxy (see references/news.md) | public |
-
-**API Base:** `https://og.nexustradinglabs.com`
 
 ---
 

@@ -7,7 +7,7 @@ All collateral lives in the Orderly Network vault on Arbitrum — non-custodial,
 ### Automated path (recommended)
 
 ```
-POST /proxy/bankr-deposit
+POST https://og.nexustradinglabs.com/proxy/bankr-deposit
 {
   "walletAddress": "<wallet>",
   "bankrApiKey":   "<user's Bankr API key>",
@@ -28,7 +28,7 @@ Returns `{ ok: true, amount, accountId, approveTxHash, depositTxHash }`. Funds l
 ### Prepare-only path (returns calldata for manual signing)
 
 ```
-POST /deposit/prepare
+POST https://og.nexustradinglabs.com/deposit/prepare
 { "walletAddress": "0x...", "amount": 20 }
 ```
 
@@ -60,7 +60,7 @@ Sign and submit step 1, wait for confirmation, then step 2.
 ## Check Balance
 
 ```
-POST /balance
+POST https://og.nexustradinglabs.com/balance
 { "walletAddress": "<wallet>", "walletSig": "<sig>" }
 ```
 
@@ -71,7 +71,7 @@ Look for `free_collateral` — this is the amount available to withdraw (not tot
 ## Withdraw USDC
 
 ```
-POST /proxy/bankr-withdraw
+POST https://og.nexustradinglabs.com/proxy/bankr-withdraw
 {
   "walletAddress": "<wallet>",
   "bankrApiKey":   "<Bankr API key — REQUIRED>",
@@ -90,17 +90,17 @@ Returns `{ ok: true, amount, withdrawNonce }`.
 Server auto-handles code 78: settles PnL, re-checks free_collateral, retries with corrected amount. If it still fails, run the manual flow:
 
 1. `sign_message({ message: "nexus-trading-key-v1" })` → walletSig
-2. `POST /settle-pnl` with walletSig
+2. `POST https://og.nexustradinglabs.com/settle-pnl` with walletSig
 3. Wait 5 seconds
-4. `POST /balance` → get free_collateral
-5. `POST /proxy/bankr-withdraw` with free_collateral amount
+4. `POST https://og.nexustradinglabs.com/balance` → get free_collateral
+5. `POST https://og.nexustradinglabs.com/proxy/bankr-withdraw` with free_collateral amount
 
 ---
 
 ## Settle PnL
 
 ```
-POST /settle-pnl
+POST https://og.nexustradinglabs.com/settle-pnl
 {
   "walletAddress": "<wallet>",
   "walletSig":     "<sig>",

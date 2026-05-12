@@ -3,7 +3,7 @@
 ## Public Feed
 
 ```
-GET /feed
+GET https://og.nexustradinglabs.com/feed
 ```
 
 Returns all public theses. Each object:
@@ -44,7 +44,7 @@ On-chain stats: call `getTraderStats(walletAddress)` on ThesisRegistry returns `
 
 ## Build the Leaderboard
 
-1. `GET /feed` → all public theses
+1. `GET https://og.nexustradinglabs.com/feed` → all public theses
 2. Group by wallet
 3. Compute per wallet:
    - `wins` = count of `HIT_TP` theses
@@ -77,7 +77,7 @@ Events: `ThesisRegistered(thesisId, trader, symbol)`, `ThesisClosed(thesisId, tr
 
 ## Copy Trading Flow
 
-1. `GET /feed` → find thesis by trader/symbol/direction
+1. `GET https://og.nexustradinglabs.com/feed` → find thesis by trader/symbol/direction
 2. Prompt user: account size (USDC), risk % (e.g. 2%), optional max loss cap
 3. Compute position size: `accountSize * riskPct / (entry - sl)` (longs); adjust for shorts
 4. `GET /lab/:userWallet` → fetch user's theses
@@ -130,7 +130,7 @@ Allowed emojis: 🔥 💎 📉 ✅ ❌
 ## On-Chain Wallet Registry
 
 ```
-GET /wallets/onchain
+GET https://og.nexustradinglabs.com/wallets/onchain
 ```
 
 Returns `{ wallets: string[], fromCache: bool }` — all wallets that have ever registered a thesis on Arbitrum.
@@ -140,10 +140,10 @@ Returns `{ wallets: string[], fromCache: bool }` — all wallets that have ever 
 ## Example Prompts
 
 **"Show me the top 5 traders by Rep Score"**
-→ GET /feed → group by wallet → compute repScore → sort desc → return top 5
+→ GET https://og.nexustradinglabs.com/feed → group by wallet → compute repScore → sort desc → return top 5
 
 **"Who has the highest win rate with ≥5 closed trades?"**
-→ GET /feed → filter wallets where (HIT_TP + STOPPED_OUT) >= 5 → sort by wins/(wins+losses) desc
+→ GET https://og.nexustradinglabs.com/feed → filter wallets where (HIT_TP + STOPPED_OUT) >= 5 → sort by wins/(wins+losses) desc
 
 **"Copy the #1 trader's latest active BTC thesis with 2% of my $10k stack"**
 → build leaderboard → top wallet → find PERP_BTC_USDC ACTIVE thesis → size: $10k * 0.02 / (entry - sl) → GET /lab/:userWallet → append → PUT /lab/:userWallet
