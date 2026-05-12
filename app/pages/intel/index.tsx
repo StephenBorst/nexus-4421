@@ -16,10 +16,11 @@ interface GlobalData     { btcDom: number; ethDom: number; mcapChange24h: number
 interface Mover          { symbol: string; change24h: number }
 
 interface HLAsset {
-  name: string;
-  funding: number;  // 8-hour % already
-  oi: number;       // USD
-  volume: number;   // 24 h USD
+  name: string;      // symbol shorthand e.g. "BTC"
+  symbol: string;    // full e.g. "PERP_BTC_USDC"
+  funding: number;   // 8-hour % already
+  oi: number;        // USD
+  volume: number;    // 24 h USD
   markPx: number;
   signal: string;
   confidence: number;
@@ -59,23 +60,22 @@ async function fetchMovers(): Promise<{ gainers: Mover[]; losers: Mover[] }> {
 }
 
 async function fetchHyperliquid(): Promise<HLAsset[]> {
-  const r = await fetch("https://api.hyperliquid.xyz/info", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ type: "metaAndAssetCtxs" }),
-  });
-  const [meta, ctxs] = await r.json();
+  // Uses Orderly Network public futures API — our own liquidity stack
+  const r = await fetch("https://api-evm.orderly.org/v1/public/futures");
+  const d = await r.json();
+  if (!d.success || !d.data?.rows) return [];
 
-  return (meta.universe as any[])
-    .map((asset: any, i: number) => {
-      const ctx    = ctxs[i];
-      const markPx = parseFloat(ctx.markPx || ctx.midPx || "0");
-      const oi     = parseFloat(ctx.openInterest || "0") * markPx;
-      const volume = parseFloat(ctx.dayNtlVlm   || "0");
-      // HL `funding` is predicted hourly rate as fraction → convert to 8 h %
-      const funding = parseFloat(ctx.funding || "0") * 8 * 100;
+  return (d.data.rows as any[])
+    .map((row: any) => {
+      const sym     = row.symbol as string;          // "PERP_BTC_USDC"
+      const name    = sym.replace("PERP_", "").replace("_USDC", ""); // "BTC"
+      const markPx  = parseFloat(row.mark_price  || row.index_price || "0");
+      const oi      = parseFloat(row.open_interest || "0") * markPx; // base → USD
+      const vol24h  = parseFloat(row["24h_volume"] || row["24h_amount"] || "0");
+      // Orderly last_funding_rate is the settled 8h rate as a decimal → × 100 for %
+      const funding = parseFloat(row.last_funding_rate || row.estimated_funding_rate || "0") * 100;
 
-      const oiVol = volume > 0 ? oi / volume : 0;
+      const oiVol = vol24h > 0 ? oi / vol24h : 0;
       let signal = "NEUTRAL", confidence = 50;
 
       if (funding > 0.08) {
@@ -92,9 +92,9 @@ async function fetchHyperliquid(): Promise<HLAsset[]> {
         confidence = 65;
       }
 
-      return { name: asset.name, funding, oi, volume, markPx, signal, confidence };
+      return { name, symbol: sym, funding, oi, volume: vol24h, markPx, signal, confidence };
     })
-    .filter((a: HLAsset) => a.oi > 500_000)
+    .filter((a: HLAsset) => a.oi > 10_000)  // Orderly OI is smaller than HL — lower threshold
     .sort((a: HLAsset, b: HLAsset) => b.oi - a.oi)
     .slice(0, 30);
 }
@@ -478,7 +478,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
 
         {/* ── Derivatives Intelligence ──────────────────────── */}
         <Card>
-          <SectionTitle>// DERIVATIVES INTELLIGENCE — COINALYZE</SectionTitle>
+          <SectionTitle>// DERIVATIVES INTELLIGENCE — ORDERLY NETWORK</SectionTitle>
 
           {renderDeriv("BTC", btcD, lsRatios["BTC"] ?? null)}
           {renderDeriv("ETH", ethD, lsRatios["ETH"] ?? null)}
@@ -497,7 +497,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
           )}
 
           <div style={{ color: DIM, fontSize: "10px", marginTop: "12px", letterSpacing: "0.05em" }}>
-            // VIA BINANCE FUTURES · HYPERLIQUID
+            // VIA BINANCE FUTURES · ORDERLY NETWORK
           </div>
         </Card>
 
@@ -593,7 +593,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
           })}
 
           <div style={{ color: DIM, fontSize: "10px", marginTop: "8px", letterSpacing: "0.05em" }}>
-            // VIA HYPERLIQUID
+            // VIA ORDERLY NETWORK
           </div>
         </Card>
 
@@ -719,7 +719,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
       <Card style={{ marginBottom: "10px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px", flexWrap: "wrap", gap: "4px" }}>
           <SectionTitle style={{ marginBottom: 0 }}>// POSITION INTELLIGENCE</SectionTitle>
-          <span style={{ color: DIM, fontSize: "10px" }}>HYPERLIQUID · {timestamp || "—"}</span>
+          <span style={{ color: DIM, fontSize: "10px" }}>ORDERLY NETWORK · {timestamp || "—"}</span>
         </div>
 
         {/* Summary bar */}
@@ -840,7 +840,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
 
       {/* ── Footer ──────────────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px", color: DIM, fontSize: "10px", letterSpacing: "0.05em", marginTop: "4px" }}>
-        <div>// DATA: COINGECKO · BINANCE FUTURES · HYPERLIQUID · ALTERNATIVE.ME</div>
+        <div>// DATA: COINGECKO · BINANCE FUTURES · ORDERLY NETWORK · ALTERNATIVE.ME</div>
         <div>AUTO-REFRESH: {REFRESH_INTERVAL}s · {countdown}s AGO</div>
       </div>
 
