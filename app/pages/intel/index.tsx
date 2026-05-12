@@ -338,9 +338,9 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
 
   // ── Styles ──────────────────────────────────────────────────
   const page: React.CSSProperties = {
-    background: "#080b0d",
-    minHeight: "100vh",
-    padding: isMobile ? "12px" : "16px 20px",
+    background: embedded ? "transparent" : "#080b0d",
+    minHeight: embedded ? undefined : "100vh",
+    padding: embedded ? (isMobile ? "8px 0" : "4px 0") : (isMobile ? "12px" : "16px 20px"),
     fontFamily: "'Courier New', Courier, monospace",
     color: BRIGHT,
     fontSize: "13px",
@@ -658,6 +658,63 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
         </div>
       </Card>
 
+            {/* ── Liquidations 24H ──────────────────────────────────── */}
+      <Card style={{ marginBottom: "10px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+          <SectionTitle style={{ marginBottom: 0 }}>// LIQUIDATIONS 24H</SectionTitle>
+          <span style={{ color: DIM, fontSize: "10px" }}>VIA BINANCE FUTURES</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "10px" }}>
+          {(["BTC", "ETH", "SOL"] as const).map(sym => {
+            const ls = lsRatios[sym] ?? null;
+            const status = ls === null ? "—" : ls > 1.35 ? "LONG FLUSH" : ls < 0.75 ? "SHORT SQUEEZE" : "BALANCED";
+            const sc = ls === null ? DIM : ls > 1.35 ? RED : ls < 0.75 ? GREEN : YELLOW;
+            const d = getDerivData(sym);
+            const oi = d?.oi ?? 0;
+            const longPct  = ls !== null ? Math.min(0.9, ls / (ls + 1)) : 0.5;
+            const shortPct = 1 - longPct;
+            const liqRate  = status === "LONG FLUSH" ? 0.018 : status === "SHORT SQUEEZE" ? 0.016 : 0.006;
+            const totalLiq = oi * liqRate;
+            const longLiq  = totalLiq * (status === "LONG FLUSH" ? 0.75 : status === "SHORT SQUEEZE" ? 0.25 : 0.5);
+            const shortLiq = totalLiq - longLiq;
+            const fmtLiq   = (v: number) => v >= 1e9 ? `$${(v/1e9).toFixed(1)}B` : v >= 1e6 ? `$${(v/1e6).toFixed(0)}M` : `$${v.toFixed(0)}`;
+            return (
+              <div key={sym} style={{ padding: "10px 12px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <span style={{ color: BRIGHT, fontWeight: 700, fontSize: "13px" }}>{sym}</span>
+                  <span style={{ color: sc, fontSize: "10px", letterSpacing: "0.06em" }}>{status}</span>
+                </div>
+                <div style={{ marginBottom: "5px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
+                    <span style={{ color: DIM }}>LONGS</span>
+                    <span style={{ color: status === "LONG FLUSH" ? RED : MUTED }}>{oi > 0 ? fmtLiq(longLiq) : "—"}</span>
+                  </div>
+                  <div style={{ height: "3px", background: "rgba(255,255,255,0.06)", borderRadius: "1px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${Math.round(longPct * 100)}%`, background: status === "LONG FLUSH" ? RED : GREEN, opacity: 0.8 }} />
+                  </div>
+                </div>
+                <div style={{ marginBottom: "6px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
+                    <span style={{ color: DIM }}>SHORTS</span>
+                    <span style={{ color: status === "SHORT SQUEEZE" ? GREEN : MUTED }}>{oi > 0 ? fmtLiq(shortLiq) : "—"}</span>
+                  </div>
+                  <div style={{ height: "3px", background: "rgba(255,255,255,0.06)", borderRadius: "1px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${Math.round(shortPct * 100)}%`, background: status === "SHORT SQUEEZE" ? GREEN : RED, opacity: 0.8 }} />
+                  </div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: DIM, borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "5px" }}>
+                  <span>L/S {ls !== null ? ls.toFixed(2) : "—"}</span>
+                  <span style={{ color: MUTED }}>EST. {oi > 0 ? fmtLiq(totalLiq) : "—"} LIQ</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ color: DIM, fontSize: "10px", marginTop: "8px", letterSpacing: "0.05em" }}>
+          // EST. FROM OI × TYPICAL DAILY LIQ RATE · L/S FROM BINANCE FUTURES GLOBAL RATIO
+        </div>
+      </Card>
+
             {/* ── Position Intelligence ───────────────────────────── */}
       <Card style={{ marginBottom: "10px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px", flexWrap: "wrap", gap: "4px" }}>
@@ -775,4 +832,18 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
         })}
 
         {topPositions.length === 0 && (
-          <div style={{ color: DIM, paddi
+          <div style={{ color: DIM, padding: "20px 0", textAlign: "center", fontSize: "12px" }}>
+            {loading ? "INITIALIZING POSITION DATA…" : "No position data available"}
+          </div>
+        )}
+      </Card>
+
+      {/* ── Footer ──────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px", color: DIM, fontSize: "10px", letterSpacing: "0.05em", marginTop: "4px" }}>
+        <div>// DATA: COINGECKO · BINANCE FUTURES · HYPERLIQUID · ALTERNATIVE.ME</div>
+        <div>AUTO-REFRESH: {REFRESH_INTERVAL}s · {countdown}s AGO</div>
+      </div>
+
+    </div>
+  );
+}
