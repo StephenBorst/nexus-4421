@@ -20,9 +20,10 @@ import { useLabStorage } from "@/hooks/useLabStorage";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 import { useThesisRegistry } from "@/hooks/useThesisRegistry";
 import type { ThesisTrade, ThesisStatus } from "./types";
+import IntelPage from "@/pages/intel";
 
 // ─── Types ───────────────────────────────────────────────
-type TabId = "analytics" | "calendar" | "tradelog" | "thesis" | "copies" | "thesisanalytics";
+type TabId = "analytics" | "calendar" | "tradelog" | "thesis" | "copies" | "thesisanalytics" | "intel";
 
 interface DayGroup {
   pnl: number;
@@ -1975,6 +1976,7 @@ export default function TheLabPage() {
     { id: "calendar", label: "[ CALENDAR ]", short: "CAL" },
     { id: "tradelog", label: "[ TRADE LOG ]", short: "LOG" },
     { id: "thesis", label: "[ THESIS ]", short: "LAB" },
+    { id: "intel", label: "[ INTEL ]", short: "INTEL" },
     { id: "copies", label: "[ COPIES ]", short: "COPY" },
     { id: "thesisanalytics", label: "[ T-STATS ]", short: "TSTA" },
   ];
@@ -2022,6 +2024,7 @@ export default function TheLabPage() {
         {activeTab === "thesis" && <ThesisView />}
         {activeTab === "copies" && <CopiesView />}
         {activeTab === "thesisanalytics" && <ThesisAnalyticsView />}
+        {activeTab === "intel" && <IntelPage embedded />}
       </div>
     </div>
   );
