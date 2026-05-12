@@ -876,7 +876,7 @@ export default {
           });
           const algoBody = {
             symbol, algo_type: "POSITIONAL_TP_SL",
-            quantity,                  // position qty required at parent level
+            quantity: null,            // MUST be null for POSITIONAL_TP_SL — Orderly rejects any qty value
             trigger_price_type: "MARK_PRICE",
             child_orders: childOrders,
           };
@@ -971,7 +971,7 @@ export default {
       });
       const algoB = {
         symbol: sym2, algo_type: "POSITIONAL_TP_SL",
-        quantity: posQty,              // position qty required at parent level
+        quantity: null,                // MUST be null for POSITIONAL_TP_SL — Orderly rejects any qty value
         trigger_price_type: "MARK_PRICE",
         child_orders: childOrders2,
       };
