@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { usePrivateQuery, useAccount } from "@orderly.network/hooks";
 
 // ─── Constants ────────────────────────────────────────────────
 const REFRESH_INTERVAL = 60; // seconds
@@ -250,6 +251,16 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
   const [countdown,  setCountdown]  = useState(REFRESH_INTERVAL);
   const [timestamp,  setTimestamp]  = useState("");
 
+  // ── Live positions from Orderly (wallet must be connected) ──
+  const { state: accountState } = useAccount();
+  const { data: posData } = usePrivateQuery("/v1/positions", { revalidateOnFocus: false }) as { data: { rows?: any[] } | null };
+  const openPositions: any[] = (posData as any)?.rows ?? [];
+
+  const longNotional  = openPositions.filter(p => p.position_qty > 0).reduce((s: number, p: any) => s + Math.abs(p.position_value ?? p.position_qty * (p.mark_price ?? 0)), 0);
+  const shortNotional = openPositions.filter(p => p.position_qty < 0).reduce((s: number, p: any) => s + Math.abs(p.position_value ?? p.position_qty * (p.mark_price ?? 0)), 0);
+  const totalNotional = longNotional + shortNotional;
+  const portfolioLongPct: number | null = totalNotional > 0 ? Math.round((longNotional / totalNotional) * 100) : null;
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -473,7 +484,104 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
         </div>
       </Card>
 
-      {/* ── Main 3-col grid ─────────────────────────────────── */}
+      {/* ── Portfolio Context ──────────────────────────────────── */}
+      {portfolioLongPct !== null && accountState?.status === "SignedIn" && (() => {
+        const netLong   = portfolioLongPct;
+        const netShort  = 100 - netLong;
+        const regScore  = regime.score;
+        // Tension: regime direction vs your net exposure
+        const regimeBullish = regScore >= 54;
+        const regimeBearish = regScore <= 46;
+        const youLong  = netLong >= 60;
+        const youShort = netLong <= 40;
+        const crowdedLong  = signals.some(s => s.signal === "CROWDED LONGS");
+        const crowdedShort = signals.some(s => s.signal === "CROWDED SHORTS");
+
+        let tensionColor = YELLOW;
+        let tensionLabel = "ALIGNED";
+        let tensionMsg   = "Your exposure aligns with the current market regime. Stay disciplined.";
+
+        if (regimeBearish && youLong) {
+          tensionColor = RED;
+          tensionLabel = "RISK — REGIME BEARISH, YOU ARE LONG";
+          tensionMsg   = `Regime score ${regScore} signals bearish conditions. Your portfolio is ${netLong}% long. Tighten stops or reduce exposure.`;
+        } else if (regimeBullish && youShort) {
+          tensionColor = RED;
+          tensionLabel = "RISK — REGIME BULLISH, YOU ARE SHORT";
+          tensionMsg   = `Regime score ${regScore} signals bullish conditions. Your portfolio is ${netShort}% short. Watch for forced unwind.`;
+        } else if (crowdedLong && youLong && netLong >= 65) {
+          tensionColor = YELLOW;
+          tensionLabel = "CAUTION — CROWDED SIDE";
+          tensionMsg   = `You are ${netLong}% long and the market signal shows crowded longs. Squeeze risk elevated if price reverses.`;
+        } else if (crowdedShort && youShort && netLong <= 35) {
+          tensionColor = YELLOW;
+          tensionLabel = "CAUTION — CROWDED SIDE";
+          tensionMsg   = `You are ${netShort}% short and the market signal shows crowded shorts. Upside unwind risk if price rips.`;
+        } else if (regimeBullish && youLong) {
+          tensionColor = GREEN;
+          tensionLabel = "ALIGNED — REGIME CONFIRMS LONG BIAS";
+          tensionMsg   = `Regime score ${regScore} supports bullish positioning. Your ${netLong}% long exposure is with the trend.`;
+        } else if (regimeBearish && youShort) {
+          tensionColor = GREEN;
+          tensionLabel = "ALIGNED — REGIME CONFIRMS SHORT BIAS";
+          tensionMsg   = `Regime score ${regScore} supports bearish positioning. Your ${netShort}% short exposure is with the trend.`;
+        }
+
+        const longBarPct = Math.round(netLong);
+        return (
+          <Card style={{ marginBottom: "10px", border: `1px solid ${tensionColor === RED ? "rgba(245,97,139,0.25)" : tensionColor === GREEN ? "rgba(41,233,169,0.18)" : "rgba(255,209,70,0.15)"}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+              <SectionTitle style={{ marginBottom: 0 }}>// YOUR POSITION CONTEXT</SectionTitle>
+              <span style={{ color: tensionColor, fontSize: "10px", letterSpacing: "0.07em", fontWeight: 700 }}>{tensionLabel}</span>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "16px", marginBottom: "12px" }}>
+              {/* Net exposure bar */}
+              <div>
+                <div style={{ color: DIM, fontSize: "10px", marginBottom: "4px", letterSpacing: "0.06em" }}>NET EXPOSURE</div>
+                <div style={{ display: "flex", height: "8px", borderRadius: "2px", overflow: "hidden", gap: "1px", marginBottom: "4px" }}>
+                  <div style={{ flex: longBarPct, background: GREEN, opacity: 0.8 }} />
+                  <div style={{ flex: 100 - longBarPct, background: RED, opacity: 0.8 }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px" }}>
+                  <span style={{ color: GREEN }}>LONG {netLong}%</span>
+                  <span style={{ color: RED }}>SHORT {netShort}%</span>
+                </div>
+              </div>
+
+              {/* Position summary */}
+              <div>
+                <div style={{ color: DIM, fontSize: "10px", marginBottom: "4px", letterSpacing: "0.06em" }}>OPEN POSITIONS ({openPositions.length})</div>
+                <div style={{ fontSize: "12px", color: MUTED, lineHeight: 1.6 }}>
+                  {openPositions.length === 0
+                    ? <span style={{ color: DIM }}>No open positions</span>
+                    : openPositions.slice(0, 4).map((p: any) => {
+                        const sym  = (p.symbol as string).replace("PERP_","").replace("_USDC","");
+                        const dir  = p.position_qty > 0 ? "LONG" : "SHORT";
+                        const pnl  = p.unsettled_pnl ?? 0;
+                        const pnlC = pnl >= 0 ? GREEN : RED;
+                        return (
+                          <div key={p.symbol} style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
+                            <span style={{ color: BRIGHT }}>{sym}</span>
+                            <span style={{ color: dir === "LONG" ? GREEN : RED, fontSize: "10px" }}>{dir}</span>
+                            <span style={{ color: pnlC, marginLeft: "auto" }}>{pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} USDC</span>
+                          </div>
+                        );
+                      })
+                  }
+                </div>
+              </div>
+            </div>
+
+            {/* Tension message */}
+            <div style={{ padding: "8px 10px", background: "rgba(255,255,255,0.02)", borderLeft: `2px solid ${tensionColor}`, fontSize: "12px", color: MUTED, lineHeight: 1.5 }}>
+              {tensionMsg}
+            </div>
+          </Card>
+        );
+      })()}
+
+            {/* ── Main 3-col grid ─────────────────────────────────── */}
       <div style={grid3}>
 
         {/* ── Derivatives Intelligence ──────────────────────── */}
@@ -658,60 +766,52 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
         </div>
       </Card>
 
-            {/* ── Liquidations 24H ──────────────────────────────────── */}
+            {/* ── Long/Short Positioning ──────────────────────────────── */}
       <Card style={{ marginBottom: "10px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-          <SectionTitle style={{ marginBottom: 0 }}>// LIQUIDATIONS 24H</SectionTitle>
-          <span style={{ color: DIM, fontSize: "10px" }}>VIA BINANCE FUTURES</span>
+          <SectionTitle style={{ marginBottom: 0 }}>// LONG / SHORT POSITIONING</SectionTitle>
+          <span style={{ color: DIM, fontSize: "10px" }}>VIA BINANCE FUTURES GLOBAL RATIO</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "10px" }}>
           {(["BTC", "ETH", "SOL"] as const).map(sym => {
             const ls = lsRatios[sym] ?? null;
-            const status = ls === null ? "—" : ls > 1.35 ? "LONG FLUSH" : ls < 0.75 ? "SHORT SQUEEZE" : "BALANCED";
+            const status = ls === null ? "LOADING" : ls > 1.35 ? "LONG FLUSH" : ls < 0.75 ? "SHORT SQUEEZE" : "BALANCED";
             const sc = ls === null ? DIM : ls > 1.35 ? RED : ls < 0.75 ? GREEN : YELLOW;
-            const d = getDerivData(sym);
-            const oi = d?.oi ?? 0;
-            const longPct  = ls !== null ? Math.min(0.9, ls / (ls + 1)) : 0.5;
+            const longPct  = ls !== null ? Math.min(0.92, ls / (ls + 1)) : 0.5;
             const shortPct = 1 - longPct;
-            const liqRate  = status === "LONG FLUSH" ? 0.018 : status === "SHORT SQUEEZE" ? 0.016 : 0.006;
-            const totalLiq = oi * liqRate;
-            const longLiq  = totalLiq * (status === "LONG FLUSH" ? 0.75 : status === "SHORT SQUEEZE" ? 0.25 : 0.5);
-            const shortLiq = totalLiq - longLiq;
-            const fmtLiq   = (v: number) => v >= 1e9 ? `$${(v/1e9).toFixed(1)}B` : v >= 1e6 ? `$${(v/1e6).toFixed(0)}M` : `$${v.toFixed(0)}`;
+            const desc =
+              status === "LONG FLUSH"    ? "Longs dominant — elevated squeeze risk on reversal" :
+              status === "SHORT SQUEEZE" ? "Shorts dominant — watch for violent upside unwind"  :
+              status === "BALANCED"      ? "Positioning balanced — no clear crowding signal"    : "Fetching ratio…";
             return (
-              <div key={sym} style={{ padding: "10px 12px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                  <span style={{ color: BRIGHT, fontWeight: 700, fontSize: "13px" }}>{sym}</span>
-                  <span style={{ color: sc, fontSize: "10px", letterSpacing: "0.06em" }}>{status}</span>
+              <div key={sym} style={{ padding: "10px 12px", background: "rgba(255,255,255,0.02)", border: `1px solid ${ls === null ? "rgba(255,255,255,0.05)" : ls > 1.35 ? "rgba(245,97,139,0.15)" : ls < 0.75 ? "rgba(41,233,169,0.15)" : "rgba(255,255,255,0.06)"}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <span style={{ color: BRIGHT, fontWeight: 700, fontSize: "14px" }}>{sym}</span>
+                  <span style={{ color: sc, fontSize: "10px", letterSpacing: "0.07em", fontWeight: 700 }}>{status}</span>
                 </div>
-                <div style={{ marginBottom: "5px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
-                    <span style={{ color: DIM }}>LONGS</span>
-                    <span style={{ color: status === "LONG FLUSH" ? RED : MUTED }}>{oi > 0 ? fmtLiq(longLiq) : "—"}</span>
+
+                {/* L/S bar */}
+                <div style={{ marginBottom: "8px" }}>
+                  <div style={{ display: "flex", height: "6px", borderRadius: "2px", overflow: "hidden", gap: "1px" }}>
+                    <div style={{ flex: longPct, background: RED, opacity: ls !== null ? 0.75 : 0.2 }} />
+                    <div style={{ flex: shortPct, background: GREEN, opacity: ls !== null ? 0.75 : 0.2 }} />
                   </div>
-                  <div style={{ height: "3px", background: "rgba(255,255,255,0.06)", borderRadius: "1px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.round(longPct * 100)}%`, background: status === "LONG FLUSH" ? RED : GREEN, opacity: 0.8 }} />
-                  </div>
-                </div>
-                <div style={{ marginBottom: "6px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
-                    <span style={{ color: DIM }}>SHORTS</span>
-                    <span style={{ color: status === "SHORT SQUEEZE" ? GREEN : MUTED }}>{oi > 0 ? fmtLiq(shortLiq) : "—"}</span>
-                  </div>
-                  <div style={{ height: "3px", background: "rgba(255,255,255,0.06)", borderRadius: "1px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.round(shortPct * 100)}%`, background: status === "SHORT SQUEEZE" ? GREEN : RED, opacity: 0.8 }} />
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: "3px", fontSize: "10px" }}>
+                    <span style={{ color: RED }}>L {Math.round(longPct * 100)}%</span>
+                    <span style={{ color: GREEN }}>S {Math.round(shortPct * 100)}%</span>
                   </div>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: DIM, borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "5px" }}>
-                  <span>L/S {ls !== null ? ls.toFixed(2) : "—"}</span>
-                  <span style={{ color: MUTED }}>EST. {oi > 0 ? fmtLiq(totalLiq) : "—"} LIQ</span>
+
+                <div style={{ fontSize: "11px", color: DIM, lineHeight: 1.4 }}>{desc}</div>
+                <div style={{ marginTop: "6px", fontSize: "10px", color: MUTED }}>
+                  L/S RATIO: <span style={{ color: sc }}>{ls !== null ? ls.toFixed(3) : "—"}</span>
                 </div>
               </div>
             );
           })}
         </div>
-        <div style={{ color: DIM, fontSize: "10px", marginTop: "8px", letterSpacing: "0.05em" }}>
-          // EST. FROM OI × TYPICAL DAILY LIQ RATE · L/S FROM BINANCE FUTURES GLOBAL RATIO
+        <div style={{ color: DIM, fontSize: "10px", marginTop: "8px" }}>
+          // LONG FLUSH = longs crowded, squeeze risk. SHORT SQUEEZE = shorts crowded, unwind risk. BALANCED = no dominant bias.
         </div>
       </Card>
 
