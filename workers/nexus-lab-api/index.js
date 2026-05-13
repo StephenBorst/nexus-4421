@@ -1680,8 +1680,8 @@ export default {
       const VAULT_V   = "0x70fe7d65ac7c1a1732f64d2e6fc0e33622d0c991";
       const USDC_V    = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
       const CHAIN_V   = 42161;
-      // LayerZero cross-chain fee — same estimate as trading deposit
-      const LZ_FEE_V  = "10000000000000"; // 0.00001 ETH in wei
+      // LayerZero cross-chain fee — OmniVault needs more than trading deposit (true cross-chain msg)
+      const LZ_FEE_V  = "1000000000000000"; // 0.001 ETH in wei
       // nexus_trading broker hash (keccak256("nexus_trading"))
       const BROKER_HASH_V = "69729be60357fd58653e988388922e200193543b4328eda1b9b9bdaaef2f1a70";
       const BANKR_SUBMIT_V = "https://api.bankr.bot/wallet/submit";
