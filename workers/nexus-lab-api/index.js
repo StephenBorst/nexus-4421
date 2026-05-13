@@ -1758,6 +1758,44 @@ export default {
         }, request, 400);
       }
 
+      // Step 1.5 — simulate deposit via eth_call to capture revert reason before spending gas
+      try {
+        const simRes = await fetch(getArbRpc(env), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0", id: 99, method: "eth_call",
+            params: [{
+              from: walletNormV,
+              to: VAULT_V,
+              data: depositCalldataV,
+              value: "0x" + BigInt(lzFeeWei).toString(16),
+            }, "latest"],
+          }),
+        });
+        const simData = await simRes.json();
+        if (simData.error) {
+          // Decode string revert if present (0x08c379a0 prefix)
+          let reason = simData.error.message || "reverted";
+          const hex = simData.error.data || "";
+          if (hex.startsWith("0x08c379a0")) {
+            try {
+              const msgHex = hex.slice(10 + 64); // skip selector + offset
+              const msgLen = parseInt(hex.slice(10 + 64, 10 + 128), 16);
+              reason = Buffer.from(msgHex.slice(64, 64 + msgLen * 2), "hex").toString("utf8");
+            } catch (_) {}
+          }
+          return json({
+            ok: false, step: "simulate",
+            revert: reason,
+            revertHex: simData.error.data || null,
+            lzFeeWei, lzFeeEth: (Number(lzFeeWei) / 1e18).toFixed(6),
+            calldata: depositCalldataV,
+            hint: "Deposit would revert on-chain. Check revert/revertHex to diagnose.",
+          }, request, 400);
+        }
+      } catch (_) { /* simulation failed — proceed anyway */ }
+
       // Step 2 — deposit to vault with quoted LayerZero fee
       const depositResV = await fetch(BANKR_SUBMIT_V, {
         method: "POST",
