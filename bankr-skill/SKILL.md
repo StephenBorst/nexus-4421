@@ -62,6 +62,7 @@ Do NOT use relative paths. Do NOT prepend `/api/`. Do NOT use the app domain (`t
 | Action | Full URL | Auth |
 |---|---|---|
 | Place trade | `POST https://og.nexustradinglabs.com/trade` | walletSig |
+| Close position | `POST https://og.nexustradinglabs.com/close-position` | walletSig |
 | Attach SL/TP | `POST https://og.nexustradinglabs.com/set-sl-tp` | walletSig |
 | Cancel order | `POST https://og.nexustradinglabs.com/cancel` | walletSig |
 | Order status | `POST https://og.nexustradinglabs.com/order-status` | walletSig |

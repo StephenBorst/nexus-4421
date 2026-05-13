@@ -75,19 +75,35 @@ Full flow: sign_message → POST https://og.nexustradinglabs.com/trade → wait 
 
 ## Close a Position
 
-Send the opposite side at the same notional:
+**Preferred path — dedicated endpoint (auto-fetches qty, no margin required):**
 
 ```
-POST https://og.nexustradinglabs.com/trade
+POST https://og.nexustradinglabs.com/close-position
 {
-  "symbol":        "PERP_SOL_USDC",
-  "side":          "BUY",    // opposite of the open SELL position
-  "notional":      15,
-  "leverage":      5,
+  "symbol":        "PERP_BTC_USDC",   // or shorthand "BTC"
   "walletSig":     "<sig>",
   "walletAddress": "<wallet>"
 }
 ```
+
+Server looks up your open position size and direction, fires a `reduce_only: true` market order for the full qty on the opposite side. Returns `{ ok, symbol, closeSide, quantity, markPrice, entryPrice, unrealizedPnl }`.
+
+**Alternative — use `closePosition: true` flag on `/trade`:**
+
+```
+POST https://og.nexustradinglabs.com/trade
+{
+  "symbol":        "PERP_BTC_USDC",
+  "side":          "SELL",          // opposite of your open LONG
+  "notional":      50,              // approximate — server uses position qty
+  "leverage":      5,
+  "closePosition": true,            // skips margin check, sets reduce_only: true
+  "walletSig":     "<sig>",
+  "walletAddress": "<wallet>"
+}
+```
+
+⚠️ Do NOT send a plain SELL without `closePosition: true` — Orderly will treat it as a new short and require full margin.
 
 ---
 

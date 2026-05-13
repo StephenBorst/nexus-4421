@@ -736,7 +736,8 @@ export default {
         return "PERP_" + s + "_USDC";
       };
       const symbol    = normalizeSymbol(body.symbol);
-      const { side, notional, leverage = 1, orderType = "MARKET", walletSig, walletAddress, stopLoss, takeProfit } = body;
+      const { side, notional, leverage = 1, orderType = "MARKET", walletSig, walletAddress, stopLoss, takeProfit, reduceOnly = false, closePosition = false } = body;
+      const isReduceOnly = reduceOnly || closePosition;
 
       const ORDERLY_BASE = "https://api-evm.orderly.org";
       const PKCS8_HDR = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
@@ -824,8 +825,8 @@ export default {
         const validNotional = minNotional > 1 ? Math.floor(notional / minNotional) * minNotional : notional;
         const quantity      = Math.floor((validNotional / markPrice) * Math.round(1 / qtyStep)) / Math.round(1 / qtyStep);
 
-        // ── Minimum notional guard ────────────────────────────────────────────
-        if (validNotional < minNotional || quantity <= 0) {
+        // ── Minimum notional guard (skip for reduce-only — qty comes from position) ──
+        if (!isReduceOnly && (validNotional < minNotional || quantity <= 0)) {
           return json({
             error: "below_min_notional",
             notional: validNotional,
@@ -839,25 +840,29 @@ export default {
           return json({ error: "auth failed", detail: authCheck, hint: "key/secret mismatch" }, request, 401);
         }
 
-        // ── Margin check ─────────────────────────────────────────────────────
+        // ── Margin check (skip for reduce-only — closing never requires margin) ──
         const lev = Math.max(1, Number(leverage) || 1);
-        const holdingRows    = authCheck?.data?.holding ?? [];
-        const usdcHolding    = holdingRows.find(h => h.token === "USDC");
-        const freeCollateral = Number(usdcHolding?.holding ?? usdcHolding?.available ?? 0);
-        const requiredMargin = validNotional / lev;
-        if (freeCollateral > 0 && requiredMargin > freeCollateral * 0.95) {
-          return json({
-            error: "insufficient_margin",
-            freeCollateral,
-            requiredMargin,
-            hint: `Trade requires ~$${requiredMargin.toFixed(2)} margin at ${lev}x but only $${freeCollateral.toFixed(2)} free collateral available. Reduce size or add collateral via /proxy/bankr-deposit.`,
-          }, request, 400);
+        if (!isReduceOnly) {
+          const holdingRows    = authCheck?.data?.holding ?? [];
+          const usdcHolding    = holdingRows.find(h => h.token === "USDC");
+          const freeCollateral = Number(usdcHolding?.holding ?? usdcHolding?.available ?? 0);
+          const requiredMargin = validNotional / lev;
+          if (freeCollateral > 0 && requiredMargin > freeCollateral * 0.95) {
+            return json({
+              error: "insufficient_margin",
+              freeCollateral,
+              requiredMargin,
+              hint: `Trade requires ~$${requiredMargin.toFixed(2)} margin at ${lev}x but only $${freeCollateral.toFixed(2)} free collateral available. Reduce size or add collateral via /proxy/bankr-deposit.`,
+            }, request, 400);
+          }
         }
 
-        const leverageResult = await orderlyRequest("POST", "/v1/client/leverage", { leverage: lev });
-        const orderResult    = await orderlyRequest("POST", "/v1/order", {
+        const leverageResult = isReduceOnly ? null : await orderlyRequest("POST", "/v1/client/leverage", { leverage: lev });
+        const orderBody = {
           symbol, order_type: orderType.toUpperCase(), side: side.toUpperCase(), order_quantity: quantity,
-        });
+          ...(isReduceOnly && { reduce_only: true }),
+        };
+        const orderResult = await orderlyRequest("POST", "/v1/order", orderBody);
 
         // ── SL/TP via POSITIONAL_TP_SL algo order (optional) ───────────────────
         // Orderly requires child_orders array with CLOSE_POSITION type — NOT flat tp/sl fields.
@@ -979,6 +984,74 @@ export default {
       return json({ ok: algoRes?.success ?? false, symbol: sym2, stopLoss: sl, takeProfit: tp, quantity: posQty, closeSide: closeSide2, raw: algoRes }, request);
     }
 
+
+    // ── /close-position — close an open position at market price ────────────
+    // Looks up current position qty, fires reduce_only opposite-side market order.
+    // No margin check — closing never requires margin.
+    if (parts[0] === "close-position" && request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const { symbol: rawSym, walletSig: wSig3, walletAddress: wAddr3 } = body;
+      if (!rawSym) return json({ error: "symbol required" }, request, 400);
+
+      const normSym3 = (s) => {
+        s = s.toUpperCase().trim();
+        return s.startsWith("PERP_") ? s : "PERP_" + s + "_USDC";
+      };
+      const sym3 = normSym3(rawSym);
+
+      const OBASE3 = "https://api-evm.orderly.org";
+      const PKCS8_HDR3 = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
+      let acctId3, apiKey3, signKey3;
+
+      if (wSig3 && wAddr3) {
+        const walletNorm3 = wAddr3.toLowerCase().trim();
+        const userRaw3 = await env.LAB_STORE.get("user:" + walletNorm3);
+        if (!userRaw3) return json({ error: "wallet_not_registered" }, request, 401);
+        const rec3 = JSON.parse(userRaw3);
+        acctId3 = rec3.accountId; apiKey3 = rec3.orderlyKey;
+        const hex3 = wSig3.startsWith("0x") ? wSig3.slice(2) : wSig3;
+        const seed3 = new Uint8Array(await crypto.subtle.digest("SHA-256",
+          new Uint8Array(hex3.match(/.{2}/g).map(b => parseInt(b, 16)))));
+        const pk83 = new Uint8Array(48); pk83.set(PKCS8_HDR3, 0); pk83.set(seed3, 16);
+        signKey3 = await crypto.subtle.importKey("pkcs8", pk83, { name: "Ed25519" }, false, ["sign"]);
+      } else {
+        return json({ error: "walletSig and walletAddress required" }, request, 401);
+      }
+
+      const req3 = async (method, path, data) => {
+        const bs = data ? JSON.stringify(data) : undefined;
+        const ts3 = Date.now();
+        const mb3 = new TextEncoder().encode(ts3 + method.toUpperCase() + path + (bs || ""));
+        const sb3 = new Uint8Array(await crypto.subtle.sign("Ed25519", signKey3, mb3));
+        const b643 = btoa(String.fromCharCode(...sb3)).replace(/[+]/g,"-").replace(/[/]/g,"_").replace(/=+$/,"");
+        const h3 = { "Content-Type":"application/json", "orderly-timestamp":String(ts3),
+          "orderly-account-id":acctId3, "orderly-key":apiKey3, "orderly-signature":b643 };
+        return (await fetch(OBASE3 + path, { method, headers: h3, body: bs })).json();
+      };
+
+      // Fetch position to get qty and direction
+      const pd3 = await req3("GET", "/v1/positions", null);
+      const pos3 = (pd3?.data?.rows || []).find(p => p.symbol === sym3);
+      if (!pos3 || Number(pos3.position_qty) === 0) {
+        return json({ error: "no_open_position", symbol: sym3, hint: "No open position found for this symbol." }, request, 400);
+      }
+      const rawQty3 = Number(pos3.position_qty);
+      const closeQty = Math.abs(rawQty3);
+      const closeSide3 = rawQty3 > 0 ? "SELL" : "BUY"; // LONG→SELL, SHORT→BUY
+
+      const closeOrder = await req3("POST", "/v1/order", {
+        symbol: sym3, order_type: "MARKET", side: closeSide3,
+        order_quantity: closeQty, reduce_only: true,
+      });
+      return json({
+        ok: closeOrder?.success ?? false,
+        symbol: sym3, closeSide: closeSide3, quantity: closeQty,
+        markPrice: pos3.mark_price, entryPrice: pos3.average_open_price,
+        unrealizedPnl: pos3.unsettled_pnl,
+        raw: closeOrder,
+      }, request);
+    }
 
     // ── /mark-price — get current mark price for a symbol ───────────────────
     // Public endpoint, no auth required. Symbol: BTC, ETH, SOL, or PERP suffix.
