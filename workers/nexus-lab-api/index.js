@@ -1682,8 +1682,9 @@ export default {
       const CHAIN_V   = 42161;
       // LayerZero cross-chain fee — OmniVault needs more than trading deposit (true cross-chain msg)
       const LZ_FEE_V  = "1000000000000000"; // 0.001 ETH in wei
-      // nexus_trading broker hash (keccak256("nexus_trading"))
-      const BROKER_HASH_V = "69729be60357fd58653e988388922e200193543b4328eda1b9b9bdaaef2f1a70";
+      // bytes32(0) — no broker attribution. isAllowedBroker is for yield attribution only,
+      // not a deposit gate. Using zero avoids any broker-check revert.
+      const BROKER_HASH_V = "0000000000000000000000000000000000000000000000000000000000000000";
       const BANKR_SUBMIT_V = "https://api.bankr.bot/wallet/submit";
 
       function pad32V(hex) {

@@ -127,22 +127,11 @@ The **Orderly OmniVault** is separate from the trading account. It's a shared li
 
 **How to deposit (current path — direct to app):**
 
-Use `POST https://og.nexustradinglabs.com/proxy/vault-deposit`:
+⛔ **OmniVault API deposit is currently blocked.** The vault contract (`isAllowedBroker`) rejects `nexus_trading` — only Orderly-whitelisted brokers can call the deposit function directly. The `/proxy/vault-deposit` endpoint exists on the Worker but will revert at the broker check.
 
-```
-POST https://og.nexustradinglabs.com/proxy/vault-deposit
-{
-  "walletAddress": "<wallet>",
-  "bankrApiKey":   "<Bankr API key>",
-  "amount":        100
-}
-```
+**Direct users to:** https://app.orderly.network/vaults
 
-- Minimum: 10 USDC
-- Flow: approve USDC → `deposit((payloadType, receiver, token, amount, brokerHash))` + LayerZero fee (~0.00001 ETH)
-- Returns `{ ok, approveTxHash, depositTxHash, hint }`
-
-If the step: "deposit" fails with a fee error, the LayerZero fee may need adjustment — direct user to https://app.orderly.network/vaults as fallback.
+This requires Orderly to whitelist nexus_trading via `allowBroker()` on the vault contract. Once whitelisted, the `/proxy/vault-deposit` endpoint will work — minimum 10 USDC, 2-day lockup, 3-hour vault periods.
 
 **What to tell the user:**
 > "OmniVault lets you earn yield on your USDC by providing liquidity to the Orderly perp ecosystem. Minimum 10 USDC, 2-day lockup. I'll link you to the deposit page: https://app.orderly.network/vaults — connect your wallet there and the process is straightforward."
