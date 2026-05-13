@@ -1677,15 +1677,12 @@ export default {
         return json({ error: "minimum deposit is 10 USDC", minDeposit: 10 }, request, 400);
       }
 
-      const VAULT_V   = "0x70fe7d65ac7c1a1732f64d2e6fc0e33622d0c991";
-      const USDC_V    = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
-      const CHAIN_V   = 42161;
-      // LayerZero cross-chain fee — OmniVault needs more than trading deposit (true cross-chain msg)
-      const LZ_FEE_V  = "1000000000000000"; // 0.001 ETH in wei
-      // bytes32(0) — no broker attribution. isAllowedBroker is for yield attribution only,
-      // not a deposit gate. Using zero avoids any broker-check revert.
-      const BROKER_HASH_V = "0000000000000000000000000000000000000000000000000000000000000000";
+      const VAULT_V        = "0x70fe7d65ac7c1a1732f64d2e6fc0e33622d0c991";
+      const USDC_V         = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
+      const CHAIN_V        = 42161;
       const BANKR_SUBMIT_V = "https://api.bankr.bot/wallet/submit";
+      // bytes32(0) — unattributed deposit (isAllowedBroker is yield attribution only, not a gate)
+      const BROKER_HASH_V  = "0000000000000000000000000000000000000000000000000000000000000000";
 
       function pad32V(hex) {
         const h = hex.startsWith("0x") ? hex.slice(2) : hex;
@@ -1694,6 +1691,31 @@ export default {
 
       const walletNormV = walletAddress.toLowerCase().trim();
       const amountBigV  = BigInt(Math.round(Number(amount) * 1_000_000)); // USDC 6 decimals
+
+      // ── Quote exact LayerZero fee via quoteOperation(uint8,address,uint256) ─
+      // Selector 0xff6072f5. All static → inline encode. Call via Alchemy eth_call.
+      const quoteCd =
+        "0xff6072f5" +
+        pad32V("0") +                        // payloadType = 0 (LP)
+        pad32V(walletNormV.slice(2)) +       // receiver
+        pad32V(amountBigV.toString(16));     // amount
+
+      let lzFeeWei = "1000000000000000"; // 0.001 ETH fallback
+      try {
+        const quoteRes = await fetch(getArbRpc(env), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0", id: 1, method: "eth_call",
+            params: [{ to: VAULT_V, data: quoteCd }, "latest"],
+          }),
+        });
+        const quoteData = await quoteRes.json();
+        if (quoteData.result && quoteData.result !== "0x") {
+          // Returns uint256 fee in wei
+          lzFeeWei = BigInt(quoteData.result).toString();
+        }
+      } catch (_) { /* use fallback */ }
 
       // approve(vault, amount) — selector 0x095ea7b3
       const approveCalldataV =
@@ -1705,11 +1727,11 @@ export default {
       // All static types → encode inline, no offset pointers
       const depositCalldataV =
         "0x91ccaefd" +
-        pad32V("0") +                                   // payloadType = 0 (LP deposit)
+        pad32V("0") +                                   // payloadType = 0 (LP)
         pad32V(walletNormV.slice(2)) +                  // receiver
         pad32V(USDC_V.toLowerCase().slice(2)) +         // token (USDC on Arbitrum)
         pad32V(amountBigV.toString(16)) +               // amount
-        BROKER_HASH_V;                                  // brokerHash (already 64 hex = 32 bytes)
+        BROKER_HASH_V;                                  // brokerHash bytes32(0)
 
       const bankrHdrsV = { "X-API-Key": bankrApiKey, "Content-Type": "application/json" };
 
@@ -1736,12 +1758,12 @@ export default {
         }, request, 400);
       }
 
-      // Step 2 — deposit to vault with LayerZero fee
+      // Step 2 — deposit to vault with quoted LayerZero fee
       const depositResV = await fetch(BANKR_SUBMIT_V, {
         method: "POST",
         headers: bankrHdrsV,
         body: JSON.stringify({
-          transaction: { to: VAULT_V, chainId: CHAIN_V, value: LZ_FEE_V, data: depositCalldataV },
+          transaction: { to: VAULT_V, chainId: CHAIN_V, value: lzFeeWei, data: depositCalldataV },
           description: `Deposit ${amount} USDC into Orderly OmniVault`,
           waitForConfirmation: true,
         }),
@@ -1760,6 +1782,8 @@ export default {
       return json({
         ok: true,
         amount,
+        lzFeeWei,
+        lzFeeEth: (Number(lzFeeWei) / 1e18).toFixed(6),
         approveTxHash: approveDataV.txHash || approveDataV.transactionHash,
         depositTxHash: depositDataV.txHash || depositDataV.transactionHash,
         hint: "Deposited to Orderly OmniVault. 2-day lockup from start of current vault period (3-hour periods). Track at https://app.orderly.network/vaults",
