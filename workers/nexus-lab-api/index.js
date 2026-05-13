@@ -1053,6 +1053,101 @@ export default {
       }, request);
     }
 
+    // ── /proxy/thesis-register — register a thesis on ThesisRegistry (Arbitrum) ─
+    // ABI-encodes registerThesis() and submits via Bankr /wallet/submit.
+    // Selector: 0xce4d0f18 = keccak256("registerThesis(string,uint8,uint256,uint256,uint256,uint256,uint256,bool,string)")
+    // Price scaling: 1e6 (e.g. $65000.50 → 65000500000). RR scaling: 1e4.
+    if (parts[0] === "proxy" && parts[1] === "thesis-register" && request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const { walletAddress, bankrApiKey, symbol: rawSym, direction, entryPrice, stopLoss, takeProfit1, takeProfit2 = 0, isPublic = true, notes = "" } = body;
+      if (!walletAddress || !bankrApiKey || !rawSym || !direction || !entryPrice || !stopLoss || !takeProfit1) {
+        return json({ error: "missing required fields: walletAddress, bankrApiKey, symbol, direction, entryPrice, stopLoss, takeProfit1" }, request, 400);
+      }
+
+      const THESIS_REGISTRY = "0x2F4EdA890f96a7979d6f26bCB210cEDAD68346Bc";
+      const CHAIN_ID = 42161; // Arbitrum One
+
+      const normSym = (s) => { s = s.toUpperCase().trim(); return s.startsWith("PERP_") ? s : "PERP_" + s + "_USDC"; };
+      const sym = normSym(rawSym);
+      const dirEnum = direction.toUpperCase() === "LONG" ? 0 : 1;
+
+      // Price encoding: 1e6 (contract uses 6 decimal scaling)
+      const scale = (v) => BigInt(Math.round(Number(v) * 1_000_000));
+      const entryScaled = scale(entryPrice);
+      const slScaled    = scale(stopLoss);
+      const tp1Scaled   = scale(takeProfit1);
+      const tp2Scaled   = scale(takeProfit2);
+
+      // Risk-reward: |tp1 - entry| / |entry - sl|, scaled by 1e4
+      const rrRaw = Math.abs(Number(takeProfit1) - Number(entryPrice)) / Math.abs(Number(entryPrice) - Number(stopLoss));
+      const rrScaled = BigInt(Math.round(rrRaw * 10_000));
+
+      // ── ABI encode registerThesis(string,uint8,uint256,uint256,uint256,uint256,uint256,bool,string) ──
+      const enc = new TextEncoder();
+      const symBytes   = enc.encode(sym);
+      const notesBytes = enc.encode(notes);
+
+      const padTo32bytes = (bytes) => {
+        const padLen = Math.ceil(Math.max(bytes.length, 1) / 32) * 32;
+        const out = new Uint8Array(padLen); out.set(bytes); return out;
+      };
+      const toBE32 = (val) => {
+        const b = new Uint8Array(32);
+        let v = typeof val === 'bigint' ? val : BigInt(val);
+        for (let i = 31; i >= 0; i--) { b[i] = Number(v & 0xffn); v >>= 8n; }
+        return b;
+      };
+
+      const symPadded   = padTo32bytes(symBytes);
+      const notesPadded = padTo32bytes(notesBytes.length ? notesBytes : new Uint8Array(0));
+
+      const HEAD = 9 * 32; // 288 bytes — 9 params
+      const offsetSym   = HEAD;
+      const offsetNotes = HEAD + 32 + symPadded.length; // after symbol length + symbol data
+
+      const parts_enc = [
+        new Uint8Array([0xce, 0x4d, 0x0f, 0x18]), // selector
+        toBE32(offsetSym),
+        toBE32(dirEnum),
+        toBE32(entryScaled),
+        toBE32(slScaled),
+        toBE32(tp1Scaled),
+        toBE32(tp2Scaled),
+        toBE32(rrScaled),
+        toBE32(isPublic ? 1 : 0),
+        toBE32(offsetNotes),
+        toBE32(symBytes.length),
+        symPadded,
+        toBE32(notesBytes.length),
+        ...(notesBytes.length ? [notesPadded] : [new Uint8Array(32)]),
+      ];
+
+      const totalLen = parts_enc.reduce((s, p) => s + p.length, 0);
+      const calldata = new Uint8Array(totalLen);
+      let off = 0;
+      for (const p of parts_enc) { calldata.set(p, off); off += p.length; }
+      const calldataHex = "0x" + Array.from(calldata).map(b => b.toString(16).padStart(2,"0")).join("");
+
+      // Submit via Bankr /wallet/submit
+      const bankrRes = await fetch("https://api.bankr.bot/wallet/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": bankrApiKey },
+        body: JSON.stringify({
+          to: THESIS_REGISTRY,
+          data: calldataHex,
+          value: "0x0",
+          chainId: CHAIN_ID,
+        }),
+      });
+      const bankrData = await bankrRes.json();
+      if (!bankrData?.txHash && !bankrData?.hash) {
+        return json({ error: "bankr_submit_failed", detail: bankrData }, request, 502);
+      }
+      const txHash = bankrData.txHash || bankrData.hash;
+      return json({ ok: true, txHash, symbol: sym, direction: direction.toUpperCase(), entryPrice, stopLoss, takeProfit1, takeProfit2, isPublic, notes, riskReward: Math.round(rrRaw * 100) / 100, hint: "Parse ThesisRegistered event from tx receipt to get onChainId." }, request);
+    }
+
     // ── /mark-price — get current mark price for a symbol ───────────────────
     // Public endpoint, no auth required. Symbol: BTC, ETH, SOL, or PERP suffix.
     // Returns { symbol, markPrice, indexPrice, lastPrice }

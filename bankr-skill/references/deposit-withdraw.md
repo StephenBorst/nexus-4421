@@ -127,9 +127,11 @@ The **Orderly OmniVault** is separate from the trading account. It's a shared li
 
 **How to deposit (current path — direct to app):**
 
+⛔ **There is NO API endpoint for OmniVault deposit on this Worker.** Do NOT attempt to call `/omnivault/deposit`, `/vault/deposit`, or any variant — these routes do not exist and will 404. Do NOT try to ABI-encode a vault deposit call manually. The OmniVault contract uses LayerZero cross-chain messaging with no publicly documented ABI.
+
 Direct the user to: https://app.orderly.network/vaults
 
-This is a direct smart contract interaction — Bankr agent automation for OmniVault is not yet wired up on Nexus. Advise the user to connect their wallet on the Orderly app and deposit there.
+Advise the user to connect their wallet on the Orderly app and deposit there.
 
 **What to tell the user:**
 > "OmniVault lets you earn yield on your USDC by providing liquidity to the Orderly perp ecosystem. Minimum 10 USDC, 2-day lockup. I'll link you to the deposit page: https://app.orderly.network/vaults — connect your wallet there and the process is straightforward."

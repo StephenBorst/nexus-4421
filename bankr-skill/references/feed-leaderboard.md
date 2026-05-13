@@ -69,7 +69,7 @@ getTraderStats(address trader) → (wins, losses, activeTrades)
 getThesis(uint256 thesisId) → ThesisData
 ```
 
-Price encoding: `Math.round(price * 1e8)` — e.g. BTC at $65,432.10 → `6543210000000`
+Price encoding: `Math.round(price * 1e6)` — e.g. BTC at $65,432.10 → `65432100000` (contract uses 6 decimal scaling, NOT 8)
 
 Events: `ThesisRegistered(thesisId, trader, symbol)`, `ThesisClosed(thesisId, trader, outcome)`
 
@@ -93,11 +93,25 @@ Events: `ThesisRegistered(thesisId, trader, symbol)`, `ThesisClosed(thesisId, tr
 
 ## Publish a Thesis On-Chain
 
-1. User must have MetaMask / EIP-1193 wallet connected
-2. Call `registerThesis()` on ThesisRegistry with encoded levels
-3. Parse `ThesisRegistered` event from tx receipt → get `thesisId`
-4. Store `onChainId` + `onChainTxHash` on the thesis object
-5. `PUT /lab/:wallet` to persist
+Use `POST https://og.nexustradinglabs.com/proxy/thesis-register` — the Worker handles ABI encoding and Bankr submission. Pass raw USD prices; server scales automatically.
+
+```
+POST https://og.nexustradinglabs.com/proxy/thesis-register
+{
+  "walletAddress": "<wallet>",
+  "bankrApiKey":   "<Bankr API key>",
+  "symbol":        "PERP_BTC_USDC",
+  "direction":     "LONG",
+  "entryPrice":    65000.50,
+  "stopLoss":      62000,
+  "takeProfit1":   70000,
+  "takeProfit2":   0,
+  "isPublic":      true,
+  "notes":         "BTC breakout thesis"
+}
+```
+
+Returns `{ ok, txHash, riskReward, hint }`. Parse `ThesisRegistered` event from the tx receipt to get `onChainId`, then `PUT https://og.nexustradinglabs.com/lab/:wallet` to store `onChainId` + `txHash` on the thesis.
 
 ---
 
