@@ -422,7 +422,7 @@ function FeedCard({
   following: Set<string>;
   onFollowToggle: (wallet: string) => void;
 }) {
-  const cfg = STATUS_CONFIG[thesis.status];
+  const cfg = STATUS_CONFIG[thesis.status] ?? STATUS_CONFIG.ACTIVE;
   const shortAddr = `${thesis.wallet.slice(0, 6)}…${thesis.wallet.slice(-4)}`;
   const ticker = thesis.symbol.replace("PERP_", "").replace("_USDC", "");
   const isOwnThesis = walletAddress?.toLowerCase() === thesis.wallet.toLowerCase();
@@ -947,7 +947,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                 {traderTheses.length === 0 ? (
                   <div style={{ fontFamily: "monospace", fontSize: 10, color: "#2a4a3a" }}>no theses</div>
                 ) : traderTheses.map((t) => {
-                  const cfg = STATUS_CONFIG[t.status];
+                  const cfg = STATUS_CONFIG[t.status] ?? STATUS_CONFIG.ACTIVE;
                   const ticker = t.symbol.replace("PERP_", "").replace("_USDC", "");
                   return (
                     <div key={t.id} style={{
