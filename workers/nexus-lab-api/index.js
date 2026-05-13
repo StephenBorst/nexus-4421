@@ -1100,11 +1100,13 @@ export default {
       };
 
       const symPadded   = padTo32bytes(symBytes);
-      const notesPadded = padTo32bytes(notesBytes.length ? notesBytes : new Uint8Array(0));
+      // notesPadded only used when notes is non-empty; empty string = length 0 + no data bytes
+      const notesPadded = notesBytes.length ? padTo32bytes(notesBytes) : null;
 
       const HEAD = 9 * 32; // 288 bytes — 9 params
       const offsetSym   = HEAD;
-      const offsetNotes = HEAD + 32 + symPadded.length; // after symbol length + symbol data
+      // offsetNotes: after selector-less HEAD + sym length word + sym data
+      const offsetNotes = HEAD + 32 + symPadded.length;
 
       const parts_enc = [
         new Uint8Array([0xce, 0x4d, 0x0f, 0x18]), // selector
@@ -1117,10 +1119,10 @@ export default {
         toBE32(rrScaled),
         toBE32(isPublic ? 1 : 0),
         toBE32(offsetNotes),
-        toBE32(symBytes.length),
-        symPadded,
-        toBE32(notesBytes.length),
-        ...(notesBytes.length ? [notesPadded] : [new Uint8Array(32)]),
+        toBE32(symBytes.length),   // symbol: length word
+        symPadded,                 // symbol: padded data
+        toBE32(notesBytes.length), // notes: length word (0 if empty)
+        ...(notesPadded ? [notesPadded] : []), // notes: padded data (omit if empty)
       ];
 
       const totalLen = parts_enc.reduce((s, p) => s + p.length, 0);
@@ -1132,19 +1134,18 @@ export default {
       // Submit via Bankr /wallet/submit
       const bankrRes = await fetch("https://api.bankr.bot/wallet/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": bankrApiKey },
+        headers: { "X-API-Key": bankrApiKey, "Content-Type": "application/json" },
         body: JSON.stringify({
-          to: THESIS_REGISTRY,
-          data: calldataHex,
-          value: "0x0",
-          chainId: CHAIN_ID,
+          transaction: { to: THESIS_REGISTRY, chainId: CHAIN_ID, value: "0", data: calldataHex },
+          description: `Register ${direction.toUpperCase()} thesis for ${sym} on ThesisRegistry`,
+          waitForConfirmation: true,
         }),
       });
       const bankrData = await bankrRes.json();
-      if (!bankrData?.txHash && !bankrData?.hash) {
+      if (!bankrData?.success) {
         return json({ error: "bankr_submit_failed", detail: bankrData }, request, 502);
       }
-      const txHash = bankrData.txHash || bankrData.hash;
+      const txHash = bankrData.txHash || bankrData?.transaction?.hash || bankrData.hash;
       return json({ ok: true, txHash, symbol: sym, direction: direction.toUpperCase(), entryPrice, stopLoss, takeProfit1, takeProfit2, isPublic, notes, riskReward: Math.round(rrRaw * 100) / 100, hint: "Parse ThesisRegistered event from tx receipt to get onChainId." }, request);
     }
 
