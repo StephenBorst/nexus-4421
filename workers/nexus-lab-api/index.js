@@ -1146,7 +1146,41 @@ export default {
         return json({ error: "bankr_submit_failed", detail: bankrData }, request, 502);
       }
       const txHash = bankrData.txHash || bankrData?.transaction?.hash || bankrData.hash;
-      return json({ ok: true, txHash, symbol: sym, direction: direction.toUpperCase(), entryPrice, stopLoss, takeProfit1, takeProfit2, isPublic, notes, riskReward: Math.round(rrRaw * 100) / 100, hint: "Parse ThesisRegistered event from tx receipt to get onChainId." }, request);
+
+      // Write thesis to KV so it shows in /feed immediately
+      const walletNormTR = walletAddress.toLowerCase().trim();
+      const labKeyTR = `lab:${walletNormTR}`;
+      const existingRawTR = await env.LAB_STORE.get(labKeyTR);
+      const existingDataTR = existingRawTR ? JSON.parse(existingRawTR) : { theses: [] };
+      const rrFinal = Math.round(rrRaw * 100) / 100;
+      const newThesis = {
+        id: crypto.randomUUID(),
+        symbol: sym,
+        direction: direction.toUpperCase(),
+        entryPrice: Number(entryPrice),
+        stopLoss: Number(stopLoss),
+        takeProfit1: Number(takeProfit1),
+        takeProfit2: Number(takeProfit2),
+        riskPercent: 0,
+        accountSize: 0,
+        fundingRate: 0,
+        notes: notes || "",
+        createdAt: Date.now(),
+        positionSize: 0,
+        leverage: 0,
+        riskReward: rrFinal,
+        fundingCost8h: 0,
+        fundingCost24h: 0,
+        fundingCost72h: 0,
+        status: "ACTIVE",
+        actualPnl: null,
+        isPublic: isPublic !== false,
+        onChainTxHash: txHash,
+      };
+      existingDataTR.theses = [newThesis, ...(existingDataTR.theses || [])];
+      await env.LAB_STORE.put(labKeyTR, JSON.stringify(existingDataTR));
+
+      return json({ ok: true, txHash, thesisId: newThesis.id, symbol: sym, direction: direction.toUpperCase(), entryPrice, stopLoss, takeProfit1, takeProfit2, isPublic, notes, riskReward: rrFinal, hint: "Thesis registered on-chain and indexed in /feed. Parse ThesisRegistered event from txHash to get onChainId." }, request);
     }
 
     // ── /mark-price — get current mark price for a symbol ───────────────────

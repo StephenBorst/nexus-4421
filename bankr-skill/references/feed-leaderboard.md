@@ -111,7 +111,7 @@ POST https://og.nexustradinglabs.com/proxy/thesis-register
 }
 ```
 
-Returns `{ ok, txHash, riskReward, hint }`. Parse `ThesisRegistered` event from the tx receipt to get `onChainId`, then `PUT https://og.nexustradinglabs.com/lab/:wallet` to store `onChainId` + `txHash` on the thesis.
+Returns `{ ok, txHash, thesisId, riskReward, hint }`. The thesis is automatically indexed in `/feed` — no separate PUT required. `thesisId` is the KV record ID. `txHash` links to Arbiscan. To also capture the on-chain `onChainId` (ThesisRegistry's integer ID), parse the `ThesisRegistered` event from the tx receipt.
 
 ---
 
