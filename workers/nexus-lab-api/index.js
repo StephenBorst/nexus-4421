@@ -192,7 +192,12 @@ function buildThesisOgSvg({ displayName, wallet, ticker, direction, entryPrice, 
 }
 
 // ── Ph17: On-chain wallet discovery ──────────────────────────────────────────
-const ARB_RPC = "https://arb1.arbitrum.io/rpc";
+// ARB_RPC resolved at runtime — Alchemy if ALCHEMY_KEY secret set, public RPC fallback
+function getArbRpc(env) {
+  return env.ALCHEMY_KEY
+    ? `https://arb-mainnet.g.alchemy.com/v2/${env.ALCHEMY_KEY}`
+    : "https://arb1.arbitrum.io/rpc";
+}
 const THESIS_REGISTRY = "0x2f4eda890f96a7979d6f26bcb210cedad68346bc";
 const ONCHAIN_CACHE_KEY = "cache:onchain-wallets";
 const ONCHAIN_TTL_MS = 5 * 60 * 1000; // 5 min
@@ -206,6 +211,8 @@ async function getOnChainWallets(env) {
       return { wallets: parsed.wallets, fromCache: true };
     }
   }
+
+  const ARB_RPC = getArbRpc(env);
 
   try {
     // Get latest block
@@ -1456,7 +1463,7 @@ export default {
       // Orderly vault constants (Arbitrum One)
       const VAULT    = "0x816f722424B49Cf1275cc86DA9840Fbd5a6167e9";
       const USDC     = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
-      const ARB_RPC  = "https://arb1.arbitrum.io/rpc";
+      const ARB_RPC  = getArbRpc(env);
 
       // Pre-computed hashes via solidityPackedKeccak256(["string"], [input])
       const BROKER_HASH = "69729be60357fd58653e988388922e200193543b4328eda1b9b9bdaaef2f1a70";
