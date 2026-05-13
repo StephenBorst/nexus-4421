@@ -71,6 +71,7 @@ Do NOT use relative paths. Do NOT prepend `/api/`. Do NOT use the app domain (`t
 | Balance | `POST https://og.nexustradinglabs.com/balance` | walletSig |
 | Set leverage | `POST https://og.nexustradinglabs.com/set-leverage` | walletSig |
 | Deposit USDC | `POST https://og.nexustradinglabs.com/proxy/bankr-deposit` | Bankr API key |
+| OmniVault deposit | `POST https://og.nexustradinglabs.com/proxy/vault-deposit` | Bankr API key |
 | Withdraw USDC | `POST https://og.nexustradinglabs.com/proxy/bankr-withdraw` | Bankr API key + walletSig |
 | Settle PnL | `POST https://og.nexustradinglabs.com/settle-pnl` | walletSig |
 | Register wallet | `POST https://og.nexustradinglabs.com/proxy/bankr-register` | Bankr API key |

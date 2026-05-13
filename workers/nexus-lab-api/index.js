@@ -1662,6 +1662,109 @@ export default {
       }
     }
 
+    // ── /proxy/vault-deposit — deposit USDC into Orderly OmniVault ──────────────
+    // Contract: 0x70fe7d65ac7c1a1732f64d2e6fc0e33622d0c991 (Arbitrum One, ERC1967 proxy)
+    // Flow: approve USDC → deposit((payloadType,receiver,token,amount,brokerHash)) + LZ fee
+    // Selector: 0x91ccaefd  payloadType: 0 = LP (standard user)
+    if (parts[0] === "proxy" && parts[1] === "vault-deposit" && request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const { walletAddress, bankrApiKey, amount } = body;
+      if (!walletAddress || !bankrApiKey || !amount) {
+        return json({ error: "walletAddress, bankrApiKey, and amount (USDC) required" }, request, 400);
+      }
+      if (Number(amount) < 10) {
+        return json({ error: "minimum deposit is 10 USDC", minDeposit: 10 }, request, 400);
+      }
+
+      const VAULT_V   = "0x70fe7d65ac7c1a1732f64d2e6fc0e33622d0c991";
+      const USDC_V    = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
+      const CHAIN_V   = 42161;
+      // LayerZero cross-chain fee — same estimate as trading deposit
+      const LZ_FEE_V  = "10000000000000"; // 0.00001 ETH in wei
+      // nexus_trading broker hash (keccak256("nexus_trading"))
+      const BROKER_HASH_V = "69729be60357fd58653e988388922e200193543b4328eda1b9b9bdaaef2f1a70";
+      const BANKR_SUBMIT_V = "https://api.bankr.bot/wallet/submit";
+
+      function pad32V(hex) {
+        const h = hex.startsWith("0x") ? hex.slice(2) : hex;
+        return h.padStart(64, "0");
+      }
+
+      const walletNormV = walletAddress.toLowerCase().trim();
+      const amountBigV  = BigInt(Math.round(Number(amount) * 1_000_000)); // USDC 6 decimals
+
+      // approve(vault, amount) — selector 0x095ea7b3
+      const approveCalldataV =
+        "0x095ea7b3" +
+        pad32V(VAULT_V.slice(2)) +
+        pad32V(amountBigV.toString(16));
+
+      // deposit((uint8 payloadType, address receiver, address token, uint256 amount, bytes32 brokerHash))
+      // All static types → encode inline, no offset pointers
+      const depositCalldataV =
+        "0x91ccaefd" +
+        pad32V("0") +                                   // payloadType = 0 (LP deposit)
+        pad32V(walletNormV.slice(2)) +                  // receiver
+        pad32V(USDC_V.toLowerCase().slice(2)) +         // token (USDC on Arbitrum)
+        pad32V(amountBigV.toString(16)) +               // amount
+        BROKER_HASH_V;                                  // brokerHash (already 64 hex = 32 bytes)
+
+      const bankrHdrsV = { "X-API-Key": bankrApiKey, "Content-Type": "application/json" };
+
+      // Step 1 — approve USDC to vault
+      const approveResV = await fetch(BANKR_SUBMIT_V, {
+        method: "POST",
+        headers: bankrHdrsV,
+        body: JSON.stringify({
+          transaction: { to: USDC_V, chainId: CHAIN_V, value: "0", data: approveCalldataV },
+          description: `Approve ${amount} USDC to Orderly OmniVault`,
+          waitForConfirmation: true,
+        }),
+      });
+      const approveDataV = await approveResV.json();
+      if (!approveDataV?.success) {
+        const isBlocked = approveResV.status === 403 || String(approveDataV?.error ?? "").includes("recipient");
+        return json({
+          ok: false, step: "approve",
+          error: approveDataV?.error ?? "approve_failed",
+          hint: isBlocked
+            ? "Bankr key has allowedRecipients set — clear it at bankr.bot/api then retry."
+            : "USDC approval failed. Check ETH balance on Arbitrum.",
+          raw: approveDataV,
+        }, request, 400);
+      }
+
+      // Step 2 — deposit to vault with LayerZero fee
+      const depositResV = await fetch(BANKR_SUBMIT_V, {
+        method: "POST",
+        headers: bankrHdrsV,
+        body: JSON.stringify({
+          transaction: { to: VAULT_V, chainId: CHAIN_V, value: LZ_FEE_V, data: depositCalldataV },
+          description: `Deposit ${amount} USDC into Orderly OmniVault`,
+          waitForConfirmation: true,
+        }),
+      });
+      const depositDataV = await depositResV.json();
+      if (!depositDataV?.success) {
+        return json({
+          ok: false, step: "deposit",
+          error: depositDataV?.error ?? "deposit_failed",
+          hint: "Approve succeeded but deposit failed. Wallet needs ~0.00001 ETH for LayerZero fee. If fee error, try increasing payable ETH.",
+          approveTxHash: approveDataV.txHash || approveDataV.transactionHash,
+          raw: depositDataV,
+        }, request, 400);
+      }
+
+      return json({
+        ok: true,
+        amount,
+        approveTxHash: approveDataV.txHash || approveDataV.transactionHash,
+        depositTxHash: depositDataV.txHash || depositDataV.transactionHash,
+        hint: "Deposited to Orderly OmniVault. 2-day lockup from start of current vault period (3-hour periods). Track at https://app.orderly.network/vaults",
+      }, request);
+    }
+
     // ── /set-leverage — set account-level max leverage ──────────────────────────
     // POST { walletAddress, walletSig, leverage }
     // leverage: integer 1–100. Sets the account-wide max leverage on Orderly.
