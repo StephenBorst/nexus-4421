@@ -361,6 +361,48 @@ export default {
       return json(result, request);
     }
 
+    // ── /account-snapshot — read positions+orders using stored seed (no walletSig) ─
+    if (parts[0] === "account-snapshot" && request.method === "GET") {
+      const asWallet = url.searchParams.get("wallet");
+      if (!asWallet) return json({ error: "wallet required" }, request, 400);
+      const asNorm = asWallet.toLowerCase().trim();
+      const asRaw = await env.LAB_STORE.get("user:" + asNorm);
+      if (!asRaw) return json({ error: "wallet_not_registered", hint: "Use the Nexus Bankr skill to register." }, request, 404);
+      const asRec = JSON.parse(asRaw);
+      if (!asRec.seed) return json({ error: "session_not_cached", hint: "Run any Nexus command via the Bankr agent (e.g. check balance) to activate." }, request, 403);
+      const AS_HDR = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
+      const asSeedBytes = new Uint8Array(asRec.seed.match(/.{2}/g).map(b => parseInt(b,16)));
+      const asPk8 = new Uint8Array(48); asPk8.set(AS_HDR,0); asPk8.set(asSeedBytes,16);
+      const asSk = await crypto.subtle.importKey("pkcs8", asPk8, { name:"Ed25519" }, false, ["sign"]);
+      const asSign = async (method, path) => {
+        const ts = Date.now();
+        const msg = new TextEncoder().encode(ts + method + path);
+        const s = new Uint8Array(await crypto.subtle.sign("Ed25519", asSk, msg));
+        const b64 = btoa(String.fromCharCode(...s)).replace(/[+]/g,"-").replace(/[/]/g,"_").replace(/=+$/,"");
+        return { "orderly-timestamp": String(ts), "orderly-account-id": asRec.accountId, "orderly-key": asRec.orderlyKey, "orderly-signature": b64 };
+      };
+      const [posFetch, ordFetch] = await Promise.all([
+        fetch("https://api-evm.orderly.org/v1/positions", { headers: await asSign("GET", "/v1/positions") }),
+        fetch("https://api-evm.orderly.org/v1/orders?size=100&page=1", { headers: await asSign("GET", "/v1/orders?size=100&page=1") }),
+      ]);
+      const [posJson, ordJson] = await Promise.all([posFetch.json(), ordFetch.json()]);
+      const positions = (posJson?.data?.rows ?? []).map(p => ({
+        symbol: p.symbol, side: p.position_qty > 0 ? "LONG" : "SHORT",
+        size: Math.abs(p.position_qty), entryPrice: p.average_open_price,
+        markPrice: p.mark_price, unrealizedPnl: p.unrealized_pnl,
+        liquidationPrice: p.est_liq_price, leverage: p.leverage,
+        fundingRate: p.last_funding_rate,
+      }));
+      const orders = (ordJson?.data?.rows ?? []).map(o => ({
+        orderId: o.order_id, symbol: o.symbol, side: o.side, type: o.type,
+        status: o.status, price: o.price, quantity: o.quantity,
+        executedQty: o.executed, avgPrice: o.average_executed_price,
+        fee: o.total_fee, feeCurrency: o.fee_asset, realizedPnl: o.realized_pnl,
+        createdAt: o.created_time, updatedAt: o.updated_time,
+      }));
+      return json({ positions, orders, wallet: asNorm }, request);
+    }
+
     // ── Ph22: /og/thesis/:wallet/:id(.png)? → thesis OG image ─
     if (parts[0] === "og" && parts[1] === "thesis" && parts[2] && parts[3]) {
       if (request.method !== "GET") return new Response("method not allowed", { status: 405 });
@@ -1281,6 +1323,10 @@ export default {
       const ohseed = new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(ohhex.match(/.{1,2}/g).map(b => parseInt(b, 16)))));
       const ohpk8  = new Uint8Array(48); ohpk8.set(OHHDR, 0); ohpk8.set(ohseed, 16);
       const ohsk   = await crypto.subtle.importKey("pkcs8", ohpk8, { name: "Ed25519" }, false, ["sign"]);
+      if (!ohrec.seed) {
+        const _ohSeedHex = [...ohseed].map(b => b.toString(16).padStart(2,"0")).join("");
+        await env.LAB_STORE.put("user:" + ohNorm, JSON.stringify({ ...ohrec, seed: _ohSeedHex }));
+      }
       const ohsign = async (method, path) => {
         const ts  = Date.now();
         const msg = new TextEncoder().encode(ts + method + path);
@@ -1428,6 +1474,10 @@ export default {
         new Uint8Array(phex.match(/.{1,2}/g).map(b => parseInt(b, 16)))));
       const ppk8  = new Uint8Array(48); ppk8.set(PHDR, 0); ppk8.set(pseed, 16);
       const psk   = await crypto.subtle.importKey("pkcs8", ppk8, { name: "Ed25519" }, false, ["sign"]);
+      if (!urec.seed) {
+        const _pSeedHex = [...pseed].map(b => b.toString(16).padStart(2,"0")).join("");
+        await env.LAB_STORE.put("user:" + wNorm, JSON.stringify({ ...urec, seed: _pSeedHex }));
+      }
       const OBASE = "https://api-evm.orderly.org";
       const psign = async (method, path) => {
         const ts  = Date.now();
@@ -2246,8 +2296,9 @@ export default {
 
         // ── Store in KV ──
         if (regData.success || regData.data) {
+          const _regSeedHex = [...seed].map(b => b.toString(16).padStart(2,"0")).join("");
           await env.LAB_STORE.put("user:" + walletNorm, JSON.stringify({
-            accountId, orderlyKey, registeredAt: Date.now(),
+            accountId, orderlyKey, seed: _regSeedHex, registeredAt: Date.now(),
           }));
           return json({ ok: true, walletAddress: walletNorm, orderlyKey, accountId }, request);
         } else {
