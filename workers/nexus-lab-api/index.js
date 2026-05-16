@@ -1492,6 +1492,11 @@ export default {
         new Uint8Array(phex.match(/.{1,2}/g).map(b => parseInt(b, 16)))));
       const ppk8  = new Uint8Array(48); ppk8.set(PHDR, 0); ppk8.set(pseed, 16);
       const psk   = await crypto.subtle.importKey("pkcs8", ppk8, { name: "Ed25519" }, false, ["sign"]);
+      // Auto-cache seed so /account-snapshot works without walletSig
+      if (!urec.seed) {
+        const _pSeedHex = [...pseed].map(b => b.toString(16).padStart(2,"0")).join("");
+        env.LAB_STORE.put("user:" + wNorm, JSON.stringify({ ...urec, seed: _pSeedHex }));
+      }
       const OBASE = "https://api-evm.orderly.org";
       const psign = async (method, path) => {
         const ts  = Date.now();
