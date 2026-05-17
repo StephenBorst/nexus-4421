@@ -73,6 +73,7 @@ export default defineConfig(() => {
       outDir: "build/client",
     },
     optimizeDeps: {
+      exclude: ["@xmtp/wasm-bindings", "@xmtp/browser-sdk"],
       include: ["react", "react-dom", "react-router-dom"],
     },
   };

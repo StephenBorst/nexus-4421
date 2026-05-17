@@ -54,6 +54,10 @@ const ThesisPage = lazy(() => import('./pages/thesis'));
 const IntelPage   = lazy(() => import('./pages/intel'));
 const IntelLayout = lazy(() => import('./pages/intel/Layout'));
 
+// ✅ MESSAGES PAGE (XMTP encrypted DMs)
+const MessagesPage   = lazy(() => import('./pages/messages'));
+const MessagesLayout = lazy(() => import('./pages/messages/Layout'));
+
 async function loadRuntimeConfig() {
   return new Promise<void>((resolve) => {
     const script = document.createElement('script');
@@ -196,6 +200,15 @@ const router = createBrowserRouter([
         element: <IntelLayout />,
         children: [
           { index: true, element: <IntelPage /> },
+        ],
+      },
+
+      // ✅ MESSAGES ROUTE (XMTP encrypted wallet-to-wallet DMs)
+      {
+        path: 'messages',
+        element: <MessagesLayout />,
+        children: [
+          { index: true, element: <MessagesPage /> },
         ],
       },
     ],

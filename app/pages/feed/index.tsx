@@ -507,6 +507,34 @@ function FeedCard({
             }}
           >{isFollowing ? "✓" : "+"}</button>
         )}
+        {/* DM button — message the trader directly via XMTP */}
+        {walletAddress && !isOwnThesis && (
+          <button
+            onClick={() => navigate(`/messages?dm=${thesis.wallet}`)}
+            title="Send encrypted DM to trader"
+            style={{
+              background: "none",
+              border: "1px solid #1a2e1a",
+              borderRadius: 3,
+              color: "#3a5a4a",
+              fontFamily: "monospace",
+              fontSize: 9,
+              padding: "3px 7px",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "#00ff88";
+              (e.currentTarget as HTMLButtonElement).style.color = "#00ff88";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a2e1a";
+              (e.currentTarget as HTMLButtonElement).style.color = "#3a5a4a";
+            }}
+          >
+            ⬡
+          </button>
+        )}
         {/* Copy button — only if wallet connected and not your own thesis */}
         {walletAddress && !isOwnThesis && (
           <button
