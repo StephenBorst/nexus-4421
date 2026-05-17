@@ -25,10 +25,10 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm install -g yarn && yarn install --frozen-lockfile
 
       - name: Build
-        run: node ./node_modules/.bin/tsx scripts/generate-manifest.ts && node ./node_modules/.bin/vite build --no-minify && node ./node_modules/.bin/tsx scripts/generate-manifest.ts
+        run: yarn tsx scripts/generate-manifest.ts && yarn vite build --no-minify && yarn tsx scripts/generate-manifest.ts
         env:
           NODE_OPTIONS: '--max-old-space-size=6144'
 
