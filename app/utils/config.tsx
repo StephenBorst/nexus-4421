@@ -267,11 +267,12 @@ export const useOrderlyConfig = () => {
   ? [{ name: "Campaigns", href: buildCampaignsUrl(), target: "_blank" as const }]
   : [];
 
-  const labMenu   = [{ name: "LAB",   href: "/lab"   }];
-  const feedMenu  = [{ name: "FEED",  href: "/feed"  }];
+  const labMenu      = [{ name: "LAB",      href: "/lab"      }];
+  const feedMenu     = [{ name: "FEED",     href: "/feed"     }];
+  const messagesMenu = [{ name: "MESSAGES", href: "/messages" }];
   // INTEL lives as a tab inside LAB — not in the top nav
 
-const allMenuItems = [...translatedEnabledMenus, ...customMenus, ...campaignsMenu, ...labMenu, ...feedMenu];
+const allMenuItems = [...translatedEnabledMenus, ...customMenus, ...campaignsMenu, ...labMenu, ...feedMenu, ...messagesMenu];
 
     const supportedBottomNavMenus = [
       "Trading",
@@ -321,7 +322,7 @@ const allMenuItems = [...translatedEnabledMenus, ...customMenus, ...campaignsMen
           >
             {isMobile && (
               <CustomLeftNav
-                menus={[...translatedEnabledMenus, ...labMenu, ...feedMenu]}
+                menus={[...translatedEnabledMenus, ...labMenu, ...feedMenu, ...messagesMenu]}
                 externalLinks={customMenus}
               />
             )}

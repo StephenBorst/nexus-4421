@@ -613,6 +613,28 @@ export default function TraderPage() {
         <div style={{ flex: 1, fontFamily: "monospace", fontSize: 10, color: "#2a4a3a", letterSpacing: "0.05em" }}>
           / TRADER
         </div>
+        {/* DM button — only when viewing another trader */}
+        {walletAddress && !isOwn && (
+          <button
+            onClick={() => navigate(`/messages?dm=${wallet}`)}
+            title="Send encrypted DM via XMTP"
+            style={{
+              background: "none", border: "1px solid #1a2e1a", borderRadius: 3,
+              color: "#3a5a4a", fontFamily: "monospace", fontSize: 9,
+              padding: "4px 10px", cursor: "pointer", letterSpacing: "0.05em",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "#00ff88";
+              (e.currentTarget as HTMLButtonElement).style.color = "#00ff88";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a2e1a";
+              (e.currentTarget as HTMLButtonElement).style.color = "#3a5a4a";
+            }}
+          >
+            ⬡ MSG
+          </button>
+        )}
         {/* Share link button */}
         <button
           onClick={copyLink}
