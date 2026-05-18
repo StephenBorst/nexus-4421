@@ -1,6 +1,6 @@
 ---
 name: nexus
-description: Non-custodial perpetual DEX on Arbitrum. Use when user says buy, sell, trade, long, short, open position, close position, flip trade, set leverage, deposit USDC, withdraw funds, check balance, view positions, cancel order, copy a thesis, publish trade on-chain, check leaderboard, top traders, Rep Score, market intel, crypto news, funding rate, OmniVault deposit, vault yield, thesis, analyst feed, who's winning on Nexus.
+description: Non-custodial perpetual DEX on Arbitrum. Use when user says buy, sell, trade, long, short, open position, close position, flip trade, set leverage, deposit USDC, withdraw funds, check balance, view positions, cancel order, copy a thesis, publish trade on-chain, check leaderboard, top traders, Rep Score, market intel, crypto news, funding rate, thesis, analyst feed, who's winning on Nexus.
 ---
 
 # Nexus Trading Labs — Agent Skill
@@ -71,7 +71,6 @@ Do NOT use relative paths. Do NOT prepend `/api/`. Do NOT use the app domain (`t
 | Balance | `POST https://og.nexustradinglabs.com/balance` | walletSig |
 | Set leverage | `POST https://og.nexustradinglabs.com/set-leverage` | walletSig |
 | Deposit USDC | `POST https://og.nexustradinglabs.com/proxy/bankr-deposit` | Bankr API key |
-| OmniVault deposit | `POST https://og.nexustradinglabs.com/proxy/vault-deposit` | Bankr API key |
 | Withdraw USDC | `POST https://og.nexustradinglabs.com/proxy/bankr-withdraw` | Bankr API key + walletSig |
 | Settle PnL | `POST https://og.nexustradinglabs.com/settle-pnl` | walletSig |
 | Register wallet | `POST https://og.nexustradinglabs.com/proxy/bankr-register` | Bankr API key |
@@ -91,7 +90,7 @@ Do NOT use relative paths. Do NOT prepend `/api/`. Do NOT use the app domain (`t
 ## Load References As Needed
 
 - **references/trading.md** — full trade flow, registration, SL/TP, close, cancel, order-status, order-history, positions, leverage
-- **references/deposit-withdraw.md** — deposit USDC, withdraw, settle PnL, balance, OmniVault vault yield
+- **references/deposit-withdraw.md** — deposit USDC, withdraw, settle PnL, balance
 - **references/feed-leaderboard.md** — public feed, thesis copy flow, on-chain registry, Rep Score, leaderboard build, notifications, comments
 - **references/market-data.md** — mark price, funding rate, 24h stats, error codes, retry logic, rate limits, testnet
 - **references/intel.md** — market intelligence: pull live OI, funding rates, regime signals from Orderly public API

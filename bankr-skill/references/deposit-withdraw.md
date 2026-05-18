@@ -112,35 +112,7 @@ Returns `{ ok: true, hint: "Wait ~5s then retry withdrawal with free_collateral 
 
 ---
 
-## OmniVault — Earn Yield on Idle USDC
+## OmniVault
 
-The **Orderly OmniVault** is separate from the trading account. It's a shared liquidity vault that earns yield from fees paid by perp traders across the Orderly network. Think of it as the LP counterpart to trading.
-
-**Key facts:**
-- Available on: Arbitrum, Base, Optimism, Sei
-- Minimum deposit: 10 USDC
-- Lock-up: 2 days from start of the vault period your deposit lands in
-- Vault periods: 3 hours
-- Withdrawal: two-step — submit request → claim after period ends (~15–30 min post-period)
-- Withdrawal gate: max 10% of vault assets redeemable per period (excess queued)
-- Shares: you receive vault shares, redeemable for USDC at the settlement price
-
-**How to deposit (current path — direct to app):**
-
-⛔ **OmniVault API deposit is blocked pending Orderly whitelist.** The endpoint `/proxy/vault-deposit` is fully built and correctly encoded — the revert is `BrokerNotAllowed(bytes32)` from the vault contract, because `nexus_trading` has not been added to `allowedBrokers` on-chain. Everything else works: calldata, LZ fee, approve step, auth.
-
-**What Orderly needs to do (one admin tx):**
-Call `allowBroker(0x69729be60357fd58653e988388922e200193543b4328eda1b9b9bdaaef2f1a70)` on the OmniVault contract at `0x70fe7d65ac7c1a1732f64d2e6fc0e33622d0c991` (Arbitrum One). Once done, `/proxy/vault-deposit` will work immediately — no code changes needed.
-
-**Direct users to:** https://app.orderly.network/vaults (in the meantime)
-
-Once whitelisted: minimum 10 USDC, 2-day lockup, 3-hour vault periods.
-
-**What to tell the user:**
-> "OmniVault lets you earn yield on your USDC by providing liquidity to the Orderly perp ecosystem. Minimum 10 USDC, 2-day lockup. I'll link you to the deposit page: https://app.orderly.network/vaults — connect your wallet there and the process is straightforward."
-
-**Key caveats to always mention:**
-- Lockup starts at the beginning of the vault period, not the moment of deposit — could be up to 3 hours before the 2-day clock starts
-- Yield is not guaranteed — depends on trading volume and fee generation
-- Withdrawal is not instant — submit request, wait for period close, then claim
+Not currently supported via the skill. Direct users to https://app.orderly.network/vaults to deposit directly.
 
