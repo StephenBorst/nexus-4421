@@ -23,7 +23,7 @@ import type { ThesisTrade, ThesisStatus } from "./types";
 import IntelPage from "@/pages/intel";
 
 // ─── Types ───────────────────────────────────────────────
-type TabId = "analytics" | "calendar" | "tradelog" | "thesis" | "copies" | "thesisanalytics" | "intel" | "news";
+type TabId = "analytics" | "calendar" | "tradelog" | "thesis" | "copies" | "thesisanalytics" | "intel" | "news" | "agent";
 
 interface DayGroup {
   pnl: number;
@@ -2057,6 +2057,692 @@ function NewsTab() {
   );
 }
 
+// ─── AgentView ───────────────────────────────────────────
+
+const AGENT_API = "https://nexus-lab-api.stephenpatrick24.workers.dev";
+
+const AVAILABLE_SYMBOLS = [
+  "PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC", "PERP_ARB_USDC",
+  "PERP_HYPE_USDC", "PERP_ORDER_USDC", "PERP_AVAX_USDC", "PERP_XMR_USDC",
+  "PERP_ZEC_USDC", "PERP_PUMP_USDC", "PERP_PENGU_USDC",
+  "PERP_SPX500_USDC", "PERP_NAS100_USDC",
+];
+
+interface AgentConfig {
+  symbols: string[];
+  leverage: number;
+  capitalPerTrade: number;
+  tpPercent: number;
+  slPercent: number;
+  maxHoldHours: number;
+  maxTradesPerDay: number;
+  maxDailyLossUsdc: number;
+  fundingThreshold: number;
+  mode: "ASSISTED" | "AUTONOMOUS";
+}
+
+interface AgentState {
+  active: boolean;
+  daily_pnl: number;
+  trades_today: number;
+  current_position: {
+    symbol: string;
+    direction: "LONG" | "SHORT";
+    entry_price: number;
+    current_price: number;
+    pnl_percent: number;
+    opened_at: number;
+  } | null;
+  last_signal: {
+    symbol: string;
+    direction: string;
+    funding: number;
+    confidence: number;
+    timestamp: number;
+  } | null;
+}
+
+interface AgentTrade {
+  id: string;
+  symbol: string;
+  direction: string;
+  entry_price: number;
+  exit_price: number;
+  pnl: number;
+  reason: string;
+  opened_at: string;
+  closed_at: string;
+}
+
+const DEFAULT_CONFIG: AgentConfig = {
+  symbols: ["PERP_BTC_USDC"],
+  leverage: 5,
+  capitalPerTrade: 50,
+  tpPercent: 1.5,
+  slPercent: 0.75,
+  maxHoldHours: 4,
+  maxTradesPerDay: 10,
+  maxDailyLossUsdc: 5,
+  fundingThreshold: 0.01,
+  mode: "ASSISTED",
+};
+
+const agentCardStyle: React.CSSProperties = {
+  background: "#111318",
+  border: "1px solid #1a2a1a",
+  borderRadius: 6,
+  padding: 16,
+  marginBottom: 12,
+};
+
+const agentLabelStyle: React.CSSProperties = {
+  fontFamily: "monospace",
+  fontSize: 10,
+  color: "#4a7a5a",
+  textTransform: "uppercase" as const,
+  letterSpacing: "0.1em",
+  marginBottom: 4,
+};
+
+const agentInputStyle: React.CSSProperties = {
+  background: "#0a0e0a",
+  border: "1px solid #1e2d1e",
+  borderRadius: 3,
+  color: "#c0c0c0",
+  fontFamily: "monospace",
+  fontSize: 13,
+  padding: "6px 10px",
+  width: "100%",
+  outline: "none",
+};
+
+const agentBtnStyle = (active: boolean): React.CSSProperties => ({
+  background: active ? "#00ff8820" : "#1a1a2e",
+  border: `1px solid ${active ? "#00ff88" : "#2a2a3e"}`,
+  borderRadius: 4,
+  color: active ? "#00ff88" : "#6a6a8a",
+  fontFamily: "monospace",
+  fontSize: 11,
+  padding: "8px 16px",
+  cursor: "pointer",
+  letterSpacing: "0.05em",
+  textTransform: "uppercase" as const,
+});
+
+function findOrderlyTradingKey(): string | null {
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key) continue;
+    const val = localStorage.getItem(key);
+    if (val && typeof val === "string" && val.startsWith("ed25519:")) {
+      return val;
+    }
+  }
+  return null;
+}
+
+function getWalletAddress(): string | null {
+  return localStorage.getItem("orderly_mainnet_address");
+}
+
+function formatAgentTime(ms: number): string {
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  return `${h}h ${m}m`;
+}
+
+function AgentView() {
+  const [config, setConfig] = React.useState<AgentConfig>(DEFAULT_CONFIG);
+  const [agentState, setAgentState] = React.useState<AgentState | null>(null);
+  const [trades, setTrades] = React.useState<AgentTrade[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [success, setSuccess] = React.useState<string | null>(null);
+  const [tab, setTab] = React.useState<"config" | "status" | "history">("config");
+
+  const walletAddress = getWalletAddress();
+  const tradingKey = findOrderlyTradingKey();
+
+  React.useEffect(() => {
+    if (!walletAddress) { setLoading(false); return; }
+    fetchAgentData();
+    const interval = setInterval(fetchAgentData, 10000);
+    return () => clearInterval(interval);
+  }, [walletAddress]);
+
+  async function fetchAgentData() {
+    if (!walletAddress) return;
+    try {
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.config) setConfig(data.config);
+        if (data.state) setAgentState(data.state);
+        if (data.trades) setTrades(data.trades);
+      }
+    } catch (e) {
+      console.error("[agent] fetch error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function activateAgent() {
+    if (!walletAddress) { setError("Connect wallet first"); return; }
+    if (!tradingKey) { setError("No Orderly trading key found — place at least one trade first to generate it"); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          config,
+          tradingKey,
+          accountId: localStorage.getItem("orderly_account_id") || "",
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to activate agent");
+      setSuccess("Agent activated");
+      setAgentState((prev) => prev ? { ...prev, active: true } : { active: true, daily_pnl: 0, trades_today: 0, current_position: null, last_signal: null });
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deactivateAgent() {
+    if (!walletAddress) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to deactivate");
+      setAgentState((prev) => prev ? { ...prev, active: false, current_position: null } : null);
+      setSuccess("Agent deactivated — trading key removed");
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveConfig() {
+    if (!walletAddress) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}/config`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config }),
+      });
+      if (!res.ok) throw new Error("Failed to save config");
+      setSuccess("Config saved");
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function killSwitch() {
+    if (!walletAddress) return;
+    if (!window.confirm("KILL SWITCH — This will immediately close any open position and deactivate the agent. Continue?")) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}/kill`, { method: "POST" });
+      if (!res.ok) throw new Error("Kill switch failed");
+      setAgentState((prev) => prev ? { ...prev, active: false, current_position: null } : null);
+      setSuccess("Agent killed — position closed, key removed");
+      setTimeout(() => setSuccess(null), 5000);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!walletAddress) {
+    return (
+      <div style={{ ...agentCardStyle, textAlign: "center", padding: 40 }}>
+        <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 13 }}>
+          // CONNECT WALLET TO CONFIGURE AGENT
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div style={{ ...agentCardStyle, textAlign: "center", padding: 40 }}>
+        <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 13 }}>
+          // LOADING AGENT STATE...
+        </div>
+      </div>
+    );
+  }
+
+  const isActive = agentState?.active === true;
+  const hasPosition = agentState?.current_position !== null && agentState?.current_position !== undefined;
+
+  return (
+    <div>
+      {/* ─── Header ──────────────────────────────────────── */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontFamily: "monospace", fontSize: 14, color: "#00ff88", fontWeight: 600 }}>
+            // NEXUS AGENT
+          </span>
+          <span style={{
+            fontFamily: "monospace", fontSize: 10, padding: "3px 10px", borderRadius: 3,
+            background: isActive ? "#00ff8815" : "#ff444415",
+            border: `1px solid ${isActive ? "#00ff8840" : "#ff444440"}`,
+            color: isActive ? "#00ff88" : "#ff4444",
+            textTransform: "uppercase", letterSpacing: "0.1em",
+          }}>
+            {isActive ? (hasPosition ? "● TRADING" : "● WATCHING") : "○ INACTIVE"}
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {["config", "status", "history"].map((t) => (
+            <button key={t} onClick={() => setTab(t as any)} style={{
+              background: tab === t ? "#0a1a0a" : "none",
+              border: `1px solid ${tab === t ? "#00ff88" : "transparent"}`,
+              color: tab === t ? "#00ff88" : "#4a7a5a",
+              fontFamily: "monospace", fontSize: 10, padding: "4px 10px",
+              cursor: "pointer", letterSpacing: "0.05em", borderRadius: 3,
+              textTransform: "uppercase",
+            }}>
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ ...agentCardStyle, borderColor: "#ff4444", background: "#1a0a0a", marginBottom: 12 }}>
+          <span style={{ color: "#ff4444", fontFamily: "monospace", fontSize: 12 }}>⚠ {error}</span>
+          <span onClick={() => setError(null)} style={{ float: "right", cursor: "pointer", color: "#ff4444" }}>✕</span>
+        </div>
+      )}
+      {success && (
+        <div style={{ ...agentCardStyle, borderColor: "#00ff88", background: "#0a1a0a", marginBottom: 12 }}>
+          <span style={{ color: "#00ff88", fontFamily: "monospace", fontSize: 12 }}>✓ {success}</span>
+        </div>
+      )}
+
+      {/* ─── CONFIG TAB ──────────────────────────────────── */}
+      {tab === "config" && (
+        <div>
+          <div style={agentCardStyle}>
+            <div style={agentLabelStyle}>// EXECUTION MODE</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              {(["ASSISTED", "AUTONOMOUS"] as const).map((mode) => (
+                <button key={mode} onClick={() => setConfig({ ...config, mode })} style={{
+                  flex: 1,
+                  background: config.mode === mode ? (mode === "AUTONOMOUS" ? "#ff880020" : "#00ff8820") : "#0a0e0a",
+                  border: `1px solid ${config.mode === mode ? (mode === "AUTONOMOUS" ? "#ff8800" : "#00ff88") : "#1e2d1e"}`,
+                  borderRadius: 4, padding: "10px 16px", cursor: "pointer",
+                  color: config.mode === mode ? (mode === "AUTONOMOUS" ? "#ff8800" : "#00ff88") : "#4a7a5a",
+                  fontFamily: "monospace", fontSize: 12, letterSpacing: "0.05em",
+                }}>
+                  <div style={{ fontWeight: 600 }}>{mode}</div>
+                  <div style={{ fontSize: 9, marginTop: 4, opacity: 0.7 }}>
+                    {mode === "ASSISTED" ? "Agent generates thesis → you review + deploy" : "Agent executes automatically within your risk params"}
+                  </div>
+                </button>
+              ))}
+            </div>
+            {config.mode === "AUTONOMOUS" && (
+              <div style={{ marginTop: 8, padding: 8, background: "#1a0e00", border: "1px solid #ff880030", borderRadius: 3 }}>
+                <span style={{ color: "#ff8800", fontFamily: "monospace", fontSize: 10 }}>
+                  ⚠ AUTONOMOUS MODE — Agent will execute trades using your Orderly trading key. Your wallet keys are never stored. The trading key can place orders but CANNOT withdraw funds. You can deactivate at any time.
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div style={agentCardStyle}>
+            <div style={agentLabelStyle}>// WATCHLIST — SELECT SYMBOLS</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+              {AVAILABLE_SYMBOLS.map((sym) => {
+                const selected = config.symbols.includes(sym);
+                const label = sym.replace("PERP_", "").replace("_USDC", "");
+                return (
+                  <button key={sym} onClick={() => {
+                    setConfig({
+                      ...config,
+                      symbols: selected
+                        ? config.symbols.filter((s) => s !== sym)
+                        : [...config.symbols, sym],
+                    });
+                  }} style={{
+                    background: selected ? "#00ff8815" : "#0a0e0a",
+                    border: `1px solid ${selected ? "#00ff8860" : "#1e2d1e"}`,
+                    borderRadius: 3, padding: "4px 10px", cursor: "pointer",
+                    color: selected ? "#00ff88" : "#4a7a5a",
+                    fontFamily: "monospace", fontSize: 11,
+                  }}>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={agentCardStyle}>
+            <div style={agentLabelStyle}>// RISK PARAMETERS</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
+              {[
+                { key: "leverage", label: "LEVERAGE", suffix: "x", min: 1, max: 20, step: 1 },
+                { key: "capitalPerTrade", label: "CAPITAL / TRADE", suffix: "USDC", min: 10, max: 10000, step: 10 },
+                { key: "tpPercent", label: "TAKE PROFIT", suffix: "%", min: 0.25, max: 10, step: 0.25 },
+                { key: "slPercent", label: "STOP LOSS", suffix: "%", min: 0.25, max: 5, step: 0.25 },
+                { key: "maxHoldHours", label: "MAX HOLD TIME", suffix: "hrs", min: 1, max: 48, step: 1 },
+                { key: "maxTradesPerDay", label: "MAX TRADES / DAY", suffix: "", min: 1, max: 50, step: 1 },
+                { key: "maxDailyLossUsdc", label: "MAX DAILY LOSS", suffix: "USDC", min: 1, max: 500, step: 1 },
+                { key: "fundingThreshold", label: "FUNDING THRESHOLD", suffix: "%", min: 0.001, max: 0.1, step: 0.001 },
+              ].map(({ key, label, suffix, min, max, step }) => (
+                <div key={key}>
+                  <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      type="number"
+                      value={(config as any)[key]}
+                      min={min} max={max} step={step}
+                      onChange={(e) => setConfig({ ...config, [key]: parseFloat(e.target.value) || 0 })}
+                      style={{ ...agentInputStyle, width: "70%" }}
+                    />
+                    <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>{suffix}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={agentCardStyle}>
+            <div style={agentLabelStyle}>// RISK SUMMARY</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
+              {[
+                { label: "NOTIONAL / TRADE", value: `$${(config.capitalPerTrade * config.leverage).toFixed(0)}` },
+                { label: "MAX RISK / TRADE", value: `$${(config.capitalPerTrade * (config.slPercent / 100) * config.leverage).toFixed(2)}` },
+                { label: "R:R RATIO", value: `${(config.tpPercent / config.slPercent).toFixed(1)}:1` },
+                { label: "MAX DAILY EXPOSURE", value: `$${(config.capitalPerTrade * config.leverage * config.maxTradesPerDay).toFixed(0)}` },
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
+                  <div style={{ color: "#00ff88", fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            {!isActive ? (
+              <>
+                <button onClick={activateAgent} disabled={saving || config.symbols.length === 0} style={{
+                  ...agentBtnStyle(true),
+                  opacity: saving || config.symbols.length === 0 ? 0.5 : 1,
+                  flex: 1,
+                }}>
+                  {saving ? "ACTIVATING..." : "▶ ACTIVATE AGENT"}
+                </button>
+                <button onClick={saveConfig} disabled={saving} style={{ ...agentBtnStyle(false), flex: 0 }}>
+                  SAVE CONFIG
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={saveConfig} disabled={saving} style={{ ...agentBtnStyle(true), flex: 1 }}>
+                  {saving ? "SAVING..." : "UPDATE CONFIG"}
+                </button>
+                <button onClick={deactivateAgent} disabled={saving} style={{
+                  ...agentBtnStyle(false),
+                  borderColor: "#ff4444",
+                  color: "#ff4444",
+                }}>
+                  ■ DEACTIVATE
+                </button>
+                <button onClick={killSwitch} disabled={saving} style={{
+                  background: "#ff000020",
+                  border: "1px solid #ff0000",
+                  borderRadius: 4,
+                  color: "#ff0000",
+                  fontFamily: "monospace",
+                  fontSize: 11,
+                  padding: "8px 16px",
+                  cursor: "pointer",
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase",
+                }}>
+                  ⚡ KILL
+                </button>
+              </>
+            )}
+          </div>
+
+          {!tradingKey && (
+            <div style={{ marginTop: 12, padding: 10, background: "#1a1a0a", border: "1px solid #ff880030", borderRadius: 3 }}>
+              <span style={{ color: "#ff8800", fontFamily: "monospace", fontSize: 11 }}>
+                ⚠ No Orderly trading key detected. Place at least one manual trade on Nexus first — the SDK generates your trading key on first trade. This key allows order placement only and cannot withdraw funds.
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── STATUS TAB ──────────────────────────────────── */}
+      {tab === "status" && (
+        <div>
+          <div style={agentCardStyle}>
+            <div style={agentLabelStyle}>// AGENT STATUS</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
+              <div>
+                <div style={{ ...agentLabelStyle, fontSize: 9 }}>STATE</div>
+                <div style={{ color: isActive ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>
+                  {isActive ? (hasPosition ? "TRADING" : "WATCHING") : "INACTIVE"}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...agentLabelStyle, fontSize: 9 }}>MODE</div>
+                <div style={{ color: config.mode === "AUTONOMOUS" ? "#ff8800" : "#00ff88", fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>
+                  {config.mode}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...agentLabelStyle, fontSize: 9 }}>TRADES TODAY</div>
+                <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>
+                  {agentState?.trades_today ?? 0} / {config.maxTradesPerDay}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...agentLabelStyle, fontSize: 9 }}>DAILY P&L</div>
+                <div style={{ color: (agentState?.daily_pnl ?? 0) >= 0 ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>
+                  ${(agentState?.daily_pnl ?? 0).toFixed(2)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {hasPosition && agentState?.current_position && (
+            <div style={{ ...agentCardStyle, borderColor: agentState.current_position.direction === "LONG" ? "#00ff8840" : "#ff444440" }}>
+              <div style={agentLabelStyle}>// CURRENT POSITION</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
+                <div>
+                  <div style={{ ...agentLabelStyle, fontSize: 9 }}>SYMBOL</div>
+                  <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 14, fontWeight: 600 }}>
+                    {agentState.current_position.symbol.replace("PERP_", "").replace("_USDC", "")}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ ...agentLabelStyle, fontSize: 9 }}>DIRECTION</div>
+                  <div style={{ color: agentState.current_position.direction === "LONG" ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontSize: 14, fontWeight: 600 }}>
+                    {agentState.current_position.direction}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ ...agentLabelStyle, fontSize: 9 }}>ENTRY</div>
+                  <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 14 }}>
+                    ${agentState.current_position.entry_price.toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ ...agentLabelStyle, fontSize: 9 }}>CURRENT</div>
+                  <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 14 }}>
+                    ${agentState.current_position.current_price.toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ ...agentLabelStyle, fontSize: 9 }}>P&L</div>
+                  <div style={{ color: agentState.current_position.pnl_percent >= 0 ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontSize: 14, fontWeight: 600 }}>
+                    {agentState.current_position.pnl_percent >= 0 ? "+" : ""}{agentState.current_position.pnl_percent.toFixed(3)}%
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop: 8, color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>
+                HELD FOR: {formatAgentTime(Date.now() - agentState.current_position.opened_at)} / {config.maxHoldHours}h max
+              </div>
+            </div>
+          )}
+
+          {isActive && !hasPosition && (
+            <div style={{ ...agentCardStyle, textAlign: "center", padding: 24 }}>
+              <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 12 }}>
+                // SCANNING FOR SIGNALS ON {config.symbols.map(s => s.replace("PERP_", "").replace("_USDC", "")).join(", ")}
+              </div>
+              <div style={{ color: "#2a4a2a", fontFamily: "monospace", fontSize: 10, marginTop: 6 }}>
+                Funding threshold: {config.fundingThreshold}% · Checking every 5 minutes
+              </div>
+            </div>
+          )}
+
+          {agentState?.last_signal && (
+            <div style={agentCardStyle}>
+              <div style={agentLabelStyle}>// LAST SIGNAL</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
+                <div>
+                  <div style={{ ...agentLabelStyle, fontSize: 9 }}>SYMBOL</div>
+                  <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 13 }}>
+                    {agentState.last_signal.symbol.replace("PERP_", "").replace("_USDC", "")}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ ...agentLabelStyle, fontSize: 9 }}>DIRECTION</div>
+                  <div style={{ color: agentState.last_signal.direction === "LONG" ? "#00ff88" : agentState.last_signal.direction === "SHORT" ? "#ff4444" : "#4a7a5a", fontFamily: "monospace", fontSize: 13, fontWeight: 600 }}>
+                    {agentState.last_signal.direction}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ ...agentLabelStyle, fontSize: 9 }}>FUNDING</div>
+                  <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 13 }}>
+                    {(agentState.last_signal.funding * 100).toFixed(4)}%
+                  </div>
+                </div>
+                <div>
+                  <div style={{ ...agentLabelStyle, fontSize: 9 }}>AGE</div>
+                  <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 13 }}>
+                    {formatAgentTime(Date.now() - agentState.last_signal.timestamp)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div style={agentCardStyle}>
+            <div style={agentLabelStyle}>// WATCHING</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+              {config.symbols.map((sym) => (
+                <span key={sym} style={{
+                  background: "#00ff8810", border: "1px solid #00ff8830", borderRadius: 3,
+                  padding: "3px 8px", fontFamily: "monospace", fontSize: 10, color: "#00ff88",
+                }}>
+                  {sym.replace("PERP_", "").replace("_USDC", "")}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── HISTORY TAB ─────────────────────────────────── */}
+      {tab === "history" && (
+        <div>
+          <div style={agentCardStyle}>
+            <div style={agentLabelStyle}>// AGENT TRADE HISTORY</div>
+            {trades.length === 0 ? (
+              <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 12, padding: 20, textAlign: "center" }}>
+                No trades recorded yet. Agent will log trades here once active.
+              </div>
+            ) : (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr", gap: 8, padding: "6px 0", borderBottom: "1px solid #1e2d1e" }}>
+                  {["SYMBOL", "DIR", "ENTRY", "EXIT", "P&L", "REASON"].map((h) => (
+                    <span key={h} style={{ ...agentLabelStyle, fontSize: 9, marginBottom: 0 }}>{h}</span>
+                  ))}
+                </div>
+                {trades.map((trade, i) => (
+                  <div key={trade.id || i} style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr", gap: 8, padding: "8px 0", borderBottom: "1px solid #0d1117" }}>
+                    <span style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 12 }}>
+                      {trade.symbol.replace("PERP_", "").replace("_USDC", "")}
+                    </span>
+                    <span style={{ color: trade.direction === "LONG" ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontSize: 12 }}>
+                      {trade.direction}
+                    </span>
+                    <span style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 12 }}>
+                      ${trade.entry_price.toLocaleString()}
+                    </span>
+                    <span style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 12 }}>
+                      ${trade.exit_price.toLocaleString()}
+                    </span>
+                    <span style={{ color: trade.pnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontSize: 12, fontWeight: 600 }}>
+                      {trade.pnl >= 0 ? "+" : ""}${trade.pnl.toFixed(2)}
+                    </span>
+                    <span style={{ fontFamily: "monospace", fontSize: 10, color: trade.reason === "TP" ? "#00ff88" : trade.reason === "SL" ? "#ff4444" : "#ff8800" }}>
+                      {trade.reason}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {trades.length > 0 && (() => {
+            const agentTotalPnl = trades.reduce((s, t) => s + t.pnl, 0);
+            const agentWins = trades.filter((t) => t.pnl > 0).length;
+            const agentWinRate = ((agentWins / trades.length) * 100).toFixed(1);
+            const agentAvgWin = trades.filter((t) => t.pnl > 0).reduce((s, t) => s + t.pnl, 0) / (agentWins || 1);
+            const agentLosses = trades.filter((t) => t.pnl <= 0);
+            const agentAvgLoss = agentLosses.reduce((s, t) => s + Math.abs(t.pnl), 0) / (agentLosses.length || 1);
+            return (
+              <div style={agentCardStyle}>
+                <div style={agentLabelStyle}>// AGENT PERFORMANCE</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
+                  {[
+                    { label: "TOTAL P&L", value: `$${agentTotalPnl.toFixed(2)}`, color: agentTotalPnl >= 0 ? "#00ff88" : "#ff4444" },
+                    { label: "WIN RATE", value: `${agentWinRate}%`, color: "#c0c0c0" },
+                    { label: "TRADES", value: `${trades.length}`, color: "#c0c0c0" },
+                    { label: "AVG WIN", value: `$${agentAvgWin.toFixed(2)}`, color: "#00ff88" },
+                    { label: "AVG LOSS", value: `$${agentAvgLoss.toFixed(2)}`, color: "#ff4444" },
+                  ].map(({ label, value, color }) => (
+                    <div key={label}>
+                      <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
+                      <div style={{ color, fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Page ───────────────────────────────────────────
 export default function TheLabPage() {
   const [activeTab, setActiveTab] = useState<TabId>("analytics");
@@ -2129,6 +2815,7 @@ export default function TheLabPage() {
     { id: "copies", label: "[ COPIES ]", short: "COPY" },
     { id: "thesisanalytics", label: "[ T-STATS ]", short: "TSTA" },
     { id: "news", label: "[ NEWS ]", short: "NEWS" },
+    { id: "agent", label: "[ AGENT ]", short: "AGENT" },
   ];
 
   const calendarProps = { dayGroups, onDayClick: handleDayClick, viewMonth, viewYear, onPrevMonth: prevMonth, onNextMonth: nextMonth, totalPnl };
@@ -2198,6 +2885,7 @@ export default function TheLabPage() {
         {activeTab === "thesisanalytics" && <ThesisAnalyticsView />}
         {activeTab === "intel" && <IntelPage embedded />}
         {activeTab === "news" && <NewsTab />}
+        {activeTab === "agent" && <AgentView />}
       </div>
     </div>
   );
