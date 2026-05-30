@@ -2443,12 +2443,14 @@ document.getElementById("btn").addEventListener("click",go);
 
       // GET /agent/:address
       if (request.method === "GET" && !parts[2]) {
-        const [configRaw, stateRaw] = await Promise.all([
+        const [configRaw, stateRaw, pendingRaw] = await Promise.all([
           AGENT_KV.get(`agent:config:${address}`),
           AGENT_KV.get(`agent:state:${address}`),
+          AGENT_KV.get(`agent:pending:${address}`),
         ]);
         const config = configRaw ? JSON.parse(configRaw) : null;
         const state = stateRaw ? JSON.parse(stateRaw) : null;
+        const pending = pendingRaw ? JSON.parse(pendingRaw) : [];
         let trades = [];
         // Only query Supabase if configured — an undefined SUPABASE_URL produces a
         // relative fetch (self-subrequest) that fails the whole route (CF error 1042).
@@ -2461,7 +2463,17 @@ document.getElementById("btn").addEventListener("click",go);
             if (tradesRes.ok) trades = await tradesRes.json();
           } catch (e) { console.error("[agent-api] supabase fetch error:", e); }
         }
-        return json({ config, state, trades }, request);
+        return json({ config, state, trades, pending }, request);
+      }
+
+      // POST /agent/:address/pending/:id/(deploy|dismiss) — resolve a thesis
+      if (request.method === "POST" && parts[2] === "pending" && parts[3] && parts[4]) {
+        const action = parts[4];
+        const pendingRaw = await AGENT_KV.get(`agent:pending:${address}`);
+        const list = pendingRaw ? JSON.parse(pendingRaw) : [];
+        const next = list.filter((t) => t.id !== parts[3]);
+        await AGENT_KV.put(`agent:pending:${address}`, JSON.stringify(next));
+        return json({ ok: true, action, remaining: next.length }, request);
       }
 
       // PUT /agent/:address — activate (config + key)

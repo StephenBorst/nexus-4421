@@ -2114,6 +2114,18 @@ interface AgentTrade {
   closed_at: string;
 }
 
+interface AgentPendingThesis {
+  id: string;
+  symbol: string;
+  direction: "LONG" | "SHORT";
+  entryPrice: number;
+  confidence: number;
+  funding: number;
+  source: string;
+  generatedAt: number;
+  status: string;
+}
+
 const DEFAULT_CONFIG: AgentConfig = {
   symbols: ["PERP_BTC_USDC"],
   leverage: 5,
@@ -2228,6 +2240,7 @@ function AgentView() {
   const [config, setConfig] = useState<AgentConfig>(DEFAULT_CONFIG);
   const [agentState, setAgentState] = useState<AgentState | null>(null);
   const [trades, setTrades] = useState<AgentTrade[]>([]);
+  const [pending, setPending] = useState<AgentPendingThesis[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2253,6 +2266,7 @@ function AgentView() {
         if (data.config) setConfig(data.config);
         if (data.state) setAgentState(data.state);
         if (data.trades) setTrades(data.trades);
+        if (data.pending) setPending(data.pending);
       }
     } catch (e) {
       console.error("[agent] fetch error:", e);
@@ -2336,6 +2350,17 @@ function AgentView() {
       setError(e.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  // ─── Resolve a pending ASSISTED thesis (deploy = manual, dismiss) ──
+  async function resolvePending(id: string, action: "deploy" | "dismiss") {
+    if (!walletAddress) return;
+    setPending((prev) => prev.filter((t) => t.id !== id));
+    try {
+      await fetch(`${AGENT_API}/agent/${walletAddress}/pending/${id}/${action}`, { method: "POST" });
+    } catch (e) {
+      console.error("[agent] resolve pending error:", e);
     }
   }
 
@@ -2571,6 +2596,56 @@ function AgentView() {
       {/* ─── STATUS TAB ──────────────────────────────────── */}
       {tab === "status" && (
         <div>
+          {/* Pending theses — ASSISTED mode review queue */}
+          {pending.length > 0 && (
+            <div style={{ ...agentCardStyle, borderColor: "#fbbf2440" }}>
+              <div style={{ ...agentLabelStyle, color: "#fbbf24" }}>// THESES AWAITING REVIEW ({pending.length})</div>
+              {pending.map((t) => (
+                <div key={t.id} style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  gap: 12, padding: "10px 0", borderBottom: "1px solid #1e2d1e",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                    <span style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 13, fontWeight: 600 }}>
+                      {t.symbol.replace("PERP_", "").replace("_USDC", "")}
+                    </span>
+                    <span style={{ color: t.direction === "LONG" ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontSize: 13, fontWeight: 600 }}>
+                      {t.direction}
+                    </span>
+                    <span style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 11 }}>
+                      @ ${t.entryPrice?.toLocaleString()}
+                    </span>
+                    <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 11 }}>
+                      conf {t.confidence}% · funding {(t.funding * 100).toFixed(4)}%
+                    </span>
+                    <span style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 10 }}>
+                      {formatAgentTime(Date.now() - t.generatedAt)} ago
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => resolvePending(t.id, "deploy")} style={{
+                      background: "#00ff8820", border: "1px solid #00ff88", borderRadius: 3,
+                      color: "#00ff88", fontFamily: "monospace", fontSize: 10, padding: "5px 12px",
+                      cursor: "pointer", letterSpacing: "0.05em", textTransform: "uppercase",
+                    }}>
+                      ✓ Reviewed
+                    </button>
+                    <button onClick={() => resolvePending(t.id, "dismiss")} style={{
+                      background: "none", border: "1px solid #ff444450", borderRadius: 3,
+                      color: "#ff4444", fontFamily: "monospace", fontSize: 10, padding: "5px 12px",
+                      cursor: "pointer", letterSpacing: "0.05em", textTransform: "uppercase",
+                    }}>
+                      ✕ Dismiss
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 10, marginTop: 8 }}>
+                ASSISTED mode generates these for manual review — the agent does not execute them. Place the trade yourself if you agree, then mark Reviewed.
+              </div>
+            </div>
+          )}
+
           <div style={agentCardStyle}>
             <div style={agentLabelStyle}>// AGENT STATUS</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
