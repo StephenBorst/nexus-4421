@@ -2169,20 +2169,53 @@ const agentBtnStyle = (active: boolean): React.CSSProperties => ({
   textTransform: "uppercase" as const,
 });
 
-function findOrderlyTradingKey(): string | null {
+// Orderly SDK (@orderly.network/core LocalStorageStore) stores the delegated
+// trading key as JSON at `orderly_{networkId}_{address}`:
+//   { orderlyKey: "<secret>", accountId: "<id>" }
+// The address it keys on is whatever is stored at `orderly_{networkId}_address`.
+function getOrderlyNetworkId(): string {
+  return (localStorage.getItem("orderly_networkId") as string) || "mainnet";
+}
+
+function getOrderlyKeyStore(): { tradingKey: string; accountId: string } | null {
+  const networkId = getOrderlyNetworkId();
+  const address = localStorage.getItem(`orderly_${networkId}_address`);
+  const tryParse = (raw: string | null) => {
+    if (!raw) return null;
+    try {
+      const obj = JSON.parse(raw);
+      if (obj && typeof obj.orderlyKey === "string" && obj.orderlyKey.length > 20) {
+        return { tradingKey: obj.orderlyKey as string, accountId: (obj.accountId as string) || "" };
+      }
+    } catch {
+      // not the JSON blob we want
+    }
+    return null;
+  };
+
+  // Preferred: the exact per-address blob
+  if (address) {
+    const direct = tryParse(localStorage.getItem(`orderly_${networkId}_${address}`));
+    if (direct) return direct;
+  }
+
+  // Fallback: scan for any orderly_{network}_0x... blob containing an orderlyKey
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (!key) continue;
-    const val = localStorage.getItem(key);
-    if (val && typeof val === "string" && val.startsWith("ed25519:")) {
-      return val;
-    }
+    if (!key || !/^orderly_[a-z]+_0x[0-9a-fA-F]+$/.test(key)) continue;
+    const parsed = tryParse(localStorage.getItem(key));
+    if (parsed) return parsed;
   }
   return null;
 }
 
+function findOrderlyTradingKey(): string | null {
+  return getOrderlyKeyStore()?.tradingKey ?? null;
+}
+
 function getWalletAddress(): string | null {
-  return localStorage.getItem("orderly_mainnet_address");
+  const networkId = getOrderlyNetworkId();
+  return localStorage.getItem(`orderly_${networkId}_address`);
 }
 
 function formatAgentTime(ms: number): string {
@@ -2240,7 +2273,7 @@ function AgentView() {
         body: JSON.stringify({
           config,
           tradingKey,
-          accountId: localStorage.getItem("orderly_account_id") || "",
+          accountId: getOrderlyKeyStore()?.accountId || "",
         }),
       });
       if (!res.ok) throw new Error("Failed to activate agent");
