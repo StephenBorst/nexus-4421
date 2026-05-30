@@ -2433,6 +2433,95 @@ document.getElementById("btn").addEventListener("click",go);
     }
 
     // ── /feed ──────────────────────────────────────────────
+    // ── /agent/:address — agent config, state, trade history ──
+    if (parts[0] === "agent" && parts[1]) {
+      const address = parts[1].toLowerCase();
+
+      // GET /agent/:address
+      if (request.method === "GET" && !parts[2]) {
+        const [configRaw, stateRaw] = await Promise.all([
+          env.LAB_STORE.get(`agent:config:${address}`),
+          env.LAB_STORE.get(`agent:state:${address}`),
+        ]);
+        const config = configRaw ? JSON.parse(configRaw) : null;
+        const state = stateRaw ? JSON.parse(stateRaw) : null;
+        let trades = [];
+        try {
+          const tradesRes = await fetch(
+            `${env.SUPABASE_URL}/rest/v1/agent_trades?wallet_address=eq.${address}&order=closed_at.desc&limit=50`,
+            { headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` } }
+          );
+          if (tradesRes.ok) trades = await tradesRes.json();
+        } catch (e) { console.error("[agent-api] supabase fetch error:", e); }
+        return json({ config, state, trades }, request);
+      }
+
+      // PUT /agent/:address — activate (config + key)
+      if (request.method === "PUT" && !parts[2]) {
+        let body;
+        try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        const { config, tradingKey, accountId } = body;
+        if (!config || !tradingKey) return json({ error: "config and tradingKey required" }, request, 400);
+        await env.LAB_STORE.put(`agent:config:${address}`, JSON.stringify(config));
+        await env.LAB_STORE.put(`agent:key:${address}`, JSON.stringify({ tradingKey, accountId, registeredAt: Date.now() }));
+        const existingState = await env.LAB_STORE.get(`agent:state:${address}`);
+        const state = existingState ? JSON.parse(existingState) : { active: true, daily_pnl: 0, trades_today: 0, last_reset: Date.now(), current_position: null, last_signal: null };
+        state.active = true;
+        await env.LAB_STORE.put(`agent:state:${address}`, JSON.stringify(state));
+        const usersRaw = await env.LAB_STORE.get("agent:users");
+        const users = usersRaw ? JSON.parse(usersRaw) : [];
+        if (!users.includes(address)) { users.push(address); await env.LAB_STORE.put("agent:users", JSON.stringify(users)); }
+        return json({ ok: true, state }, request);
+      }
+
+      // PUT /agent/:address/config — update config only
+      if (request.method === "PUT" && parts[2] === "config") {
+        let body;
+        try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        const { config } = body;
+        if (!config) return json({ error: "config required" }, request, 400);
+        await env.LAB_STORE.put(`agent:config:${address}`, JSON.stringify(config));
+        return json({ ok: true }, request);
+      }
+
+      // DELETE /agent/:address — deactivate
+      if (request.method === "DELETE" && !parts[2]) {
+        await env.LAB_STORE.delete(`agent:key:${address}`);
+        const stateRaw = await env.LAB_STORE.get(`agent:state:${address}`);
+        if (stateRaw) {
+          const state = JSON.parse(stateRaw);
+          state.active = false;
+          state.current_position = null;
+          await env.LAB_STORE.put(`agent:state:${address}`, JSON.stringify(state));
+        }
+        const usersRaw = await env.LAB_STORE.get("agent:users");
+        if (usersRaw) {
+          const users = JSON.parse(usersRaw).filter((u) => u !== address);
+          await env.LAB_STORE.put("agent:users", JSON.stringify(users));
+        }
+        return json({ ok: true }, request);
+      }
+
+      // POST /agent/:address/kill — kill switch
+      if (request.method === "POST" && parts[2] === "kill") {
+        const stateRaw = await env.LAB_STORE.get(`agent:state:${address}`);
+        if (stateRaw) {
+          const state = JSON.parse(stateRaw);
+          state.kill_requested = true;
+          await env.LAB_STORE.put(`agent:state:${address}`, JSON.stringify(state));
+        }
+        await env.LAB_STORE.delete(`agent:key:${address}`);
+        const usersRaw = await env.LAB_STORE.get("agent:users");
+        if (usersRaw) {
+          const users = JSON.parse(usersRaw).filter((u) => u !== address);
+          await env.LAB_STORE.put("agent:users", JSON.stringify(users));
+        }
+        return json({ ok: true, message: "Kill switch activated" }, request);
+      }
+
+      return json({ error: "not found" }, request, 404);
+    }
+
     if (parts[0] === "feed") {
       if (request.method !== "GET") {
         return json({ error: "method not allowed" }, request, 405);
