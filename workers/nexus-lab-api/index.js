@@ -2436,12 +2436,16 @@ document.getElementById("btn").addEventListener("click",go);
     // ── /agent/:address — agent config, state, trade history ──
     if (parts[0] === "agent" && parts[1]) {
       const address = parts[1].toLowerCase();
+      // Agent data MUST live in the same KV namespace the brain/exec Workers read
+      // (binding NEXUS_AGENT). Falling back to LAB_STORE only if the binding is
+      // somehow absent so the route never hard-crashes.
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
 
       // GET /agent/:address
       if (request.method === "GET" && !parts[2]) {
         const [configRaw, stateRaw] = await Promise.all([
-          env.LAB_STORE.get(`agent:config:${address}`),
-          env.LAB_STORE.get(`agent:state:${address}`),
+          AGENT_KV.get(`agent:config:${address}`),
+          AGENT_KV.get(`agent:state:${address}`),
         ]);
         const config = configRaw ? JSON.parse(configRaw) : null;
         const state = stateRaw ? JSON.parse(stateRaw) : null;
@@ -2466,15 +2470,15 @@ document.getElementById("btn").addEventListener("click",go);
         try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
         const { config, tradingKey, accountId } = body;
         if (!config || !tradingKey) return json({ error: "config and tradingKey required" }, request, 400);
-        await env.LAB_STORE.put(`agent:config:${address}`, JSON.stringify(config));
-        await env.LAB_STORE.put(`agent:key:${address}`, JSON.stringify({ tradingKey, accountId, registeredAt: Date.now() }));
-        const existingState = await env.LAB_STORE.get(`agent:state:${address}`);
+        await AGENT_KV.put(`agent:config:${address}`, JSON.stringify(config));
+        await AGENT_KV.put(`agent:key:${address}`, JSON.stringify({ tradingKey, accountId, registeredAt: Date.now() }));
+        const existingState = await AGENT_KV.get(`agent:state:${address}`);
         const state = existingState ? JSON.parse(existingState) : { active: true, daily_pnl: 0, trades_today: 0, last_reset: Date.now(), current_position: null, last_signal: null };
         state.active = true;
-        await env.LAB_STORE.put(`agent:state:${address}`, JSON.stringify(state));
-        const usersRaw = await env.LAB_STORE.get("agent:users");
+        await AGENT_KV.put(`agent:state:${address}`, JSON.stringify(state));
+        const usersRaw = await AGENT_KV.get("agent:users");
         const users = usersRaw ? JSON.parse(usersRaw) : [];
-        if (!users.includes(address)) { users.push(address); await env.LAB_STORE.put("agent:users", JSON.stringify(users)); }
+        if (!users.includes(address)) { users.push(address); await AGENT_KV.put("agent:users", JSON.stringify(users)); }
         return json({ ok: true, state }, request);
       }
 
@@ -2484,41 +2488,41 @@ document.getElementById("btn").addEventListener("click",go);
         try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
         const { config } = body;
         if (!config) return json({ error: "config required" }, request, 400);
-        await env.LAB_STORE.put(`agent:config:${address}`, JSON.stringify(config));
+        await AGENT_KV.put(`agent:config:${address}`, JSON.stringify(config));
         return json({ ok: true }, request);
       }
 
       // DELETE /agent/:address — deactivate
       if (request.method === "DELETE" && !parts[2]) {
-        await env.LAB_STORE.delete(`agent:key:${address}`);
-        const stateRaw = await env.LAB_STORE.get(`agent:state:${address}`);
+        await AGENT_KV.delete(`agent:key:${address}`);
+        const stateRaw = await AGENT_KV.get(`agent:state:${address}`);
         if (stateRaw) {
           const state = JSON.parse(stateRaw);
           state.active = false;
           state.current_position = null;
-          await env.LAB_STORE.put(`agent:state:${address}`, JSON.stringify(state));
+          await AGENT_KV.put(`agent:state:${address}`, JSON.stringify(state));
         }
-        const usersRaw = await env.LAB_STORE.get("agent:users");
+        const usersRaw = await AGENT_KV.get("agent:users");
         if (usersRaw) {
           const users = JSON.parse(usersRaw).filter((u) => u !== address);
-          await env.LAB_STORE.put("agent:users", JSON.stringify(users));
+          await AGENT_KV.put("agent:users", JSON.stringify(users));
         }
         return json({ ok: true }, request);
       }
 
       // POST /agent/:address/kill — kill switch
       if (request.method === "POST" && parts[2] === "kill") {
-        const stateRaw = await env.LAB_STORE.get(`agent:state:${address}`);
+        const stateRaw = await AGENT_KV.get(`agent:state:${address}`);
         if (stateRaw) {
           const state = JSON.parse(stateRaw);
           state.kill_requested = true;
-          await env.LAB_STORE.put(`agent:state:${address}`, JSON.stringify(state));
+          await AGENT_KV.put(`agent:state:${address}`, JSON.stringify(state));
         }
-        await env.LAB_STORE.delete(`agent:key:${address}`);
-        const usersRaw = await env.LAB_STORE.get("agent:users");
+        await AGENT_KV.delete(`agent:key:${address}`);
+        const usersRaw = await AGENT_KV.get("agent:users");
         if (usersRaw) {
           const users = JSON.parse(usersRaw).filter((u) => u !== address);
-          await env.LAB_STORE.put("agent:users", JSON.stringify(users));
+          await AGENT_KV.put("agent:users", JSON.stringify(users));
         }
         return json({ ok: true, message: "Kill switch activated" }, request);
       }
