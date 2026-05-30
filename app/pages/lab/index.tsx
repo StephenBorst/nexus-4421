@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 // ─── Responsive hook ──────────────────────────────────────
@@ -2192,19 +2192,19 @@ function formatAgentTime(ms: number): string {
 }
 
 function AgentView() {
-  const [config, setConfig] = React.useState<AgentConfig>(DEFAULT_CONFIG);
-  const [agentState, setAgentState] = React.useState<AgentState | null>(null);
-  const [trades, setTrades] = React.useState<AgentTrade[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [success, setSuccess] = React.useState<string | null>(null);
-  const [tab, setTab] = React.useState<"config" | "status" | "history">("config");
+  const [config, setConfig] = useState<AgentConfig>(DEFAULT_CONFIG);
+  const [agentState, setAgentState] = useState<AgentState | null>(null);
+  const [trades, setTrades] = useState<AgentTrade[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [tab, setTab] = useState<"config" | "status" | "history">("config");
 
   const walletAddress = getWalletAddress();
   const tradingKey = findOrderlyTradingKey();
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!walletAddress) { setLoading(false); return; }
     fetchAgentData();
     const interval = setInterval(fetchAgentData, 10000);
