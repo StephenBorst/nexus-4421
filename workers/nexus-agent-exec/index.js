@@ -143,8 +143,23 @@ async function processUser(address, env) {
 
   // Mode check
   if (config.mode === "ASSISTED") {
-    // In assisted mode — generate thesis but don't execute
-    // Write thesis to LAB_STORE for the frontend to pick up
+    // In assisted mode — generate a thesis for review, don't execute.
+    const pendingRaw = await env.NEXUS_AGENT.get(`agent:pending:${address}`);
+    const pending = pendingRaw ? JSON.parse(pendingRaw) : [];
+
+    // Dedupe: the exec runs every minute and ASSISTED never sets last_trade_time,
+    // so without this the same signal floods the queue. Only add a new thesis if
+    // the most recent one differs in symbol/direction OR is older than the cooldown.
+    const latest = pending[0];
+    const isDuplicate = latest
+      && latest.symbol === signal.symbol
+      && latest.direction === signal.direction
+      && (now - latest.generatedAt) < COOLDOWN_MS;
+    if (isDuplicate) {
+      console.log(`[exec] ${address.slice(0, 10)} ASSISTED signal unchanged, skipping duplicate thesis`);
+      return;
+    }
+
     const thesis = {
       id: `agent_${now}`,
       symbol: signal.symbol,
@@ -156,9 +171,6 @@ async function processUser(address, env) {
       generatedAt: now,
       status: "PENDING_REVIEW",
     };
-    // Store as pending thesis for user to review in Thesis tab
-    const pendingRaw = await env.NEXUS_AGENT.get(`agent:pending:${address}`);
-    const pending = pendingRaw ? JSON.parse(pendingRaw) : [];
     pending.unshift(thesis);
     if (pending.length > 20) pending.pop(); // keep last 20
     await env.NEXUS_AGENT.put(`agent:pending:${address}`, JSON.stringify(pending));
