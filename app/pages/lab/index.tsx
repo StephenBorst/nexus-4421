@@ -2059,7 +2059,7 @@ function NewsTab() {
 
 // ─── AgentView ───────────────────────────────────────────
 
-const AGENT_API = "https://nexus-lab-api.stephenpatrick24.workers.dev";
+const AGENT_API = "https://og.nexustradinglabs.com";
 
 const AVAILABLE_SYMBOLS = [
   "PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC", "PERP_ARB_USDC",

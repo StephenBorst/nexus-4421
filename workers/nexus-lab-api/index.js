@@ -2446,13 +2446,17 @@ document.getElementById("btn").addEventListener("click",go);
         const config = configRaw ? JSON.parse(configRaw) : null;
         const state = stateRaw ? JSON.parse(stateRaw) : null;
         let trades = [];
-        try {
-          const tradesRes = await fetch(
-            `${env.SUPABASE_URL}/rest/v1/agent_trades?wallet_address=eq.${address}&order=closed_at.desc&limit=50`,
-            { headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` } }
-          );
-          if (tradesRes.ok) trades = await tradesRes.json();
-        } catch (e) { console.error("[agent-api] supabase fetch error:", e); }
+        // Only query Supabase if configured — an undefined SUPABASE_URL produces a
+        // relative fetch (self-subrequest) that fails the whole route (CF error 1042).
+        if (env.SUPABASE_URL && env.SUPABASE_ANON_KEY) {
+          try {
+            const tradesRes = await fetch(
+              `${env.SUPABASE_URL}/rest/v1/agent_trades?wallet_address=eq.${address}&order=closed_at.desc&limit=50`,
+              { headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` } }
+            );
+            if (tradesRes.ok) trades = await tradesRes.json();
+          } catch (e) { console.error("[agent-api] supabase fetch error:", e); }
+        }
         return json({ config, state, trades }, request);
       }
 
