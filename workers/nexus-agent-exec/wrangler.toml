@@ -1,0 +1,18 @@
+﻿name = "nexus-agent-exec"
+main = "index.js"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[kv_namespaces]]
+binding = "NEXUS_AGENT"
+id = "c3c0582ec71c4d049d0795872f39f033"
+
+[triggers]
+crons = ["* * * * *"]
+
+[vars]
+ORDERLY_API = "https://api-evm.orderly.org"
+
+[observability.logs]
+enabled = true
+invocation_logs = true

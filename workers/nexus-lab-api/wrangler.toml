@@ -17,3 +17,7 @@ id = "12c4fcbc04cc4211902d49b8abc2a751"
 [[kv_namespaces]]
 binding = "NEXUS_AGENT"
 id = "c3c0582ec71c4d049d0795872f39f033"
+
+[observability.logs]
+enabled = true
+invocation_logs = true
