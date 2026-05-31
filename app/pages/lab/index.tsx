@@ -2436,6 +2436,28 @@ function AgentView() {
       {/* ─── CONFIG TAB ──────────────────────────────────── */}
       {tab === "config" && (
         <div>
+          {/* Onboarding + key-status panel */}
+          <div style={{ ...agentCardStyle, borderColor: tradingKey ? "#1a3a2a" : "#4a3a00" }}>
+            <div style={agentLabelStyle}>// HOW THE AGENT WORKS</div>
+            <ol style={{ margin: "8px 0 0", paddingLeft: 18, color: "#8aaa9a", fontFamily: "monospace", fontSize: 11, lineHeight: 1.7 }}>
+              <li>Place at least one manual trade on Nexus — this generates your Orderly trading key (order-only, <strong style={{ color: "#c0c0c0" }}>cannot withdraw funds</strong>).</li>
+              <li>Pick your symbols, risk params, and mode below.</li>
+              <li><strong style={{ color: "#c0c0c0" }}>ASSISTED</strong> = the agent surfaces signals for you to place yourself. <strong style={{ color: "#c0c0c0" }}>AUTONOMOUS</strong> = it trades within your risk limits.</li>
+              <li>Activate. You can DEACTIVATE or KILL anytime.</li>
+            </ol>
+            <div style={{
+              marginTop: 10, padding: "8px 10px", borderRadius: 3,
+              background: tradingKey ? "#0a1a0a" : "#1a1400",
+              border: `1px solid ${tradingKey ? "#1a4a2a" : "#4a3a00"}`,
+              fontFamily: "monospace", fontSize: 11,
+              color: tradingKey ? "#00ff88" : "#fbbf24",
+            }}>
+              {tradingKey
+                ? "● TRADING KEY DETECTED — ready to activate. Your key is encrypted at rest and can only place orders, never withdraw."
+                : "○ NO TRADING KEY YET — place one manual trade first to generate it, then refresh this tab."}
+            </div>
+          </div>
+
           <div style={agentCardStyle}>
             <div style={agentLabelStyle}>// EXECUTION MODE</div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -2538,6 +2560,14 @@ function AgentView() {
               ))}
             </div>
           </div>
+
+          {!isActive && (
+            <div style={{ marginTop: 16, padding: "8px 10px", borderRadius: 3, background: "#0a0e0a", border: "1px solid #1e2d1e" }}>
+              <span style={{ fontFamily: "monospace", fontSize: 10, color: "#4a7a5a", lineHeight: 1.6 }}>
+                🔒 By activating, your order-only Orderly key is stored encrypted to let the agent trade on your behalf. It <strong style={{ color: "#8aaa9a" }}>cannot withdraw or transfer funds</strong>. Trading is risky — only deploy capital you can afford to lose. Deactivate anytime.
+              </span>
+            </div>
+          )}
 
           <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
             {!isActive ? (
