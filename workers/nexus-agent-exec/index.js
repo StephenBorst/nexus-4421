@@ -226,10 +226,10 @@ async function processUser(address, env, cache) {
   }
 
   // ── AUTONOMOUS MODE — EXECUTE ─────────────────────────
-  await enterPosition(address, state, config, signal, env);
+  await enterPosition(address, state, config, signal, env, cache);
 }
 
-async function enterPosition(address, state, config, signal, env) {
+async function enterPosition(address, state, config, signal, env, cache) {
   const keyRaw = await env.NEXUS_AGENT.get(`agent:key:${address}`);
   if (!keyRaw) { console.error(`[exec] no key for ${address.slice(0, 10)}`); return; }
   const keyData = JSON.parse(keyRaw);
