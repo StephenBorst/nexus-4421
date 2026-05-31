@@ -69,6 +69,27 @@ function normalizeAddress(addr) {
   return addr.toLowerCase().trim();
 }
 
+// ── Agent key encryption at rest (AES-256-GCM via Web Crypto) ──────────────────
+// Trading keys are encrypted before being written to KV so a KV dump alone is
+// useless without the AGENT_ENC_KEY Worker secret. Format: "v1:<b64 iv>:<b64 ct>".
+async function importAencKey(env) {
+  const raw = Uint8Array.from(atob(env.AGENT_ENC_KEY), (c) => c.charCodeAt(0));
+  return crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+
+async function encryptSecret(plaintext, env) {
+  if (!env.AGENT_ENC_KEY) throw new Error("AGENT_ENC_KEY not configured");
+  const key = await importAencKey(env);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    new TextEncoder().encode(plaintext)
+  );
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  return `v1:${b64(iv)}:${b64(ct)}`;
+}
+
 // ── Ph27: notification helpers ────────────────────────────────────────────────
 async function appendNotification(env, wallet, notif) {
   const key = `notif:${wallet}`;
@@ -2483,7 +2504,9 @@ document.getElementById("btn").addEventListener("click",go);
         const { config, tradingKey, accountId } = body;
         if (!config || !tradingKey) return json({ error: "config and tradingKey required" }, request, 400);
         await AGENT_KV.put(`agent:config:${address}`, JSON.stringify(config));
-        await AGENT_KV.put(`agent:key:${address}`, JSON.stringify({ tradingKey, accountId, registeredAt: Date.now() }));
+        // Encrypt the trading key at rest — KV never holds it in plaintext.
+        const encryptedKey = await encryptSecret(tradingKey, env);
+        await AGENT_KV.put(`agent:key:${address}`, JSON.stringify({ tradingKey: encryptedKey, accountId, registeredAt: Date.now(), enc: "v1" }));
         const existingState = await AGENT_KV.get(`agent:state:${address}`);
         const state = existingState ? JSON.parse(existingState) : { active: true, daily_pnl: 0, trades_today: 0, last_reset: Date.now(), current_position: null, last_signal: null };
         state.active = true;

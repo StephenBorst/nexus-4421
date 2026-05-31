@@ -17,6 +17,21 @@ import bs58 from "bs58";
 const ORDERLY_API = "https://api-evm.orderly.org";
 const COOLDOWN_MS = 15 * 60 * 1000; // 15 min between trades
 
+// ── Decrypt the trading key stored at rest (AES-256-GCM, "v1:<iv>:<ct>") ──────
+// Legacy plaintext keys (no "v1:" prefix) are passed through for backward compat
+// until the user re-activates and the key is re-stored encrypted.
+async function decryptTradingKey(stored, env) {
+  if (typeof stored !== "string" || !stored.startsWith("v1:")) return stored; // legacy plaintext
+  if (!env.AGENT_ENC_KEY) throw new Error("AGENT_ENC_KEY not configured");
+  const [, ivB64, ctB64] = stored.split(":");
+  const rawKey = Uint8Array.from(atob(env.AGENT_ENC_KEY), (c) => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey("raw", rawKey, { name: "AES-GCM" }, false, ["decrypt"]);
+  const iv = Uint8Array.from(atob(ivB64), (c) => c.charCodeAt(0));
+  const ct = Uint8Array.from(atob(ctB64), (c) => c.charCodeAt(0));
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
+  return new TextDecoder().decode(pt);
+}
+
 // Sign Orderly API request with a user's delegated trading key.
 //
 // Proven pattern from the original single-user bot (Session Handoff 012):
@@ -192,6 +207,7 @@ async function enterPosition(address, state, config, signal, env) {
   const keyRaw = await env.NEXUS_AGENT.get(`agent:key:${address}`);
   if (!keyRaw) { console.error(`[exec] no key for ${address.slice(0, 10)}`); return; }
   const keyData = JSON.parse(keyRaw);
+  keyData.tradingKey = await decryptTradingKey(keyData.tradingKey, env);
 
   const symbol = signal.symbol;
   const side = signal.direction === "SHORT" ? "SELL" : "BUY";
@@ -268,6 +284,7 @@ async function monitorPosition(address, state, config, env) {
   if (keyRaw) {
     try {
       const keyData = JSON.parse(keyRaw);
+      keyData.tradingKey = await decryptTradingKey(keyData.tradingKey, env);
       const posRes = await orderlyRequest(keyData, "GET", `/v1/position/${pos.symbol}`);
       const liveQty = Math.abs(parseFloat(posRes?.data?.position_qty ?? 0));
       if (Number.isFinite(liveQty) && liveQty < 1e-9) {
@@ -332,6 +349,7 @@ async function closePosition(address, state, env, reason) {
 
   if (keyRaw) {
     const keyData = JSON.parse(keyRaw);
+    keyData.tradingKey = await decryptTradingKey(keyData.tradingKey, env);
     const closeSide = pos.direction === "LONG" ? "SELL" : "BUY";
 
     try {
