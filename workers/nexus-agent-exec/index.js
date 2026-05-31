@@ -78,6 +78,23 @@ async function orderlyRequest(keyData, method, path, body = null) {
   return res.json();
 }
 
+// Per-invocation mark-price cache. The public futures price is identical for
+// every user watching a symbol, so fetch it once per symbol per tick instead of
+// once per user. Stores the in-flight promise so concurrent users in a batch
+// dedupe onto the same request.
+function getMarkPrice(symbol, env, cache) {
+  if (!cache.has(symbol)) {
+    cache.set(symbol, (async () => {
+      const res = await fetch(`${ORDERLY_API}/v1/public/futures/${symbol}`);
+      const data = await res.json();
+      return parseFloat(data.data.mark_price);
+    })());
+  }
+  return cache.get(symbol);
+}
+
+const BATCH_SIZE = 10; // bounded concurrency — fast without hammering the APIs
+
 export default {
   async scheduled(event, env) {
     try {
@@ -86,12 +103,21 @@ export default {
       const users = JSON.parse(usersRaw);
       if (users.length === 0) return;
 
-      for (const address of users) {
-        try {
-          await processUser(address, env);
-        } catch (e) {
-          console.error(`[exec] ${address.slice(0, 10)} error:`, e.message);
-        }
+      // One shared price cache for the whole tick.
+      const priceCache = new Map();
+
+      // Process users in bounded-concurrency batches: O(users/BATCH) wall-clock
+      // instead of O(users), while the price cache keeps public fetches at
+      // O(unique symbols) regardless of user count.
+      for (let i = 0; i < users.length; i += BATCH_SIZE) {
+        const batch = users.slice(i, i + BATCH_SIZE);
+        await Promise.all(
+          batch.map((address) =>
+            processUser(address, env, priceCache).catch((e) =>
+              console.error(`[exec] ${address.slice(0, 10)} error:`, e.message)
+            )
+          )
+        );
       }
     } catch (e) {
       console.error("[exec] fatal:", e.message);
@@ -99,7 +125,7 @@ export default {
   },
 };
 
-async function processUser(address, env) {
+async function processUser(address, env, cache) {
   const stateRaw = await env.NEXUS_AGENT.get(`agent:state:${address}`);
   if (!stateRaw) return;
   const state = JSON.parse(stateRaw);
@@ -107,7 +133,7 @@ async function processUser(address, env) {
   // Check kill switch
   if (state.kill_requested) {
     if (state.current_position) {
-      await closePosition(address, state, env, "KILLED");
+      await closePosition(address, state, env, "KILLED", cache);
     }
     state.active = false;
     state.kill_requested = false;
@@ -145,7 +171,7 @@ async function processUser(address, env) {
 
   // ── HOLDING POSITION ──────────────────────────────────
   if (state.current_position) {
-    await monitorPosition(address, state, config, env);
+    await monitorPosition(address, state, config, env, cache);
     return;
   }
 
@@ -212,10 +238,8 @@ async function enterPosition(address, state, config, signal, env) {
   const symbol = signal.symbol;
   const side = signal.direction === "SHORT" ? "SELL" : "BUY";
 
-  // Fetch current mark price + tick size
-  const futuresRes = await fetch(`${ORDERLY_API}/v1/public/futures/${symbol}`);
-  const futuresData = await futuresRes.json();
-  const markPrice = futuresData.data.mark_price;
+  // Fetch current mark price (shared per-symbol cache) + tick size
+  const markPrice = await getMarkPrice(symbol, env, cache);
 
   // Fetch symbol info for tick size
   const infoRes = await fetch(`${ORDERLY_API}/v1/public/info/${symbol}`);
@@ -269,7 +293,7 @@ async function enterPosition(address, state, config, signal, env) {
   console.log(`[exec] ${address.slice(0, 10)} ENTER ${signal.direction} ${symbol} @ ${markPrice} qty=${qty}`);
 }
 
-async function monitorPosition(address, state, config, env) {
+async function monitorPosition(address, state, config, env, cache) {
   const pos = state.current_position;
   if (!pos) return;
 
@@ -299,10 +323,8 @@ async function monitorPosition(address, state, config, env) {
     }
   }
 
-  // Fetch current price
-  const res = await fetch(`${ORDERLY_API}/v1/public/futures/${pos.symbol}`);
-  const data = await res.json();
-  const currentPrice = data.data.mark_price;
+  // Fetch current price (shared per-symbol cache)
+  const currentPrice = await getMarkPrice(pos.symbol, env, cache);
 
   // Calculate P&L %
   const pnlPct = pos.direction === "LONG"
@@ -318,19 +340,19 @@ async function monitorPosition(address, state, config, env) {
 
   // Check TP
   if (pnlPct >= config.tpPercent) {
-    await closePosition(address, state, env, "TP");
+    await closePosition(address, state, env, "TP", cache);
     return;
   }
 
   // Check SL
   if (pnlPct <= -config.slPercent) {
-    await closePosition(address, state, env, "SL");
+    await closePosition(address, state, env, "SL", cache);
     return;
   }
 
   // Check timeout
   if (holdTime >= maxHoldMs) {
-    await closePosition(address, state, env, "TIMEOUT");
+    await closePosition(address, state, env, "TIMEOUT", cache);
     return;
   }
 
@@ -339,7 +361,7 @@ async function monitorPosition(address, state, config, env) {
   console.log(`[exec] ${address.slice(0, 10)} HOLDING ${pos.direction} ${pos.symbol.replace("PERP_","").replace("_USDC","")} pnl=${pnlPct.toFixed(3)}%`);
 }
 
-async function closePosition(address, state, env, reason) {
+async function closePosition(address, state, env, reason, cache) {
   const pos = state.current_position;
   if (!pos) return;
 
@@ -369,9 +391,7 @@ async function closePosition(address, state, env, reason) {
   // Fetch final price
   let exitPrice = pos.current_price;
   try {
-    const res = await fetch(`${ORDERLY_API}/v1/public/futures/${pos.symbol}`);
-    const data = await res.json();
-    exitPrice = data.data.mark_price;
+    exitPrice = await getMarkPrice(pos.symbol, env, cache);
   } catch (e) {}
 
   const pnlPct = pos.direction === "LONG"
