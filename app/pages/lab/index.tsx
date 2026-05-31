@@ -2728,14 +2728,14 @@ function AgentView() {
             </div>
           )}
 
-          {agentState?.last_signal && (
+          {agentState?.last_signal && agentState.last_signal.symbol && (
             <div style={agentCardStyle}>
               <div style={agentLabelStyle}>// LAST SIGNAL</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>SYMBOL</div>
                   <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 13 }}>
-                    {agentState.last_signal.symbol.replace("PERP_", "").replace("_USDC", "")}
+                    {(agentState.last_signal.symbol || "").replace("PERP_", "").replace("_USDC", "")}
                   </div>
                 </div>
                 <div>
