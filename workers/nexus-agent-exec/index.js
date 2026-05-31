@@ -42,10 +42,16 @@ async function orderlyRequest(keyData, method, path, body = null) {
   const pubKeyBytes = await ed.getPublicKeyAsync(privKey);
   const orderlyKey = `ed25519:${bs58.encode(pubKeyBytes)}`;
 
+  // Orderly expects application/json for POST/PUT bodies and
+  // application/x-www-form-urlencoded for GET (per Handoff 012).
+  const contentType = method === "GET"
+    ? "application/x-www-form-urlencoded"
+    : "application/json";
+
   const res = await fetch(`${ORDERLY_API}${path}`, {
     method,
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": contentType,
       "orderly-timestamp": timestamp,
       "orderly-account-id": keyData.accountId,
       "orderly-key": orderlyKey,
@@ -250,6 +256,31 @@ async function enterPosition(address, state, config, signal, env) {
 async function monitorPosition(address, state, config, env) {
   const pos = state.current_position;
   if (!pos) return;
+
+  // ── Reconcile with the exchange ──────────────────────────
+  // The user may have closed this position manually in the UI. The agent tracks
+  // positions from KV, so without this it would monitor a ghost and eventually
+  // log a bogus trade. Verify the position still exists on Orderly; if the
+  // exchange shows flat, clear the stale record and resume scanning (honoring
+  // the cooldown). If the check itself fails (API hiccup), fall through and
+  // manage on cached data rather than risk discarding a real position.
+  const keyRaw = await env.NEXUS_AGENT.get(`agent:key:${address}`);
+  if (keyRaw) {
+    try {
+      const keyData = JSON.parse(keyRaw);
+      const posRes = await orderlyRequest(keyData, "GET", `/v1/position/${pos.symbol}`);
+      const liveQty = Math.abs(parseFloat(posRes?.data?.position_qty ?? 0));
+      if (Number.isFinite(liveQty) && liveQty < 1e-9) {
+        console.log(`[exec] ${address.slice(0, 10)} position flat on exchange (manual close?) — clearing stale record`);
+        state.current_position = null;
+        state.last_trade_time = Date.now(); // respect cooldown before any re-entry
+        await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
+        return;
+      }
+    } catch (e) {
+      console.error(`[exec] ${address.slice(0, 10)} position reconcile failed, managing on cached data:`, e.message);
+    }
+  }
 
   // Fetch current price
   const res = await fetch(`${ORDERLY_API}/v1/public/futures/${pos.symbol}`);
