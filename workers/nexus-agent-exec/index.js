@@ -241,23 +241,33 @@ async function enterPosition(address, state, config, signal, env, cache) {
   // Fetch current mark price (shared per-symbol cache) + tick size
   const markPrice = await getMarkPrice(symbol, env, cache);
 
-  // Fetch symbol info for tick size
+  // Fetch symbol info for step size + min order constraints
   const infoRes = await fetch(`${ORDERLY_API}/v1/public/info/${symbol}`);
   const infoData = await infoRes.json();
-  const baseTick = infoData.data?.base_tick || 0.001;
+  const info = infoData.data || {};
+  const baseTick = info.base_tick || 0.001;
+  const baseMin = info.base_min || baseTick;
+  const minNotional = info.min_notional || 0;
 
   // Set leverage
   await orderlyRequest(keyData, "POST", "/v1/client/leverage", {
     symbol, leverage: config.leverage,
   });
 
-  // Calculate qty
+  // Calculate qty, snapped to base_tick. Format to the tick's decimal places so
+  // floating-point artifacts (e.g. 340 * 1e-5 = 0.0034000000000000007) don't
+  // produce a value Orderly rejects with -1104 "does not match the step size".
   const notional = config.capitalPerTrade * config.leverage;
-  let qty = notional / markPrice;
-  qty = Math.floor(qty / baseTick) * baseTick;
+  const decimals = Math.max(0, Math.round(-Math.log10(baseTick)));
+  const steps = Math.floor((notional / markPrice) / baseTick);
+  let qty = parseFloat((steps * baseTick).toFixed(decimals));
 
-  if (qty <= 0) {
-    console.error(`[exec] ${address.slice(0, 10)} qty too small for ${symbol}`);
+  if (qty < baseMin || qty <= 0) {
+    console.error(`[exec] ${address.slice(0, 10)} qty ${qty} below base_min ${baseMin} for ${symbol}`);
+    return;
+  }
+  if (minNotional && qty * markPrice < minNotional) {
+    console.error(`[exec] ${address.slice(0, 10)} notional ${(qty * markPrice).toFixed(2)} below min ${minNotional} for ${symbol}`);
     return;
   }
 
