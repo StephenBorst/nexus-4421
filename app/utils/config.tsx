@@ -272,7 +272,7 @@ export const useOrderlyConfig = () => {
   const messagesMenu = [{ name: "MESSAGES", href: "/messages" }];
   // INTEL lives as a tab inside LAB — not in the top nav
 
-const NAV_HREF_ORDER = ["/markets", "/", "/vaults", "/swap", "/portfolio", "/leaderboard", "/points", "/rewards"];
+const NAV_HREF_ORDER = ["/markets", "/", "/swap", "/vaults", "/portfolio", "/leaderboard", "/points", "/rewards"];
 const byHref = (href: string) => translatedEnabledMenus.find(m => m.href === href);
 const allMenuItems = [
   ...NAV_HREF_ORDER.slice(0, 4).map(byHref).filter(Boolean),
