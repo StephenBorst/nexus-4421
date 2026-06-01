@@ -275,10 +275,10 @@ export const useOrderlyConfig = () => {
 const NAV_HREF_ORDER = ["/markets", "/", "/swap", "/vaults", "/portfolio", "/leaderboard", "/points", "/rewards"];
 const byHref = (href: string) => translatedEnabledMenus.find(m => m.href === href);
 const allMenuItems = [
-  ...NAV_HREF_ORDER.slice(0, 4).map(byHref).filter(Boolean),
+  ...NAV_HREF_ORDER.slice(0, 5).map(byHref).filter(Boolean),
   ...labMenu,
   ...feedMenu,
-  ...NAV_HREF_ORDER.slice(4).map(byHref).filter(Boolean),
+  ...NAV_HREF_ORDER.slice(5).map(byHref).filter(Boolean),
   ...customMenus,
   ...campaignsMenu,
 ] as typeof translatedEnabledMenus;
