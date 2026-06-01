@@ -21,9 +21,10 @@ import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePr
 import { useThesisRegistry } from "@/hooks/useThesisRegistry";
 import type { ThesisTrade, ThesisStatus } from "./types";
 import IntelPage from "@/pages/intel";
+import MessagesPage from "@/pages/messages";
 
 // ─── Types ───────────────────────────────────────────────
-type TabId = "analytics" | "calendar" | "tradelog" | "thesis" | "copies" | "thesisanalytics" | "intel" | "news" | "agent";
+type TabId = "analytics" | "calendar" | "tradelog" | "thesis" | "copies" | "thesisanalytics" | "intel" | "news" | "agent" | "messages";
 
 interface DayGroup {
   pnl: number;
@@ -2954,6 +2955,7 @@ export default function TheLabPage() {
     { id: "thesisanalytics", label: "[ T-STATS ]", short: "TSTA" },
     { id: "news", label: "[ NEWS ]", short: "NEWS" },
     { id: "agent", label: "[ AGENT ]", short: "AGENT" },
+    { id: "messages", label: "[ MESSAGES ]", short: "MSG" },
   ];
 
   const calendarProps = { dayGroups, onDayClick: handleDayClick, viewMonth, viewYear, onPrevMonth: prevMonth, onNextMonth: nextMonth, totalPnl };
@@ -3024,6 +3026,7 @@ export default function TheLabPage() {
         {activeTab === "intel" && <IntelPage embedded />}
         {activeTab === "news" && <NewsTab />}
         {activeTab === "agent" && <AgentView />}
+        {activeTab === "messages" && <MessagesPage />}
       </div>
     </div>
   );

@@ -272,7 +272,14 @@ export const useOrderlyConfig = () => {
   const messagesMenu = [{ name: "MESSAGES", href: "/messages" }];
   // INTEL lives as a tab inside LAB — not in the top nav
 
-const allMenuItems = [...translatedEnabledMenus, ...customMenus, ...campaignsMenu, ...labMenu, ...feedMenu, ...messagesMenu];
+const allMenuItems = [
+  ...translatedEnabledMenus.slice(0, 4),
+  ...labMenu,
+  ...feedMenu,
+  ...translatedEnabledMenus.slice(4),
+  ...customMenus,
+  ...campaignsMenu,
+];
 
     const supportedBottomNavMenus = [
       "Trading",
