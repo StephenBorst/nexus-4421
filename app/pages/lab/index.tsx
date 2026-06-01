@@ -2946,16 +2946,15 @@ export default function TheLabPage() {
   const unrealizedPnl = openPositions.reduce((s: number, p: any) => s + (p.unsettled_pnl ?? 0), 0);
 
   const tabs: { id: TabId; label: string; short: string }[] = [
-    { id: "analytics", label: "[ ANALYTICS ]", short: "STATS" },
-    { id: "calendar", label: "[ CALENDAR ]", short: "CAL" },
-    { id: "tradelog", label: "[ TRADE LOG ]", short: "LOG" },
-    { id: "thesis", label: "[ THESIS ]", short: "LAB" },
-    { id: "intel", label: "[ INTEL ]", short: "INTEL" },
-    { id: "copies", label: "[ COPIES ]", short: "COPY" },
-    { id: "thesisanalytics", label: "[ T-STATS ]", short: "TSTA" },
-    { id: "news", label: "[ NEWS ]", short: "NEWS" },
-    { id: "agent", label: "[ AGENT ]", short: "AGENT" },
-    { id: "messages", label: "[ MESSAGES ]", short: "MSG" },
+    { id: "analytics",      label: "[ ANALYTICS ]",      short: "STATS" },
+    { id: "agent",          label: "[ AGENT ]",           short: "AGENT" },
+    { id: "thesis",         label: "[ THESIS ENGINE ]",   short: "LAB"   },
+    { id: "intel",          label: "[ INTEL ]",           short: "INTEL" },
+    { id: "news",           label: "[ NEWS ]",            short: "NEWS"  },
+    { id: "copies",         label: "[ COPY TRADES ]",     short: "COPY"  },
+    { id: "calendar",       label: "[ CALENDAR ]",        short: "CAL"   },
+    { id: "tradelog",       label: "[ TRADE LOG ]",       short: "LOG"   },
+    { id: "messages",       label: "[ MESSAGES ]",        short: "MSG"   },
   ];
 
   const calendarProps = { dayGroups, onDayClick: handleDayClick, viewMonth, viewYear, onPrevMonth: prevMonth, onNextMonth: nextMonth, totalPnl };
@@ -3020,9 +3019,13 @@ export default function TheLabPage() {
               />
             : <CalendarView {...calendarProps} />
         )}
-        {activeTab === "thesis" && <ThesisView />}
+        {activeTab === "thesis" && (
+          <>
+            <ThesisView />
+            <ThesisAnalyticsView />
+          </>
+        )}
         {activeTab === "copies" && <CopiesView />}
-        {activeTab === "thesisanalytics" && <ThesisAnalyticsView />}
         {activeTab === "intel" && <IntelPage embedded />}
         {activeTab === "news" && <NewsTab />}
         {activeTab === "agent" && <AgentView />}
