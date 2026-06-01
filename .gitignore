@@ -23,3 +23,15 @@ node_modules/
 .vercel
 
 .claude/
+
+# Wrangler / Cloudflare Workers local state
+.wrangler/
+wrangler-account.json
+
+# Local KV emulator databases
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Backup files
+*.bak
