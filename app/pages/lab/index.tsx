@@ -2949,7 +2949,7 @@ export default function TheLabPage() {
     { id: "analytics",      label: "[ ANALYTICS ]",      short: "STATS" },
     { id: "agent",          label: "[ AGENT ]",           short: "AGENT" },
     { id: "thesis",         label: "[ THESIS ENGINE ]",   short: "LAB"   },
-    { id: "intel",          label: "[ INTEL ]",           short: "INTEL" },
+    { id: "intel",          label: "[ MARKET INTEL ]",    short: "INTEL" },
     { id: "news",           label: "[ NEWS ]",            short: "NEWS"  },
     { id: "copies",         label: "[ COPY TRADES ]",     short: "COPY"  },
     { id: "calendar",       label: "[ CALENDAR ]",        short: "CAL"   },
