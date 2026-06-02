@@ -21,10 +21,9 @@ import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePr
 import { useThesisRegistry } from "@/hooks/useThesisRegistry";
 import type { ThesisTrade, ThesisStatus } from "./types";
 import IntelPage from "@/pages/intel";
-import MessagesPage from "@/pages/messages";
 
 // ─── Types ───────────────────────────────────────────────
-type TabId = "analytics" | "tradelog" | "thesis" | "copies" | "intel" | "agent" | "messages";
+type TabId = "analytics" | "tradelog" | "thesis" | "copies" | "intel" | "agent";
 
 interface DayGroup {
   pnl: number;
@@ -3238,7 +3237,6 @@ export default function TheLabPage() {
     { id: "intel",          label: "[ MARKET INTEL ]",    short: "INTEL" },
     { id: "copies",         label: "[ COPY TRADES ]",     short: "COPY"  },
     { id: "tradelog",       label: "[ TRADE LOG ]",       short: "LOG"   },
-    { id: "messages",       label: "[ MESSAGES ]",        short: "MSG"   },
   ];
 
   const calendarProps = { dayGroups, onDayClick: handleDayClick, viewMonth, viewYear, onPrevMonth: prevMonth, onNextMonth: nextMonth, totalPnl };
@@ -3325,7 +3323,6 @@ export default function TheLabPage() {
         {activeTab === "copies" && <CopiesView />}
         {activeTab === "intel" && <MarketIntelView />}
         {activeTab === "agent" && <AgentView />}
-        {activeTab === "messages" && <MessagesPage />}
       </div>
     </div>
   );

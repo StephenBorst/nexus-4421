@@ -10,6 +10,7 @@ import { useSearchParams } from "react-router-dom";
 import { useAccount } from "@orderly.network/hooks";
 import { useXMTP } from "@/hooks/useXMTP";
 import type { Conversation, DecodedMessage } from "@/hooks/useXMTP";
+import { markConvoRead } from "@/utils/xmtpUnread";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -326,6 +327,11 @@ function ThreadView({
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [loadMessages]);
+
+  // Mark this thread read while it's open (clears the nav unread badge)
+  useEffect(() => {
+    markConvoRead(convo.id);
+  }, [convo.id, messages.length]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
