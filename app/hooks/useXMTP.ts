@@ -150,6 +150,18 @@ export function useXMTP() {
     return client.conversations.list() as Promise<Conversation[]>;
   }, [getClient]);
 
+  // Real-time message stream for a single conversation. Returns a closer to
+  // stop the stream. New messages arrive via onMessage with no polling delay.
+  const streamMessages = useCallback(
+    async (convo: Conversation, onMessage: (msg: DecodedMessage) => void): Promise<() => void> => {
+      const stream = await convo.stream({
+        onValue: (msg: DecodedMessage) => { if (msg) onMessage(msg); },
+      });
+      return () => { stream.end().catch(() => {}); };
+    },
+    []
+  );
+
   const getMessages = useCallback(async (convo: Conversation): Promise<DecodedMessage[]> => {
     // Pull from the network if we can, but never let a sync hiccup block reading
     // the local store — a just-sent message lives there immediately, so a failed
@@ -179,7 +191,7 @@ export function useXMTP() {
 
   return {
     ready, initializing, error,
-    init, sendDM, openDM, getConversations, getMessages, canMessage,
+    init, sendDM, openDM, getConversations, getMessages, streamMessages, canMessage,
     getClient, myAddress: xmtpAddress ?? walletAddress, myInboxId,
   };
 }

@@ -287,11 +287,13 @@ function ThreadView({
   convo,
   myInboxId,
   getMessages,
+  streamMessages,
   peerAddressHint,
 }: {
   convo: Conversation;
   myInboxId: string | null;
   getMessages: (c: Conversation) => Promise<DecodedMessage[]>;
+  streamMessages: (c: Conversation, onMessage: (msg: DecodedMessage) => void) => Promise<() => void>;
   peerAddressHint?: string;
 }) {
   const [messages, setMessages] = useState<DecodedMessage[]>([]);
@@ -323,11 +325,31 @@ function ThreadView({
 
   useEffect(() => {
     loadMessages();
-    pollRef.current = setInterval(loadMessages, 2000);
+    // Slow safety-net poll — the live stream below handles real-time delivery,
+    // this just reconciles if the stream ever drops.
+    pollRef.current = setInterval(loadMessages, 15000);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [loadMessages]);
+
+  // Real-time message stream — near-instant inbound, no polling delay.
+  useEffect(() => {
+    let cancelled = false;
+    let closer: (() => void) | null = null;
+    streamMessages(convo, (msg) => {
+      setMessages((prev) => {
+        const mid = (msg as { id?: string }).id;
+        // Drop optimistic placeholders and skip if we already have this id
+        const base = prev.filter((m) => !String((m as { id?: string }).id ?? "").startsWith("optimistic_"));
+        if (mid && base.some((m) => (m as { id?: string }).id === mid)) return base;
+        return [...base, msg];
+      });
+    })
+      .then((c) => { if (cancelled) c(); else closer = c; })
+      .catch(() => { /* stream unavailable — safety-net poll covers it */ });
+    return () => { cancelled = true; if (closer) closer(); };
+  }, [convo, streamMessages]);
 
   // Mark this thread read while it's open (clears the nav unread badge)
   useEffect(() => {
@@ -437,7 +459,7 @@ export default function MessagesPage() {
   const dmParam = searchParams.get("dm");
 
   const xmtp = useXMTP();
-  const { ready, initializing, error, init, getConversations, getMessages, myInboxId } = xmtp;
+  const { ready, initializing, error, init, getConversations, getMessages, streamMessages, myInboxId } = xmtp;
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvo, setActiveConvo] = useState<Conversation | null>(null);
@@ -680,6 +702,7 @@ export default function MessagesPage() {
               convo={activeConvo}
               myInboxId={myInboxId}
               getMessages={getMessages}
+              streamMessages={streamMessages}
               peerAddressHint={activePeerHint}
             />
           ) : (
