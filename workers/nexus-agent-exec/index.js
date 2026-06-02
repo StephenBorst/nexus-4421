@@ -230,10 +230,11 @@ async function processUser(address, env, cache) {
 }
 
 async function enterPosition(address, state, config, signal, env, cache) {
-  const keyRaw = await env.NEXUS_AGENT.get(`agent:key:${address}`);
-  if (!keyRaw) { console.error(`[exec] no key for ${address.slice(0, 10)}`); return; }
-  const keyData = JSON.parse(keyRaw);
-  keyData.tradingKey = await decryptTradingKey(keyData.tradingKey, env);
+  // PAPER mode simulates the full trade lifecycle without ever touching a real
+  // trading key or placing a live order. Everything else (sizing, mark price,
+  // TP/SL/timeout management, daily limits) runs identically so results are
+  // realistic — they're just recorded to a separate paper ledger in state.
+  const paper = config.mode === "PAPER";
 
   const symbol = signal.symbol;
   const side = signal.direction === "SHORT" ? "SELL" : "BUY";
@@ -248,11 +249,6 @@ async function enterPosition(address, state, config, signal, env, cache) {
   const baseTick = info.base_tick || 0.001;
   const baseMin = info.base_min || baseTick;
   const minNotional = info.min_notional || 0;
-
-  // Set leverage
-  await orderlyRequest(keyData, "POST", "/v1/client/leverage", {
-    symbol, leverage: config.leverage,
-  });
 
   // Calculate qty, snapped to base_tick. Format to the tick's decimal places so
   // floating-point artifacts (e.g. 340 * 1e-5 = 0.0034000000000000007) don't
@@ -271,18 +267,32 @@ async function enterPosition(address, state, config, signal, env, cache) {
     return;
   }
 
-  // Place market order
-  const order = await orderlyRequest(keyData, "POST", "/v1/order", {
-    symbol,
-    order_type: "MARKET",
-    side,
-    order_quantity: qty,
-    broker_id: "nexus_trading",
-  });
+  let orderId = null;
+  if (!paper) {
+    const keyRaw = await env.NEXUS_AGENT.get(`agent:key:${address}`);
+    if (!keyRaw) { console.error(`[exec] no key for ${address.slice(0, 10)}`); return; }
+    const keyData = JSON.parse(keyRaw);
+    keyData.tradingKey = await decryptTradingKey(keyData.tradingKey, env);
 
-  if (order.success === false) {
-    console.error(`[exec] ${address.slice(0, 10)} order failed:`, JSON.stringify(order));
-    return;
+    // Set leverage
+    await orderlyRequest(keyData, "POST", "/v1/client/leverage", {
+      symbol, leverage: config.leverage,
+    });
+
+    // Place market order
+    const order = await orderlyRequest(keyData, "POST", "/v1/order", {
+      symbol,
+      order_type: "MARKET",
+      side,
+      order_quantity: qty,
+      broker_id: "nexus_trading",
+    });
+
+    if (order.success === false) {
+      console.error(`[exec] ${address.slice(0, 10)} order failed:`, JSON.stringify(order));
+      return;
+    }
+    orderId = order.data?.order_id;
   }
 
   // Update state
@@ -294,13 +304,14 @@ async function enterPosition(address, state, config, signal, env, cache) {
     pnl_percent: 0,
     qty,
     opened_at: Date.now(),
-    order_id: order.data?.order_id,
+    order_id: orderId,
+    paper,
   };
   state.last_trade_time = Date.now();
   state.trades_today = (state.trades_today || 0) + 1;
   await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
 
-  console.log(`[exec] ${address.slice(0, 10)} ENTER ${signal.direction} ${symbol} @ ${markPrice} qty=${qty}`);
+  console.log(`[exec] ${address.slice(0, 10)} ${paper ? "PAPER " : ""}ENTER ${signal.direction} ${symbol} @ ${markPrice} qty=${qty}`);
 }
 
 async function monitorPosition(address, state, config, env, cache) {
@@ -314,7 +325,8 @@ async function monitorPosition(address, state, config, env, cache) {
   // exchange shows flat, clear the stale record and resume scanning (honoring
   // the cooldown). If the check itself fails (API hiccup), fall through and
   // manage on cached data rather than risk discarding a real position.
-  const keyRaw = await env.NEXUS_AGENT.get(`agent:key:${address}`);
+  // Paper positions have no exchange counterpart — skip reconciliation entirely.
+  const keyRaw = pos.paper ? null : await env.NEXUS_AGENT.get(`agent:key:${address}`);
   if (keyRaw) {
     try {
       const keyData = JSON.parse(keyRaw);
@@ -374,27 +386,31 @@ async function monitorPosition(address, state, config, env, cache) {
 async function closePosition(address, state, env, reason, cache) {
   const pos = state.current_position;
   if (!pos) return;
+  const paper = !!pos.paper;
 
-  const keyRaw = await env.NEXUS_AGENT.get(`agent:key:${address}`);
-  // If key was deleted (kill switch), we still try to close with cached data
-  // but may fail — that's acceptable, position will auto-liquidate or user closes manually
+  // Real positions: send a reduce-only market close. Paper positions never
+  // touched the exchange, so there's nothing to close — skip straight to P&L.
+  if (!paper) {
+    const keyRaw = await env.NEXUS_AGENT.get(`agent:key:${address}`);
+    // If key was deleted (kill switch), we still try to close with cached data
+    // but may fail — that's acceptable, position will auto-liquidate or user closes manually
+    if (keyRaw) {
+      const keyData = JSON.parse(keyRaw);
+      keyData.tradingKey = await decryptTradingKey(keyData.tradingKey, env);
+      const closeSide = pos.direction === "LONG" ? "SELL" : "BUY";
 
-  if (keyRaw) {
-    const keyData = JSON.parse(keyRaw);
-    keyData.tradingKey = await decryptTradingKey(keyData.tradingKey, env);
-    const closeSide = pos.direction === "LONG" ? "SELL" : "BUY";
-
-    try {
-      await orderlyRequest(keyData, "POST", "/v1/order", {
-        symbol: pos.symbol,
-        order_type: "MARKET",
-        side: closeSide,
-        order_quantity: pos.qty,
-        reduce_only: true,
-        broker_id: "nexus_trading",
-      });
-    } catch (e) {
-      console.error(`[exec] ${address.slice(0, 10)} close order failed:`, e.message);
+      try {
+        await orderlyRequest(keyData, "POST", "/v1/order", {
+          symbol: pos.symbol,
+          order_type: "MARKET",
+          side: closeSide,
+          order_quantity: pos.qty,
+          reduce_only: true,
+          broker_id: "nexus_trading",
+        });
+      } catch (e) {
+        console.error(`[exec] ${address.slice(0, 10)} close order failed:`, e.message);
+      }
     }
   }
 
@@ -413,33 +429,42 @@ async function closePosition(address, state, env, reason, cache) {
   state.daily_pnl = (state.daily_pnl || 0) + pnlUsdc;
   state.current_position = null;
 
-  // Log to Supabase
-  try {
-    await fetch(`${env.SUPABASE_URL}/rest/v1/agent_trades`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: env.SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${env.SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify({
-        wallet_address: address,
-        symbol: pos.symbol,
-        direction: pos.direction,
-        entry_price: pos.entry_price,
-        exit_price: exitPrice,
-        qty: pos.qty,
-        pnl: pnlUsdc,
-        pnl_percent: pnlPct,
-        reason,
-        opened_at: new Date(pos.opened_at).toISOString(),
-        closed_at: new Date().toISOString(),
-      }),
-    });
-  } catch (e) {
-    console.error(`[exec] ${address.slice(0, 10)} supabase log failed:`, e.message);
+  const trade = {
+    symbol: pos.symbol,
+    direction: pos.direction,
+    entry_price: pos.entry_price,
+    exit_price: exitPrice,
+    qty: pos.qty,
+    pnl: pnlUsdc,
+    pnl_percent: pnlPct,
+    reason,
+    opened_at: new Date(pos.opened_at).toISOString(),
+    closed_at: new Date().toISOString(),
+  };
+
+  if (paper) {
+    // Paper trades live in state (rides along in the API's state response) so
+    // they stay completely separate from the real Supabase track record.
+    state.paper_trades = state.paper_trades || [];
+    state.paper_trades.unshift({ id: `paper_${Date.now()}`, ...trade });
+    if (state.paper_trades.length > 50) state.paper_trades.pop(); // keep last 50
+  } else {
+    // Log real trades to Supabase
+    try {
+      await fetch(`${env.SUPABASE_URL}/rest/v1/agent_trades`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: env.SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${env.SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ wallet_address: address, ...trade }),
+      });
+    } catch (e) {
+      console.error(`[exec] ${address.slice(0, 10)} supabase log failed:`, e.message);
+    }
   }
 
   await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
-  console.log(`[exec] ${address.slice(0, 10)} CLOSE ${pos.direction} ${pos.symbol} reason=${reason} pnl=$${pnlUsdc.toFixed(4)}`);
+  console.log(`[exec] ${address.slice(0, 10)} ${paper ? "PAPER " : ""}CLOSE ${pos.direction} ${pos.symbol} reason=${reason} pnl=$${pnlUsdc.toFixed(4)}`);
 }

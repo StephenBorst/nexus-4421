@@ -2249,13 +2249,14 @@ interface AgentConfig {
   maxTradesPerDay: number;
   maxDailyLossUsdc: number;
   fundingThreshold: number;
-  mode: "ASSISTED" | "AUTONOMOUS";
+  mode: "ASSISTED" | "AUTONOMOUS" | "PAPER";
 }
 
 interface AgentState {
   active: boolean;
   daily_pnl: number;
   trades_today: number;
+  paper_trades?: AgentTrade[];
   current_position: {
     symbol: string;
     direction: "LONG" | "SHORT";
@@ -2263,6 +2264,7 @@ interface AgentState {
     current_price: number;
     pnl_percent: number;
     opened_at: number;
+    paper?: boolean;
   } | null;
   last_signal: {
     symbol: string;
@@ -2307,7 +2309,7 @@ const DEFAULT_CONFIG: AgentConfig = {
   maxTradesPerDay: 10,
   maxDailyLossUsdc: 5,
   fundingThreshold: 0.01,
-  mode: "ASSISTED",
+  mode: "PAPER", // new users start in risk-free simulation by default
 };
 
 const agentCardStyle: React.CSSProperties = {
@@ -2338,6 +2340,62 @@ const agentInputStyle: React.CSSProperties = {
   width: "100%",
   outline: "none",
 };
+
+// ─── Agent Track Record (shared by live + paper) ─────────
+function AgentTrackRecord({ title, accent, trades, paper }: {
+  title: string;
+  accent: string;
+  trades: AgentTrade[];
+  paper?: boolean;
+}) {
+  const tr = trades.length;
+  const wins = trades.filter((t) => t.pnl > 0).length;
+  const wr = tr ? (wins / tr) * 100 : 0;
+  const net = trades.reduce((s, t) => s + t.pnl, 0);
+  const winsArr = trades.filter((t) => t.pnl > 0);
+  const lossArr = trades.filter((t) => t.pnl <= 0);
+  const avgWin = winsArr.length ? winsArr.reduce((s, t) => s + t.pnl, 0) / winsArr.length : 0;
+  const avgLoss = lossArr.length ? lossArr.reduce((s, t) => s + Math.abs(t.pnl), 0) / lossArr.length : 0;
+  const since = tr ? new Date(Math.min(...trades.map((t) => new Date(t.opened_at).getTime() || Date.now()))).toLocaleDateString() : null;
+
+  return (
+    <div style={{ ...agentCardStyle, borderColor: tr > 0 ? (net >= 0 ? "#1a4a2a" : "#4a1a1a") : "#1e2d1e" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ ...agentLabelStyle, color: accent }}>{title}</div>
+        {since && <span style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>since {since}</span>}
+      </div>
+      {tr === 0 ? (
+        <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 11, marginTop: 8, lineHeight: 1.6 }}>
+          {paper
+            ? <>No paper trades yet — switch to 🧪 PAPER and activate to build a simulated track record against live prices. Risk-free.</>
+            : <>No live track record yet — this agent hasn't traded for you. Stats build here transparently from its first trade. <strong style={{ color: "#8aaa9a" }}>Start small.</strong></>}
+        </div>
+      ) : (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginTop: 8 }}>
+            {[
+              { label: "NET P&L", value: `${net >= 0 ? "+" : ""}$${Math.abs(net).toFixed(2)}`, color: net >= 0 ? "#00ff88" : "#ff4444" },
+              { label: "WIN RATE", value: `${wr.toFixed(1)}%`, color: wr >= 50 ? "#00ff88" : "#ff4444" },
+              { label: "TRADES", value: String(tr), color: "#c0c0c0" },
+              { label: "AVG WIN", value: `$${avgWin.toFixed(2)}`, color: "#00ff88" },
+              { label: "AVG LOSS", value: `$${avgLoss.toFixed(2)}`, color: "#ff4444" },
+            ].map(({ label, value, color }) => (
+              <div key={label}>
+                <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
+                <div style={{ color, fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>{value}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 10, fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", lineHeight: 1.5 }}>
+            {paper
+              ? "🧪 Simulated results — paper trades never touch the exchange. A great paper record is encouraging, not a guarantee."
+              : "⚠ Past performance does not guarantee future results. Markets are risky — only deploy capital you can afford to lose, and start small."}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 const agentBtnStyle = (active: boolean): React.CSSProperties => ({
   background: active ? "#00ff8820" : "#1a1a2e",
@@ -2448,7 +2506,8 @@ function AgentView() {
 
   async function activateAgent() {
     if (!walletAddress) { setError("Connect wallet first"); return; }
-    if (!tradingKey) { setError("No Orderly trading key found — place at least one trade first to generate it"); return; }
+    // PAPER mode never places real orders, so it doesn't need a trading key.
+    if (config.mode !== "PAPER" && !tradingKey) { setError("No Orderly trading key found — place at least one trade first to generate it"); return; }
     setSaving(true);
     setError(null);
     try {
@@ -2607,51 +2666,12 @@ function AgentView() {
       {/* ─── CONFIG TAB ──────────────────────────────────── */}
       {tab === "config" && (
         <div>
-          {/* Track record — surfaced before activation so users judge on real numbers */}
-          {(() => {
-            const tr = trades.length;
-            const wins = trades.filter((t) => t.pnl > 0).length;
-            const wr = tr ? (wins / tr) * 100 : 0;
-            const net = trades.reduce((s, t) => s + t.pnl, 0);
-            const winsArr = trades.filter((t) => t.pnl > 0);
-            const lossArr = trades.filter((t) => t.pnl <= 0);
-            const avgWin = winsArr.length ? winsArr.reduce((s, t) => s + t.pnl, 0) / winsArr.length : 0;
-            const avgLoss = lossArr.length ? lossArr.reduce((s, t) => s + Math.abs(t.pnl), 0) / lossArr.length : 0;
-            const since = tr ? new Date(Math.min(...trades.map((t) => new Date(t.opened_at).getTime() || Date.now()))).toLocaleDateString() : null;
-            return (
-              <div style={{ ...agentCardStyle, borderColor: tr > 0 ? (net >= 0 ? "#1a4a2a" : "#4a1a1a") : "#1e2d1e" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={agentLabelStyle}>// AGENT TRACK RECORD</div>
-                  {since && <span style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>since {since}</span>}
-                </div>
-                {tr === 0 ? (
-                  <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 11, marginTop: 8, lineHeight: 1.6 }}>
-                    No track record yet — this agent hasn't traded for you. Stats will build here transparently from its first trade. <strong style={{ color: "#8aaa9a" }}>Start small.</strong>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginTop: 8 }}>
-                      {[
-                        { label: "NET P&L", value: `${net >= 0 ? "+" : ""}$${Math.abs(net).toFixed(2)}`, color: net >= 0 ? "#00ff88" : "#ff4444" },
-                        { label: "WIN RATE", value: `${wr.toFixed(1)}%`, color: wr >= 50 ? "#00ff88" : "#ff4444" },
-                        { label: "TRADES", value: String(tr), color: "#c0c0c0" },
-                        { label: "AVG WIN", value: `$${avgWin.toFixed(2)}`, color: "#00ff88" },
-                        { label: "AVG LOSS", value: `$${avgLoss.toFixed(2)}`, color: "#ff4444" },
-                      ].map(({ label, value, color }) => (
-                        <div key={label}>
-                          <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
-                          <div style={{ color, fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>{value}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ marginTop: 10, fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", lineHeight: 1.5 }}>
-                      ⚠ Past performance does not guarantee future results. Markets are risky — only deploy capital you can afford to lose, and start small.
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })()}
+          {/* Track record — surfaced before activation so users judge on real numbers.
+              Live (Supabase) and Paper (state ledger) are kept strictly separate. */}
+          {(config.mode === "PAPER" || (agentState?.paper_trades?.length ?? 0) > 0) && (
+            <AgentTrackRecord title="// 🧪 PAPER TRACK RECORD" accent="#4a9fff" trades={agentState?.paper_trades ?? []} paper />
+          )}
+          <AgentTrackRecord title="// LIVE TRACK RECORD" accent="#8aaa9a" trades={trades} />
 
           {/* Onboarding + key-status panel */}
           <div style={{ ...agentCardStyle, borderColor: tradingKey ? "#1a3a2a" : "#4a3a00" }}>
@@ -2678,26 +2698,38 @@ function AgentView() {
           <div style={agentCardStyle}>
             <div style={agentLabelStyle}>// EXECUTION MODE</div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              {(["ASSISTED", "AUTONOMOUS"] as const).map((mode) => (
-                <button key={mode} onClick={() => setConfig({ ...config, mode })} style={{
-                  flex: 1,
-                  background: config.mode === mode ? (mode === "AUTONOMOUS" ? "#ff880020" : "#00ff8820") : "#0a0e0a",
-                  border: `1px solid ${config.mode === mode ? (mode === "AUTONOMOUS" ? "#ff8800" : "#00ff88") : "#1e2d1e"}`,
-                  borderRadius: 4, padding: "10px 16px", cursor: "pointer",
-                  color: config.mode === mode ? (mode === "AUTONOMOUS" ? "#ff8800" : "#00ff88") : "#4a7a5a",
-                  fontFamily: "monospace", fontSize: 12, letterSpacing: "0.05em",
-                }}>
-                  <div style={{ fontWeight: 600 }}>{mode}</div>
-                  <div style={{ fontSize: 9, marginTop: 4, opacity: 0.7 }}>
-                    {mode === "ASSISTED" ? "Agent generates thesis → you review + deploy" : "Agent executes automatically within your risk params"}
-                  </div>
-                </button>
-              ))}
+              {([
+                { mode: "PAPER" as const,      color: "#4a9fff", desc: "Simulated — no real orders, no key needed. Test risk-free." },
+                { mode: "ASSISTED" as const,   color: "#00ff88", desc: "Agent generates thesis → you review + deploy" },
+                { mode: "AUTONOMOUS" as const, color: "#ff8800", desc: "Agent executes automatically within your risk params" },
+              ]).map(({ mode, color, desc }) => {
+                const sel = config.mode === mode;
+                return (
+                  <button key={mode} onClick={() => setConfig({ ...config, mode })} style={{
+                    flex: 1,
+                    background: sel ? `${color}20` : "#0a0e0a",
+                    border: `1px solid ${sel ? color : "#1e2d1e"}`,
+                    borderRadius: 4, padding: "10px 16px", cursor: "pointer",
+                    color: sel ? color : "#4a7a5a",
+                    fontFamily: "monospace", fontSize: 12, letterSpacing: "0.05em",
+                  }}>
+                    <div style={{ fontWeight: 600 }}>{mode === "PAPER" ? "🧪 PAPER" : mode}</div>
+                    <div style={{ fontSize: 9, marginTop: 4, opacity: 0.7 }}>{desc}</div>
+                  </button>
+                );
+              })}
             </div>
             {config.mode === "AUTONOMOUS" && (
               <div style={{ marginTop: 8, padding: 8, background: "#1a0e00", border: "1px solid #ff880030", borderRadius: 3 }}>
                 <span style={{ color: "#ff8800", fontFamily: "monospace", fontSize: 10 }}>
                   ⚠ AUTONOMOUS MODE — Agent will execute trades using your Orderly trading key. Your wallet keys are never stored. The trading key can place orders but CANNOT withdraw funds. You can deactivate at any time.
+                </span>
+              </div>
+            )}
+            {config.mode === "PAPER" && (
+              <div style={{ marginTop: 8, padding: 8, background: "#0a1420", border: "1px solid #4a9fff30", borderRadius: 3 }}>
+                <span style={{ color: "#4a9fff", fontFamily: "monospace", fontSize: 10 }}>
+                  🧪 PAPER MODE — The agent runs its full strategy against live prices but places <strong>zero real orders</strong>. No trading key required. Results are recorded to a separate paper track record below so you can prove it out before risking a cent.
                 </span>
               </div>
             )}
@@ -2781,7 +2813,9 @@ function AgentView() {
           {!isActive && (
             <div style={{ marginTop: 16, padding: "8px 10px", borderRadius: 3, background: "#0a0e0a", border: "1px solid #1e2d1e" }}>
               <span style={{ fontFamily: "monospace", fontSize: 10, color: "#4a7a5a", lineHeight: 1.6 }}>
-                🔒 By activating, your order-only Orderly key is stored encrypted to let the agent trade on your behalf. It <strong style={{ color: "#8aaa9a" }}>cannot withdraw or transfer funds</strong>. Trading is risky — only deploy capital you can afford to lose. Deactivate anytime.
+                {config.mode === "PAPER"
+                  ? <>🧪 Paper mode is fully simulated — <strong style={{ color: "#8aaa9a" }}>no key stored, no orders placed, no funds at risk</strong>. Activate to start building a paper track record against live prices.</>
+                  : <>🔒 By activating, your order-only Orderly key is stored encrypted to let the agent trade on your behalf. It <strong style={{ color: "#8aaa9a" }}>cannot withdraw or transfer funds</strong>. Trading is risky — only deploy capital you can afford to lose. Deactivate anytime.</>}
               </span>
             </div>
           )}
@@ -2830,10 +2864,10 @@ function AgentView() {
             )}
           </div>
 
-          {!tradingKey && (
+          {!tradingKey && config.mode !== "PAPER" && (
             <div style={{ marginTop: 12, padding: 10, background: "#1a1a0a", border: "1px solid #ff880030", borderRadius: 3 }}>
               <span style={{ color: "#ff8800", fontFamily: "monospace", fontSize: 11 }}>
-                ⚠ No Orderly trading key detected. Place at least one manual trade on Nexus first — the SDK generates your trading key on first trade. This key allows order placement only and cannot withdraw funds.
+                ⚠ No Orderly trading key detected. Place at least one manual trade on Nexus first — the SDK generates your trading key on first trade. This key allows order placement only and cannot withdraw funds. <strong style={{ color: "#4a9fff" }}>Or try 🧪 PAPER mode — no key needed.</strong>
               </span>
             </div>
           )}
@@ -2904,8 +2938,8 @@ function AgentView() {
               </div>
               <div>
                 <div style={{ ...agentLabelStyle, fontSize: 9 }}>MODE</div>
-                <div style={{ color: config.mode === "AUTONOMOUS" ? "#ff8800" : "#00ff88", fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>
-                  {config.mode}
+                <div style={{ color: config.mode === "AUTONOMOUS" ? "#ff8800" : config.mode === "PAPER" ? "#4a9fff" : "#00ff88", fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>
+                  {config.mode === "PAPER" ? "🧪 PAPER" : config.mode}
                 </div>
               </div>
               <div>
@@ -2978,7 +3012,12 @@ function AgentView() {
 
           {hasPosition && agentState?.current_position && (
             <div style={{ ...agentCardStyle, borderColor: agentState.current_position.direction === "LONG" ? "#00ff8840" : "#ff444440" }}>
-              <div style={agentLabelStyle}>// CURRENT POSITION</div>
+              <div style={{ ...agentLabelStyle, display: "flex", alignItems: "center", gap: 8 }}>
+                // CURRENT POSITION
+                {agentState.current_position.paper && (
+                  <span style={{ color: "#4a9fff", border: "1px solid #4a9fff40", borderRadius: 3, padding: "1px 6px", fontSize: 8 }}>🧪 PAPER</span>
+                )}
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>SYMBOL</div>
@@ -3077,13 +3116,21 @@ function AgentView() {
       )}
 
       {/* ─── HISTORY TAB ─────────────────────────────────── */}
-      {tab === "history" && (
+      {tab === "history" && (() => {
+        const isPaperHist = config.mode === "PAPER";
+        const histTrades = isPaperHist ? (agentState?.paper_trades ?? []) : trades;
+        return (
         <div>
           <div style={agentCardStyle}>
-            <div style={agentLabelStyle}>// AGENT TRADE HISTORY</div>
-            {trades.length === 0 ? (
+            <div style={{ ...agentLabelStyle, display: "flex", alignItems: "center", gap: 8 }}>
+              // AGENT TRADE HISTORY
+              {isPaperHist && <span style={{ color: "#4a9fff", border: "1px solid #4a9fff40", borderRadius: 3, padding: "1px 6px", fontSize: 8 }}>🧪 PAPER</span>}
+            </div>
+            {histTrades.length === 0 ? (
               <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 12, padding: 20, textAlign: "center" }}>
-                No trades recorded yet. Agent will log trades here once active.
+                {isPaperHist
+                  ? "No paper trades yet. Activate in PAPER mode to start simulating."
+                  : "No trades recorded yet. Agent will log trades here once active."}
               </div>
             ) : (
               <div style={{ marginTop: 8 }}>
@@ -3092,7 +3139,7 @@ function AgentView() {
                     <span key={h} style={{ ...agentLabelStyle, fontSize: 9, marginBottom: 0 }}>{h}</span>
                   ))}
                 </div>
-                {trades.map((trade, i) => (
+                {histTrades.map((trade, i) => (
                   <div key={trade.id || i} style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr", gap: 8, padding: "8px 0", borderBottom: "1px solid #0d1117" }}>
                     <span style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 12 }}>
                       {trade.symbol.replace("PERP_", "").replace("_USDC", "")}
@@ -3118,21 +3165,24 @@ function AgentView() {
             )}
           </div>
 
-          {trades.length > 0 && (() => {
-            const agentTotalPnl = trades.reduce((s, t) => s + t.pnl, 0);
-            const agentWins = trades.filter((t) => t.pnl > 0).length;
-            const agentWinRate = ((agentWins / trades.length) * 100).toFixed(1);
-            const agentAvgWin = trades.filter((t) => t.pnl > 0).reduce((s, t) => s + t.pnl, 0) / (agentWins || 1);
-            const agentLosses = trades.filter((t) => t.pnl <= 0);
+          {histTrades.length > 0 && (() => {
+            const agentTotalPnl = histTrades.reduce((s, t) => s + t.pnl, 0);
+            const agentWins = histTrades.filter((t) => t.pnl > 0).length;
+            const agentWinRate = ((agentWins / histTrades.length) * 100).toFixed(1);
+            const agentAvgWin = histTrades.filter((t) => t.pnl > 0).reduce((s, t) => s + t.pnl, 0) / (agentWins || 1);
+            const agentLosses = histTrades.filter((t) => t.pnl <= 0);
             const agentAvgLoss = agentLosses.reduce((s, t) => s + Math.abs(t.pnl), 0) / (agentLosses.length || 1);
             return (
               <div style={agentCardStyle}>
-                <div style={agentLabelStyle}>// AGENT PERFORMANCE</div>
+                <div style={{ ...agentLabelStyle, display: "flex", alignItems: "center", gap: 8 }}>
+                  // AGENT PERFORMANCE
+                  {isPaperHist && <span style={{ color: "#4a9fff", border: "1px solid #4a9fff40", borderRadius: 3, padding: "1px 6px", fontSize: 8 }}>🧪 PAPER</span>}
+                </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
                   {[
                     { label: "TOTAL P&L", value: `$${agentTotalPnl.toFixed(2)}`, color: agentTotalPnl >= 0 ? "#00ff88" : "#ff4444" },
                     { label: "WIN RATE", value: `${agentWinRate}%`, color: "#c0c0c0" },
-                    { label: "TRADES", value: `${trades.length}`, color: "#c0c0c0" },
+                    { label: "TRADES", value: `${histTrades.length}`, color: "#c0c0c0" },
                     { label: "AVG WIN", value: `$${agentAvgWin.toFixed(2)}`, color: "#00ff88" },
                     { label: "AVG LOSS", value: `$${agentAvgLoss.toFixed(2)}`, color: "#ff4444" },
                   ].map(({ label, value, color }) => (
@@ -3146,7 +3196,8 @@ function AgentView() {
             );
           })()}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

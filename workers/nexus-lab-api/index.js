@@ -2502,11 +2502,16 @@ document.getElementById("btn").addEventListener("click",go);
         let body;
         try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
         const { config, tradingKey, accountId } = body;
-        if (!config || !tradingKey) return json({ error: "config and tradingKey required" }, request, 400);
+        // PAPER mode is fully simulated — it never places real orders, so no
+        // trading key is required or stored.
+        const isPaper = config?.mode === "PAPER";
+        if (!config || (!isPaper && !tradingKey)) return json({ error: "config and tradingKey required" }, request, 400);
         await AGENT_KV.put(`agent:config:${address}`, JSON.stringify(config));
-        // Encrypt the trading key at rest — KV never holds it in plaintext.
-        const encryptedKey = await encryptSecret(tradingKey, env);
-        await AGENT_KV.put(`agent:key:${address}`, JSON.stringify({ tradingKey: encryptedKey, accountId, registeredAt: Date.now(), enc: "v1" }));
+        if (!isPaper) {
+          // Encrypt the trading key at rest — KV never holds it in plaintext.
+          const encryptedKey = await encryptSecret(tradingKey, env);
+          await AGENT_KV.put(`agent:key:${address}`, JSON.stringify({ tradingKey: encryptedKey, accountId, registeredAt: Date.now(), enc: "v1" }));
+        }
         const existingState = await AGENT_KV.get(`agent:state:${address}`);
         const state = existingState ? JSON.parse(existingState) : { active: true, daily_pnl: 0, trades_today: 0, last_reset: Date.now(), current_position: null, last_signal: null };
         state.active = true;
