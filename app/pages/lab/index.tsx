@@ -24,7 +24,7 @@ import IntelPage from "@/pages/intel";
 import MessagesPage from "@/pages/messages";
 
 // ─── Types ───────────────────────────────────────────────
-type TabId = "analytics" | "calendar" | "tradelog" | "thesis" | "copies" | "thesisanalytics" | "intel" | "news" | "agent" | "messages";
+type TabId = "analytics" | "tradelog" | "thesis" | "copies" | "intel" | "agent" | "messages";
 
 interface DayGroup {
   pnl: number;
@@ -656,13 +656,16 @@ function TradeLogAllView({
   dayGroups,
   onDaySelect,
   notes,
+  calendarProps,
 }: {
   dayGroups: Record<string, DayGroup>;
   onDaySelect: (key: string, day: number) => void;
   notes: Record<string, string>;
+  calendarProps: React.ComponentProps<typeof CalendarView>;
 }) {
   const [filter, setFilter] = useState<"all" | "wins" | "losses">("all");
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<"list" | "calendar">("list");
 
   const sortedDays = useMemo(() =>
     Object.entries(dayGroups)
@@ -687,17 +690,48 @@ function TradeLogAllView({
   const totalTrades = useMemo(() => sortedDays.reduce((s, [, g]) => s + g.trades, 0), [sortedDays]);
   const winDays = useMemo(() => sortedDays.filter(([, g]) => g.pnl > 0).length, [sortedDays]);
 
-  if (sortedDays.length === 0) {
-    return <EmptyState message="no closed trades found — connect wallet to load your trade history" />;
-  }
-
   const formatKey = (key: string) => {
     const [y, m, d] = key.split("-").map(Number);
     return new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
   };
 
+  const viewToggle = (
+    <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+      {([
+        { id: "list" as const, label: "▤ LIST" },
+        { id: "calendar" as const, label: "▦ CALENDAR" },
+      ]).map(({ id, label }) => (
+        <button key={id} onClick={() => setView(id)} style={{
+          ...navBtnStyle, fontSize: 10, padding: "5px 16px",
+          color: view === id ? "#00ff88" : "#3a5a4a",
+          borderColor: view === id ? "#1a4a2a" : "#1a2e1a",
+          background: view === id ? "#0a2a0a" : "transparent",
+        }}>{label}</button>
+      ))}
+    </div>
+  );
+
+  if (view === "calendar") {
+    return (
+      <div>
+        {viewToggle}
+        <CalendarView {...calendarProps} />
+      </div>
+    );
+  }
+
+  if (sortedDays.length === 0) {
+    return (
+      <div>
+        {viewToggle}
+        <EmptyState message="no closed trades found — connect wallet to load your trade history" />
+      </div>
+    );
+  }
+
   return (
     <div>
+      {viewToggle}
       {/* ── Summary bar ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
         {[
@@ -2844,6 +2878,59 @@ function AgentView() {
             </div>
           </div>
 
+          {/* ── GUARDRAILS (always visible while live) ── */}
+          {(() => {
+            const dailyLoss = Math.max(0, -(agentState?.daily_pnl ?? 0));
+            const lossPct = Math.min(100, (dailyLoss / (config.maxDailyLossUsdc || 1)) * 100);
+            const tradesPct = Math.min(100, ((agentState?.trades_today ?? 0) / (config.maxTradesPerDay || 1)) * 100);
+            const barColor = (pct: number) => pct >= 90 ? "#ff4444" : pct >= 60 ? "#fbbf24" : "#00ff88";
+            return (
+              <div style={{ ...agentCardStyle, borderColor: lossPct >= 90 ? "#ff444460" : "#1a3a2a" }}>
+                <div style={{ ...agentLabelStyle, color: "#00ff88" }}>🛡 ACTIVE GUARDRAILS</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 10 }}>
+                  {/* Daily loss limit */}
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ ...agentLabelStyle, fontSize: 9 }}>DAILY LOSS LIMIT</span>
+                      <span style={{ fontFamily: "monospace", fontSize: 10, color: barColor(lossPct) }}>${dailyLoss.toFixed(2)} / ${config.maxDailyLossUsdc}</span>
+                    </div>
+                    <div style={{ height: 6, background: "#0a0e0a", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${lossPct}%`, background: barColor(lossPct), transition: "width 0.3s" }} />
+                    </div>
+                    <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", marginTop: 4 }}>auto-halts trading at limit</div>
+                  </div>
+                  {/* Trades today */}
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ ...agentLabelStyle, fontSize: 9 }}>TRADES TODAY</span>
+                      <span style={{ fontFamily: "monospace", fontSize: 10, color: barColor(tradesPct) }}>{agentState?.trades_today ?? 0} / {config.maxTradesPerDay}</span>
+                    </div>
+                    <div style={{ height: 6, background: "#0a0e0a", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${tradesPct}%`, background: barColor(tradesPct), transition: "width 0.3s" }} />
+                    </div>
+                    <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", marginTop: 4 }}>stops opening new trades at cap</div>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 14, paddingTop: 12, borderTop: "1px solid #1a2e1a" }}>
+                  {[
+                    { label: "MAX LEVERAGE", value: `${config.leverage}x` },
+                    { label: "STOP / TRADE", value: `${config.slPercent}%` },
+                    { label: "MAX HOLD", value: `${config.maxHoldHours}h` },
+                    { label: "MAX RISK / TRADE", value: `$${(config.capitalPerTrade * (config.slPercent / 100) * config.leverage).toFixed(2)}` },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
+                      <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 14, fontWeight: 600 }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: 12, fontFamily: "monospace", fontSize: 10, color: "#4a7a5a", lineHeight: 1.5 }}>
+                  🔒 Order-only key — the agent <strong style={{ color: "#8aaa9a" }}>cannot withdraw or transfer funds</strong>. Hit ⚡ KILL on the config tab to flatten and stop instantly.
+                </div>
+              </div>
+            );
+          })()}
+
           {hasPosition && agentState?.current_position && (
             <div style={{ ...agentCardStyle, borderColor: agentState.current_position.direction === "LONG" ? "#00ff8840" : "#ff444440" }}>
               <div style={agentLabelStyle}>// CURRENT POSITION</div>
@@ -3020,6 +3107,68 @@ function AgentView() {
 }
 
 // ─── Main Page ───────────────────────────────────────────
+// ─── Market Intel (Intel + News merged) ──────────────────
+function MarketIntelView() {
+  const [sub, setSub] = useState<"intel" | "news">("intel");
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        {([
+          { id: "intel" as const, label: "INTEL" },
+          { id: "news" as const, label: "NEWS" },
+        ]).map(({ id, label }) => (
+          <button key={id} onClick={() => setSub(id)} style={{
+            ...navBtnStyle, fontSize: 10, padding: "5px 16px",
+            color: sub === id ? "#00ff88" : "#3a5a4a",
+            borderColor: sub === id ? "#1a4a2a" : "#1a2e1a",
+            background: sub === id ? "#0a2a0a" : "transparent",
+          }}>{label}</button>
+        ))}
+      </div>
+      {sub === "intel" ? <IntelPage embedded /> : <NewsTab />}
+    </div>
+  );
+}
+
+// ─── First-run Welcome (disconnected) ────────────────────
+function LabWelcome() {
+  const features = [
+    { icon: "◈", title: "THESIS ENGINE", desc: "Plan every trade — position sizing, R:R, funding cost, live P&L tracking, on-chain proof." },
+    { icon: "⬢", title: "AUTO AGENT", desc: "Deploy an algo that trades funding edges for you. Hard risk caps, kill switch, order-only keys." },
+    { icon: "▣", title: "ANALYTICS", desc: "Trading score, win-rate breakdowns, hold-time & leverage analysis — grade yourself like a desk." },
+    { icon: "▤", title: "TRADE LOG", desc: "Full journal of every closed day with notes, filters, and a calendar heatmap." },
+  ];
+  return (
+    <div style={{ padding: "32px 8px" }}>
+      <div style={{ textAlign: "center", marginBottom: 32 }}>
+        <div style={{ fontFamily: "monospace", fontSize: 11, color: "#00ff88", letterSpacing: "0.3em", marginBottom: 12, textShadow: "0 0 12px rgba(0,255,136,0.5)" }}>// THE LAB</div>
+        <div style={{ fontFamily: "monospace", fontSize: 28, color: "#fff", fontWeight: "bold", marginBottom: 12, lineHeight: 1.2 }}>
+          Your edge, in one terminal.
+        </div>
+        <div style={{ fontFamily: "monospace", fontSize: 13, color: "#5a7a6a", maxWidth: 560, margin: "0 auto", lineHeight: 1.6 }}>
+          Plan it. Automate it. Grade it. The Lab turns raw trading into a repeatable process —
+          connect your wallet to load your data and unlock every tool.
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, maxWidth: 760, margin: "0 auto 28px" }}>
+        {features.map((f) => (
+          <div key={f.title} style={{ ...cardStyle, padding: "16px 18px" }}>
+            <div style={{ fontSize: 20, color: "#00ff88", marginBottom: 8 }}>{f.icon}</div>
+            <div style={{ fontFamily: "monospace", fontSize: 12, color: "#fff", fontWeight: "bold", letterSpacing: "0.08em", marginBottom: 6 }}>{f.title}</div>
+            <div style={{ fontFamily: "monospace", fontSize: 11, color: "#5a7a6a", lineHeight: 1.5 }}>{f.desc}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "monospace", fontSize: 11, color: "#3a5a4a", border: "1px solid #1a2e1a", borderRadius: 4, padding: "10px 18px", background: "#0a0e0a" }}>
+          <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#fbbf24", boxShadow: "0 0 8px #fbbf24", animation: "pulse 2s infinite" }} />
+          Connect your wallet (top right) to load your trades and activate The Lab
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TheLabPage() {
   const [activeTab, setActiveTab] = useState<TabId>("analytics");
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
@@ -3087,9 +3236,7 @@ export default function TheLabPage() {
     { id: "agent",          label: "[ AGENT ]",           short: "AGENT" },
     { id: "thesis",         label: "[ THESIS ENGINE ]",   short: "LAB"   },
     { id: "intel",          label: "[ MARKET INTEL ]",    short: "INTEL" },
-    { id: "news",           label: "[ NEWS ]",            short: "NEWS"  },
     { id: "copies",         label: "[ COPY TRADES ]",     short: "COPY"  },
-    { id: "calendar",       label: "[ CALENDAR ]",        short: "CAL"   },
     { id: "tradelog",       label: "[ TRADE LOG ]",       short: "LOG"   },
     { id: "messages",       label: "[ MESSAGES ]",        short: "MSG"   },
   ];
@@ -3148,8 +3295,11 @@ export default function TheLabPage() {
         </div>
       </div>
       <div style={{ padding: isMobile ? 12 : 16 }}>
-        {activeTab === "analytics" && <AnalyticsView orders={processedTrades} totalPnl={totalPnl} winRate={winRate} collateral={availableBalance ?? 0} />}
-        {activeTab === "calendar" && <CalendarView {...calendarProps} />}
+        {activeTab === "analytics" && (
+          connected
+            ? <AnalyticsView orders={processedTrades} totalPnl={totalPnl} winRate={winRate} collateral={availableBalance ?? 0} />
+            : <LabWelcome />
+        )}
         {activeTab === "tradelog" && (
           selectedDayKey && selectedDay !== null && dayGroups[selectedDayKey]
             ? <TradeLogView
@@ -3163,6 +3313,7 @@ export default function TheLabPage() {
                 dayGroups={dayGroups}
                 onDaySelect={(key, day) => { setSelectedDayKey(key); setSelectedDay(day); }}
                 notes={notes}
+                calendarProps={calendarProps}
               />
         )}
         {activeTab === "thesis" && (
@@ -3172,8 +3323,7 @@ export default function TheLabPage() {
           </>
         )}
         {activeTab === "copies" && <CopiesView />}
-        {activeTab === "intel" && <IntelPage embedded />}
-        {activeTab === "news" && <NewsTab />}
+        {activeTab === "intel" && <MarketIntelView />}
         {activeTab === "agent" && <AgentView />}
         {activeTab === "messages" && <MessagesPage />}
       </div>
