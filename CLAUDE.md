@@ -28,10 +28,12 @@ is everything built on top:
   Action `.github/workflows/deploy.yml` (wrangler direct-upload). Do NOT expect Git auto-builds here.
 - `deploy.yml` (on push to main) builds the app, `wrangler pages deploy build/client`, AND deploys the
   **nexus-lab-api** worker. Install step retries 3x to survive registry flakes.
-- **Redundant builds:** there is/was a separate Pages project Git-connected to `StephenBorst/nexus-4421`
-  that auto-builds on push ("pages build and deployment" runs) — a leftover **zombie** (migration cruft,
-  like the old Vercel setup). It serves no production domain. Plan: disconnect its Git / delete it.
-  `nexus-trading-lab` is independent and unaffected.
+- **Redundant builds:** the "pages build and deployment" runs in the repo's GitHub Actions are **GitHub
+  Pages** (GitHub's own built-in workflow), NOT Cloudflare. There is NO Cloudflare zombie project —
+  `nexus-trading-lab` has no Git connection and is the only app Pages project. Fix = repo **Settings →
+  Pages → Source: None** to stop them. Zero impact on Cloudflare/prod/code. (Cloudflare account has 7
+  apps total: nexus-lab-api, nexus-trading-lab, nexus-agent-exec, nexus-agent-brain, nexus-landing,
+  nexus-lab-alerts, orderly-proxy — all legit, none Git-connected to nexus-4421.)
 - A "Build & Deploy" Action run failing fast (~21s) is almost always a transient `yarn install` flake,
   not a real break — the next push's superset deploy covers it.
 
