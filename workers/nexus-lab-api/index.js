@@ -2497,6 +2497,51 @@ document.getElementById("btn").addEventListener("click",go);
         return json({ ok: true, action, remaining: next.length }, request);
       }
 
+      // POST /agent/:address/paper/reset — clear the simulated paper ledger
+      if (request.method === "POST" && parts[2] === "paper" && parts[3] === "reset") {
+        const stateRaw = await AGENT_KV.get(`agent:state:${address}`);
+        if (!stateRaw) return json({ ok: true, cleared: 0 }, request);
+        const state = JSON.parse(stateRaw);
+        const cleared = (state.paper_trades || []).length;
+        state.paper_trades = [];
+        // Also reset paper-mode daily counters so the record starts clean
+        if (state.current_position?.paper) state.current_position = null;
+        state.daily_pnl = 0;
+        state.trades_today = 0;
+        await AGENT_KV.put(`agent:state:${address}`, JSON.stringify(state));
+        return json({ ok: true, cleared }, request);
+      }
+
+      // POST /agent/:address/test-signal — DEV: inject a synthetic signal so a
+      // PAPER trade fires on the next exec tick. Hard-refuses unless the user is
+      // in PAPER mode, so it can never trigger a real order.
+      if (request.method === "POST" && parts[2] === "test-signal") {
+        const configRaw = await AGENT_KV.get(`agent:config:${address}`);
+        if (!configRaw) return json({ error: "no agent config — activate first" }, request, 400);
+        const config = JSON.parse(configRaw);
+        if (config.mode !== "PAPER") return json({ error: "test-signal only allowed in PAPER mode" }, request, 403);
+        let body = {};
+        try { body = await request.json(); } catch { /* optional */ }
+        const direction = body?.direction === "SHORT" ? "SHORT" : "LONG";
+        const symbol = (config.symbols && config.symbols[0]) || "PERP_BTC_USDC";
+        let price = 0;
+        try {
+          const r = await fetch(`https://api-evm.orderly.org/v1/public/futures/${symbol}`);
+          const d = await r.json();
+          price = parseFloat(d?.data?.mark_price) || 0;
+        } catch { /* entry uses live mark price in exec anyway */ }
+        const signal = { symbol, direction, funding: 0.05, oi: 0, confidence: 80, price, reason: "DEV test-signal", timestamp: Date.now(), user: address };
+        await AGENT_KV.put(`agent:signal:${address}`, JSON.stringify(signal));
+        // Clear cooldown so the next tick acts immediately
+        const stateRaw = await AGENT_KV.get(`agent:state:${address}`);
+        if (stateRaw) {
+          const state = JSON.parse(stateRaw);
+          state.last_trade_time = 0;
+          await AGENT_KV.put(`agent:state:${address}`, JSON.stringify(state));
+        }
+        return json({ ok: true, signal }, request);
+      }
+
       // PUT /agent/:address — activate (config + key)
       if (request.method === "PUT" && !parts[2]) {
         let body;

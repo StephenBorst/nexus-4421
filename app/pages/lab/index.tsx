@@ -2342,11 +2342,12 @@ const agentInputStyle: React.CSSProperties = {
 };
 
 // ─── Agent Track Record (shared by live + paper) ─────────
-function AgentTrackRecord({ title, accent, trades, paper }: {
+function AgentTrackRecord({ title, accent, trades, paper, onReset }: {
   title: string;
   accent: string;
   trades: AgentTrade[];
   paper?: boolean;
+  onReset?: () => void;
 }) {
   const tr = trades.length;
   const wins = trades.filter((t) => t.pnl > 0).length;
@@ -2362,7 +2363,12 @@ function AgentTrackRecord({ title, accent, trades, paper }: {
     <div style={{ ...agentCardStyle, borderColor: tr > 0 ? (net >= 0 ? "#1a4a2a" : "#4a1a1a") : "#1e2d1e" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ ...agentLabelStyle, color: accent }}>{title}</div>
-        {since && <span style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>since {since}</span>}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {since && <span style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>since {since}</span>}
+          {onReset && tr > 0 && (
+            <button onClick={onReset} style={{ ...navBtnStyle, fontSize: 9, padding: "3px 10px", color: "#4a9fff", borderColor: "#1a3a5a" }}>RESET</button>
+          )}
+        </div>
       </div>
       {tr === 0 ? (
         <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 11, marginTop: 8, lineHeight: 1.6 }}>
@@ -2566,6 +2572,43 @@ function AgentView() {
     }
   }
 
+  async function resetPaperRecord() {
+    if (!walletAddress) return;
+    if (!window.confirm("Clear your paper track record? This wipes all simulated trades and resets paper daily stats. Your live record is untouched.")) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}/paper/reset`, { method: "POST" });
+      if (!res.ok) throw new Error("Failed to reset paper record");
+      setSuccess("Paper record cleared");
+      await fetchAgentData();
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function forceTestSignal() {
+    if (!walletAddress) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}/test-signal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ direction: "LONG" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to inject test signal");
+      setSuccess("Test signal injected — paper trade fires within ~1 min");
+      setTimeout(() => setSuccess(null), 4000);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function killSwitch() {
     if (!walletAddress) return;
     if (!window.confirm("KILL SWITCH — This will immediately close any open position and deactivate the agent. Continue?")) return;
@@ -2669,7 +2712,7 @@ function AgentView() {
           {/* Track record — surfaced before activation so users judge on real numbers.
               Live (Supabase) and Paper (state ledger) are kept strictly separate. */}
           {(config.mode === "PAPER" || (agentState?.paper_trades?.length ?? 0) > 0) && (
-            <AgentTrackRecord title="// 🧪 PAPER TRACK RECORD" accent="#4a9fff" trades={agentState?.paper_trades ?? []} paper />
+            <AgentTrackRecord title="// 🧪 PAPER TRACK RECORD" accent="#4a9fff" trades={agentState?.paper_trades ?? []} paper onReset={resetPaperRecord} />
           )}
           <AgentTrackRecord title="// LIVE TRACK RECORD" accent="#8aaa9a" trades={trades} />
 
@@ -2877,6 +2920,18 @@ function AgentView() {
       {/* ─── STATUS TAB ──────────────────────────────────── */}
       {tab === "status" && (
         <div>
+          {/* DEV-only: force a paper signal so the open→close loop can be tested
+              in minutes instead of waiting for real funding/OI confluence. */}
+          {(import.meta as any).env?.DEV && isActive && config.mode === "PAPER" && (
+            <div style={{ ...agentCardStyle, borderColor: "#1a3a5a", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <span style={{ fontFamily: "monospace", fontSize: 10, color: "#4a9fff" }}>
+                ⚡ DEV — inject a synthetic PAPER signal (refused outside paper mode)
+              </span>
+              <button onClick={forceTestSignal} disabled={saving} style={{ ...navBtnStyle, fontSize: 10, padding: "6px 14px", color: "#4a9fff", borderColor: "#1a3a5a", opacity: saving ? 0.5 : 1 }}>
+                FORCE TEST SIGNAL
+              </button>
+            </div>
+          )}
           {/* Pending theses — ASSISTED mode review queue */}
           {pending.length > 0 && (
             <div style={{ ...agentCardStyle, borderColor: "#fbbf2440" }}>
