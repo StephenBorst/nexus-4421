@@ -425,6 +425,7 @@ export default function MessagesPage() {
   const [loadingConvos, setLoadingConvos] = useState(false);
   const [dmAddress, setDmAddress] = useState("");
   const [openingDM, setOpeningDM] = useState(false);
+  const [dmError, setDmError] = useState<string | null>(null);
 
   // Load conversations once XMTP is ready
   useEffect(() => {
@@ -467,8 +468,27 @@ export default function MessagesPage() {
   async function startDM() {
     const addr = dmAddress.trim();
     if (!addr || openingDM) return;
+    setDmError(null);
+
+    // Validate address shape before hitting the network
+    if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) {
+      setDmError("Enter a valid 0x wallet address (42 chars).");
+      return;
+    }
+    if (addr.toLowerCase() === (xmtp.myAddress ?? "").toLowerCase()) {
+      setDmError("That's your own address — pick a different wallet.");
+      return;
+    }
+
     setOpeningDM(true);
     try {
+      // XMTP can only message wallets that have registered an XMTP identity.
+      // Check first so we can give a clear reason instead of failing silently.
+      const reachable = await xmtp.canMessage(addr);
+      if (!reachable) {
+        setDmError("That wallet hasn't enabled XMTP yet. It needs to open Messages and click ENABLE MESSAGING once — then you can DM it.");
+        return;
+      }
       const convo = await xmtp.openDM(addr);
       setActiveConvo(convo);
       setActivePeerHint(addr);
@@ -477,8 +497,8 @@ export default function MessagesPage() {
         return already ? prev : [convo, ...prev];
       });
       setDmAddress("");
-    } catch {
-      // address not on XMTP — could show a toast here
+    } catch (e) {
+      setDmError(e instanceof Error ? e.message : "Couldn't start that conversation. Try again.");
     } finally {
       setOpeningDM(false);
     }
@@ -559,6 +579,11 @@ export default function MessagesPage() {
               {openingDM ? "…" : "+"}
             </button>
           </div>
+          {dmError && (
+            <div style={{ padding: "6px 10px", borderBottom: "1px solid #1a2e1a", fontFamily: "monospace", fontSize: 9, color: "#ff6b6b", lineHeight: 1.5 }}>
+              {dmError}
+            </div>
+          )}
 
           <div style={S.convoList}>
             {loadingConvos && (
