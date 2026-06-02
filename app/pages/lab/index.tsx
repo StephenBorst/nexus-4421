@@ -2607,6 +2607,52 @@ function AgentView() {
       {/* ─── CONFIG TAB ──────────────────────────────────── */}
       {tab === "config" && (
         <div>
+          {/* Track record — surfaced before activation so users judge on real numbers */}
+          {(() => {
+            const tr = trades.length;
+            const wins = trades.filter((t) => t.pnl > 0).length;
+            const wr = tr ? (wins / tr) * 100 : 0;
+            const net = trades.reduce((s, t) => s + t.pnl, 0);
+            const winsArr = trades.filter((t) => t.pnl > 0);
+            const lossArr = trades.filter((t) => t.pnl <= 0);
+            const avgWin = winsArr.length ? winsArr.reduce((s, t) => s + t.pnl, 0) / winsArr.length : 0;
+            const avgLoss = lossArr.length ? lossArr.reduce((s, t) => s + Math.abs(t.pnl), 0) / lossArr.length : 0;
+            const since = tr ? new Date(Math.min(...trades.map((t) => new Date(t.opened_at).getTime() || Date.now()))).toLocaleDateString() : null;
+            return (
+              <div style={{ ...agentCardStyle, borderColor: tr > 0 ? (net >= 0 ? "#1a4a2a" : "#4a1a1a") : "#1e2d1e" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={agentLabelStyle}>// AGENT TRACK RECORD</div>
+                  {since && <span style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>since {since}</span>}
+                </div>
+                {tr === 0 ? (
+                  <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 11, marginTop: 8, lineHeight: 1.6 }}>
+                    No track record yet — this agent hasn't traded for you. Stats will build here transparently from its first trade. <strong style={{ color: "#8aaa9a" }}>Start small.</strong>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginTop: 8 }}>
+                      {[
+                        { label: "NET P&L", value: `${net >= 0 ? "+" : ""}$${Math.abs(net).toFixed(2)}`, color: net >= 0 ? "#00ff88" : "#ff4444" },
+                        { label: "WIN RATE", value: `${wr.toFixed(1)}%`, color: wr >= 50 ? "#00ff88" : "#ff4444" },
+                        { label: "TRADES", value: String(tr), color: "#c0c0c0" },
+                        { label: "AVG WIN", value: `$${avgWin.toFixed(2)}`, color: "#00ff88" },
+                        { label: "AVG LOSS", value: `$${avgLoss.toFixed(2)}`, color: "#ff4444" },
+                      ].map(({ label, value, color }) => (
+                        <div key={label}>
+                          <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
+                          <div style={{ color, fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 10, fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", lineHeight: 1.5 }}>
+                      ⚠ Past performance does not guarantee future results. Markets are risky — only deploy capital you can afford to lose, and start small.
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Onboarding + key-status panel */}
           <div style={{ ...agentCardStyle, borderColor: tradingKey ? "#1a3a2a" : "#4a3a00" }}>
             <div style={agentLabelStyle}>// HOW THE AGENT WORKS</div>
@@ -3141,12 +3187,12 @@ function LabWelcome() {
     <div style={{ padding: "32px 8px" }}>
       <div style={{ textAlign: "center", marginBottom: 32 }}>
         <div style={{ fontFamily: "monospace", fontSize: 11, color: "#00ff88", letterSpacing: "0.3em", marginBottom: 12, textShadow: "0 0 12px rgba(0,255,136,0.5)" }}>// THE LAB</div>
-        <div style={{ fontFamily: "monospace", fontSize: 28, color: "#fff", fontWeight: "bold", marginBottom: 12, lineHeight: 1.2 }}>
-          Your edge, in one terminal.
+        <div style={{ fontFamily: "monospace", fontSize: 28, color: "#fff", fontWeight: "bold", marginBottom: 12, lineHeight: 1.25 }}>
+          The trading terminal that<br />makes you a better trader.
         </div>
-        <div style={{ fontFamily: "monospace", fontSize: 13, color: "#5a7a6a", maxWidth: 560, margin: "0 auto", lineHeight: 1.6 }}>
-          Plan it. Automate it. Grade it. The Lab turns raw trading into a repeatable process —
-          connect your wallet to load your data and unlock every tool.
+        <div style={{ fontFamily: "monospace", fontSize: 13, color: "#5a7a6a", maxWidth: 580, margin: "0 auto", lineHeight: 1.6 }}>
+          Plan it, automate it, grade it. Most apps just let you trade — The Lab turns every
+          position into a repeatable process. Connect your wallet to load your data and unlock every tool.
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, maxWidth: 760, margin: "0 auto 28px" }}>
@@ -3168,6 +3214,80 @@ function LabWelcome() {
   );
 }
 
+// ─── Onboarding Activation Checklist ─────────────────────
+function OnboardingChecklist({
+  hasThesis,
+  hasTrade,
+  onGoThesis,
+  onGoAnalytics,
+}: {
+  hasThesis: boolean;
+  hasTrade: boolean;
+  onGoThesis: () => void;
+  onGoAnalytics: () => void;
+}) {
+  const [dismissed, setDismissed] = useState(
+    () => typeof window !== "undefined" && window.localStorage.getItem("lab_onboard_dismissed") === "1"
+  );
+  if (dismissed) return null;
+
+  const steps = [
+    { key: "connect", label: "Connect your wallet", hint: "Your data is loading — you're in.", done: true, action: null },
+    { key: "thesis",  label: "Plan your first thesis", hint: "Size a trade with R:R, stops & funding in the Thesis Engine.", done: hasThesis, action: onGoThesis, cta: "OPEN THESIS ENGINE" },
+    { key: "trade",   label: "Place your first trade", hint: "Trade anywhere on Nexus — it flows back here automatically.", done: hasTrade, action: null },
+    { key: "grade",   label: "Grade your performance", hint: "See your trading score, breakdowns & journal.", done: hasTrade, action: onGoAnalytics, cta: "VIEW ANALYTICS" },
+  ];
+  const doneCount = steps.filter((s) => s.done).length;
+  const allDone = doneCount === steps.length;
+  const pct = Math.round((doneCount / steps.length) * 100);
+
+  const dismiss = () => {
+    window.localStorage.setItem("lab_onboard_dismissed", "1");
+    setDismissed(true);
+  };
+
+  return (
+    <div style={{ ...cardStyle, marginBottom: 16, borderColor: allDone ? "#1a4a2a" : "#1a3a2a" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontFamily: "monospace", fontSize: 10, color: "#00ff88", letterSpacing: "0.12em" }}>
+            {allDone ? "🎉 YOU'RE SET UP" : "// GET STARTED"}
+          </span>
+          <span style={{ fontFamily: "monospace", fontSize: 10, color: "#3a5a4a" }}>{doneCount}/{steps.length}</span>
+        </div>
+        <button onClick={dismiss} style={{ ...navBtnStyle, fontSize: 9, padding: "3px 10px", color: "#3a5a4a" }}>
+          {allDone ? "DISMISS" : "SKIP"}
+        </button>
+      </div>
+      <div style={{ height: 4, background: "#0a0e0a", borderRadius: 2, marginBottom: 14, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: "#00ff88", transition: "width 0.4s", boxShadow: "0 0 8px rgba(0,255,136,0.5)" }} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {steps.map((s) => (
+          <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{
+              width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+              border: `1px solid ${s.done ? "#00ff88" : "#2a4a3a"}`,
+              background: s.done ? "#00ff8820" : "transparent",
+              color: s.done ? "#00ff88" : "#2a4a3a",
+              fontFamily: "monospace", fontSize: 11, textAlign: "center", lineHeight: "17px",
+            }}>{s.done ? "✓" : ""}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: "monospace", fontSize: 12, color: s.done ? "#8aaa9a" : "#fff", textDecoration: s.done ? "line-through" : "none" }}>{s.label}</div>
+              <div style={{ fontFamily: "monospace", fontSize: 10, color: "#3a5a4a", marginTop: 1 }}>{s.hint}</div>
+            </div>
+            {!s.done && s.action && (
+              <button onClick={s.action} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 12px", color: "#00ff88", borderColor: "#1a4a2a", flexShrink: 0 }}>
+                {s.cta}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function TheLabPage() {
   const [activeTab, setActiveTab] = useState<TabId>("analytics");
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
@@ -3177,7 +3297,7 @@ export default function TheLabPage() {
   // ── Persistence (KV + localStorage) ─────────────────────
   const { state: rootAccountState } = useAccount();
   const rootWalletAddress = (rootAccountState as { address?: string })?.address ?? null;
-  const { notes, saveNote, syncing, synced } = useLabStorage(rootWalletAddress);
+  const { theses, notes, saveNote, syncing, synced } = useLabStorage(rootWalletAddress);
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [viewYear, setViewYear] = useState(today.getFullYear());
 
@@ -3293,6 +3413,14 @@ export default function TheLabPage() {
         </div>
       </div>
       <div style={{ padding: isMobile ? 12 : 16 }}>
+        {connected && (
+          <OnboardingChecklist
+            hasThesis={theses.length > 0}
+            hasTrade={processedTrades.length > 0}
+            onGoThesis={() => setActiveTab("thesis")}
+            onGoAnalytics={() => setActiveTab("analytics")}
+          />
+        )}
         {activeTab === "analytics" && (
           connected
             ? <AnalyticsView orders={processedTrades} totalPnl={totalPnl} winRate={winRate} collateral={availableBalance ?? 0} />
