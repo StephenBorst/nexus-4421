@@ -3395,7 +3395,7 @@ function OnboardingChecklist({
 }
 
 export default function TheLabPage() {
-  const [activeTab, setActiveTab] = useState<TabId>("analytics");
+  const [activeTab, setActiveTab] = useState<TabId>("intel");
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const today = new Date();
@@ -3530,9 +3530,7 @@ export default function TheLabPage() {
           />
         )}
         {activeTab === "analytics" && (
-          connected
-            ? <AnalyticsView orders={processedTrades} totalPnl={totalPnl} winRate={winRate} collateral={availableBalance ?? 0} />
-            : <LabWelcome />
+          <AnalyticsView orders={processedTrades} totalPnl={totalPnl} winRate={winRate} collateral={availableBalance ?? 0} />
         )}
         {activeTab === "tradelog" && (
           selectedDayKey && selectedDay !== null && dayGroups[selectedDayKey]
@@ -3557,7 +3555,9 @@ export default function TheLabPage() {
           </>
         )}
         {activeTab === "copies" && <CopiesView />}
-        {activeTab === "intel" && <MarketIntelView />}
+        {activeTab === "intel" && (
+          connected ? <MarketIntelView /> : <LabWelcome />
+        )}
         {activeTab === "agent" && <AgentView />}
       </div>
     </div>
