@@ -843,7 +843,7 @@ function TradeLogView({ dayKey, data, onBack, initialNote, onSaveNote }: {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #1a2e1a" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: "monospace" }}>
           <button onClick={onBack} style={{ ...navBtnStyle, fontSize: 12 }}>&#8592; BACK</button>
-          <span style={{ fontSize: 13, color: "#00ff88" }}>&#9632; TRADE_LOG/{dayKey}</span>
+          <span style={{ fontSize: 13, color: "#00ff88" }}>&#9632; TRADING_LOG/{dayKey}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 9, color: "#3a5a4a", background: "#0d120d", border: "1px solid #1a2e1a", padding: "3px 8px", borderRadius: 3, fontFamily: "monospace" }}>{data.trades} TRADES</span>
@@ -3456,13 +3456,15 @@ export default function TheLabPage() {
   const openCount = openPositions.length;
   const unrealizedPnl = openPositions.reduce((s: number, p: any) => s + (p.unsettled_pnl ?? 0), 0);
 
+  // Left-to-right = the trader's lifecycle: scout → plan → automate → follow →
+  // record → grade. Analytics sits last to close the loop back to the top.
   const tabs: { id: TabId; label: string; short: string }[] = [
-    { id: "analytics",      label: "[ ANALYTICS ]",      short: "STATS" },
-    { id: "agent",          label: "[ AGENT ]",           short: "AGENT" },
-    { id: "thesis",         label: "[ THESIS ENGINE ]",   short: "LAB"   },
     { id: "intel",          label: "[ MARKET INTEL ]",    short: "INTEL" },
+    { id: "thesis",         label: "[ THESIS ENGINE ]",   short: "LAB"   },
+    { id: "agent",          label: "[ TRADING AGENT ]",   short: "AGENT" },
     { id: "copies",         label: "[ COPY TRADES ]",     short: "COPY"  },
-    { id: "tradelog",       label: "[ TRADE LOG ]",       short: "LOG"   },
+    { id: "tradelog",       label: "[ TRADING LOG ]",     short: "LOG"   },
+    { id: "analytics",      label: "[ ANALYTICS ]",       short: "STATS" },
   ];
 
   const calendarProps = { dayGroups, onDayClick: handleDayClick, viewMonth, viewYear, onPrevMonth: prevMonth, onNextMonth: nextMonth, totalPnl };
