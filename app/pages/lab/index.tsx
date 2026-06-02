@@ -2963,9 +2963,14 @@ export default function TheLabPage() {
 
   return (
     <div style={{ background: "#0a0e0a", minHeight: "100vh", padding: 0 }}>
+      <style>{`@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px #00ff88}50%{opacity:0.4;box-shadow:0 0 2px #00ff88}}`}</style>
       {/* ── BRIEFING HEADER ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "6px 10px" : "6px 18px", background: "#05080a", borderBottom: "1px solid #0d1f0d", flexWrap: "wrap", gap: 4 }}>
-        <span style={{ fontFamily: "monospace", fontSize: 9, color: "#2a5a3a", letterSpacing: "0.15em" }}>// NEXUS LAB</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontFamily: "monospace", fontSize: 11, color: "#00ff88", letterSpacing: "0.25em", fontWeight: "bold", textShadow: "0 0 12px rgba(0,255,136,0.5)" }}>// NEXUS</span>
+          <span style={{ fontFamily: "monospace", fontSize: 11, color: "#fff", letterSpacing: "0.25em", fontWeight: "bold" }}>LAB</span>
+          <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#00ff88", boxShadow: "0 0 8px #00ff88", animation: "pulse 2s infinite" }} />
+        </div>
         <div style={{ display: "flex", gap: isMobile ? 10 : 20, alignItems: "center", flexWrap: "wrap" }}>
           {[
             { label: "OPEN", val: connected ? String(openCount) : "—", color: openCount > 0 ? "#fbbf24" : "#3a6a4a" },
