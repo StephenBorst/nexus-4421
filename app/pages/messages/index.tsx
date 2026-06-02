@@ -297,6 +297,7 @@ function ThreadView({
   const [messages, setMessages] = useState<DecodedMessage[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [peerDisplay, setPeerDisplay] = useState<string>(
     peerAddressHint ? shortAddr(peerAddressHint) : shortAddr(convo.id)
   );
@@ -322,7 +323,7 @@ function ThreadView({
 
   useEffect(() => {
     loadMessages();
-    pollRef.current = setInterval(loadMessages, 3000);
+    pollRef.current = setInterval(loadMessages, 2000);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
@@ -341,12 +342,26 @@ function ThreadView({
     const trimmed = text.trim();
     if (!trimmed || sending) return;
     setSending(true);
+    setSendError(null);
+
+    // Optimistic render — show the message instantly, reconcile on next load.
+    const optimistic = {
+      id: `optimistic_${Date.now()}`,
+      senderInboxId: myInboxId,
+      content: trimmed,
+      sentAtNs: BigInt(Date.now()) * 1_000_000n,
+    } as unknown as DecodedMessage;
+    setMessages((prev) => [...prev, optimistic]);
+    setText("");
+
     try {
       await convo.sendText(trimmed);
-      setText("");
       await loadMessages();
-    } catch {
-      // keep text so user can retry
+    } catch (e) {
+      // Roll back the optimistic bubble and let the user retry
+      setMessages((prev) => prev.filter((m) => (m as { id?: string }).id !== optimistic.id));
+      setText(trimmed);
+      setSendError(e instanceof Error ? e.message : "Message failed to send. Try again.");
     } finally {
       setSending(false);
     }
@@ -387,6 +402,11 @@ function ThreadView({
         <div ref={bottomRef} />
       </div>
 
+      {sendError && (
+        <div style={{ padding: "5px 12px", fontFamily: "monospace", fontSize: 9, color: "#ff6b6b" }}>
+          {sendError}
+        </div>
+      )}
       <div style={S.compose}>
         <textarea
           style={S.input}
@@ -426,6 +446,8 @@ export default function MessagesPage() {
   const [dmAddress, setDmAddress] = useState("");
   const [openingDM, setOpeningDM] = useState(false);
   const [dmError, setDmError] = useState<string | null>(null);
+  const [inviteAddr, setInviteAddr] = useState<string | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   // Load conversations once XMTP is ready
   useEffect(() => {
@@ -469,6 +491,7 @@ export default function MessagesPage() {
     const addr = dmAddress.trim();
     if (!addr || openingDM) return;
     setDmError(null);
+    setInviteAddr(null);
 
     // Validate address shape before hitting the network
     if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) {
@@ -483,10 +506,10 @@ export default function MessagesPage() {
     setOpeningDM(true);
     try {
       // XMTP can only message wallets that have registered an XMTP identity.
-      // Check first so we can give a clear reason instead of failing silently.
+      // Check first so we can offer an invite instead of failing silently.
       const reachable = await xmtp.canMessage(addr);
       if (!reachable) {
-        setDmError("That wallet hasn't enabled XMTP yet. It needs to open Messages and click ENABLE MESSAGING once — then you can DM it.");
+        setInviteAddr(addr);
         return;
       }
       const convo = await xmtp.openDM(addr);
@@ -584,6 +607,43 @@ export default function MessagesPage() {
               {dmError}
             </div>
           )}
+          {inviteAddr && (() => {
+            const inviteLink = `${window.location.origin}/messages?dm=${(xmtp.myAddress ?? "").toLowerCase()}`;
+            const copy = async () => {
+              try {
+                await navigator.clipboard.writeText(inviteLink);
+                setInviteCopied(true);
+                setTimeout(() => setInviteCopied(false), 2000);
+              } catch { /* clipboard blocked — user can select manually */ }
+            };
+            return (
+              <div style={{ padding: "8px 10px", borderBottom: "1px solid #1a2e1a", background: "#0a1420" }}>
+                <div style={{ fontFamily: "monospace", fontSize: 9, color: "#4a9fff", lineHeight: 1.5, marginBottom: 6 }}>
+                  {shortAddr(inviteAddr)} isn’t on XMTP yet. Send them this link — it opens Messages and pre-fills a DM back to you:
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input
+                    readOnly
+                    value={inviteLink}
+                    onFocus={(e) => e.currentTarget.select()}
+                    style={{ flex: 1, background: "#0d120d", border: "1px solid #1a3a5a", borderRadius: 3, color: "#8aaa9a", fontFamily: "monospace", fontSize: 8, padding: "5px 7px", outline: "none" }}
+                  />
+                  <button
+                    onClick={copy}
+                    style={{ background: "none", border: "1px solid #1a3a5a", borderRadius: 3, color: "#4a9fff", fontFamily: "monospace", fontSize: 9, padding: "4px 8px", cursor: "pointer", whiteSpace: "nowrap" }}
+                  >
+                    {inviteCopied ? "COPIED ✓" : "COPY"}
+                  </button>
+                </div>
+                <button
+                  onClick={() => { setInviteAddr(null); setDmAddress(""); }}
+                  style={{ marginTop: 6, background: "none", border: "none", color: "#3a5a4a", fontFamily: "monospace", fontSize: 8, cursor: "pointer", padding: 0 }}
+                >
+                  dismiss
+                </button>
+              </div>
+            );
+          })()}
 
           <div style={S.convoList}>
             {loadingConvos && (

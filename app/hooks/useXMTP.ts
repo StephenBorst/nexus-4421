@@ -151,7 +151,14 @@ export function useXMTP() {
   }, [getClient]);
 
   const getMessages = useCallback(async (convo: Conversation): Promise<DecodedMessage[]> => {
-    await convo.sync();
+    // Pull from the network if we can, but never let a sync hiccup block reading
+    // the local store — a just-sent message lives there immediately, so a failed
+    // sync must not leave the thread looking empty.
+    try {
+      await convo.sync();
+    } catch {
+      /* offline / transient — fall through to local messages */
+    }
     return convo.messages();
   }, []);
 
