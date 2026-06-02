@@ -162,6 +162,20 @@ export function useXMTP() {
     []
   );
 
+  // Real-time stream of ALL inbound messages across every conversation. Used by
+  // the global nav badge for instant unread updates. Returns a closer.
+  const streamAllMessages = useCallback(
+    async (onMessage: (msg: DecodedMessage) => void): Promise<() => void> => {
+      const client = getClient();
+      if (!client) return () => {};
+      const stream = await client.conversations.streamAllMessages({
+        onValue: (msg: DecodedMessage) => { if (msg) onMessage(msg); },
+      });
+      return () => { stream.end().catch(() => {}); };
+    },
+    [getClient]
+  );
+
   const getMessages = useCallback(async (convo: Conversation): Promise<DecodedMessage[]> => {
     // Pull from the network if we can, but never let a sync hiccup block reading
     // the local store — a just-sent message lives there immediately, so a failed
@@ -191,7 +205,7 @@ export function useXMTP() {
 
   return {
     ready, initializing, error,
-    init, sendDM, openDM, getConversations, getMessages, streamMessages, canMessage,
+    init, sendDM, openDM, getConversations, getMessages, streamMessages, streamAllMessages, canMessage,
     getClient, myAddress: xmtpAddress ?? walletAddress, myInboxId,
   };
 }

@@ -12,7 +12,7 @@ import { getLastRead, nsToMs, UNREAD_EVENT } from "@/utils/xmtpUnread";
  * whose latest inbound message is newer than the stored "last read" time.
  */
 export default function MessagesNavButton() {
-  const { ready, getConversations, getMessages, myInboxId } = useXMTP();
+  const { ready, getConversations, getMessages, streamAllMessages, myInboxId } = useXMTP();
   const [unread, setUnread] = useState(0);
 
   const compute = useCallback(async () => {
@@ -51,16 +51,31 @@ export default function MessagesNavButton() {
       return;
     }
     compute();
-    const interval = setInterval(compute, 45_000);
+    // Slow safety-net poll — the live stream below drives instant updates.
+    const interval = setInterval(compute, 120_000);
     const onChange = () => compute();
     window.addEventListener(UNREAD_EVENT, onChange);
     document.addEventListener("visibilitychange", onChange);
+
+    // Live stream: recompute the badge the instant any DM lands app-wide.
+    let cancelled = false;
+    let closer: (() => void) | null = null;
+    streamAllMessages((msg) => {
+      // Ignore our own outbound messages — they don't make a thread unread
+      if (msg && (msg as { senderInboxId?: string }).senderInboxId === myInboxId) return;
+      compute();
+    })
+      .then((c) => { if (cancelled) c(); else closer = c; })
+      .catch(() => { /* stream unavailable — poll covers it */ });
+
     return () => {
+      cancelled = true;
+      if (closer) closer();
       clearInterval(interval);
       window.removeEventListener(UNREAD_EVENT, onChange);
       document.removeEventListener("visibilitychange", onChange);
     };
-  }, [ready, compute]);
+  }, [ready, compute, streamAllMessages, myInboxId]);
 
   return (
     <Link
