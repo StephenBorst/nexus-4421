@@ -25,7 +25,17 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: corepack enable && yarn install --frozen-lockfile
+        run: |
+          corepack enable
+          n=0
+          until [ "$n" -ge 3 ]; do
+            yarn install --frozen-lockfile && exit 0
+            n=$((n+1))
+            echo "::warning::yarn install failed (attempt $n/3) — retrying in 10s"
+            sleep 10
+          done
+          echo "::error::yarn install failed after 3 attempts"
+          exit 1
 
       - name: Build
         run: yarn tsx scripts/generate-manifest.ts && yarn vite build --no-minify && yarn tsx scripts/generate-manifest.ts
