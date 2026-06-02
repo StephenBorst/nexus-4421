@@ -53,6 +53,54 @@ is everything built on top:
   (DEV-only force a paper signal; hard-refuses unless mode===PAPER). Force button is gated to
   `import.meta.env.DEV`.
 
+## Agent multi-user build (Session 013 — 2026-05-30/31)
+Migrated the single-user bot → full multi-user, non-custodial, autonomous agent. All committed to `main`.
+- **Architecture:** `nexus-agent-brain` (5-min cron) iterates `agent:users`, evaluates **funding + OI-divergence
+  confluence** per symbol (BOTH rules must agree — ported from the validated single-user `.bak`; the first
+  multi-user brain had a stubbed `oi>0` check that fired on funding alone — fixed). Stores `market:prev:{symbol}`
+  for price/OI deltas; evaluates each symbol ONCE per tick (no per-user race). `nexus-agent-exec` (1-min cron)
+  reads `agent:signal:{address}`, enters/monitors/closes per user. AgentView in `app/pages/lab/index.tsx`.
+- **⚠️ KV namespace gotcha (cost us hours):** brain/exec use binding `NEXUS_AGENT` = `c3c0582ec71c4d049d0795872f39f033`.
+  The lab-api agent routes MUST use the SAME namespace — lab-api binds it as `NEXUS_AGENT` (also has `LAB_STORE`
+  =`12c4fcbc...` for lab data). Agent keys: `agent:users`, `agent:config:{addr}`, `agent:key:{addr}`,
+  `agent:state:{addr}`, `agent:signal:{addr}`, `agent:pending:{addr}`.
+- **⚠️ AGENT_API URL:** frontend hits lab-api via custom domain **`https://og.nexustradinglabs.com`** (the
+  `*.workers.dev` subdomain is NOT routed → 404/CF-1042). Same base as all other app API calls.
+- **Orderly signing (ground truth, Handoff 012):** use `@noble/ed25519 signAsync()` + `bs58` (NOT `crypto.subtle`,
+  which can't sign Orderly ed25519 seeds). Signature = **base64URL** (`+`→`-`, `/`→`_`, strip `=`). `orderly-key`
+  header = the DERIVED public key (`ed25519:` + bs58(getPublicKeyAsync)), NOT a slice of the secret. GET requests
+  need `Content-Type: application/x-www-form-urlencoded`; POST = `application/json`. Must POST `/v1/client/leverage`
+  before each order (defaults to 1x). Market data: `GET /v1/public/futures/{symbol}` (mark_price, last_funding_rate,
+  open_interest); step size from `GET /v1/public/info/{symbol}` (`base_tick`, `base_min`, `min_notional`).
+- **⚠️ Order qty MUST snap cleanly to base_tick:** `Math.floor(q/tick)*tick` produces float artifacts
+  (e.g. `0.0034000000000000007`) → Orderly **-1104 "does not match step size"** (intermittent, price-dependent).
+  Fix: `parseFloat((steps*baseTick).toFixed(decimals))` where `decimals = -log10(baseTick)`. Also guard base_min/min_notional.
+- **-1101 "margin insufficient"** = capitalPerTrade margin too close to account balance. Keep a buffer
+  (balance ≈ $52 couldn't run $50 margin; dropped to $30/trade).
+- **Key security (#1, Phase 1a DONE):** trading keys encrypted at rest with **AES-256-GCM** (Web Crypto, zero-cost)
+  under Worker secret `AGENT_ENC_KEY` (set on BOTH lab-api + exec, same value). KV stores `v1:<b64iv>:<b64ct>`;
+  exec decrypts only at signing time. Legacy plaintext passes through (re-activate to migrate). Orderly keys
+  CANNOT withdraw — blast radius is trading only. Phase 1b (dedicated short-lived scoped keys via `AddOrderlyKey`
+  w/ `scope`+`expiration`, default 30d) = DEFERRED/optional; 1a agreed as legit stopping point.
+- **Exec scaling (#2 DONE):** per-symbol promise-cached `getMarkPrice` (public price fetched once/tick, not per-user)
+  + bounded-concurrency batches (`BATCH_SIZE=10`, `Promise.all`). Remaining ceiling = total subrequests/invocation
+  (per-user authed position reconcile is irreducible); time-sharding/Queues is the next lever at hundreds of users.
+- **Reconciliation / self-heal:** before monitoring, exec fetches live Orderly position; if exchange is flat
+  (manual close) it clears the stale KV record + resumes — no ghost position, no bogus trade. Fail-safe: on a
+  reconcile error it manages on cached data rather than wrongly clearing.
+- **Onboarding (#3 DONE):** Config tab has how-it-works panel, live key-status indicator (detected/encrypted vs
+  missing — must place ONE manual trade first to generate the Orderly key), and a security disclaimer on activate.
+- **ASSISTED vs AUTONOMOUS:** ASSISTED writes a thesis to `agent:pending` (deduped per cooldown) surfaced in the
+  Status tab for manual review — never executes. AUTONOMOUS enters/manages real orders within risk params.
+- **Controls:** Flip ASSISTED = pause new entries (still manages open position). DEACTIVATE = stop + delete key
+  but LEAVES position open/unmanaged. KILL = close position + delete key + deactivate (full stop, must re-activate).
+  Rule: agent must be FLAT before you trade manually on the same account (positions net together; agent tracks KV).
+- **Verified live:** TP/SL/TIMEOUT closes, signing, reconcile self-heal, encrypted-key round-trip, Supabase logging
+  + History read (lab-api also needs `SUPABASE_URL`/`SUPABASE_ANON_KEY` secrets — was missing, caused empty History).
+- **Deploy:** frontend → push `main` (CI → Cloudflare Pages). Workers → `npx wrangler deploy` per dir. ⚠️ CI's
+  deploy.yml redeploys nexus-lab-api from committed source — so COMMIT worker changes or CI overwrites manual deploys.
+  Worker observability logs enabled in each wrangler.toml (`[observability.logs] enabled=true`).
+
 ## Conventions
 - Aesthetic: monospace terminal / green (#00ff88). Keep it — it's an ownable brand, don't "SaaS-ify".
 - Commit trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`. Commit/push when asked.
