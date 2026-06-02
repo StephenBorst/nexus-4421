@@ -651,6 +651,143 @@ function CalendarView({ dayGroups, onDayClick, viewMonth, viewYear, onPrevMonth,
   );
 }
 
+// ─── Trade Log All View ───────────────────────────────────
+function TradeLogAllView({
+  dayGroups,
+  onDaySelect,
+  notes,
+}: {
+  dayGroups: Record<string, DayGroup>;
+  onDaySelect: (key: string, day: number) => void;
+  notes: Record<string, string>;
+}) {
+  const [filter, setFilter] = useState<"all" | "wins" | "losses">("all");
+  const [search, setSearch] = useState("");
+
+  const sortedDays = useMemo(() =>
+    Object.entries(dayGroups)
+      .sort(([a], [b]) => {
+        const toTs = (k: string) => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d).getTime(); };
+        return toTs(b) - toTs(a);
+      }),
+    [dayGroups]
+  );
+
+  const filtered = useMemo(() => sortedDays.filter(([key, g]) => {
+    if (filter === "wins" && g.pnl < 0) return false;
+    if (filter === "losses" && g.pnl >= 0) return false;
+    if (search) {
+      const syms = g.tradeList.map(t => t.symbol.replace("PERP_","").replace("_USDC","").toLowerCase());
+      if (!syms.some(s => s.includes(search.toLowerCase())) && !key.includes(search)) return false;
+    }
+    return true;
+  }), [sortedDays, filter, search]);
+
+  const totalPnl = useMemo(() => sortedDays.reduce((s, [, g]) => s + g.pnl, 0), [sortedDays]);
+  const totalTrades = useMemo(() => sortedDays.reduce((s, [, g]) => s + g.trades, 0), [sortedDays]);
+  const winDays = useMemo(() => sortedDays.filter(([, g]) => g.pnl > 0).length, [sortedDays]);
+
+  if (sortedDays.length === 0) {
+    return <EmptyState message="no closed trades found — connect wallet to load your trade history" />;
+  }
+
+  const formatKey = (key: string) => {
+    const [y, m, d] = key.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  };
+
+  return (
+    <div>
+      {/* ── Summary bar ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
+        {[
+          { label: "TOTAL PNL",   value: `${totalPnl >= 0 ? "+" : ""}$${Math.abs(totalPnl).toFixed(2)}`, color: totalPnl >= 0 ? "#00ff88" : "#ff4444" },
+          { label: "TRADING DAYS", value: String(sortedDays.length),  color: "#4a9fff" },
+          { label: "WIN DAYS",    value: `${winDays} / ${sortedDays.length}`, color: "#00ff88" },
+          { label: "TOTAL TRADES", value: String(totalTrades),         color: "#a855f7" },
+        ].map(r => (
+          <div key={r.label} style={cardStyle}>
+            <div style={labelStyle}>{r.label}</div>
+            <div style={{ fontSize: 20, fontWeight: "bold", fontFamily: "monospace", color: r.color }}>{r.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Filters ── */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
+        {(["all", "wins", "losses"] as const).map(f => (
+          <button key={f} onClick={() => setFilter(f)} style={{
+            ...navBtnStyle, fontSize: 10, padding: "5px 14px",
+            color: filter === f ? "#00ff88" : "#3a5a4a",
+            borderColor: filter === f ? "#1a4a2a" : "#1a2e1a",
+            background: filter === f ? "#0a2a0a" : "transparent",
+          }}>{f.toUpperCase()}</button>
+        ))}
+        <input
+          placeholder="search symbol or date…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ ...inputStyle, width: 220, padding: "5px 10px", fontSize: 11 }}
+        />
+      </div>
+
+      {/* ── Day rows ── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {filtered.map(([key, g]) => {
+          const winRate = g.trades ? Math.round((g.wins / g.trades) * 100) : 0;
+          const [, m, d] = key.split("-").map(Number);
+          return (
+            <div
+              key={key}
+              onClick={() => onDaySelect(key, d)}
+              style={{
+                ...cardStyle, cursor: "pointer", display: "grid",
+                gridTemplateColumns: "180px 1fr repeat(4, 90px) 28px",
+                alignItems: "center", gap: 12,
+                borderColor: g.pnl >= 0 ? "#1a3a2a" : "#3a1a1a",
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#101810")}
+              onMouseLeave={e => (e.currentTarget.style.background = "#0d120d")}
+            >
+              {/* date */}
+              <div>
+                <div style={{ fontSize: 12, color: "#fff", fontFamily: "monospace", fontWeight: "bold" }}>{formatKey(key)}</div>
+                {notes[key] && <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace", marginTop: 2, fontStyle: "italic" }}>📝 note</div>}
+              </div>
+              {/* symbols */}
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {[...new Set(g.tradeList.map(t => t.symbol.replace("PERP_","").replace("_USDC","")))].map(s => (
+                  <span key={s} style={{ fontSize: 9, color: "#4a9fff", fontFamily: "monospace", background: "#0a1a2a", border: "1px solid #0a2a3a", borderRadius: 3, padding: "2px 6px" }}>{s}</span>
+                ))}
+              </div>
+              {/* stats */}
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>PNL</div>
+                <div style={{ fontSize: 14, fontWeight: "bold", fontFamily: "monospace", color: g.pnl >= 0 ? "#00ff88" : "#ff4444" }}>{g.pnl >= 0 ? "+" : ""}${Math.abs(g.pnl).toFixed(2)}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>TRADES</div>
+                <div style={{ fontSize: 14, fontFamily: "monospace", color: "#a855f7" }}>{g.trades}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>WIN RATE</div>
+                <div style={{ fontSize: 14, fontFamily: "monospace", color: winRate >= 50 ? "#00ff88" : "#ff4444" }}>{winRate}%</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ height: 40, width: 4, background: "#1a2e1a", borderRadius: 2, display: "inline-block", position: "relative", verticalAlign: "middle" }}>
+                  <div style={{ position: "absolute", bottom: 0, width: "100%", height: `${winRate}%`, background: g.pnl >= 0 ? "#00ff88" : "#ff4444", borderRadius: 2 }} />
+                </div>
+              </div>
+              <div style={{ fontSize: 14, color: "#2a4a3a", fontFamily: "monospace", textAlign: "right" }}>›</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Trade Log View ──────────────────────────────────────
 function TradeLogView({ dayKey, data, onBack, initialNote, onSaveNote }: {
   dayKey: string;
@@ -2933,7 +3070,7 @@ export default function TheLabPage() {
   const winRate = useMemo(() => { const w = processedTrades.filter((t) => t.pnl > 0).length; return processedTrades.length ? (w / processedTrades.length) * 100 : 0; }, [processedTrades]);
 
   const handleDayClick = (key: string, day: number) => { setSelectedDayKey(key); setSelectedDay(day); setActiveTab("tradelog"); };
-  const handleBack = () => { setSelectedDayKey(null); setSelectedDay(null); setActiveTab("calendar"); };
+  const handleBack = () => { setSelectedDayKey(null); setSelectedDay(null); };
   const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1); } else setViewMonth((m) => m - 1); };
   const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1); } else setViewMonth((m) => m + 1); };
 
@@ -3018,11 +3155,15 @@ export default function TheLabPage() {
             ? <TradeLogView
                 dayKey={selectedDayKey}
                 data={dayGroups[selectedDayKey]}
-                onBack={handleBack}
+                onBack={() => { setSelectedDayKey(null); setSelectedDay(null); }}
                 initialNote={notes[selectedDayKey]}
                 onSaveNote={saveNote}
               />
-            : <CalendarView {...calendarProps} />
+            : <TradeLogAllView
+                dayGroups={dayGroups}
+                onDaySelect={(key, day) => { setSelectedDayKey(key); setSelectedDay(day); }}
+                notes={notes}
+              />
         )}
         {activeTab === "thesis" && (
           <>
