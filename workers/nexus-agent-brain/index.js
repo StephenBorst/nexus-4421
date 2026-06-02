@@ -67,9 +67,12 @@ export default {
             }
           }
           const signalData = { ...best, timestamp: Date.now(), user: address };
+          // The brain ONLY owns agent:signal. It must never write agent:state —
+          // that key is single-writer-owned by the exec Worker (risk counters,
+          // daily reset, position). Writing state here previously raced with the
+          // exec's 1-min cycle and clobbered trades_today / daily resets. The UI's
+          // "last signal" is now sourced from agent:signal (merged by lab-api).
           await env.NEXUS_AGENT.put(`agent:signal:${address}`, JSON.stringify(signalData));
-          state.last_signal = signalData;
-          await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
           console.log(`[brain] ${address.slice(0, 10)} → ${best.symbol || "none"} ${best.direction} conf=${best.confidence}% (${best.reason})`);
         } catch (e) {
           console.error(`[brain] assign error for ${address.slice(0, 10)}:`, e.message);

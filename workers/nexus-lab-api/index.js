@@ -2464,14 +2464,20 @@ document.getElementById("btn").addEventListener("click",go);
 
       // GET /agent/:address
       if (request.method === "GET" && !parts[2]) {
-        const [configRaw, stateRaw, pendingRaw] = await Promise.all([
+        const [configRaw, stateRaw, pendingRaw, signalRaw] = await Promise.all([
           AGENT_KV.get(`agent:config:${address}`),
           AGENT_KV.get(`agent:state:${address}`),
           AGENT_KV.get(`agent:pending:${address}`),
+          AGENT_KV.get(`agent:signal:${address}`),
         ]);
         const config = configRaw ? JSON.parse(configRaw) : null;
         const state = stateRaw ? JSON.parse(stateRaw) : null;
         const pending = pendingRaw ? JSON.parse(pendingRaw) : [];
+        // last_signal is owned by the brain via agent:signal — merge it into the
+        // state response (read-only) so the brain never has to write agent:state.
+        if (state && signalRaw) {
+          try { state.last_signal = JSON.parse(signalRaw); } catch { /* keep stored */ }
+        }
         let trades = [];
         // Only query Supabase if configured — an undefined SUPABASE_URL produces a
         // relative fetch (self-subrequest) that fails the whole route (CF error 1042).
@@ -2597,12 +2603,10 @@ document.getElementById("btn").addEventListener("click",go);
 
       // POST /agent/:address/kill — kill switch
       if (request.method === "POST" && parts[2] === "kill") {
-        const stateRaw = await AGENT_KV.get(`agent:state:${address}`);
-        if (stateRaw) {
-          const state = JSON.parse(stateRaw);
-          state.kill_requested = true;
-          await AGENT_KV.put(`agent:state:${address}`, JSON.stringify(state));
-        }
+        // Emergency stop must be un-clobberable. Write a DEDICATED kill flag the
+        // exec consumes + clears — never rely on a state field the exec also
+        // rewrites every minute (that write could race and drop the kill).
+        await AGENT_KV.put(`agent:kill:${address}`, "1");
         await AGENT_KV.delete(`agent:key:${address}`);
         const usersRaw = await AGENT_KV.get("agent:users");
         if (usersRaw) {

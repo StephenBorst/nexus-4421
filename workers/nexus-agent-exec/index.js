@@ -126,12 +126,17 @@ export default {
 };
 
 async function processUser(address, env, cache) {
-  const stateRaw = await env.NEXUS_AGENT.get(`agent:state:${address}`);
+  const [stateRaw, killRaw] = await Promise.all([
+    env.NEXUS_AGENT.get(`agent:state:${address}`),
+    env.NEXUS_AGENT.get(`agent:kill:${address}`),
+  ]);
   if (!stateRaw) return;
   const state = JSON.parse(stateRaw);
 
-  // Check kill switch
-  if (state.kill_requested) {
+  // Kill switch — honored via a DEDICATED agent:kill key (set by lab-api) so an
+  // emergency stop can never be lost to a state-write race. Legacy in-flight
+  // state.kill_requested is still respected for backward compatibility.
+  if (killRaw || state.kill_requested) {
     if (state.current_position) {
       await closePosition(address, state, env, "KILLED", cache);
     }
@@ -139,6 +144,7 @@ async function processUser(address, env, cache) {
     state.kill_requested = false;
     state.current_position = null;
     await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
+    await env.NEXUS_AGENT.delete(`agent:kill:${address}`); // consume the flag
     console.log(`[exec] ${address.slice(0, 10)} KILLED`);
     return;
   }
