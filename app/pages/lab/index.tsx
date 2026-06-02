@@ -2287,6 +2287,20 @@ interface AgentTrade {
   closed_at: string;
 }
 
+interface AgentLeaderboardEntry {
+  rank: number;
+  wallet: string;
+  displayName: string | null;
+  pfp: string | null;
+  trades: number;
+  winRate: number;
+  netPnl: number;
+  profitFactor: number;
+  daysActive: number;
+  score: number;
+  config: Partial<AgentConfig> | null;
+}
+
 interface AgentPendingThesis {
   id: string;
   symbol: string;
@@ -2480,7 +2494,9 @@ function AgentView() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [tab, setTab] = useState<"config" | "status" | "history">("config");
+  const [tab, setTab] = useState<"config" | "status" | "history" | "leaderboard">("config");
+  const [leaderboard, setLeaderboard] = useState<AgentLeaderboardEntry[] | null>(null);
+  const [lbLoading, setLbLoading] = useState(false);
 
   const walletAddress = getWalletAddress();
   const tradingKey = findOrderlyTradingKey();
@@ -2609,6 +2625,40 @@ function AgentView() {
     }
   }
 
+  async function loadLeaderboard() {
+    setLbLoading(true);
+    try {
+      const res = await fetch(`${AGENT_API}/agents/leaderboard`);
+      const data = await res.json();
+      setLeaderboard(Array.isArray(data?.leaderboard) ? data.leaderboard : []);
+    } catch {
+      setLeaderboard([]);
+    } finally {
+      setLbLoading(false);
+    }
+  }
+
+  function copyAgentConfig(entry: AgentLeaderboardEntry) {
+    if (!entry.config) return;
+    // Copy the STRATEGY only — keep the user's own capital/daily-loss budget,
+    // and force PAPER so they prove the copied strategy before risking real funds.
+    setConfig((prev) => ({
+      ...prev,
+      symbols: entry.config!.symbols ?? prev.symbols,
+      leverage: entry.config!.leverage ?? prev.leverage,
+      tpPercent: entry.config!.tpPercent ?? prev.tpPercent,
+      slPercent: entry.config!.slPercent ?? prev.slPercent,
+      maxHoldHours: entry.config!.maxHoldHours ?? prev.maxHoldHours,
+      maxTradesPerDay: entry.config!.maxTradesPerDay ?? prev.maxTradesPerDay,
+      fundingThreshold: entry.config!.fundingThreshold ?? prev.fundingThreshold,
+      mode: "PAPER",
+    }));
+    setTab("config");
+    const who = entry.displayName || `${entry.wallet.slice(0, 6)}…${entry.wallet.slice(-4)}`;
+    setSuccess(`Copied ${who}'s strategy → running in PAPER. Review & activate below.`);
+    setTimeout(() => setSuccess(null), 5000);
+  }
+
   async function killSwitch() {
     if (!walletAddress) return;
     if (!window.confirm("KILL SWITCH — This will immediately close any open position and deactivate the agent. Continue?")) return;
@@ -2679,8 +2729,8 @@ function AgentView() {
           </span>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          {["config", "status", "history"].map((t) => (
-            <button key={t} onClick={() => setTab(t as any)} style={{
+          {(["config", "status", "history", "leaderboard"] as const).map((t) => (
+            <button key={t} onClick={() => { setTab(t); if (t === "leaderboard" && !leaderboard) loadLeaderboard(); }} style={{
               background: tab === t ? "#0a1a0a" : "none",
               border: `1px solid ${tab === t ? "#00ff88" : "transparent"}`,
               color: tab === t ? "#00ff88" : "#4a7a5a",
@@ -2688,7 +2738,7 @@ function AgentView() {
               cursor: "pointer", letterSpacing: "0.05em", borderRadius: 3,
               textTransform: "uppercase",
             }}>
-              {t}
+              {t === "leaderboard" ? "TOP AGENTS" : t}
             </button>
           ))}
         </div>
@@ -3286,6 +3336,90 @@ function AgentView() {
         </div>
         );
       })()}
+
+      {/* ─── TOP AGENTS (public leaderboard) ─────────────── */}
+      {tab === "leaderboard" && (
+        <div>
+          <div style={{ ...agentCardStyle, borderColor: "#1a3a2a" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={agentLabelStyle}>// TOP AUTONOMOUS AGENTS</div>
+              <button onClick={loadLeaderboard} disabled={lbLoading} style={{ ...navBtnStyle, fontSize: 9, padding: "3px 10px", color: "#4a7a5a" }}>
+                {lbLoading ? "…" : "↻ REFRESH"}
+              </button>
+            </div>
+            <div style={{ fontFamily: "monospace", fontSize: 10, color: "#3a5a4a", marginTop: 6, lineHeight: 1.5 }}>
+              Ranked by risk-adjusted score (win rate + profit factor, weighted by sample size) over <strong style={{ color: "#8aaa9a" }}>≥10 live trades spanning ≥3 days</strong>. Paper excluded. Copy any strategy to test it in PAPER first.
+            </div>
+          </div>
+
+          {lbLoading && (!leaderboard || leaderboard.length === 0) ? (
+            <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 12, padding: 24, textAlign: "center" }}>loading leaderboard…</div>
+          ) : !leaderboard || leaderboard.length === 0 ? (
+            <div style={{ ...agentCardStyle, textAlign: "center", padding: 28 }}>
+              <div style={{ fontSize: 22, color: "#00ff88", marginBottom: 8 }}>◆</div>
+              <div style={{ color: "#fff", fontFamily: "monospace", fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>No ranked agents yet</div>
+              <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 11, lineHeight: 1.6 }}>
+                Agents qualify after 10 live trades over 3+ days. Run yours live and claim rank #1 — your strategy becomes copyable by everyone.
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {leaderboard.map((e) => {
+                const isMe = e.wallet.toLowerCase() === (walletAddress ?? "").toLowerCase();
+                const who = e.displayName || `${e.wallet.slice(0, 6)}…${e.wallet.slice(-4)}`;
+                const medal = e.rank === 1 ? "#ffd700" : e.rank === 2 ? "#c0c0c0" : e.rank === 3 ? "#cd7f32" : "#3a5a4a";
+                return (
+                  <div key={e.wallet} style={{ ...agentCardStyle, borderColor: isMe ? "#00ff88" : "#1a3a2a", display: "grid", gridTemplateColumns: "34px 1fr repeat(4, auto) 110px", gap: 12, alignItems: "center" }}>
+                    <div style={{ fontFamily: "monospace", fontSize: 18, fontWeight: 700, color: medal, textAlign: "center" }}>{e.rank}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                      {e.pfp
+                        ? <img src={e.pfp} alt="" style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                        : <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#0a1a0e", border: "1px solid #1a3a2a", flexShrink: 0 }} />}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontFamily: "monospace", fontSize: 12, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {who}{isMe && <span style={{ color: "#00ff88", fontSize: 9 }}> (you)</span>}
+                        </div>
+                        <div style={{ display: "flex", gap: 3, marginTop: 2, flexWrap: "wrap" }}>
+                          {(e.config?.symbols ?? []).slice(0, 4).map((s) => (
+                            <span key={s} style={{ fontSize: 8, color: "#4a9fff", fontFamily: "monospace", background: "#0a1a2a", border: "1px solid #0a2a3a", borderRadius: 2, padding: "1px 4px" }}>
+                              {s.replace("PERP_", "").replace("_USDC", "")}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    {[
+                      { label: "SCORE", val: e.score.toFixed(1), color: "#00ff88" },
+                      { label: "NET P&L", val: `+$${e.netPnl.toFixed(0)}`, color: "#00ff88" },
+                      { label: "WIN", val: `${e.winRate.toFixed(0)}%`, color: e.winRate >= 50 ? "#00ff88" : "#ff8800" },
+                      { label: "PF", val: e.profitFactor.toFixed(2), color: "#c0c0c0" },
+                    ].map(({ label, val, color }) => (
+                      <div key={label} style={{ textAlign: "right" }}>
+                        <div style={{ ...agentLabelStyle, fontSize: 8 }}>{label}</div>
+                        <div style={{ color, fontFamily: "monospace", fontSize: 13, fontWeight: 600 }}>{val}</div>
+                        {label === "SCORE" && <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>{e.trades}t · {e.daysActive}d</div>}
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => copyAgentConfig(e)}
+                      disabled={!e.config || isMe}
+                      style={{
+                        background: e.config && !isMe ? "#00ff8815" : "#0a0e0a",
+                        border: `1px solid ${e.config && !isMe ? "#00ff88" : "#1e2d1e"}`,
+                        borderRadius: 4, color: e.config && !isMe ? "#00ff88" : "#3a5a4a",
+                        fontFamily: "monospace", fontSize: 10, padding: "7px 10px",
+                        cursor: e.config && !isMe ? "pointer" : "default", letterSpacing: "0.03em",
+                      }}
+                    >
+                      {isMe ? "YOUR AGENT" : "COPY CONFIG"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

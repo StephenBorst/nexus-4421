@@ -2615,6 +2615,93 @@ document.getElementById("btn").addEventListener("click",go);
       return json({ error: "not found" }, request, 404);
     }
 
+    // ── /agents/leaderboard — public ranking of autonomous agents ──
+    // Ranks by a risk-adjusted score (win rate + capped profit factor, shrunk by
+    // sample size) so it reflects STRATEGY quality, not deposit size or a lucky
+    // small sample. Live trades only (paper never reaches Supabase).
+    if (parts[0] === "agents" && parts[1] === "leaderboard") {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+
+      const MIN_TRADES = 10;   // anti-gaming: meaningful sample
+      const MIN_DAYS = 3;      // anti-gaming: spread over time, not one session
+      const FULL_CONF_TRADES = 30;
+      const TOP_N = 25;
+
+      if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+        return json({ leaderboard: [], criteria: { minTrades: MIN_TRADES, minDays: MIN_DAYS } }, request);
+      }
+
+      // One pull of all live agent trades; aggregate per wallet in-worker.
+      let rows = [];
+      try {
+        const res = await fetch(
+          `${env.SUPABASE_URL}/rest/v1/agent_trades?select=wallet_address,pnl,closed_at&order=closed_at.desc&limit=10000`,
+          { headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` } }
+        );
+        if (res.ok) rows = await res.json();
+      } catch (e) { console.error("[leaderboard] supabase error:", e); }
+
+      const byWallet = {};
+      for (const r of rows) {
+        const w = (r.wallet_address || "").toLowerCase();
+        if (!w) continue;
+        const pnl = parseFloat(r.pnl) || 0;
+        const closed = new Date(r.closed_at).getTime() || 0;
+        if (!byWallet[w]) byWallet[w] = { trades: 0, wins: 0, net: 0, grossWin: 0, grossLoss: 0, first: Infinity, last: 0 };
+        const a = byWallet[w];
+        a.trades++; a.net += pnl;
+        if (pnl > 0) { a.wins++; a.grossWin += pnl; } else { a.grossLoss += Math.abs(pnl); }
+        if (closed) { a.first = Math.min(a.first, closed); a.last = Math.max(a.last, closed); }
+      }
+
+      const dayMs = 86400000;
+      const eligible = [];
+      for (const [wallet, a] of Object.entries(byWallet)) {
+        const daysActive = a.first === Infinity ? 0 : Math.max(1, Math.round((a.last - a.first) / dayMs));
+        if (a.trades < MIN_TRADES || daysActive < MIN_DAYS || a.net <= 0) continue;
+        const winRate = a.wins / a.trades;
+        const profitFactor = a.grossLoss > 0 ? a.grossWin / a.grossLoss : (a.grossWin > 0 ? 99 : 0);
+        const pfScore = Math.min(profitFactor, 5) / 5;
+        const sampleConf = Math.min(1, a.trades / FULL_CONF_TRADES);
+        const score = Math.round((0.5 * winRate + 0.5 * pfScore) * sampleConf * 1000) / 10; // 0–100
+        eligible.push({
+          wallet, trades: a.trades, daysActive,
+          winRate: Math.round(winRate * 1000) / 10,
+          netPnl: Math.round(a.net * 100) / 100,
+          profitFactor: Math.round(Math.min(profitFactor, 99) * 100) / 100,
+          score,
+        });
+      }
+
+      eligible.sort((x, y) => y.score - x.score || y.netPnl - x.netPnl);
+      const top = eligible.slice(0, TOP_N);
+
+      // Enrich top entries with profile + copyable (strategy-only) config.
+      const enriched = await Promise.all(top.map(async (e, i) => {
+        const [configRaw, profileRaw] = await Promise.all([
+          AGENT_KV.get(`agent:config:${e.wallet}`),
+          env.LAB_STORE.get(`profile:${e.wallet}`),
+        ]);
+        const cfg = configRaw ? JSON.parse(configRaw) : null;
+        const profile = profileRaw ? JSON.parse(profileRaw) : {};
+        const sharedConfig = cfg ? {
+          symbols: cfg.symbols, leverage: cfg.leverage, tpPercent: cfg.tpPercent,
+          slPercent: cfg.slPercent, maxHoldHours: cfg.maxHoldHours,
+          maxTradesPerDay: cfg.maxTradesPerDay, fundingThreshold: cfg.fundingThreshold,
+        } : null;
+        return {
+          rank: i + 1, wallet: e.wallet,
+          displayName: profile.displayName || null, pfp: profile.pfp || null,
+          trades: e.trades, winRate: e.winRate, netPnl: e.netPnl,
+          profitFactor: e.profitFactor, daysActive: e.daysActive, score: e.score,
+          config: sharedConfig,
+        };
+      }));
+
+      return json({ leaderboard: enriched, criteria: { minTrades: MIN_TRADES, minDays: MIN_DAYS } }, request);
+    }
+
     if (parts[0] === "feed") {
       if (request.method !== "GET") {
         return json({ error: "method not allowed" }, request, 405);
