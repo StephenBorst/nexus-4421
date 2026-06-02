@@ -10,6 +10,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAccount } from "@orderly.network/hooks";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 import { fetchOnChainRepScore } from "@/hooks/useThesisRegistry";
+import { NexusTierBadge } from "@/components/NexusTierBadge";
 import type { ThesisTrade } from "@/pages/lab/types";
 import CommentsPanel from "@/components/CommentsPanel";
 
@@ -670,6 +671,7 @@ export default function TraderPage() {
                 <div style={{ fontFamily: "monospace", fontSize: 18, fontWeight: "bold", color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {displayName ?? shortAddr}
                   {isOwn && <span style={{ color: "#00ff88", marginLeft: 10, fontSize: 11 }}>YOU</span>}
+                  {wallet && <span style={{ marginLeft: 10 }}><NexusTierBadge address={wallet} /></span>}
                 </div>
                 <div style={{ fontFamily: "monospace", fontSize: 10, color: "#3a5a4a", marginTop: 2 }}>{shortAddr}</div>
                 <div style={{ fontFamily: "monospace", fontSize: 9, color: "#2a4a3a", marginTop: 4 }}>
