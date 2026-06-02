@@ -828,14 +828,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
   }, [board, onChainStats]);
 
   if (board.length === 0) {
-    return (
-      <div style={{ textAlign: "center", padding: "60px 0" }}>
-        <div style={{ fontSize: 20, color: "#2a4a3a", marginBottom: 8 }}>◆</div>
-        <div style={{ fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>
-          no public theses yet — rankings appear once traders publish
-        </div>
-      </div>
-    );
+    return <FeedEmptyState variant="ranks" />;
   }
 
   return (
@@ -1024,6 +1017,52 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
       })}
     </div>
     </>
+  );
+}
+
+// ─── Cold-start empty state ──────────────────────────────────────────────────
+// A recruit landing on an empty feed should see an invitation, not a dead app.
+function FeedEmptyState({ variant }: { variant: "feed" | "ranks" }) {
+  const navigate = useNavigate();
+  const isRanks = variant === "ranks";
+  const steps = [
+    { n: "01", title: "Plan a thesis", desc: "Size a trade in the Thesis Engine — entry, stop, targets, R:R." },
+    { n: "02", title: "Publish it", desc: "Hit 📡 to push it live here, registered on-chain." },
+    { n: "03", title: "Build your rep", desc: "Others follow, copy, and grade it — your track record compounds." },
+  ];
+  return (
+    <div style={{ textAlign: "center", padding: "48px 16px", maxWidth: 620, margin: "0 auto" }}>
+      <div style={{ fontSize: 30, color: "#00ff88", marginBottom: 12, textShadow: "0 0 16px rgba(0,255,136,0.4)" }}>
+        {isRanks ? "◆" : "⬡"}
+      </div>
+      <div style={{ fontFamily: "monospace", fontSize: 20, color: "#fff", fontWeight: "bold", marginBottom: 8, letterSpacing: "0.02em" }}>
+        {isRanks ? "The leaderboard is wide open." : "The signal starts here."}
+      </div>
+      <div style={{ fontFamily: "monospace", fontSize: 12, color: "#5a7a6a", lineHeight: 1.6, marginBottom: 26 }}>
+        {isRanks
+          ? "No traders ranked yet — rankings build as theses get published and closed out. Publish yours and claim rank #1."
+          : "No public theses yet. Publish one from your Lab and it lands in the live feed — others can follow, copy, and grade it. Be the first signal."}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26, textAlign: "left" }}>
+        {steps.map((s) => (
+          <div key={s.n} style={{ background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 4, padding: "12px 14px" }}>
+            <div style={{ fontFamily: "monospace", fontSize: 10, color: "#00ff88", marginBottom: 6 }}>{s.n}</div>
+            <div style={{ fontFamily: "monospace", fontSize: 12, color: "#fff", fontWeight: "bold", marginBottom: 4 }}>{s.title}</div>
+            <div style={{ fontFamily: "monospace", fontSize: 10, color: "#3a5a4a", lineHeight: 1.5 }}>{s.desc}</div>
+          </div>
+        ))}
+      </div>
+      <button
+        onClick={() => navigate("/lab")}
+        style={{
+          background: "#00ff8815", border: "1px solid #00ff88", borderRadius: 4,
+          color: "#00ff88", fontFamily: "monospace", fontSize: 12, fontWeight: "bold",
+          padding: "10px 22px", cursor: "pointer", letterSpacing: "0.05em",
+        }}
+      >
+        → OPEN THE LAB &amp; PUBLISH
+      </button>
+    </div>
   );
 }
 
@@ -1350,14 +1389,16 @@ export default function FeedPage() {
             )}
 
             {!loading && !error && filtered.length === 0 && (
-              <div style={{ textAlign: "center", padding: "60px 0" }}>
-                <div style={{ fontSize: 20, color: "#2a4a3a", marginBottom: 8 }}>■</div>
-                <div style={{ fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>
-                  {feed.length === 0
-                    ? "no public theses yet — go to LAB and hit 📡 to publish yours"
-                    : "no results for this filter"}
-                </div>
-              </div>
+              feed.length === 0
+                ? <FeedEmptyState variant="feed" />
+                : (
+                  <div style={{ textAlign: "center", padding: "60px 0" }}>
+                    <div style={{ fontSize: 20, color: "#2a4a3a", marginBottom: 8 }}>■</div>
+                    <div style={{ fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>
+                      no results for this filter
+                    </div>
+                  </div>
+                )
             )}
 
             {!loading && !error && filtered.length > 0 && (

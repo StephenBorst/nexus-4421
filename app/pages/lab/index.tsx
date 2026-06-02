@@ -2714,6 +2714,39 @@ function AgentView() {
           {(config.mode === "PAPER" || (agentState?.paper_trades?.length ?? 0) > 0) && (
             <AgentTrackRecord title="// 🧪 PAPER TRACK RECORD" accent="#4a9fff" trades={agentState?.paper_trades ?? []} paper onReset={resetPaperRecord} />
           )}
+
+          {/* Graduation nudge — once a paper agent is proven, bridge to live */}
+          {config.mode === "PAPER" && (() => {
+            const pt = agentState?.paper_trades ?? [];
+            const net = pt.reduce((s, t) => s + t.pnl, 0);
+            const wins = pt.filter((t) => t.pnl > 0).length;
+            const wr = pt.length ? Math.round((wins / pt.length) * 100) : 0;
+            if (pt.length < 5 || net <= 0) return null;
+            return (
+              <div style={{ ...agentCardStyle, borderColor: "#1a4a2a", background: "#0a1a0e" }}>
+                <div style={{ ...agentLabelStyle, color: "#00ff88" }}>🎓 READY TO GO LIVE?</div>
+                <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 12, lineHeight: 1.6, marginTop: 8 }}>
+                  Your paper agent is proven — <strong style={{ color: "#00ff88" }}>+${net.toFixed(2)}</strong> over{" "}
+                  <strong style={{ color: "#fff" }}>{pt.length}</strong> simulated trades ({wr}% win rate). Same strategy,
+                  same guardrails — switch it to live to put it to work for real.
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                  <button onClick={() => { setConfig({ ...config, mode: "ASSISTED" }); setSuccess("Mode → ASSISTED. Review params + hit Update below."); setTimeout(() => setSuccess(null), 4000); }}
+                    style={{ background: "#00ff8815", border: "1px solid #00ff88", borderRadius: 4, color: "#00ff88", fontFamily: "monospace", fontSize: 11, padding: "8px 16px", cursor: "pointer" }}>
+                    → GO ASSISTED
+                  </button>
+                  <button onClick={() => { setConfig({ ...config, mode: "AUTONOMOUS" }); setSuccess("Mode → AUTONOMOUS. Needs a trading key — review below."); setTimeout(() => setSuccess(null), 4000); }}
+                    style={{ background: "#ff880015", border: "1px solid #ff8800", borderRadius: 4, color: "#ff8800", fontFamily: "monospace", fontSize: 11, padding: "8px 16px", cursor: "pointer" }}>
+                    → GO AUTONOMOUS
+                  </button>
+                </div>
+                <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", marginTop: 10, lineHeight: 1.5 }}>
+                  Paper results don't guarantee live results — live trades face real fills, slippage, and funding. Start with size you can afford to lose.
+                </div>
+              </div>
+            );
+          })()}
+
           <AgentTrackRecord title="// LIVE TRACK RECORD" accent="#8aaa9a" trades={trades} />
 
           {/* Onboarding + key-status panel */}
