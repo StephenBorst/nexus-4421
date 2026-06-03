@@ -6,9 +6,9 @@ An **Orderly Network white-label perp DEX** (`dex-creator-template`) heavily cus
 rewards) comes from the Orderly SDK — that's the commodity layer. The **product / differentiation**
 is everything built on top:
 
-- **The Lab** (`app/pages/lab/index.tsx`) — the flagship. Tabs (6): Analytics, Agent, Thesis Engine,
-  Market Intel, Copy Trades, Trade Log. Header brand: `// THE LAB`.
-- **Thesis Engine** — position sizing, R:R, funding cost, live P&L, on-chain thesis registry.
+- **The Lab** (`app/pages/lab/index.tsx`) — the flagship. Tabs (7): Market Intel, Nexus Thesis Engine,
+  Agent, Copy Trades, Trade Log, Holders Room, Analytics. Header brand: `// THE LAB`.
+- **Nexus Thesis Engine** — position sizing, R:R, funding cost, live P&L, on-chain thesis registry.
 - **Agent** — autonomous funding-edge trading bot. Modes: PAPER (simulated, default), ASSISTED
   (signals only), AUTONOMOUS (real orders). Guardrails: daily-loss cap, max trades/day, kill switch,
   order-only keys (cannot withdraw).
