@@ -11,6 +11,7 @@ import { useAccount } from "@orderly.network/hooks";
 import { useNavigate } from "react-router-dom";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 import { fetchOnChainRepScore } from "@/hooks/useThesisRegistry";
+import { NexusTierBadge } from "@/components/NexusTierBadge";
 import type { ThesisTrade } from "@/pages/lab/types";
 import CommentsPanel from "@/components/CommentsPanel";
 
@@ -455,6 +456,7 @@ function FeedCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: "monospace", fontSize: 11, color: "#8aaa9a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {thesis.displayName ?? shortAddr}
+            <span style={{ marginLeft: 6 }}><NexusTierBadge address={thesis.wallet} /></span>
           </div>
           <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>{shortAddr}</div>
         </div>
@@ -875,6 +877,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                 <div style={{ fontFamily: "monospace", fontSize: 11, color: "#8aaa9a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {trader.displayName ?? shortAddr}
                   {isOwn && <span style={{ color: "#00ff88", marginLeft: 6, fontSize: 9 }}>YOU</span>}
+                  <span style={{ marginLeft: 6 }}><NexusTierBadge address={trader.wallet} /></span>
                 </div>
                 <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>{shortAddr}</div>
               </div>

@@ -19,11 +19,12 @@ import { useCollateral, usePrivateQuery, useMutation, useAccount } from "@orderl
 import { useLabStorage } from "@/hooks/useLabStorage";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 import { useThesisRegistry } from "@/hooks/useThesisRegistry";
+import { HoldersRoom } from "@/components/HoldersRoom";
 import type { ThesisTrade, ThesisStatus } from "./types";
 import IntelPage from "@/pages/intel";
 
 // ─── Types ───────────────────────────────────────────────
-type TabId = "analytics" | "tradelog" | "thesis" | "copies" | "intel" | "agent";
+type TabId = "analytics" | "tradelog" | "thesis" | "copies" | "intel" | "agent" | "holders";
 
 interface DayGroup {
   pnl: number;
@@ -3651,6 +3652,7 @@ export default function TheLabPage() {
     { id: "agent",          label: "[ TRADING AGENT ]",   short: "AGENT" },
     { id: "copies",         label: "[ COPY TRADES ]",     short: "COPY"  },
     { id: "tradelog",       label: "[ TRADING LOG ]",     short: "LOG"   },
+    { id: "holders",        label: "[ HOLDERS ROOM ]",    short: "◆"     },
     { id: "analytics",      label: "[ ANALYTICS ]",       short: "STATS" },
   ];
 
@@ -3746,6 +3748,7 @@ export default function TheLabPage() {
           connected ? <MarketIntelView /> : <LabWelcome />
         )}
         {activeTab === "agent" && <AgentView />}
+        {activeTab === "holders" && <HoldersRoom walletAddress={rootWalletAddress} />}
       </div>
     </div>
   );

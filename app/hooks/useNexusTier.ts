@@ -68,6 +68,13 @@ const ERC20_ABI = [
     inputs: [],
     outputs: [{ name: "", type: "uint8" }],
   },
+  {
+    name: "totalSupply",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
 ] as const;
 
 // Browser-friendly, CORS-enabled Base RPCs. The chain default (mainnet.base.org)
@@ -85,6 +92,73 @@ const publicClient = createPublicClient({
 
 // Module-level cache so repeated profile views don't re-hit the RPC.
 const cache = new Map<string, { balance: number; tier: NexusTier }>();
+
+// Standard burn sink. $NEXUS sent here is provably out of circulation.
+export const BURN_ADDRESS =
+  "0x000000000000000000000000000000000000dEaD" as const;
+
+let cachedDecimals: number | null = null;
+async function getDecimals(): Promise<number> {
+  if (cachedDecimals != null) return cachedDecimals;
+  const d = await publicClient.readContract({
+    address: NEXUS_TOKEN_ADDRESS,
+    abi: ERC20_ABI,
+    functionName: "decimals",
+  });
+  cachedDecimals = Number(d);
+  return cachedDecimals;
+}
+
+/**
+ * Non-hook balance/tier read for any address. Used where hooks can't run
+ * (e.g. mapping over a list of feed wallets). Shares the module cache.
+ */
+export async function fetchNexusTier(
+  address: string
+): Promise<{ balance: number; tier: NexusTier }> {
+  const key = address.toLowerCase();
+  const cached = cache.get(key);
+  if (cached) return cached;
+  const [raw, decimals] = await Promise.all([
+    publicClient.readContract({
+      address: NEXUS_TOKEN_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: [address as `0x${string}`],
+    }),
+    getDecimals(),
+  ]);
+  const balance = Number(formatUnits(raw as bigint, decimals));
+  const result = { balance, tier: tierForBalance(balance) };
+  cache.set(key, result);
+  return result;
+}
+
+/** Reads $NEXUS total supply and the amount provably burned (held at dead). */
+export async function fetchBurnStats(): Promise<{
+  burned: number;
+  totalSupply: number;
+  pctBurned: number;
+}> {
+  const decimals = await getDecimals();
+  const [burnedRaw, supplyRaw] = await Promise.all([
+    publicClient.readContract({
+      address: NEXUS_TOKEN_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: [BURN_ADDRESS],
+    }),
+    publicClient.readContract({
+      address: NEXUS_TOKEN_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: "totalSupply",
+    }),
+  ]);
+  const burned = Number(formatUnits(burnedRaw as bigint, decimals));
+  const totalSupply = Number(formatUnits(supplyRaw as bigint, decimals));
+  const pctBurned = totalSupply > 0 ? (burned / totalSupply) * 100 : 0;
+  return { burned, totalSupply, pctBurned };
+}
 
 export interface NexusTierState {
   balance: number | null;
