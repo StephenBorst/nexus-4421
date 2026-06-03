@@ -14,7 +14,8 @@ import { createWalletClient, createPublicClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { arbitrum } from "viem/chains";
 
-const LEDGER_URL = "https://og.nexustradinglabs.com/agents/ledger";
+const AGENT_LEDGER_URL = "https://og.nexustradinglabs.com/agents/ledger";
+const THESES_LEDGER_URL = "https://og.nexustradinglabs.com/theses/ledger";
 
 const ABI = [
   { type: "function", name: "anchor", stateMutability: "nonpayable",
@@ -23,55 +24,57 @@ const ABI = [
     inputs: [], outputs: [{ type: "bytes32" }] },
 ];
 
+async function anchorOne(env, label, ledgerUrl, kvKey) {
+  const rpc = env.ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc";
+  const contract = env.LEDGER_ANCHOR_CONTRACT;
+
+  const res = await fetch(ledgerUrl);
+  if (!res.ok) { console.error(`[anchor:${label}] ledger fetch failed`, res.status); return { ok: false, reason: "ledger fetch" }; }
+  const { ledgerHash, count } = await res.json();
+  if (!ledgerHash || !/^[0-9a-f]{64}$/i.test(ledgerHash)) { console.error(`[anchor:${label}] bad ledgerHash`); return { ok: false, reason: "bad hash" }; }
+  const root = `0x${ledgerHash}`;
+
+  // Dedup against our last stored proof for THIS ledger (each ledger anchors
+  // independently — its own event in the contract log).
+  let lastRoot = null;
+  try {
+    const prev = env.NEXUS_AGENT ? await env.NEXUS_AGENT.get(kvKey) : null;
+    if (prev) lastRoot = JSON.parse(prev).root;
+  } catch { /* ignore */ }
+  if (lastRoot && lastRoot.toLowerCase() === root.toLowerCase()) {
+    console.log(`[anchor:${label}] root unchanged, skip`);
+    return { ok: true, skipped: true, root };
+  }
+
+  const account = privateKeyToAccount(env.ANCHOR_PRIVATE_KEY);
+  const wallet = createWalletClient({ account, chain: arbitrum, transport: http(rpc) });
+  const txHash = await wallet.writeContract({
+    address: contract, abi: ABI, functionName: "anchor", args: [root, BigInt(count || 0)],
+  });
+  console.log(`[anchor:${label}] committed ${root} (${count}) tx ${txHash}`);
+
+  try {
+    if (env.NEXUS_AGENT) {
+      await env.NEXUS_AGENT.put(kvKey, JSON.stringify({
+        root, txHash, recordCount: count || 0, ts: Date.now(),
+        chain: "arbitrum", contract, explorer: `https://arbiscan.io/tx/${txHash}`,
+      }));
+    }
+  } catch (e) { console.error(`[anchor:${label}] kv write failed:`, e.message); }
+
+  return { ok: true, root, txHash };
+}
+
 async function runAnchor(env) {
   if (!env.ANCHOR_PRIVATE_KEY || !env.LEDGER_ANCHOR_CONTRACT || env.LEDGER_ANCHOR_CONTRACT.startsWith("0x0000")) {
     console.warn("[anchor] not configured (need ANCHOR_PRIVATE_KEY + LEDGER_ANCHOR_CONTRACT)");
     return { ok: false, reason: "not configured" };
   }
-  const rpc = env.ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc";
-
-  // 1) Pull the current canonical ledger hash.
-  const res = await fetch(LEDGER_URL);
-  if (!res.ok) { console.error("[anchor] ledger fetch failed", res.status); return { ok: false, reason: "ledger fetch" }; }
-  const { ledgerHash, count } = await res.json();
-  if (!ledgerHash || !/^[0-9a-f]{64}$/i.test(ledgerHash)) { console.error("[anchor] bad ledgerHash"); return { ok: false, reason: "bad hash" }; }
-  const root = `0x${ledgerHash}`;
-
-  const account = privateKeyToAccount(env.ANCHOR_PRIVATE_KEY);
-  const contract = env.LEDGER_ANCHOR_CONTRACT;
-
-  // 2) Read the on-chain root — authoritative dedup. Skip if unchanged.
-  const pub = createPublicClient({ chain: arbitrum, transport: http(rpc) });
-  let onchainRoot = null;
-  try {
-    onchainRoot = await pub.readContract({ address: contract, abi: ABI, functionName: "latestRoot" });
-  } catch (e) {
-    console.error("[anchor] readContract failed (continuing to write):", e.message);
-  }
-  if (onchainRoot && onchainRoot.toLowerCase() === root.toLowerCase()) {
-    console.log("[anchor] root unchanged, skip:", root);
-    return { ok: true, skipped: true, root };
-  }
-
-  // 3) Commit the new root.
-  const wallet = createWalletClient({ account, chain: arbitrum, transport: http(rpc) });
-  const txHash = await wallet.writeContract({
-    address: contract, abi: ABI, functionName: "anchor", args: [root, BigInt(count || 0)],
-  });
-  console.log(`[anchor] committed root ${root} (${count} records) tx ${txHash}`);
-
-  // 4) Record the proof for the verify UI (lab-api /agents/ledger reads this).
-  try {
-    if (env.NEXUS_AGENT) {
-      await env.NEXUS_AGENT.put("agent:ledger:onchain", JSON.stringify({
-        root, txHash, recordCount: count || 0, ts: Date.now(),
-        chain: "arbitrum", contract,
-        explorer: `https://arbiscan.io/tx/${txHash}`,
-      }));
-    }
-  } catch (e) { console.error("[anchor] kv write failed:", e.message); }
-
-  return { ok: true, root, txHash };
+  // Anchor both ledgers — agents (real trades) and theses (public calls) — each
+  // as its own committed root + Arbiscan-visible event. Sequential to avoid nonce races.
+  const agents = await anchorOne(env, "agents", AGENT_LEDGER_URL, "agent:ledger:onchain").catch((e) => ({ ok: false, error: e.message }));
+  const theses = await anchorOne(env, "theses", THESES_LEDGER_URL, "theses:ledger:onchain").catch((e) => ({ ok: false, error: e.message }));
+  return { ok: true, agents, theses };
 }
 
 export default {

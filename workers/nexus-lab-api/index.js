@@ -2929,6 +2929,75 @@ document.getElementById("btn").addEventListener("click",go);
       }, request);
     }
 
+    // ── /theses/ledger — verifiable canonical hash of the public CALL ledger ──
+    // Proof-of-call: the prediction fields + creation time, hashable by anyone.
+    // (Outcomes are graded separately from public price — see /theses/leaderboard.)
+    if (parts[0] === "theses" && parts[1] === "ledger") {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+      const ANCHOR_KV = env.NEXUS_AGENT || env.LAB_STORE;
+      const sha256Hex = async (s) => {
+        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+        return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      };
+
+      if (parts[2] === "chain") {
+        const chainRaw = await env.LAB_STORE.get("theses:ledger:chain");
+        const chain = chainRaw ? JSON.parse(chainRaw) : [];
+        return json({ chain, length: chain.length, note: "Append-only prev-linked SHA-256 checkpoints of the public call ledger." }, request);
+      }
+
+      const listed = await env.LAB_STORE.list({ prefix: "lab:" });
+      const recs = [];
+      for (const key of listed.keys) {
+        const raw = await env.LAB_STORE.get(key.name);
+        if (!raw) continue;
+        const data = JSON.parse(raw);
+        const wallet = key.name.replace("lab:", "");
+        for (const t of (data.theses || [])) {
+          if (t.isPublic && t.symbol && t.createdAt) {
+            recs.push({
+              wallet, id: t.id, symbol: t.symbol, direction: t.direction,
+              entryPrice: t.entryPrice, stopLoss: t.stopLoss, takeProfit1: t.takeProfit1,
+              riskReward: t.riskReward, createdAt: t.createdAt,
+            });
+          }
+        }
+      }
+      // Deterministic order so anyone recomputes the identical hash.
+      recs.sort((a, b) => (a.wallet < b.wallet ? -1 : a.wallet > b.wallet ? 1 : (a.createdAt - b.createdAt) || (String(a.id) < String(b.id) ? -1 : 1)));
+      const F = ["wallet", "id", "symbol", "direction", "entryPrice", "stopLoss", "takeProfit1", "riskReward", "createdAt"];
+      const canonical = JSON.stringify(recs.map((r) => F.map((f) => r[f] ?? null)));
+      const ledgerHash = await sha256Hex(canonical);
+
+      try {
+        const chainRaw = await env.LAB_STORE.get("theses:ledger:chain");
+        const chain = chainRaw ? JSON.parse(chainRaw) : [];
+        const last = chain[chain.length - 1];
+        if (!last || last.ledgerHash !== ledgerHash) {
+          const prevHash = last ? last.ledgerHash : "0".repeat(64);
+          const linkHash = await sha256Hex(`${prevHash}:${ledgerHash}:${recs.length}`);
+          chain.push({ ts: Date.now(), ledgerHash, prevHash, linkHash, count: recs.length });
+          if (chain.length > 500) chain.shift();
+          await env.LAB_STORE.put("theses:ledger:chain", JSON.stringify(chain));
+        }
+      } catch (e) { console.error("[theses-ledger] chain", e.message); }
+
+      let onChain = null;
+      try {
+        const ocRaw = await ANCHOR_KV.get("theses:ledger:onchain");
+        if (ocRaw) {
+          const oc = JSON.parse(ocRaw);
+          onChain = { ...oc, verified: (oc.root || "").toLowerCase() === `0x${ledgerHash}`.toLowerCase() };
+        }
+      } catch { /* anchor not set up yet */ }
+
+      return json({
+        ledgerHash, algorithm: "sha256",
+        canonicalForm: "JSON array; each row = [" + F.join(", ") + "]; sorted by wallet, createdAt, id",
+        count: recs.length, generatedAt: Date.now(), onChain, records: recs,
+      }, request);
+    }
+
     if (parts[0] === "feed" && !parts[1]) {
       if (request.method !== "GET") {
         return json({ error: "method not allowed" }, request, 405);
