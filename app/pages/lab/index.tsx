@@ -47,89 +47,9 @@ interface ProcessedTrade {
   leverage?: number;
 }
 
-// ─── Thesis Types (imported from ./types) ─────────────────
-
-// ─── Styles ──────────────────────────────────────────────
-const cardStyle: React.CSSProperties = {
-  background: "#0d120d",
-  border: "1px solid #1a2e1a",
-  borderRadius: 4,
-  padding: "12px 14px",
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: 9,
-  letterSpacing: "0.12em",
-  color: "#3a5a4a",
-  marginBottom: 6,
-  fontFamily: "monospace",
-};
-
-const navBtnStyle: React.CSSProperties = {
-  background: "none",
-  border: "1px solid #1a2e1a",
-  color: "#4a7a5a",
-  fontFamily: "monospace",
-  fontSize: 11,
-  padding: "5px 12px",
-  cursor: "pointer",
-  borderRadius: 3,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  background: "#080c08",
-  border: "1px solid #1a2e1a",
-  borderRadius: 3,
-  color: "#00ff88",
-  fontFamily: "monospace",
-  fontSize: 12,
-  padding: "8px 10px",
-  outline: "none",
-  boxSizing: "border-box",
-};
-
-const fieldLabelStyle: React.CSSProperties = {
-  fontSize: 9,
-  color: "#3a5a4a",
-  fontFamily: "monospace",
-  letterSpacing: "0.1em",
-  marginBottom: 4,
-  display: "block",
-};
-
-// ─── Status Config ────────────────────────────────────────
-const STATUS_CONFIG: Record<ThesisStatus, { label: string; color: string; bg: string; border: string }> = {
-  ACTIVE:      { label: "ACTIVE",      color: "#4a9fff", bg: "#0a1a2a", border: "#1a3a5a" },
-  HIT_TP:      { label: "HIT TP",      color: "#00ff88", bg: "#0a2a0a", border: "#1a4a2a" },
-  STOPPED_OUT: { label: "STOPPED OUT", color: "#ff4444", bg: "#2a0a0a", border: "#4a1a1a" },
-  INVALIDATED: { label: "INVALIDATED", color: "#fbbf24", bg: "#2a1a00", border: "#4a3a00" },
-};
-
-const CLOSED_STATUSES: ThesisStatus[] = ["HIT_TP", "STOPPED_OUT", "INVALIDATED"];
-
-// ─── Helpers ─────────────────────────────────────────────
-function formatPnl(val: number) {
-  return `${val >= 0 ? "+" : ""}$${Math.abs(val).toFixed(2)}`;
-}
-
-function getDayKey(ts: number) {
-  const d = new Date(ts);
-  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-}
-
-function daysInMonth(month: number, year: number) {
-  return new Date(year, month + 1, 0).getDate();
-}
-
-function firstDayOfMonth(month: number, year: number) {
-  return new Date(year, month, 1).getDay();
-}
-
-const MONTH_NAMES = [
-  "January","February","March","April","May","June",
-  "July","August","September","October","November","December",
-];
+// ─── Shared styles + helpers (extracted modules) ─────────
+import { cardStyle, labelStyle, navBtnStyle, inputStyle, fieldLabelStyle, STATUS_CONFIG, CLOSED_STATUSES } from "./styles";
+import { formatPnl, getDayKey, daysInMonth, firstDayOfMonth, MONTH_NAMES } from "./helpers";
 
 // ─── PnL Chart ───────────────────────────────────────────
 function PnlChart({ points }: { points: number[] }) {
