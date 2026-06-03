@@ -26,7 +26,7 @@ type FeedThesis = {
   riskReward: number;
   positionSize: number;
   leverage: number;
-  status: "ACTIVE" | "HIT_TP" | "STOPPED_OUT" | "INVALIDATED";
+  status: "ACTIVE" | "HIT_TP" | "STOPPED_OUT" | "INVALIDATED" | "CLOSED";
   actualPnl: number | null;
   createdAt: number;
   notes: string;
