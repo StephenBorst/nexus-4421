@@ -20,6 +20,7 @@ import { useLabStorage } from "@/hooks/useLabStorage";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 import { useThesisRegistry } from "@/hooks/useThesisRegistry";
 import { HoldersRoom } from "@/components/HoldersRoom";
+import { NexusMarket } from "@/components/NexusMarket";
 import type { ThesisTrade, ThesisStatus } from "./types";
 import IntelPage from "@/pages/intel";
 
@@ -3730,6 +3731,9 @@ export default function TheLabPage() {
         </div>
       </div>
       <div style={{ padding: isMobile ? 12 : 16 }}>
+        <div style={{ marginBottom: 12 }}>
+          <NexusMarket />
+        </div>
         {connected && (
           <OnboardingChecklist
             hasThesis={theses.length > 0}
