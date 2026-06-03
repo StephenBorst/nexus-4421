@@ -12,6 +12,19 @@ import { useXMTP } from "@/hooks/useXMTP";
 import type { Conversation, DecodedMessage } from "@/hooks/useXMTP";
 import { markConvoRead } from "@/utils/xmtpUnread";
 
+// ─── Responsive hook ───────────────────────────────────────────────────────────
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < breakpoint);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    setIsMobile(mq.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function shortAddr(addr: string): string {
@@ -463,6 +476,7 @@ export default function MessagesPage() {
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvo, setActiveConvo] = useState<Conversation | null>(null);
+  const isMobile = useIsMobile();
   const [activePeerHint, setActivePeerHint] = useState<string | undefined>(undefined);
   const [loadingConvos, setLoadingConvos] = useState(false);
   const [dmAddress, setDmAddress] = useState("");
@@ -596,8 +610,8 @@ export default function MessagesPage() {
       </div>
 
       <div style={S.body}>
-        {/* Sidebar — conversation list */}
-        <div style={S.sidebar}>
+        {/* Sidebar — conversation list (full-width on mobile, hidden when a thread is open) */}
+        <div style={{ ...S.sidebar, ...(isMobile ? { width: "100%", borderRight: "none", display: activeConvo ? "none" : "flex" } : {}) }}>
           <div style={S.sidebarHeader}>CONVERSATIONS</div>
 
           {/* New DM input */}
@@ -694,17 +708,27 @@ export default function MessagesPage() {
           </div>
         </div>
 
-        {/* Thread panel */}
-        <div style={S.thread}>
+        {/* Thread panel (hidden on mobile until a conversation is selected) */}
+        <div style={{ ...S.thread, ...(isMobile && !activeConvo ? { display: "none" } : {}) }}>
           {activeConvo ? (
-            <ThreadView
-              key={activeConvo.id}
-              convo={activeConvo}
-              myInboxId={myInboxId}
-              getMessages={getMessages}
-              streamMessages={streamMessages}
-              peerAddressHint={activePeerHint}
-            />
+            <>
+              {isMobile && (
+                <button
+                  onClick={() => setActiveConvo(null)}
+                  style={{ background: "none", border: "none", borderBottom: "1px solid #1a2e1a", color: "#3a6a4a", fontFamily: "monospace", fontSize: 11, padding: "10px 14px", cursor: "pointer", textAlign: "left", width: "100%" }}
+                >
+                  ← conversations
+                </button>
+              )}
+              <ThreadView
+                key={activeConvo.id}
+                convo={activeConvo}
+                myInboxId={myInboxId}
+                getMessages={getMessages}
+                streamMessages={streamMessages}
+                peerAddressHint={activePeerHint}
+              />
+            </>
           ) : (
             <div style={S.center}>
               <div style={{ fontSize: 28, color: "#1a2e1a" }}>⬡</div>

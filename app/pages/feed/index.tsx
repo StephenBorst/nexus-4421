@@ -263,7 +263,7 @@ function CopyModal({
         </div>
 
         {/* Editable: account size + risk + funding */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 4 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: 10, marginBottom: 4 }}>
           <div>
             <div style={labelStyle}>ACCOUNT SIZE ($)</div>
             <input
@@ -902,7 +902,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
             {/* Trader row */}
             <div
               onClick={() => setExpandedWallet(isExpanded ? null : trader.wallet.toLowerCase())}
-              style={{ padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}
+              style={{ padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12, overflowX: "auto" }}
             >
               {/* Rank */}
               <div style={{ fontFamily: "monospace", fontSize: RANK_MEDALS[rank] ? 16 : 12, minWidth: 28, textAlign: "center", color: "#3a5a4a" }}>
