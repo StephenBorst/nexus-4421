@@ -133,6 +133,21 @@ The public agents leaderboard ranks on a risk-adjusted score from live `agent_tr
   verified. ⚠️ HANDOFF: (1) deploy the contract on Arbitrum from a DEDICATED hot wallet (Remix), (2) fund
   that wallet w/ ~$2 ETH on Arbitrum, (3) set `LEDGER_ANCHOR_CONTRACT` var + `ANCHOR_PRIVATE_KEY` secret on
   nexus-ledger-anchor, (4) `npm i` + `npx wrangler deploy` the worker. Until then it no-ops safely.
+- **✅ DEPLOYED + LIVE (Session 2026-06-02):** contract `0x57a698df84a44F3dA3dac3E08CA455a55A4eff84`
+  (Arbitrum), signer = a dedicated fresh hot wallet (~$3 gas, key in `ANCHOR_PRIVATE_KEY` secret). Both
+  the AGENT ledger (`0x1fa8…`) and human CALL ledger are anchored + `verified:true`.
+
+## Human call leaderboard (trustless — same standard as agents)
+- A human thesis = a **call**. Outcomes are graded OBJECTIVELY from PUBLIC price (Orderly `GET /tv/history`,
+  1h OHLC, first-touch TP1-vs-SL; same-candle = LOSS conservative) — NOT self-reported. So `actualPnl`/status
+  the user types is ignored for ranking.
+- `GET /theses/leaderboard`: ranks public-thesis authors by hit-rate + avg-R over ≥5 resolved calls
+  (net-positive-R gate, sample-confidence shrink). `GET /theses/ledger`: canonical SHA-256 of the public
+  call set (proof-of-call fields + createdAt), recomputable, prev-linked chain (`/theses/ledger/chain`),
+  `onChain` proof merge. anchor worker `anchorOne()` anchors agents + theses each run (separate roots/events,
+  KV-deduped). Frontend: **VERIFIED CALLERS** board atop Feed RANKS (`app/pages/feed/index.tsx`).
+- ⚠️ Honest ceiling: verifying a human's *personal Orderly trades* server-side is NOT possible (position_history
+  is private-auth; no public per-address endpoint) — that's why we grade the CALL vs public price instead.
 
 ## Conventions
 - Aesthetic: monospace terminal / green (#00ff88). Keep it — it's an ownable brand, don't "SaaS-ify".
