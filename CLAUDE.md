@@ -164,14 +164,15 @@ The public agents leaderboard ranks on a risk-adjusted score from live `agent_tr
   🧠 brain down (via `ops:brain:heartbeat` KV the brain stamps every run; >15min = down). 3h per-issue
   debounce + daily ✅ heartbeat. Secrets: `TELEGRAM_TOKEN` (same bot as lab-alerts) + `OPS_TELEGRAM_CHAT_ID`
   var (6927717434). Test: `GET /monitor-now`. Verified live → `{"issues":[]}`.
-- **Refactor (IN PROGRESS — resume here):** splitting the two god files. DONE: `app/pages/lab/styles.ts`
-  (all shared + agent styles, STATUS_CONFIG, CLOSED_STATUSES) + `app/pages/lab/helpers.ts` (formatPnl,
-  getDayKey, daysInMonth, firstDayOfMonth, MONTH_NAMES); index.tsx imports them (3775→3657 lines).
-  NEXT slices (each = extract → tsc → small commit, watch for parallel-session collisions):
-  (1) types → move ProcessedTrade/DayGroup/TabId/Agent* interfaces + DEFAULT_CONFIG into `types.ts`;
-  (2) shared primitives EmptyState + PnlChart → `components.tsx`;
-  (3) big views → `AnalyticsView.tsx` (~470 lines), `AgentView.tsx` (~1000), ThesisView, Calendar/TradeLog,
-  MarketIntel (the ~70% shrink); (4) worker: split nexus-lab-api routes into routes/agent|theses|feed.
+- **Refactor (LAB DONE):** `app/pages/lab/index.tsx` split 3775 → **190-line orchestrator** + modules:
+  `styles.ts`, `helpers.ts`, `types.ts` (+ all view/agent types + DEFAULT_CONFIG), `useIsMobile.ts`,
+  `components.tsx` (EmptyState/PnlChart), `AnalyticsView.tsx`, `TradeLog.tsx` (Calendar+TradeLog),
+  `ThesisView.tsx` (+ThesisAnalyticsView), `AgentView.tsx` (+AGENT_API/key readers), `CopiesView.tsx`,
+  `MarketIntel.tsx` (+NewsTab), `Onboarding.tsx` (LabWelcome+OnboardingChecklist). tsc clean + `vite build`
+  verified green. Pattern: extract → import → tsc → small commit.
+- **Refactor (worker — OPTIONAL/deferred):** `nexus-lab-api` (3.2k) is still one big fetch handler, but its
+  risky logic (gradeCall) is already extracted to logic.mjs + tested, and it's uniform route blocks (lower
+  maintainability pain than the Lab was). Split routes/agent|theses|feed only if it starts hurting.
 
 ## Conventions
 - **Mobile/responsive:** the app uses inline styles, so CSS media queries can't override them. Pattern:
