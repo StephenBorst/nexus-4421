@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { createPublicClient, http, formatUnits } from "viem";
+import { createPublicClient, http, fallback, formatUnits } from "viem";
 import { base } from "viem/chains";
 
 export const NEXUS_TOKEN_ADDRESS =
@@ -70,9 +70,17 @@ const ERC20_ABI = [
   },
 ] as const;
 
+// Browser-friendly, CORS-enabled Base RPCs. The chain default (mainnet.base.org)
+// gets rate-limited/CORS-blocked from the browser, which silently hid the badge —
+// fallback() tries each in order until one succeeds.
 const publicClient = createPublicClient({
   chain: base,
-  transport: http(),
+  transport: fallback([
+    http("https://base.llamarpc.com"),
+    http("https://base-rpc.publicnode.com"),
+    http("https://base.drpc.org"),
+    http(), // chain default, last resort
+  ]),
 });
 
 // Module-level cache so repeated profile views don't re-hit the RPC.
@@ -125,8 +133,9 @@ export function useNexusTier(address?: string | null): NexusTierState {
         const tier = tierForBalance(balance);
         cache.set(key, { balance, tier });
         if (!cancelled) setState({ balance, tier, isLoading: false });
-      } catch {
-        // Fail soft: no badge rather than a broken UI.
+      } catch (err) {
+        // Fail soft: no badge rather than a broken UI. Log for diagnosis.
+        console.debug("[useNexusTier] balance read failed", err);
         if (!cancelled) setState({ balance: null, tier: "NONE", isLoading: false });
       }
     })();
