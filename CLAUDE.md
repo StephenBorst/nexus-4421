@@ -175,6 +175,12 @@ The public agents leaderboard ranks on a risk-adjusted score from live `agent_tr
   maintainability pain than the Lab was). Split routes/agent|theses|feed only if it starts hurting.
 
 ## Conventions
+- **⚠️ After creating new files, `git add` them + verify `git status` is clean BEFORE trusting a build.**
+  A local `vite build`/`tsc` passes with untracked files (they exist in the working tree), but CI builds
+  from a clean checkout and fails to resolve them (Build step → Pages deploy skipped). The CI result is the
+  only one that counts. (Bit us once: `components.tsx` was created in the refactor but never committed →
+  6 red deploys until `git add`ed.) To get CI step status without admin: `GET api.github.com/repos/<repo>/
+  actions/runs` then `/jobs` (public, unauthenticated; logs need admin though).
 - **Mobile/responsive:** the app uses inline styles, so CSS media queries can't override them. Pattern:
   stat-card grids use `repeat(auto-fit, minmax(NNpx,1fr))` (fluid, desktop unchanged since auto-fit never
   exceeds item count); dense row tables get `overflowX:auto` + `minWidth`; layout-level changes use the
