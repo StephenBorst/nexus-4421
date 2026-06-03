@@ -149,6 +149,20 @@ The public agents leaderboard ranks on a risk-adjusted score from live `agent_tr
 - ⚠️ Honest ceiling: verifying a human's *personal Orderly trades* server-side is NOT possible (position_history
   is private-auth; no public per-address endpoint) — that's why we grade the CALL vs public price instead.
 
+## Testing (money-path + trust-path)
+- Pure logic is extracted into `logic.mjs` next to each worker's `index.js` (which imports it, so
+  tests cover the REAL deployed code, not a copy). Tests = zero-dep `node:test` in `logic.test.mjs`.
+  Run: `node --test workers/<worker>/logic.test.mjs` (or `npm test` in the worker dir).
+- **nexus-agent-exec/logic.mjs** (12 tests): `snapQty` (-1104 step-size float-artifact guard +
+  base_min/min_notional), `shouldResetDaily`, `dailyCapBlocked` (never blocks a win), `computePnl`
+  (long/short), `exitReason` (TP→SL→timeout priority).
+- **nexus-lab-api/logic.mjs** (9 tests): `gradeCall` — trustless first-touch TP-vs-SL grading
+  (same-candle=loss, short inversion, pre-call candles ignored). Ledger hashing left inline (anchored
+  on-chain — don't risk it).
+- ⚠️ TODO (monitoring, not yet built): anchor-signer gas balance, ledger anchor freshness, brain/exec
+  cron liveness → alert via Telegram (`nexus-lab-alerts` has TELEGRAM_TOKEN + sendMessage). Needs an
+  OPS chat id. And refactor: lab/index.tsx (3.7k) + nexus-lab-api (3.2k) are god files.
+
 ## Conventions
 - **Mobile/responsive:** the app uses inline styles, so CSS media queries can't override them. Pattern:
   stat-card grids use `repeat(auto-fit, minmax(NNpx,1fr))` (fluid, desktop unchanged since auto-fit never
