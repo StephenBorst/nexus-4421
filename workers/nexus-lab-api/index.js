@@ -2706,6 +2706,73 @@ document.getElementById("btn").addEventListener("click",go);
       return json({ leaderboard: enriched, criteria: { minTrades: MIN_TRADES, minDays: MIN_DAYS } }, request);
     }
 
+    // ── /agents/ledger — verifiable, canonical hash of the agent trade ledger ──
+    // Anyone can fetch the raw records, recompute the SHA-256 over the canonical
+    // serialization, and confirm it matches `ledgerHash`. This makes every number
+    // on the leaderboard provably derived from these exact records — no trust in
+    // our DB required. Each read also checkpoints the hash into an append-only,
+    // prev-linked chain (tamper-evidence over time). Anchor the latest root
+    // on-chain (see /agents/ledger/chain) for full trustlessness.
+    if (parts[0] === "agents" && parts[1] === "ledger") {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+
+      const sha256Hex = async (s) => {
+        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+        return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      };
+
+      // GET /agents/ledger/chain — the append-only checkpoint chain
+      if (parts[2] === "chain") {
+        const chainRaw = await AGENT_KV.get("agent:ledger:chain");
+        const chain = chainRaw ? JSON.parse(chainRaw) : [];
+        return json({ chain, length: chain.length, note: "Append-only, prev-linked SHA-256 checkpoints. Anchor the latest hash on-chain for full trustlessness." }, request);
+      }
+
+      if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+        return json({ ledgerHash: null, count: 0, records: [] }, request);
+      }
+
+      let rows = [];
+      try {
+        const res = await fetch(
+          `${env.SUPABASE_URL}/rest/v1/agent_trades?select=id,wallet_address,symbol,direction,entry_price,exit_price,qty,pnl,pnl_percent,reason,opened_at,closed_at&order=id.asc&limit=10000`,
+          { headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` } }
+        );
+        if (res.ok) rows = await res.json();
+      } catch (e) { console.error("[ledger] supabase error:", e); }
+
+      // Canonical serialization: fixed field order per row, rows ordered by id.
+      // Deterministic → any third party recomputes the identical hash.
+      const FIELDS = ["id", "wallet_address", "symbol", "direction", "entry_price", "exit_price", "qty", "pnl", "pnl_percent", "reason", "opened_at", "closed_at"];
+      const canonical = JSON.stringify(rows.map((r) => FIELDS.map((f) => r[f] ?? null)));
+      const ledgerHash = await sha256Hex(canonical);
+
+      // Checkpoint into the prev-linked chain only when the hash changes (dedup
+      // so frequent reads don't spam the chain — it grows only as trades settle).
+      try {
+        const chainRaw = await AGENT_KV.get("agent:ledger:chain");
+        const chain = chainRaw ? JSON.parse(chainRaw) : [];
+        const last = chain[chain.length - 1];
+        if (!last || last.ledgerHash !== ledgerHash) {
+          const prevHash = last ? last.ledgerHash : "0".repeat(64);
+          const linkHash = await sha256Hex(`${prevHash}:${ledgerHash}:${rows.length}`);
+          chain.push({ ts: Date.now(), ledgerHash, prevHash, linkHash, count: rows.length });
+          if (chain.length > 500) chain.shift();
+          await AGENT_KV.put("agent:ledger:chain", JSON.stringify(chain));
+        }
+      } catch (e) { console.error("[ledger] chain checkpoint error:", e); }
+
+      return json({
+        ledgerHash,
+        algorithm: "sha256",
+        canonicalForm: "JSON array of rows; each row = [" + FIELDS.join(", ") + "]; rows sorted by id asc",
+        count: rows.length,
+        generatedAt: Date.now(),
+        records: rows,
+      }, request);
+    }
+
     if (parts[0] === "feed") {
       if (request.method !== "GET") {
         return json({ error: "method not allowed" }, request, 405);

@@ -393,6 +393,7 @@ async function closePosition(address, state, env, reason, cache) {
   const pos = state.current_position;
   if (!pos) return;
   const paper = !!pos.paper;
+  let closeOrderId = null;
 
   // Real positions: send a reduce-only market close. Paper positions never
   // touched the exchange, so there's nothing to close — skip straight to P&L.
@@ -406,7 +407,7 @@ async function closePosition(address, state, env, reason, cache) {
       const closeSide = pos.direction === "LONG" ? "SELL" : "BUY";
 
       try {
-        await orderlyRequest(keyData, "POST", "/v1/order", {
+        const closeOrder = await orderlyRequest(keyData, "POST", "/v1/order", {
           symbol: pos.symbol,
           order_type: "MARKET",
           side: closeSide,
@@ -414,6 +415,7 @@ async function closePosition(address, state, env, reason, cache) {
           reduce_only: true,
           broker_id: "nexus_trading",
         });
+        closeOrderId = closeOrder?.data?.order_id ?? null;
       } catch (e) {
         console.error(`[exec] ${address.slice(0, 10)} close order failed:`, e.message);
       }
@@ -447,25 +449,38 @@ async function closePosition(address, state, env, reason, cache) {
     opened_at: new Date(pos.opened_at).toISOString(),
     closed_at: new Date().toISOString(),
   };
+  // Orderly order IDs make every record independently auditable against the
+  // exchange (anyone can verify the order existed + its fill). Optional columns.
+  const auditable = { ...trade, entry_order_id: pos.order_id ?? null, close_order_id: closeOrderId };
 
   if (paper) {
     // Paper trades live in state (rides along in the API's state response) so
     // they stay completely separate from the real Supabase track record.
     state.paper_trades = state.paper_trades || [];
-    state.paper_trades.unshift({ id: `paper_${Date.now()}`, ...trade });
+    state.paper_trades.unshift({ id: `paper_${Date.now()}`, ...auditable });
     if (state.paper_trades.length > 50) state.paper_trades.pop(); // keep last 50
   } else {
-    // Log real trades to Supabase
+    // Log real trades to Supabase. Writes use the SERVICE key (least privilege:
+    // only the exec can insert). Falls back to the anon key if the service key
+    // isn't set yet so logging never breaks mid-migration. Pair this with an RLS
+    // policy that blocks anon INSERT on agent_trades — then the public anon key
+    // (used for reads) cannot forge trade rows.
+    const writeKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY;
+    const insert = async (payload) => fetch(`${env.SUPABASE_URL}/rest/v1/agent_trades`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: writeKey, Authorization: `Bearer ${writeKey}` },
+      body: JSON.stringify(payload),
+    });
     try {
-      await fetch(`${env.SUPABASE_URL}/rest/v1/agent_trades`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: env.SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${env.SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({ wallet_address: address, ...trade }),
-      });
+      // Try the auditable row (with order IDs). If the columns aren't migrated
+      // yet, PostgREST 400s — fall back to the core row so logging never breaks.
+      let res = await insert({ wallet_address: address, ...auditable });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        console.warn(`[exec] ${address.slice(0, 10)} auditable insert failed (${res.status}) — retrying core row:`, detail.slice(0, 120));
+        res = await insert({ wallet_address: address, ...trade });
+        if (!res.ok) console.error(`[exec] ${address.slice(0, 10)} core insert also failed (${res.status})`);
+      }
     } catch (e) {
       console.error(`[exec] ${address.slice(0, 10)} supabase log failed:`, e.message);
     }
