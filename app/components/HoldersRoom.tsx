@@ -13,10 +13,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   useNexusTier,
-  fetchNexusTier,
   TIER_META,
   TIER_THRESHOLDS,
-  type NexusTier,
 } from "@/hooks/useNexusTier";
 import { NexusTierBadge } from "@/components/NexusTierBadge";
 import { NexusBurnCounter } from "@/components/NexusBurnCounter";
@@ -72,29 +70,17 @@ export function HoldersRoom({ walletAddress }: { walletAddress: string | null })
   const isHolder = tier !== "NONE";
 
   useEffect(() => {
-    if (!isHolder) return;
+    if (!isHolder || !walletAddress) return;
     setLoadingFeed(true);
-    fetch(`${API_BASE}/feed`)
+    // Server-gated endpoint: only returns holders-only theses if the address holds $NEXUS.
+    fetch(`${API_BASE}/feed/holders?address=${walletAddress.toLowerCase()}`)
       .then((r) => r.json())
-      .then(async (data: { feed: FeedThesis[] }) => {
-        const all = data.feed ?? [];
-        // Resolve each author's tier; keep only theses from holders.
-        const wallets = [...new Set(all.map((t) => t.wallet.toLowerCase()))];
-        const tiers = new Map<string, NexusTier>();
-        await Promise.all(
-          wallets.map(async (w) => {
-            try { tiers.set(w, (await fetchNexusTier(w)).tier); }
-            catch { tiers.set(w, "NONE"); }
-          })
-        );
-        const holderTheses = all
-          .filter((t) => tiers.get(t.wallet.toLowerCase()) !== "NONE")
-          .sort((a, b) => b.createdAt - a.createdAt);
-        setTheses(holderTheses);
+      .then((data: { feed?: FeedThesis[] }) => {
+        setTheses((data.feed ?? []).sort((a, b) => b.createdAt - a.createdAt));
       })
       .catch(() => setTheses([]))
       .finally(() => setLoadingFeed(false));
-  }, [isHolder]);
+  }, [isHolder, walletAddress]);
 
   if (!walletAddress) {
     return (
@@ -133,7 +119,7 @@ export function HoldersRoom({ walletAddress }: { walletAddress: string | null })
 
       {theses && theses.length === 0 && !loadingFeed && (
         <div style={{ fontFamily: "monospace", fontSize: 11, color: "#3a6a4a", padding: "32px 0", textAlign: "center" }}>
-          No holder theses yet. Publish one from the Thesis Engine to seed the room.
+          No holders-only theses yet. In the Thesis Engine, set a thesis to ◆ HOLDERS to share it here.
         </div>
       )}
 

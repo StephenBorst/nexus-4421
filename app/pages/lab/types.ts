@@ -22,6 +22,7 @@ export interface ThesisTrade {
   status: ThesisStatus;
   actualPnl: number | null;
   isPublic?: boolean;
+  holdersOnly?: boolean; // shared to the $NEXUS Holders Room only (excluded from public feed)
   pfp?: string;
   displayName?: string;
   onChainId?: number;

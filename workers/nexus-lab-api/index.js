@@ -2846,7 +2846,7 @@ document.getElementById("btn").addEventListener("click",go);
       // eth_call balanceOf(address)
       const callData = "0x70a08231000000000000000000000000" + claimed.slice(2);
       let isHolder = false;
-      for (const rpc of ["https://base.llamarpc.com", "https://base-rpc.publicnode.com", "https://mainnet.base.org"]) {
+      for (const rpc of ["https://base-rpc.publicnode.com", "https://mainnet.base.org", "https://base.llamarpc.com"]) {
         try {
           const res = await fetch(rpc, {
             method: "POST",

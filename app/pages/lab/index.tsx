@@ -1001,18 +1001,32 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
                 🔔 ALERTS
               </a>
             )}
-            <button
-              onClick={() => onUpdate(t.id, { isPublic: !t.isPublic })}
-              title={t.isPublic ? "Click to make private" : "Click to publish to feed"}
-              style={{
-                ...navBtnStyle, fontSize: 10, minHeight: 36, padding: "6px 12px",
-                color: t.isPublic ? "#00ff88" : "#3a5a4a",
-                borderColor: t.isPublic ? "#1a4a2a" : "#1a2e1a",
-                background: t.isPublic ? "#0a2a0a" : "transparent",
-              }}
-            >
-              {t.isPublic ? "📡 PUBLIC" : "📡 PRIVATE"}
-            </button>
+            {(() => {
+              // 3-state visibility cycle: PRIVATE → PUBLIC → HOLDERS → PRIVATE
+              const vis = t.holdersOnly ? "HOLDERS" : t.isPublic ? "PUBLIC" : "PRIVATE";
+              const next = vis === "PRIVATE"
+                ? { isPublic: true, holdersOnly: false }
+                : vis === "PUBLIC"
+                ? { isPublic: false, holdersOnly: true }
+                : { isPublic: false, holdersOnly: false };
+              const meta = {
+                PRIVATE: { label: "📡 PRIVATE", color: "#3a5a4a", border: "#1a2e1a", bg: "transparent" },
+                PUBLIC:  { label: "📡 PUBLIC",  color: "#00ff88", border: "#1a4a2a", bg: "#0a2a0a" },
+                HOLDERS: { label: "◆ HOLDERS",  color: "#5fd6a0", border: "#1a4a3a", bg: "#0a2a1a" },
+              }[vis];
+              return (
+                <button
+                  onClick={() => onUpdate(t.id, next)}
+                  title={`Visibility: ${vis} — click to cycle (PRIVATE → PUBLIC → HOLDERS-ONLY)`}
+                  style={{
+                    ...navBtnStyle, fontSize: 10, minHeight: 36, padding: "6px 12px",
+                    color: meta.color, borderColor: meta.border, background: meta.bg,
+                  }}
+                >
+                  {meta.label}
+                </button>
+              );
+            })()}
             <button onClick={() => onRemove(t.id)} style={{ ...navBtnStyle, fontSize: 10, color: "#ff4444", borderColor: "#2a1a1a", minHeight: 36, padding: "6px 12px" }}>REMOVE</button>
           </div>
         </div>
