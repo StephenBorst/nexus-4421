@@ -452,15 +452,17 @@ function FeedCard({
       opacity: thesis.status === "INVALIDATED" ? 0.65 : 1,
     }}>
       <div style={{ padding: "14px 16px" }}>
-      {/* Header: avatar + identity + status + time + copy */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+      {/* Header: avatar + identity + status + time + copy. Wraps on narrow
+          screens so the status badge/buttons drop to a second line instead of
+          overlapping the identity. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, rowGap: 6, flexWrap: "wrap", marginBottom: 12 }}>
         <Avatar pfp={thesis.pfp} displayName={thesis.displayName} size={34} />
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 120 }}>
           <div style={{ fontFamily: "monospace", fontSize: 11, color: "#8aaa9a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {thesis.displayName ?? shortAddr}
             <span style={{ marginLeft: 6 }}><NexusTierBadge address={thesis.wallet} /></span>
           </div>
-          <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>{shortAddr}</div>
+          {thesis.displayName && <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>{shortAddr}</div>}
         </div>
         <div style={{
           fontFamily: "monospace", fontSize: 9, letterSpacing: "0.08em",
