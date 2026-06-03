@@ -2497,6 +2497,7 @@ function AgentView() {
   const [tab, setTab] = useState<"config" | "status" | "history" | "leaderboard">("config");
   const [leaderboard, setLeaderboard] = useState<AgentLeaderboardEntry[] | null>(null);
   const [lbLoading, setLbLoading] = useState(false);
+  const [ledgerInfo, setLedgerInfo] = useState<{ hash: string; count: number } | null>(null);
 
   const walletAddress = getWalletAddress();
   const tradingKey = findOrderlyTradingKey();
@@ -2628,9 +2629,16 @@ function AgentView() {
   async function loadLeaderboard() {
     setLbLoading(true);
     try {
-      const res = await fetch(`${AGENT_API}/agents/leaderboard`);
-      const data = await res.json();
+      const [lbRes, ledRes] = await Promise.all([
+        fetch(`${AGENT_API}/agents/leaderboard`),
+        fetch(`${AGENT_API}/agents/ledger`).catch(() => null),
+      ]);
+      const data = await lbRes.json();
       setLeaderboard(Array.isArray(data?.leaderboard) ? data.leaderboard : []);
+      if (ledRes && ledRes.ok) {
+        const led = await ledRes.json();
+        if (led?.ledgerHash) setLedgerInfo({ hash: led.ledgerHash, count: led.count ?? 0 });
+      }
     } catch {
       setLeaderboard([]);
     } finally {
@@ -3350,6 +3358,18 @@ function AgentView() {
             <div style={{ fontFamily: "monospace", fontSize: 10, color: "#3a5a4a", marginTop: 6, lineHeight: 1.5 }}>
               Ranked by risk-adjusted score (win rate + profit factor, weighted by sample size) over <strong style={{ color: "#8aaa9a" }}>≥10 live trades spanning ≥3 days</strong>. Paper excluded. Copy any strategy to test it in PAPER first.
             </div>
+            {ledgerInfo && (
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #1a2e1a", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontFamily: "monospace", fontSize: 9, color: "#00ff88" }}>🔗 LEDGER SHA-256</span>
+                <code style={{ fontFamily: "monospace", fontSize: 9, color: "#8aaa9a", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 3, padding: "2px 6px" }}>
+                  {ledgerInfo.hash.slice(0, 10)}…{ledgerInfo.hash.slice(-8)}
+                </code>
+                <span style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>· {ledgerInfo.count} records ·</span>
+                <a href={`${AGENT_API}/agents/ledger`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "monospace", fontSize: 9, color: "#4a9fff", textDecoration: "none" }}>
+                  verify ↗
+                </a>
+              </div>
+            )}
           </div>
 
           {lbLoading && (!leaderboard || leaderboard.length === 0) ? (

@@ -110,6 +110,23 @@ Migrated the single-user bot → full multi-user, non-custodial, autonomous agen
   deploy.yml redeploys nexus-lab-api from committed source — so COMMIT worker changes or CI overwrites manual deploys.
   Worker observability logs enabled in each wrangler.toml (`[observability.logs] enabled=true`).
 
+## Leaderboard integrity (cypherpunk hardening — tiers 1-3)
+The public agents leaderboard ranks on a risk-adjusted score from live `agent_trades`
+(Supabase). Trust hardening, all on `main`:
+- **Tier 1 — write-path:** exec logs with `SUPABASE_SERVICE_KEY` (falls back to anon until set).
+  ⚠️ TODO (user/dashboard): set `SUPABASE_SERVICE_KEY` secret on nexus-agent-exec + add RLS policy
+  blocking anon INSERT on `agent_trades` (anon stays SELECT-only for reads). Then the public read key
+  can't forge rows.
+- **Tier 2 — exchange-auditable:** every closed trade now records Orderly `entry_order_id` +
+  `close_order_id` so records are independently verifiable against the exchange. Insert is resilient
+  (retries core row if order_id columns aren't migrated). ⚠️ TODO (dashboard): `ALTER TABLE agent_trades
+  ADD COLUMN entry_order_id text, ADD COLUMN close_order_id text;` (else those fields just get dropped via fallback).
+- **Tier 3 — verifiable ledger (DONE, live):** `GET /agents/ledger` → canonical records + SHA-256
+  `ledgerHash` anyone can recompute (verified: Python recompute == server hash). Each read checkpoints
+  an append-only prev-linked hash chain (`GET /agents/ledger/chain`). Frontend TOP AGENTS shows the hash
+  + "verify ↗". ⚠️ Final trustless step (needs funded signer + tiny storage contract on Arbitrum):
+  anchor the latest `ledgerHash` on-chain so the DB becomes provably tamper-evident.
+
 ## Conventions
 - Aesthetic: monospace terminal / green (#00ff88). Keep it — it's an ownable brand, don't "SaaS-ify".
 - Commit trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`. Commit/push when asked.
