@@ -19,6 +19,35 @@
 // Bundled by wrangler esbuild — run `npm install` in this directory before `wrangler deploy`
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
 import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
+// Holders Room signature gate — EIP-191 ecrecover (verifies wallet ownership)
+import { secp256k1 } from "@noble/curves/secp256k1.js";
+import { keccak_256 } from "@noble/hashes/sha3.js";
+import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+
+// Recover the signer address from an EIP-191 personal_sign signature.
+function recoverEthAddress(message, sigHex) {
+  const msgBytes = utf8ToBytes(message);
+  const prefix = utf8ToBytes("\x19Ethereum Signed Message:\n" + msgBytes.length);
+  const digest = keccak_256(new Uint8Array([...prefix, ...msgBytes]));
+  const sb = hexToBytes(sigHex.replace(/^0x/, ""));
+  if (sb.length !== 65) return null;
+  const r = sb.slice(0, 32), s = sb.slice(32, 64);
+  let v = sb[64]; if (v >= 27) v -= 27;
+  try {
+    const sig = secp256k1.Signature
+      .fromHex(bytesToHex(new Uint8Array([...r, ...s])))
+      .addRecoveryBit(v);
+    const pub = sig.recoverPublicKey(digest).toBytes(false).slice(1);
+    return ("0x" + bytesToHex(keccak_256(pub).slice(-20))).toLowerCase();
+  } catch (_) {
+    return null;
+  }
+}
+
+// Canonical message both client and server build identically.
+function holdersRoomMessage(address, ts) {
+  return `Nexus Holders Room\nAddress: ${address.toLowerCase()}\nTimestamp: ${ts}`;
+}
 
 let resvgReady = false;
 let fontCache = null;
@@ -2792,6 +2821,114 @@ document.getElementById("btn").addEventListener("click",go);
       }, request);
     }
 
+    // ── /theses/leaderboard — TRUSTLESS human call ranking ──
+    // A thesis is a *call*. Whether it hit TP1 or SL first is a fact about PUBLIC
+    // price (Orderly /tv/history), NOT the trader's self-report. We grade every
+    // public call against that public data and rank traders on objective call
+    // accuracy + R-multiple. No personal-account access, no "trust me".
+    if (parts[0] === "theses" && parts[1] === "leaderboard") {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+
+      const MIN_CALLS = 5, FULL_CONF = 20, TOP_N = 25, MAX_HORIZON_S = 30 * 86400;
+
+      // First-touch grade against 1h candles. Same-candle TP+SL = LOSS (conservative).
+      const gradeCall = (t, cd) => {
+        const { direction, entryPrice, stopLoss, takeProfit1, createdAt, riskReward } = t;
+        if (!entryPrice || !stopLoss || !takeProfit1 || !cd) return { outcome: "INVALID", r: 0 };
+        const startSec = Math.floor((createdAt || 0) / 1000);
+        const R = (typeof riskReward === "number" && riskReward > 0) ? riskReward : 1;
+        for (let i = 0; i < cd.t.length; i++) {
+          if (cd.t[i] < startSec) continue;
+          const hi = cd.h[i], lo = cd.l[i];
+          if (direction === "LONG") {
+            const tp = hi >= takeProfit1, sl = lo <= stopLoss;
+            if (tp && sl) return { outcome: "LOSS", r: -1 };
+            if (tp) return { outcome: "WIN", r: R };
+            if (sl) return { outcome: "LOSS", r: -1 };
+          } else {
+            const tp = lo <= takeProfit1, sl = hi >= stopLoss;
+            if (tp && sl) return { outcome: "LOSS", r: -1 };
+            if (tp) return { outcome: "WIN", r: R };
+            if (sl) return { outcome: "LOSS", r: -1 };
+          }
+        }
+        return { outcome: "PENDING", r: 0 };
+      };
+
+      // Gather all public theses across wallets.
+      const listed = await env.LAB_STORE.list({ prefix: "lab:" });
+      const calls = [];
+      for (const key of listed.keys) {
+        const raw = await env.LAB_STORE.get(key.name);
+        if (!raw) continue;
+        const data = JSON.parse(raw);
+        const wallet = key.name.replace("lab:", "");
+        for (const t of (data.theses || [])) {
+          if (t.isPublic && t.symbol && t.createdAt) calls.push({ wallet, t });
+        }
+      }
+
+      // One public-history pull per symbol (covers all that symbol's calls).
+      const now = Math.floor(Date.now() / 1000);
+      const symFrom = {};
+      for (const { t } of calls) {
+        const start = Math.floor((t.createdAt || Date.now()) / 1000);
+        symFrom[t.symbol] = Math.min(symFrom[t.symbol] ?? start, start);
+      }
+      const history = {};
+      await Promise.all(Object.entries(symFrom).map(async ([sym, fromS]) => {
+        try {
+          const from = Math.max(fromS - 3600, now - MAX_HORIZON_S);
+          const r = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${sym}&resolution=60&from=${from}&to=${now}`);
+          const d = await r.json();
+          if (d && d.s === "ok" && Array.isArray(d.t)) history[sym] = { t: d.t, h: d.h, l: d.l };
+        } catch (e) { console.error("[theses-lb] history fetch", sym, e.message); }
+      }));
+
+      // Grade + aggregate per wallet (PENDING/INVALID excluded from the record).
+      const byWallet = {};
+      for (const { wallet, t } of calls) {
+        const g = gradeCall(t, history[t.symbol]);
+        if (g.outcome === "PENDING" || g.outcome === "INVALID") continue;
+        const a = byWallet[wallet] || (byWallet[wallet] = { calls: 0, wins: 0, rSum: 0 });
+        a.calls += 1; if (g.outcome === "WIN") a.wins += 1; a.rSum += g.r;
+      }
+
+      const eligible = [];
+      for (const [wallet, a] of Object.entries(byWallet)) {
+        if (a.calls < MIN_CALLS) continue;
+        const hitRate = a.wins / a.calls;
+        const avgR = a.rSum / a.calls;
+        if (avgR <= 0) continue; // top board = traders net-positive by R
+        const rScore = Math.max(0, Math.min(avgR, 3)) / 3;
+        const conf = Math.min(1, a.calls / FULL_CONF);
+        const score = Math.round((0.5 * hitRate + 0.5 * rScore) * conf * 1000) / 10;
+        eligible.push({
+          wallet, calls: a.calls,
+          hitRate: Math.round(hitRate * 1000) / 10,
+          avgR: Math.round(avgR * 100) / 100,
+          totalR: Math.round(a.rSum * 100) / 100,
+          score,
+        });
+      }
+      eligible.sort((x, y) => y.score - x.score || y.avgR - x.avgR);
+      const top = eligible.slice(0, TOP_N);
+
+      const enriched = await Promise.all(top.map(async (e, i) => {
+        const profileRaw = await env.LAB_STORE.get(`profile:${e.wallet}`);
+        const p = profileRaw ? JSON.parse(profileRaw) : {};
+        return { rank: i + 1, displayName: p.displayName || null, pfp: p.pfp || null, ...e };
+      }));
+
+      return json({
+        leaderboard: enriched,
+        criteria: {
+          minCalls: MIN_CALLS,
+          grading: "Objective first-touch vs public Orderly OHLC (/tv/history, 1h). TP1-first = WIN (+planned R), SL-first = LOSS (-1R), same-candle = LOSS (conservative). PENDING excluded. Anyone can recompute.",
+        },
+      }, request);
+    }
+
     if (parts[0] === "feed" && !parts[1]) {
       if (request.method !== "GET") {
         return json({ error: "method not allowed" }, request, 405);
@@ -2828,18 +2965,28 @@ document.getElementById("btn").addEventListener("click",go);
 
     // ── /feed/holders ──────────────────────────────────────
     // $NEXUS Holders Room: theses marked holdersOnly. Server-side gated — the
-    // caller must pass ?address= of a wallet that holds the OPERATOR threshold,
-    // verified by an on-chain balanceOf read on Base. (Soft gate: the address
-    // isn't signature-proven, but it blocks casual scraping; signature auth is
-    // the future hardening.)
+    // caller must pass ?address=&ts=&sig= — the signature proves wallet
+    // ownership (EIP-191), and an on-chain balanceOf read on Base proves the
+    // wallet holds the OPERATOR threshold. Signature + fresh timestamp defeats
+    // address-spoofing and replay.
     if (parts[0] === "feed" && parts[1] === "holders") {
       if (request.method !== "GET") {
         return json({ error: "method not allowed" }, request, 405);
       }
       const url = new URL(request.url);
       const claimed = (url.searchParams.get("address") || "").toLowerCase();
+      const ts = parseInt(url.searchParams.get("ts") || "0", 10);
+      const sig = url.searchParams.get("sig") || "";
       if (!/^0x[0-9a-f]{40}$/.test(claimed)) {
         return json({ error: "address required" }, request, 400);
+      }
+      // 1) Signature must be fresh (10-min window) and recover to the claimed address.
+      if (!ts || Math.abs(Date.now() - ts) > 600000) {
+        return json({ error: "stale or missing timestamp" }, request, 401);
+      }
+      const recovered = recoverEthAddress(holdersRoomMessage(claimed, ts), sig);
+      if (!recovered || recovered !== claimed) {
+        return json({ error: "invalid signature" }, request, 401);
       }
       const NEXUS_TOKEN = "0x3D958634ab725B627919EF8F2Ed59227309fDba3";
       const OPERATOR_MIN = 12000000n * (10n ** 18n); // matches frontend TIER_THRESHOLDS

@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { createWalletClient, custom } from "viem";
 import {
   useNexusTier,
   TIER_META,
@@ -20,6 +21,36 @@ import { NexusTierBadge } from "@/components/NexusTierBadge";
 import { NexusBurnCounter } from "@/components/NexusBurnCounter";
 
 const API_BASE = "https://og.nexustradinglabs.com";
+
+// Canonical access message — must match the worker's holdersRoomMessage().
+function holdersRoomMessage(address: string, ts: number): string {
+  return `Nexus Holders Room\nAddress: ${address.toLowerCase()}\nTimestamp: ${ts}`;
+}
+
+/**
+ * Proves wallet ownership for the Holders Room. Reuses a cached signature for
+ * the session validity window (8 min < the server's 10) so we don't re-prompt
+ * on every visit. Signs via the injected wallet (EIP-191 personal_sign).
+ */
+async function getHoldersAccess(address: string): Promise<{ ts: number; sig: string }> {
+  const key = `nexus_holders_sig_${address.toLowerCase()}`;
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(key) || "null");
+    if (cached && Date.now() - cached.ts < 8 * 60 * 1000) return cached;
+  } catch { /* ignore */ }
+
+  const eth = (window as unknown as { ethereum?: unknown }).ethereum;
+  if (!eth) throw new Error("No wallet found");
+  const client = createWalletClient({ transport: custom(eth as Parameters<typeof custom>[0]) });
+  const ts = Date.now();
+  const sig = await client.signMessage({
+    account: address as `0x${string}`,
+    message: holdersRoomMessage(address, ts),
+  });
+  const access = { ts, sig };
+  try { sessionStorage.setItem(key, JSON.stringify(access)); } catch { /* ignore */ }
+  return access;
+}
 
 type FeedThesis = {
   id: string;
@@ -66,21 +97,34 @@ export function HoldersRoom({ walletAddress }: { walletAddress: string | null })
   const { tier, isLoading: tierLoading } = useNexusTier(walletAddress);
   const [theses, setTheses] = useState<FeedThesis[] | null>(null);
   const [loadingFeed, setLoadingFeed] = useState(false);
+  const [authError, setAuthError] = useState(false);
+  const [signNonce, setSignNonce] = useState(0); // bump to retry signing
 
   const isHolder = tier !== "NONE";
 
   useEffect(() => {
     if (!isHolder || !walletAddress) return;
+    let cancelled = false;
     setLoadingFeed(true);
-    // Server-gated endpoint: only returns holders-only theses if the address holds $NEXUS.
-    fetch(`${API_BASE}/feed/holders?address=${walletAddress.toLowerCase()}`)
-      .then((r) => r.json())
-      .then((data: { feed?: FeedThesis[] }) => {
-        setTheses((data.feed ?? []).sort((a, b) => b.createdAt - a.createdAt));
-      })
-      .catch(() => setTheses([]))
-      .finally(() => setLoadingFeed(false));
-  }, [isHolder, walletAddress]);
+    setAuthError(false);
+    (async () => {
+      try {
+        // Sign-to-prove ownership, then hit the server-gated endpoint.
+        const { ts, sig } = await getHoldersAccess(walletAddress);
+        const qs = `address=${walletAddress.toLowerCase()}&ts=${ts}&sig=${sig}`;
+        const r = await fetch(`${API_BASE}/feed/holders?${qs}`);
+        if (!r.ok) throw new Error(String(r.status));
+        const data: { feed?: FeedThesis[] } = await r.json();
+        if (!cancelled) setTheses((data.feed ?? []).sort((a, b) => b.createdAt - a.createdAt));
+      } catch {
+        // User rejected the signature, or the gate denied access.
+        if (!cancelled) setAuthError(true);
+      } finally {
+        if (!cancelled) setLoadingFeed(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isHolder, walletAddress, signNonce]);
 
   if (!walletAddress) {
     return (
@@ -113,7 +157,21 @@ export function HoldersRoom({ walletAddress }: { walletAddress: string | null })
 
       {loadingFeed && (
         <div style={{ fontFamily: "monospace", fontSize: 11, color: "#3a6a4a", padding: "20px 0", textAlign: "center" }}>
-          loading holder theses…
+          verifying signature &amp; loading holder theses…
+        </div>
+      )}
+
+      {authError && !loadingFeed && (
+        <div style={{ textAlign: "center", padding: "32px 0", fontFamily: "monospace", fontSize: 11, color: "#fbbf24" }}>
+          Signature required to enter the room.
+          <div style={{ marginTop: 12 }}>
+            <button
+              onClick={() => setSignNonce((n) => n + 1)}
+              style={{ background: "#0a2a1a", border: "1px solid #1a4a3a", borderRadius: 3, color: "#5fd6a0", fontFamily: "monospace", fontSize: 11, padding: "6px 14px", cursor: "pointer", letterSpacing: "0.08em" }}
+            >
+              ◆ SIGN TO ENTER
+            </button>
+          </div>
         </div>
       )}
 
