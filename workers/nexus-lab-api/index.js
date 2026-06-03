@@ -542,11 +542,18 @@ export default {
       const coinId = COINGECKO_IDS[ticker];
       if (!coinId) return json({ error: "unsupported asset", ticker }, request, 422);
 
-      const daysSince = Math.min(Math.ceil((Date.now() - thesis.createdAt) / 86400000) + 1, 365);
+      // CoinGecko /ohlc only accepts these discrete `days` values — snap up to the
+      // smallest one that still covers the thesis lifetime (arbitrary values 400).
+      const rawDays = Math.ceil((Date.now() - thesis.createdAt) / 86400000) + 1;
+      const ALLOWED_DAYS = [1, 7, 14, 30, 90, 180, 365];
+      const daysSince = ALLOWED_DAYS.find((d) => d >= rawDays) ?? 365;
       try {
+        // Keyless requests from cloud IPs get 403 — a (free) demo key is required.
+        const cgHeaders = { Accept: "application/json" };
+        if (env.COINGECKO_API_KEY) cgHeaders["x-cg-demo-api-key"] = env.COINGECKO_API_KEY;
         const cgResp = await fetch(
           `https://api.coingecko.com/api/v3/coins/${coinId}/ohlc?vs_currency=usd&days=${daysSince}`,
-          { headers: { Accept: "application/json" } }
+          { headers: cgHeaders }
         );
         if (!cgResp.ok) throw new Error(`CoinGecko ${cgResp.status}`);
         const ohlc = await cgResp.json();
@@ -2785,7 +2792,7 @@ document.getElementById("btn").addEventListener("click",go);
       }, request);
     }
 
-    if (parts[0] === "feed") {
+    if (parts[0] === "feed" && !parts[1]) {
       if (request.method !== "GET") {
         return json({ error: "method not allowed" }, request, 405);
       }
@@ -2815,6 +2822,59 @@ document.getElementById("btn").addEventListener("click",go);
       }
 
       // Sort newest first
+      feedItems.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      return json({ feed: feedItems }, request);
+    }
+
+    // ── /feed/holders ──────────────────────────────────────
+    // $NEXUS Holders Room: theses marked holdersOnly. Server-side gated — the
+    // caller must pass ?address= of a wallet that holds the OPERATOR threshold,
+    // verified by an on-chain balanceOf read on Base. (Soft gate: the address
+    // isn't signature-proven, but it blocks casual scraping; signature auth is
+    // the future hardening.)
+    if (parts[0] === "feed" && parts[1] === "holders") {
+      if (request.method !== "GET") {
+        return json({ error: "method not allowed" }, request, 405);
+      }
+      const url = new URL(request.url);
+      const claimed = (url.searchParams.get("address") || "").toLowerCase();
+      if (!/^0x[0-9a-f]{40}$/.test(claimed)) {
+        return json({ error: "address required" }, request, 400);
+      }
+      const NEXUS_TOKEN = "0x3D958634ab725B627919EF8F2Ed59227309fDba3";
+      const OPERATOR_MIN = 12000000n * (10n ** 18n); // matches frontend TIER_THRESHOLDS
+      // eth_call balanceOf(address)
+      const callData = "0x70a08231000000000000000000000000" + claimed.slice(2);
+      let isHolder = false;
+      for (const rpc of ["https://base.llamarpc.com", "https://base-rpc.publicnode.com", "https://mainnet.base.org"]) {
+        try {
+          const res = await fetch(rpc, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to: NEXUS_TOKEN, data: callData }, "latest"] }),
+          });
+          const j = await res.json();
+          if (j.result) { isHolder = BigInt(j.result) >= OPERATOR_MIN; break; }
+        } catch (_) { /* try next rpc */ }
+      }
+      if (!isHolder) {
+        return json({ error: "not a $NEXUS holder", feed: [] }, request, 403);
+      }
+
+      const listed = await env.LAB_STORE.list({ prefix: "lab:" });
+      const feedItems = [];
+      for (const key of listed.keys) {
+        const raw = await env.LAB_STORE.get(key.name);
+        if (!raw) continue;
+        const data = JSON.parse(raw);
+        const address = key.name.replace("lab:", "");
+        const profileRaw = await env.LAB_STORE.get(`profile:${address}`);
+        const profile = profileRaw ? JSON.parse(profileRaw) : {};
+        const holderTheses = (data.theses || []).filter((t) => t.holdersOnly === true);
+        for (const thesis of holderTheses) {
+          feedItems.push({ ...thesis, wallet: address, pfp: profile.pfp || null, displayName: profile.displayName || null });
+        }
+      }
       feedItems.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       return json({ feed: feedItems }, request);
     }
