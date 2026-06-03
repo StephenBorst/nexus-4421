@@ -159,9 +159,19 @@ The public agents leaderboard ranks on a risk-adjusted score from live `agent_tr
 - **nexus-lab-api/logic.mjs** (9 tests): `gradeCall` — trustless first-touch TP-vs-SL grading
   (same-candle=loss, short inversion, pre-call candles ignored). Ledger hashing left inline (anchored
   on-chain — don't risk it).
-- ⚠️ TODO (monitoring, not yet built): anchor-signer gas balance, ledger anchor freshness, brain/exec
-  cron liveness → alert via Telegram (`nexus-lab-alerts` has TELEGRAM_TOKEN + sendMessage). Needs an
-  OPS chat id. And refactor: lab/index.tsx (3.7k) + nexus-lab-api (3.2k) are god files.
+- **Monitoring (DONE):** `nexus-ledger-anchor` runs an hourly `runMonitor` (after `runAnchor`) → Telegram
+  ops alerts for ⛽ anchor-signer gas low (<0.0004 ETH), ⚓ ledger drifted from on-chain anchor >6h,
+  🧠 brain down (via `ops:brain:heartbeat` KV the brain stamps every run; >15min = down). 3h per-issue
+  debounce + daily ✅ heartbeat. Secrets: `TELEGRAM_TOKEN` (same bot as lab-alerts) + `OPS_TELEGRAM_CHAT_ID`
+  var (6927717434). Test: `GET /monitor-now`. Verified live → `{"issues":[]}`.
+- **Refactor (IN PROGRESS — resume here):** splitting the two god files. DONE: `app/pages/lab/styles.ts`
+  (all shared + agent styles, STATUS_CONFIG, CLOSED_STATUSES) + `app/pages/lab/helpers.ts` (formatPnl,
+  getDayKey, daysInMonth, firstDayOfMonth, MONTH_NAMES); index.tsx imports them (3775→3657 lines).
+  NEXT slices (each = extract → tsc → small commit, watch for parallel-session collisions):
+  (1) types → move ProcessedTrade/DayGroup/TabId/Agent* interfaces + DEFAULT_CONFIG into `types.ts`;
+  (2) shared primitives EmptyState + PnlChart → `components.tsx`;
+  (3) big views → `AnalyticsView.tsx` (~470 lines), `AgentView.tsx` (~1000), ThesisView, Calendar/TradeLog,
+  MarketIntel (the ~70% shrink); (4) worker: split nexus-lab-api routes into routes/agent|theses|feed.
 
 ## Conventions
 - **Mobile/responsive:** the app uses inline styles, so CSS media queries can't override them. Pattern:
