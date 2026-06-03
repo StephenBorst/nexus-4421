@@ -30,10 +30,11 @@ function usd(n: number | null): string {
 }
 
 function price(n: number | null): string {
-  if (n == null) return "—";
-  if (n >= 1) return `$${n.toFixed(4)}`;
-  // small memecoin price — show enough significant digits
-  return `$${n.toPrecision(3)}`;
+  if (n == null || !isFinite(n)) return "—";
+  if (n >= 1) return `$${n.toLocaleString("en-US", { maximumFractionDigits: 4 })}`;
+  // small memecoin price — ~3 significant figures, NO scientific notation
+  const decimals = Math.min(18, Math.max(2, 2 - Math.floor(Math.log10(n))));
+  return `$${n.toFixed(decimals)}`;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
