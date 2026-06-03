@@ -21,31 +21,10 @@ import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePr
 import { useThesisRegistry } from "@/hooks/useThesisRegistry";
 import { HoldersRoom } from "@/components/HoldersRoom";
 import { NexusMarket } from "@/components/NexusMarket";
-import type { ThesisTrade, ThesisStatus } from "./types";
+import type { ThesisTrade, ThesisStatus, TabId, DayGroup, ProcessedTrade, AgentConfig, AgentState, AgentTrade, AgentLeaderboardEntry, AgentPendingThesis } from "./types";
+import { DEFAULT_CONFIG } from "./types";
 import IntelPage from "@/pages/intel";
 
-// ─── Types ───────────────────────────────────────────────
-type TabId = "analytics" | "tradelog" | "thesis" | "copies" | "intel" | "agent" | "holders";
-
-interface DayGroup {
-  pnl: number;
-  trades: number;
-  wins: number;
-  tradeList: ProcessedTrade[];
-}
-
-interface ProcessedTrade {
-  symbol: string;
-  direction: "LONG" | "SHORT";
-  side: string;
-  pnl: number;
-  qty: number;
-  price: number;
-  entryPrice?: number;
-  timestamp: number;
-  openTimestamp?: number;
-  leverage?: number;
-}
 
 // ─── Shared styles + helpers (extracted modules) ─────────
 import { cardStyle, labelStyle, navBtnStyle, inputStyle, fieldLabelStyle, STATUS_CONFIG, CLOSED_STATUSES, agentCardStyle, agentLabelStyle, agentInputStyle, agentBtnStyle } from "./styles";
@@ -2174,93 +2153,6 @@ const AVAILABLE_SYMBOLS = [
   "PERP_ZEC_USDC", "PERP_PUMP_USDC", "PERP_PENGU_USDC",
   "PERP_SPX500_USDC", "PERP_NAS100_USDC",
 ];
-
-interface AgentConfig {
-  symbols: string[];
-  leverage: number;
-  capitalPerTrade: number;
-  tpPercent: number;
-  slPercent: number;
-  maxHoldHours: number;
-  maxTradesPerDay: number;
-  maxDailyLossUsdc: number;
-  fundingThreshold: number;
-  mode: "ASSISTED" | "AUTONOMOUS" | "PAPER";
-}
-
-interface AgentState {
-  active: boolean;
-  daily_pnl: number;
-  trades_today: number;
-  paper_trades?: AgentTrade[];
-  current_position: {
-    symbol: string;
-    direction: "LONG" | "SHORT";
-    entry_price: number;
-    current_price: number;
-    pnl_percent: number;
-    opened_at: number;
-    paper?: boolean;
-  } | null;
-  last_signal: {
-    symbol: string;
-    direction: string;
-    funding: number;
-    confidence: number;
-    timestamp: number;
-  } | null;
-}
-
-interface AgentTrade {
-  id: string;
-  symbol: string;
-  direction: string;
-  entry_price: number;
-  exit_price: number;
-  pnl: number;
-  reason: string;
-  opened_at: string;
-  closed_at: string;
-}
-
-interface AgentLeaderboardEntry {
-  rank: number;
-  wallet: string;
-  displayName: string | null;
-  pfp: string | null;
-  trades: number;
-  winRate: number;
-  netPnl: number;
-  profitFactor: number;
-  daysActive: number;
-  score: number;
-  config: Partial<AgentConfig> | null;
-}
-
-interface AgentPendingThesis {
-  id: string;
-  symbol: string;
-  direction: "LONG" | "SHORT";
-  entryPrice: number;
-  confidence: number;
-  funding: number;
-  source: string;
-  generatedAt: number;
-  status: string;
-}
-
-const DEFAULT_CONFIG: AgentConfig = {
-  symbols: ["PERP_BTC_USDC"],
-  leverage: 5,
-  capitalPerTrade: 50,
-  tpPercent: 1.5,
-  slPercent: 0.75,
-  maxHoldHours: 4,
-  maxTradesPerDay: 10,
-  maxDailyLossUsdc: 5,
-  fundingThreshold: 0.01,
-  mode: "PAPER", // new users start in risk-free simulation by default
-};
 
 // ─── Agent Track Record (shared by live + paper) ─────────
 function AgentTrackRecord({ title, accent, trades, paper, onReset }: {
