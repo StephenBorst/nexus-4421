@@ -150,6 +150,10 @@ The public agents leaderboard ranks on a risk-adjusted score from live `agent_tr
   is private-auth; no public per-address endpoint) — that's why we grade the CALL vs public price instead.
 
 ## Conventions
+- **Mobile/responsive:** the app uses inline styles, so CSS media queries can't override them. Pattern:
+  stat-card grids use `repeat(auto-fit, minmax(NNpx,1fr))` (fluid, desktop unchanged since auto-fit never
+  exceeds item count); dense row tables get `overflowX:auto` + `minWidth`; layout-level changes use the
+  `useIsMobile()` hook (768px). Lab/Feed/Messages done; Intel partial; SDK pages are Orderly-managed.
 - Aesthetic: monospace terminal / green (#00ff88). Keep it — it's an ownable brand, don't "SaaS-ify".
 - Commit trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`. Commit/push when asked.
 - Env is **Windows PowerShell** — no `&&` chaining; use `;`. `gh` CLI is NOT installed.
