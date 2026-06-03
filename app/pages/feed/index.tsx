@@ -47,6 +47,7 @@ const STATUS_CONFIG = {
   HIT_TP:      { label: "HIT TP",      color: "#00ff88", bg: "#0a2a0a", border: "#1a4a2a" },
   STOPPED_OUT: { label: "STOPPED OUT", color: "#ff4444", bg: "#2a0a0a", border: "#4a1a1a" },
   INVALIDATED: { label: "INVALIDATED", color: "#fbbf24", bg: "#2a1a00", border: "#4a3a00" },
+  CLOSED:      { label: "CLOSED",      color: "#8aaa9a", bg: "#12161a", border: "#2a3a4a" },
 };
 
 // ─── Calc helper (mirrors lab/index.tsx calcThesis) ─────────────────────────
