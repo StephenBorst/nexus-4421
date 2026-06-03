@@ -1031,7 +1031,7 @@ function FeedEmptyState({ variant }: { variant: "feed" | "ranks" }) {
   const navigate = useNavigate();
   const isRanks = variant === "ranks";
   const steps = [
-    { n: "01", title: "Plan a thesis", desc: "Size a trade in the Thesis Engine — entry, stop, targets, R:R." },
+    { n: "01", title: "Plan a thesis", desc: "Size a trade in the Nexus Thesis Engine — entry, stop, targets, R:R." },
     { n: "02", title: "Publish it", desc: "Hit 📡 to push it live here, registered on-chain." },
     { n: "03", title: "Build your rep", desc: "Others follow, copy, and grade it — your track record compounds." },
   ];

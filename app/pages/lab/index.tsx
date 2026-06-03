@@ -3492,7 +3492,7 @@ function MarketIntelView() {
 // ─── First-run Welcome (disconnected) ────────────────────
 function LabWelcome() {
   const features = [
-    { icon: "◈", title: "THESIS ENGINE", desc: "Plan every trade — position sizing, R:R, funding cost, live P&L tracking, on-chain proof." },
+    { icon: "◈", title: "NEXUS THESIS ENGINE", desc: "Plan every trade — position sizing, R:R, funding cost, live P&L tracking, on-chain proof." },
     { icon: "⬢", title: "AUTO AGENT", desc: "Deploy an algo that trades funding edges for you. Hard risk caps, kill switch, order-only keys." },
     { icon: "▣", title: "ANALYTICS", desc: "Trading score, win-rate breakdowns, hold-time & leverage analysis — grade yourself like a desk." },
     { icon: "▤", title: "TRADE LOG", desc: "Full journal of every closed day with notes, filters, and a calendar heatmap." },
@@ -3547,7 +3547,7 @@ function OnboardingChecklist({
 
   const steps = [
     { key: "connect", label: "Connect your wallet", hint: "Your data is loading — you're in.", done: true, action: null },
-    { key: "thesis",  label: "Plan your first thesis", hint: "Size a trade with R:R, stops & funding in the Thesis Engine.", done: hasThesis, action: onGoThesis, cta: "OPEN THESIS ENGINE" },
+    { key: "thesis",  label: "Plan your first thesis", hint: "Size a trade with R:R, stops & funding in the Nexus Thesis Engine.", done: hasThesis, action: onGoThesis, cta: "OPEN NEXUS THESIS ENGINE" },
     { key: "trade",   label: "Place your first trade", hint: "Trade anywhere on Nexus — it flows back here automatically.", done: hasTrade, action: null },
     { key: "grade",   label: "Grade your performance", hint: "See your trading score, breakdowns & journal.", done: hasTrade, action: onGoAnalytics, cta: "VIEW ANALYTICS" },
   ];
@@ -3668,7 +3668,7 @@ export default function TheLabPage() {
   // record → grade. Analytics sits last to close the loop back to the top.
   const tabs: { id: TabId; label: string; short: string }[] = [
     { id: "intel",          label: "[ MARKET INTEL ]",    short: "INTEL" },
-    { id: "thesis",         label: "[ THESIS ENGINE ]",   short: "LAB"   },
+    { id: "thesis",         label: "[ NEXUS THESIS ENGINE ]", short: "LAB"   },
     { id: "agent",          label: "[ TRADING AGENT ]",   short: "AGENT" },
     { id: "copies",         label: "[ COPY TRADES ]",     short: "COPY"  },
     { id: "tradelog",       label: "[ TRADING LOG ]",     short: "LOG"   },

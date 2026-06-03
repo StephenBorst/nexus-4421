@@ -119,7 +119,7 @@ export function HoldersRoom({ walletAddress }: { walletAddress: string | null })
 
       {theses && theses.length === 0 && !loadingFeed && (
         <div style={{ fontFamily: "monospace", fontSize: 11, color: "#3a6a4a", padding: "32px 0", textAlign: "center" }}>
-          No holders-only theses yet. In the Thesis Engine, set a thesis to ◆ HOLDERS to share it here.
+          No holders-only theses yet. In the Nexus Thesis Engine, set a thesis to ◆ HOLDERS to share it here.
         </div>
       )}
 
