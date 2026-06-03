@@ -185,6 +185,25 @@ The public agents leaderboard ranks on a risk-adjusted score from live `agent_tr
   stat-card grids use `repeat(auto-fit, minmax(NNpx,1fr))` (fluid, desktop unchanged since auto-fit never
   exceeds item count); dense row tables get `overflowX:auto` + `minWidth`; layout-level changes use the
   `useIsMobile()` hook (768px). Lab/Feed/Messages done; Intel partial; SDK pages are Orderly-managed.
+- **⚠️ Mobile overflow playbook (Session 2026-06-02 sweep — the recurring bug class):** fixed-PIXEL
+  `gridTemplateColumns` (e.g. `"180px 1fr repeat(4,90px) 28px"`, `"280px 1fr"`, `"1fr 54px 40px 54px"`)
+  are THE recurring mobile-clip culprit — they overflow/clip off the right edge on phones. Fixes by case:
+  (1) two-column "chart + panel" blocks (e.g. TRADING SCORE radar+composite) → `gridTemplateColumns: isMobile
+  ? "1fr" : "<desktop>"` to STACK; (2) cards holding sub-tables (best/worst markets) → make the CARD grid
+  single-col on mobile so the inner table gets full width; (3) genuinely dense rows that can't shrink (trade
+  log day rows, agent history/leaderboard) → wrap in `overflowX:auto` + put `minWidth:<sumpx>` on the row so
+  it SCROLLS instead of clipping; (4) flex rows with `flex:1`/`minWidth:0` children that collide → set
+  `flexShrink:0` on every column + a fixed identity width (feed VERIFIED CALLERS rows); (5) badges/labels in a
+  `nowrap`+`overflow:hidden` line get clipped → move them to their own wrap-capable line. Fractional (`1fr`/
+  `0.6fr`) grids are SAFE (they shrink). ⚠️ **`useIsMobile()` is per-COMPONENT** — each refactored module
+  (`ThesisView` vs `ThesisAnalyticsView`, `CalendarView` vs `TradeLogAllView`) needs its OWN
+  `const isMobile = useIsMobile()` call; referencing `isMobile` without it = `ReferenceError` that white-screens
+  the whole tab (bit us twice). Feed reuses the Lab hook: `import { useIsMobile } from "@/pages/lab/useIsMobile"`.
+- **Calendar cells:** use a FIXED `height` (not `minHeight`) so data-days don't grow taller than empty days
+  ("weekdays huge, weekends small"); 60px mobile / 80px desktop + condensed content + `overflow:hidden`.
+- **Lab tab row mobile:** tabs are equal-width `flex:1` with `short` labels; Holders short = `ROOM` (was a
+  cryptic `◆`); the sync/operational status dot is hidden on mobile to reclaim space. Feed nav mirrors this
+  (equal `flex:1` tabs, glyphs+divider dropped, "N theses" count hidden on mobile — no awkward gap).
 - Aesthetic: monospace terminal / green (#00ff88). Keep it — it's an ownable brand, don't "SaaS-ify".
 - Commit trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`. Commit/push when asked.
 - Env is **Windows PowerShell** — no `&&` chaining; use `;`. `gh` CLI is NOT installed.
