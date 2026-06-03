@@ -77,18 +77,102 @@ async function runAnchor(env) {
   return { ok: true, agents, theses };
 }
 
+// ─── Ops monitoring ────────────────────────────────────────
+// Hourly health checks → Telegram. Catches the silent failures: anchor wallet
+// out of gas, anchoring stuck, or the signal brain dying.
+async function sendTg(env, text) {
+  if (!env.TELEGRAM_TOKEN || !env.OPS_TELEGRAM_CHAT_ID) { console.warn("[monitor] telegram not configured"); return; }
+  try {
+    await fetch(`https://api.telegram.org/bot${env.TELEGRAM_TOKEN}/sendMessage`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: env.OPS_TELEGRAM_CHAT_ID, text, parse_mode: "HTML", disable_web_page_preview: true }),
+    });
+  } catch (e) { console.error("[monitor] tg send failed:", e.message); }
+}
+
+// Debounce: an alert for `key` fires at most once per `everyMs`.
+async function shouldAlert(env, key, everyMs) {
+  try {
+    const k = `ops:alert:${key}`;
+    const last = await env.NEXUS_AGENT.get(k);
+    if (last && Date.now() - Number(last) < everyMs) return false;
+    await env.NEXUS_AGENT.put(k, String(Date.now()));
+    return true;
+  } catch { return true; }
+}
+
+async function runMonitor(env) {
+  const rpc = env.ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc";
+  const issues = [];
+  const HOUR = 3600000;
+
+  // 1) Anchor signer gas — the silent killer. No gas → anchoring stops.
+  try {
+    if (env.ANCHOR_PRIVATE_KEY) {
+      const account = privateKeyToAccount(env.ANCHOR_PRIVATE_KEY);
+      const pub = createPublicClient({ chain: arbitrum, transport: http(rpc) });
+      const bal = await pub.getBalance({ address: account.address });
+      const eth = Number(bal) / 1e18;
+      if (eth < 0.0004) issues.push({ key: "gas", msg: `⛽ Anchor wallet LOW: <b>${eth.toFixed(5)} ETH</b> on Arbitrum — top up or on-chain anchoring stops.\n<code>${account.address}</code>` });
+    }
+  } catch (e) { console.error("[monitor] gas:", e.message); }
+
+  // 2) Anchor freshness — ledger drifted from its on-chain root for too long.
+  try {
+    const ocRaw = await env.NEXUS_AGENT.get("agent:ledger:onchain");
+    if (ocRaw) {
+      const oc = JSON.parse(ocRaw);
+      const ageH = (Date.now() - (oc.ts || 0)) / HOUR;
+      const led = await fetch(AGENT_LEDGER_URL).then((r) => r.json()).catch(() => null);
+      if (led?.ledgerHash && oc.root && `0x${led.ledgerHash}`.toLowerCase() !== oc.root.toLowerCase() && ageH > 6) {
+        issues.push({ key: "anchor", msg: `⚓ Agent ledger has drifted from its on-chain anchor for <b>${ageH.toFixed(1)}h</b> — anchoring may be failing.` });
+      }
+    }
+  } catch (e) { console.error("[monitor] freshness:", e.message); }
+
+  // 3) Brain liveness — no fresh signal for active users (cron is every 5 min).
+  try {
+    const usersRaw = await env.NEXUS_AGENT.get("agent:users");
+    const users = usersRaw ? JSON.parse(usersRaw) : [];
+    if (users.length) {
+      let newest = 0;
+      for (const a of users.slice(0, 20)) {
+        const sigRaw = await env.NEXUS_AGENT.get(`agent:signal:${a}`);
+        if (sigRaw) { const s = JSON.parse(sigRaw); if ((s.timestamp || 0) > newest) newest = s.timestamp; }
+      }
+      const ageMin = (Date.now() - newest) / 60000;
+      if (newest && ageMin > 20) issues.push({ key: "brain", msg: `🧠 Brain stale: newest agent signal is <b>${ageMin.toFixed(0)} min</b> old (cron runs every 5 min). Signal pipeline may be down.` });
+    }
+  } catch (e) { console.error("[monitor] brain:", e.message); }
+
+  // Alert per-issue, debounced 3h so we don't spam an ongoing problem.
+  for (const { key, msg } of issues) {
+    if (await shouldAlert(env, key, 3 * HOUR)) await sendTg(env, `🚨 <b>Nexus ops alert</b>\n\n${msg}`);
+  }
+
+  // Daily heartbeat so a dead monitor isn't mistaken for "all healthy".
+  if (issues.length === 0 && await shouldAlert(env, "heartbeat", 24 * HOUR)) {
+    await sendTg(env, "✅ <b>Nexus ops</b> — all healthy. Anchoring live, brain emitting signals, gas OK.");
+  }
+  return { issues: issues.map((i) => i.key) };
+}
+
 export default {
   async scheduled(event, env) {
-    try { await runAnchor(env); }
-    catch (e) { console.error("[anchor] fatal:", e.message); }
+    try { await runAnchor(env); } catch (e) { console.error("[anchor] fatal:", e.message); }
+    try { await runMonitor(env); } catch (e) { console.error("[monitor] fatal:", e.message); }
   },
-  // Manual trigger for testing: GET /anchor-now
+  // Manual triggers for testing: GET /anchor-now , GET /monitor-now
   async fetch(req, env) {
     const url = new URL(req.url);
     if (url.pathname === "/anchor-now") {
       const r = await runAnchor(env).catch((e) => ({ ok: false, error: e.message }));
       return new Response(JSON.stringify(r), { headers: { "Content-Type": "application/json" } });
     }
-    return new Response("nexus-ledger-anchor: cron commits the ledger root to Arbitrum");
+    if (url.pathname === "/monitor-now") {
+      const r = await runMonitor(env).catch((e) => ({ ok: false, error: e.message }));
+      return new Response(JSON.stringify(r), { headers: { "Content-Type": "application/json" } });
+    }
+    return new Response("nexus-ledger-anchor: anchors the ledger root + ops monitoring");
   },
 };

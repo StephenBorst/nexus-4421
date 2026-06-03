@@ -10,6 +10,8 @@ crons = ["0 * * * *"]
 [vars]
 # Deployed NexusLedgerAnchor (Arbitrum One). Owner = the anchor signer wallet.
 LEDGER_ANCHOR_CONTRACT = "0x57a698df84a44F3dA3dac3E08CA455a55A4eff84"
+# Ops alerts go here (operator's Telegram chat id). TELEGRAM_TOKEN is a secret.
+OPS_TELEGRAM_CHAT_ID = "6927717434"
 # Optional: override the default public Arbitrum RPC.
 # ARBITRUM_RPC_URL = "https://arb1.arbitrum.io/rpc"
 
