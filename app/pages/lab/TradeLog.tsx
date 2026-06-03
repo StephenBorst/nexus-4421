@@ -5,8 +5,11 @@ import type { DayGroup } from "./types";
 import { cardStyle, labelStyle, navBtnStyle, inputStyle } from "./styles";
 import { formatPnl, daysInMonth, firstDayOfMonth, MONTH_NAMES } from "./helpers";
 import { EmptyState } from "./components";
+import { useIsMobile } from "./useIsMobile";
 
 function CalendarView({ dayGroups, onDayClick, viewMonth, viewYear, onPrevMonth, onNextMonth, totalPnl }: { dayGroups: Record<string, DayGroup>; onDayClick: (key: string, day: number) => void; viewMonth: number; viewYear: number; onPrevMonth: () => void; onNextMonth: () => void; totalPnl: number; }) {
+  const isMobile = useIsMobile();
+  const cellH = isMobile ? 60 : 80; // fixed cell height → every day is the same size
   const days = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
   const totalDays = daysInMonth(viewMonth, viewYear);
   const firstDay = firstDayOfMonth(viewMonth, viewYear);
@@ -34,7 +37,7 @@ function CalendarView({ dayGroups, onDayClick, viewMonth, viewYear, onPrevMonth,
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
         {cells.map((cellDay, i) => {
-          if (!cellDay) return <div key={i} style={{ minHeight: 80 }} />;
+          if (!cellDay) return <div key={i} style={{ height: cellH }} />;
           const key = `${viewYear}-${viewMonth + 1}-${cellDay}`;
           const data = dayGroups[key];
           const isToday = cellDay === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
@@ -42,14 +45,21 @@ function CalendarView({ dayGroups, onDayClick, viewMonth, viewYear, onPrevMonth,
             <div key={i} role={data ? "button" : undefined} tabIndex={data ? 0 : -1}
               onClick={() => data && onDayClick(key, cellDay)}
               onKeyDown={(e) => e.key === "Enter" && data && onDayClick(key, cellDay)}
-              style={{ background: data ? "#0d120d" : "#0a0e0a", border: `1px solid ${isToday ? "#1a4a2a" : data ? "#1a3a1a" : "#121c12"}`, borderRadius: 4, minHeight: 80, padding: "6px 8px", cursor: data ? "pointer" : "default", fontFamily: "monospace" }}>
-              <div style={{ fontSize: 11, color: "#3a5a4a" }}>{cellDay}</div>
-              {data && <div>
-                <div style={{ fontSize: 10, color: "#3a5a4a" }}>&#9632;</div>
-                <div style={{ fontSize: 13, color: data.pnl >= 0 ? "#00ff88" : "#ff4444", fontWeight: "bold" }}>{formatPnl(data.pnl)}</div>
-                <div style={{ fontSize: 9, color: "#3a5a4a" }}>{data.trades}T</div>
-                <div style={{ fontSize: 9, color: "#3a5a4a" }}>{data.trades ? `${Math.round((data.wins / data.trades) * 100)}%` : ""}</div>
-              </div>}
+              style={{ background: data ? "#0d120d" : "#0a0e0a", border: `1px solid ${isToday ? "#1a4a2a" : data ? "#1a3a1a" : "#121c12"}`, borderRadius: 4, height: cellH, padding: isMobile ? "3px 4px" : "6px 8px", cursor: data ? "pointer" : "default", fontFamily: "monospace", overflow: "hidden", boxSizing: "border-box" }}>
+              <div style={{ fontSize: isMobile ? 9 : 11, color: "#3a5a4a" }}>{cellDay}</div>
+              {data && (isMobile ? (
+                <div>
+                  <div style={{ fontSize: 10, color: data.pnl >= 0 ? "#00ff88" : "#ff4444", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{formatPnl(data.pnl)}</div>
+                  <div style={{ fontSize: 8, color: "#3a5a4a" }}>{data.trades}T · {data.trades ? `${Math.round((data.wins / data.trades) * 100)}%` : ""}</div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 10, color: "#3a5a4a" }}>&#9632;</div>
+                  <div style={{ fontSize: 13, color: data.pnl >= 0 ? "#00ff88" : "#ff4444", fontWeight: "bold" }}>{formatPnl(data.pnl)}</div>
+                  <div style={{ fontSize: 9, color: "#3a5a4a" }}>{data.trades}T</div>
+                  <div style={{ fontSize: 9, color: "#3a5a4a" }}>{data.trades ? `${Math.round((data.wins / data.trades) * 100)}%` : ""}</div>
+                </div>
+              ))}
             </div>
           );
         })}

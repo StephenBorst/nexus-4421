@@ -556,7 +556,7 @@ export function ThesisAnalyticsView() {
       </div>
 
       {/* Streak + best/worst markets */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(130px, 1fr))", gap: 8 }}>
         {/* Win streak */}
         <div style={cardStyle}>
           <div style={{ fontFamily: "monospace", fontSize: 10, color: "#fbbf24", letterSpacing: "0.1em", marginBottom: 14 }}>◆ WIN STREAK</div>

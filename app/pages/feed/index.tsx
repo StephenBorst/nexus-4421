@@ -17,6 +17,7 @@ import { NexusTreasury } from "@/components/NexusTreasury";
 import { NexusMarket } from "@/components/NexusMarket";
 import type { ThesisTrade } from "@/pages/lab/types";
 import CommentsPanel from "@/components/CommentsPanel";
+import { useIsMobile } from "@/pages/lab/useIsMobile";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 
@@ -1131,6 +1132,7 @@ type FilterStatus = "ALL" | "ACTIVE" | "HIT_TP" | "STOPPED_OUT" | "INVALIDATED";
 type DirFilter = "ALL" | "LONG" | "SHORT";
 
 export default function FeedPage() {
+  const isMobile = useIsMobile();
   const [feed, setFeed] = useState<FeedThesis[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -1312,7 +1314,7 @@ export default function FeedPage() {
             </>
           )}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+        <div style={{ display: isMobile ? "none" : "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
           <div style={{ fontSize: 9, fontFamily: "monospace", color: "#3a5a4a" }}>
             {loading ? "loading..." : view === "ranks"
               ? `${feed.length > 0 ? [...new Set(feed.map(t => t.wallet.toLowerCase()))].length : 0} trader${[...new Set(feed.map(t => t.wallet.toLowerCase()))].length !== 1 ? "s" : ""}`

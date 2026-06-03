@@ -84,7 +84,7 @@ export default function TheLabPage() {
     { id: "agent",          label: "[ TRADING AGENT ]",   short: "AGENT" },
     { id: "copies",         label: "[ COPY TRADES ]",     short: "COPY"  },
     { id: "tradelog",       label: "[ TRADING LOG ]",     short: "LOG"   },
-    { id: "holders",        label: "[ HOLDERS ROOM ]",    short: "◆"     },
+    { id: "holders",        label: "[ HOLDERS ROOM ]",    short: "HODL"  },
     { id: "analytics",      label: "[ ANALYTICS ]",       short: "STATS" },
   ];
 
@@ -139,9 +139,11 @@ export default function TheLabPage() {
             }}>{isMobile ? tab.short : tab.label}</button>
           ))}
         </div>
-        <div style={{ fontSize: 9, fontFamily: "monospace", letterSpacing: "0.1em", color: syncing ? "#fbbf24" : synced ? "#00ff88" : "#2a4a3a", flexShrink: 0, marginLeft: 8 }}>
-          {syncing ? "⟳" : synced ? "●" : rootWalletAddress ? "○" : isMobile ? "○" : "○ CONNECT WALLET"}
-        </div>
+        {!isMobile && (
+          <div style={{ fontSize: 9, fontFamily: "monospace", letterSpacing: "0.1em", color: syncing ? "#fbbf24" : synced ? "#00ff88" : "#2a4a3a", flexShrink: 0, marginLeft: 8 }}>
+            {syncing ? "⟳" : synced ? "●" : rootWalletAddress ? "○" : "○ CONNECT WALLET"}
+          </div>
+        )}
       </div>
       <div style={{ padding: isMobile ? 12 : 16 }}>
         <div style={{ marginBottom: 12 }}>
