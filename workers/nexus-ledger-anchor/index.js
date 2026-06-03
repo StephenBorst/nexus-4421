@@ -130,19 +130,17 @@ async function runMonitor(env) {
     }
   } catch (e) { console.error("[monitor] freshness:", e.message); }
 
-  // 3) Brain liveness — no fresh signal for active users (cron is every 5 min).
+  // 3) Brain liveness — via the brain's heartbeat (stamped every completed run,
+  // even when no signals are emitted). Avoids false positives when active users
+  // simply hold open positions (the brain correctly emits nothing then).
   try {
-    const usersRaw = await env.NEXUS_AGENT.get("agent:users");
-    const users = usersRaw ? JSON.parse(usersRaw) : [];
-    if (users.length) {
-      let newest = 0;
-      for (const a of users.slice(0, 20)) {
-        const sigRaw = await env.NEXUS_AGENT.get(`agent:signal:${a}`);
-        if (sigRaw) { const s = JSON.parse(sigRaw); if ((s.timestamp || 0) > newest) newest = s.timestamp; }
-      }
-      const ageMin = (Date.now() - newest) / 60000;
-      if (newest && ageMin > 20) issues.push({ key: "brain", msg: `🧠 Brain stale: newest agent signal is <b>${ageMin.toFixed(0)} min</b> old (cron runs every 5 min). Signal pipeline may be down.` });
+    const hb = await env.NEXUS_AGENT.get("ops:brain:heartbeat");
+    if (hb) {
+      const ageMin = (Date.now() - Number(hb)) / 60000;
+      if (ageMin > 15) issues.push({ key: "brain", msg: `🧠 Brain down: last run was <b>${ageMin.toFixed(0)} min</b> ago (cron runs every 5 min). Signal pipeline may be down.` });
     }
+    // No heartbeat key yet = brain hasn't deployed the heartbeat or never ran;
+    // don't alert (avoids a false positive on first rollout).
   } catch (e) { console.error("[monitor] brain:", e.message); }
 
   // Alert per-issue, debounced 3h so we don't spam an ongoing problem.
