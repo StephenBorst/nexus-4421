@@ -90,6 +90,13 @@ Migrated the single-user bot → full multi-user, non-custodial, autonomous agen
 - **Reconciliation / self-heal:** before monitoring, exec fetches live Orderly position; if exchange is flat
   (manual close) it clears the stale KV record + resumes — no ghost position, no bogus trade. Fail-safe: on a
   reconcile error it manages on cached data rather than wrongly clearing.
+- **⚠️ SINGLE-WRITER state ownership (race fix):** `agent:state:{addr}` is written ONLY by exec (risk counters,
+  daily reset, position). The brain writes ONLY `agent:signal:{addr}` — it must NEVER write agent:state (it used to,
+  to stamp `last_signal`, which raced with exec every 5 min and clobbered trades_today/daily reset → cap undercount).
+  lab-api GET merges `agent:signal` into the state response (read-only) so the UI still shows last_signal. **Kill** is
+  a DEDICATED key `agent:kill:{addr}` (lab-api sets "1", exec consumes+deletes) so an emergency stop can't be lost to
+  a state-write race; legacy `state.kill_requested` still honored. Deactivate stays safe via key deletion regardless
+  of the active flag. Verified live: 10 real autonomous trades logged, +$ net, counters intact post-fix.
 - **Onboarding (#3 DONE):** Config tab has how-it-works panel, live key-status indicator (detected/encrypted vs
   missing — must place ONE manual trade first to generate the Orderly key), and a security disclaimer on activate.
 - **ASSISTED vs AUTONOMOUS:** ASSISTED writes a thesis to `agent:pending` (deduped per cooldown) surfaced in the
