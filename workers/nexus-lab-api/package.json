@@ -9,5 +9,8 @@
     "@noble/hashes": "^2.2.0",
     "@resvg/resvg-wasm": "^2.6.0",
     "bs58": "^6.0.0"
+  },
+  "scripts": {
+    "test": "node --test"
   }
 }

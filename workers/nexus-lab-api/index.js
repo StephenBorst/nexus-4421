@@ -23,6 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+import { gradeCall } from "./logic.mjs";
 
 // Recover the signer address from an EIP-191 personal_sign signature.
 function recoverEthAddress(message, sigHex) {
@@ -2831,30 +2832,7 @@ document.getElementById("btn").addEventListener("click",go);
 
       const MIN_CALLS = 5, FULL_CONF = 20, TOP_N = 25, MAX_HORIZON_S = 30 * 86400;
 
-      // First-touch grade against 1h candles. Same-candle TP+SL = LOSS (conservative).
-      const gradeCall = (t, cd) => {
-        const { direction, entryPrice, stopLoss, takeProfit1, createdAt, riskReward } = t;
-        if (!entryPrice || !stopLoss || !takeProfit1 || !cd) return { outcome: "INVALID", r: 0 };
-        const startSec = Math.floor((createdAt || 0) / 1000);
-        const R = (typeof riskReward === "number" && riskReward > 0) ? riskReward : 1;
-        for (let i = 0; i < cd.t.length; i++) {
-          if (cd.t[i] < startSec) continue;
-          const hi = cd.h[i], lo = cd.l[i];
-          if (direction === "LONG") {
-            const tp = hi >= takeProfit1, sl = lo <= stopLoss;
-            if (tp && sl) return { outcome: "LOSS", r: -1 };
-            if (tp) return { outcome: "WIN", r: R };
-            if (sl) return { outcome: "LOSS", r: -1 };
-          } else {
-            const tp = lo <= takeProfit1, sl = hi >= stopLoss;
-            if (tp && sl) return { outcome: "LOSS", r: -1 };
-            if (tp) return { outcome: "WIN", r: R };
-            if (sl) return { outcome: "LOSS", r: -1 };
-          }
-        }
-        return { outcome: "PENDING", r: 0 };
-      };
-
+      // First-touch grade against 1h candles (tested in logic.mjs).
       // Gather all public theses across wallets.
       const listed = await env.LAB_STORE.list({ prefix: "lab:" });
       const calls = [];
