@@ -80,6 +80,7 @@ export function TradeLogAllView({
   notes: Record<string, string>;
   calendarProps: React.ComponentProps<typeof CalendarView>;
 }) {
+  const isMobile = useIsMobile();
   const [filter, setFilter] = useState<"all" | "wins" | "losses">("all");
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"list" | "calendar">("list");
@@ -183,7 +184,8 @@ export function TradeLogAllView({
       </div>
 
       {/* ── Day rows ── */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {/* Dense fixed-width rows — scroll horizontally on mobile instead of clipping */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, overflowX: isMobile ? "auto" : "visible" }}>
         {filtered.map(([key, g]) => {
           const winRate = g.trades ? Math.round((g.wins / g.trades) * 100) : 0;
           const [, m, d] = key.split("-").map(Number);
@@ -194,6 +196,7 @@ export function TradeLogAllView({
               style={{
                 ...cardStyle, cursor: "pointer", display: "grid",
                 gridTemplateColumns: "180px 1fr repeat(4, 90px) 28px",
+                minWidth: isMobile ? 620 : undefined,
                 alignItems: "center", gap: 12,
                 borderColor: g.pnl >= 0 ? "#1a3a2a" : "#3a1a1a",
                 transition: "background 0.15s",
