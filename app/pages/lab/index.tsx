@@ -2498,7 +2498,7 @@ function AgentView() {
   const [tab, setTab] = useState<"config" | "status" | "history" | "leaderboard">("config");
   const [leaderboard, setLeaderboard] = useState<AgentLeaderboardEntry[] | null>(null);
   const [lbLoading, setLbLoading] = useState(false);
-  const [ledgerInfo, setLedgerInfo] = useState<{ hash: string; count: number } | null>(null);
+  const [ledgerInfo, setLedgerInfo] = useState<{ hash: string; count: number; onChain?: { verified?: boolean; explorer?: string } | null } | null>(null);
 
   const walletAddress = getWalletAddress();
   const tradingKey = findOrderlyTradingKey();
@@ -2638,7 +2638,7 @@ function AgentView() {
       setLeaderboard(Array.isArray(data?.leaderboard) ? data.leaderboard : []);
       if (ledRes && ledRes.ok) {
         const led = await ledRes.json();
-        if (led?.ledgerHash) setLedgerInfo({ hash: led.ledgerHash, count: led.count ?? 0 });
+        if (led?.ledgerHash) setLedgerInfo({ hash: led.ledgerHash, count: led.count ?? 0, onChain: led.onChain ?? null });
       }
     } catch {
       setLeaderboard([]);
@@ -3369,6 +3369,12 @@ function AgentView() {
                 <a href={`${AGENT_API}/agents/ledger`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "monospace", fontSize: 9, color: "#4a9fff", textDecoration: "none" }}>
                   verify ↗
                 </a>
+                {ledgerInfo.onChain?.verified && (
+                  <a href={ledgerInfo.onChain.explorer || "#"} target="_blank" rel="noopener noreferrer"
+                    style={{ fontFamily: "monospace", fontSize: 9, color: "#00ff88", textDecoration: "none", border: "1px solid #1a4a2a", borderRadius: 3, padding: "2px 6px", background: "#0a1a0e" }}>
+                    ⛓ ANCHORED ON-CHAIN ↗
+                  </a>
+                )}
               </div>
             )}
           </div>

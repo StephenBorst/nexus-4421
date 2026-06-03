@@ -1,0 +1,23 @@
+name = "nexus-ledger-anchor"
+main = "index.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Hourly — but it only spends gas when the ledger root actually changed (dedup).
+[triggers]
+crons = ["0 * * * *"]
+
+[vars]
+# Set this to the deployed NexusLedgerAnchor address (Arbitrum). Until then the
+# worker no-ops safely.
+LEDGER_ANCHOR_CONTRACT = "0x0000000000000000000000000000000000000000"
+# Optional: override the default public Arbitrum RPC.
+# ARBITRUM_RPC_URL = "https://arb1.arbitrum.io/rpc"
+
+# Same KV the agent stack uses — lets the anchor write proof for the verify UI.
+[[kv_namespaces]]
+binding = "NEXUS_AGENT"
+id = "c3c0582ec71c4d049d0795872f39f033"
+
+[observability.logs]
+enabled = true

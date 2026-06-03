@@ -2763,12 +2763,24 @@ document.getElementById("btn").addEventListener("click",go);
         }
       } catch (e) { console.error("[ledger] chain checkpoint error:", e); }
 
+      // On-chain anchor proof (written by nexus-ledger-anchor). `verified` is true
+      // when the latest on-chain root matches the freshly computed ledger hash.
+      let onChain = null;
+      try {
+        const ocRaw = await AGENT_KV.get("agent:ledger:onchain");
+        if (ocRaw) {
+          const oc = JSON.parse(ocRaw);
+          onChain = { ...oc, verified: (oc.root || "").toLowerCase() === `0x${ledgerHash}`.toLowerCase() };
+        }
+      } catch { /* anchor not set up yet */ }
+
       return json({
         ledgerHash,
         algorithm: "sha256",
         canonicalForm: "JSON array of rows; each row = [" + FIELDS.join(", ") + "]; rows sorted by id asc",
         count: rows.length,
         generatedAt: Date.now(),
+        onChain,
         records: rows,
       }, request);
     }

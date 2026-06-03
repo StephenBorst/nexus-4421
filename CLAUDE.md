@@ -124,8 +124,15 @@ The public agents leaderboard ranks on a risk-adjusted score from live `agent_tr
 - **Tier 3 — verifiable ledger (DONE, live):** `GET /agents/ledger` → canonical records + SHA-256
   `ledgerHash` anyone can recompute (verified: Python recompute == server hash). Each read checkpoints
   an append-only prev-linked hash chain (`GET /agents/ledger/chain`). Frontend TOP AGENTS shows the hash
-  + "verify ↗". ⚠️ Final trustless step (needs funded signer + tiny storage contract on Arbitrum):
-  anchor the latest `ledgerHash` on-chain so the DB becomes provably tamper-evident.
+  + "verify ↗".
+- **Tier 3+ — on-chain anchor (code DONE; needs deploy+fund):** `contracts/NexusLedgerAnchor.sol`
+  (Arbitrum, append-only `anchor(bytes32 root, uint256 count)`, owner-only, emits `Anchored`). New worker
+  `workers/nexus-ledger-anchor` (hourly cron, viem) reads /agents/ledger, dedupes vs on-chain `latestRoot`,
+  and commits the root when changed; writes proof to KV `agent:ledger:onchain`. lab-api `/agents/ledger`
+  merges that as `onChain {root,txHash,verified,explorer}`; frontend shows "⛓ ANCHORED ON-CHAIN ↗" when
+  verified. ⚠️ HANDOFF: (1) deploy the contract on Arbitrum from a DEDICATED hot wallet (Remix), (2) fund
+  that wallet w/ ~$2 ETH on Arbitrum, (3) set `LEDGER_ANCHOR_CONTRACT` var + `ANCHOR_PRIVATE_KEY` secret on
+  nexus-ledger-anchor, (4) `npm i` + `npx wrangler deploy` the worker. Until then it no-ops safely.
 
 ## Conventions
 - Aesthetic: monospace terminal / green (#00ff88). Keep it — it's an ownable brand, don't "SaaS-ify".
