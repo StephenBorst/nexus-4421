@@ -13,6 +13,7 @@
 
 import * as ed from "@noble/ed25519";
 import bs58 from "bs58";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason } from "./logic.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const COOLDOWN_MS = 15 * 60 * 1000; // 15 min between trades
@@ -158,20 +159,16 @@ async function processUser(address, env, cache) {
 
   // Daily reset check
   const now = Date.now();
-  const dayMs = 24 * 60 * 60 * 1000;
-  if (now - (state.last_reset || 0) > dayMs) {
+  if (shouldResetDaily(state.last_reset, now)) {
     state.daily_pnl = 0;
     state.trades_today = 0;
     state.last_reset = now;
   }
 
-  // Daily limits check
-  if (state.trades_today >= config.maxTradesPerDay) {
-    console.log(`[exec] ${address.slice(0, 10)} max trades reached`);
-    return;
-  }
-  if (Math.abs(state.daily_pnl) >= config.maxDailyLossUsdc && state.daily_pnl < 0) {
-    console.log(`[exec] ${address.slice(0, 10)} max daily loss reached`);
+  // Daily limits check (tested in logic.mjs)
+  const cap = dailyCapBlocked(state, config);
+  if (cap.blocked) {
+    console.log(`[exec] ${address.slice(0, 10)} ${cap.reason}`);
     return;
   }
 
@@ -256,22 +253,17 @@ async function enterPosition(address, state, config, signal, env, cache) {
   const baseMin = info.base_min || baseTick;
   const minNotional = info.min_notional || 0;
 
-  // Calculate qty, snapped to base_tick. Format to the tick's decimal places so
-  // floating-point artifacts (e.g. 340 * 1e-5 = 0.0034000000000000007) don't
-  // produce a value Orderly rejects with -1104 "does not match the step size".
-  const notional = config.capitalPerTrade * config.leverage;
-  const decimals = Math.max(0, Math.round(-Math.log10(baseTick)));
-  const steps = Math.floor((notional / markPrice) / baseTick);
-  let qty = parseFloat((steps * baseTick).toFixed(decimals));
-
-  if (qty < baseMin || qty <= 0) {
-    console.error(`[exec] ${address.slice(0, 10)} qty ${qty} below base_min ${baseMin} for ${symbol}`);
+  // Calculate qty, snapped to base_tick (tested in logic.mjs — guards the
+  // -1104 step-size float artifact + base_min / min_notional constraints).
+  const snap = snapQty({
+    capitalPerTrade: config.capitalPerTrade, leverage: config.leverage,
+    markPrice, baseTick, baseMin, minNotional,
+  });
+  if (!snap.ok) {
+    console.error(`[exec] ${address.slice(0, 10)} ${snap.reason} for ${symbol}`);
     return;
   }
-  if (minNotional && qty * markPrice < minNotional) {
-    console.error(`[exec] ${address.slice(0, 10)} notional ${(qty * markPrice).toFixed(2)} below min ${minNotional} for ${symbol}`);
-    return;
-  }
+  const qty = snap.qty;
 
   let orderId = null;
   if (!paper) {
@@ -354,33 +346,17 @@ async function monitorPosition(address, state, config, env, cache) {
   // Fetch current price (shared per-symbol cache)
   const currentPrice = await getMarkPrice(pos.symbol, env, cache);
 
-  // Calculate P&L %
-  const pnlPct = pos.direction === "LONG"
-    ? ((currentPrice - pos.entry_price) / pos.entry_price) * 100
-    : ((pos.entry_price - currentPrice) / pos.entry_price) * 100;
+  // Calculate P&L % (tested in logic.mjs)
+  const { pnlPct } = computePnl(pos.direction, pos.entry_price, currentPrice, pos.qty);
 
   // Update current price in state
   pos.current_price = currentPrice;
   pos.pnl_percent = pnlPct;
 
-  const holdTime = Date.now() - pos.opened_at;
-  const maxHoldMs = config.maxHoldHours * 60 * 60 * 1000;
-
-  // Check TP
-  if (pnlPct >= config.tpPercent) {
-    await closePosition(address, state, env, "TP", cache);
-    return;
-  }
-
-  // Check SL
-  if (pnlPct <= -config.slPercent) {
-    await closePosition(address, state, env, "SL", cache);
-    return;
-  }
-
-  // Check timeout
-  if (holdTime >= maxHoldMs) {
-    await closePosition(address, state, env, "TIMEOUT", cache);
+  // Exit decision: TP → SL → timeout (tested in logic.mjs)
+  const reason = exitReason(pnlPct, Date.now() - pos.opened_at, config);
+  if (reason) {
+    await closePosition(address, state, env, reason, cache);
     return;
   }
 
@@ -428,10 +404,7 @@ async function closePosition(address, state, env, reason, cache) {
     exitPrice = await getMarkPrice(pos.symbol, env, cache);
   } catch (e) {}
 
-  const pnlPct = pos.direction === "LONG"
-    ? ((exitPrice - pos.entry_price) / pos.entry_price) * 100
-    : ((pos.entry_price - exitPrice) / pos.entry_price) * 100;
-  const pnlUsdc = (pnlPct / 100) * pos.qty * pos.entry_price;
+  const { pnlPct, pnlUsdc } = computePnl(pos.direction, pos.entry_price, exitPrice, pos.qty);
 
   // Update daily P&L
   state.daily_pnl = (state.daily_pnl || 0) + pnlUsdc;
