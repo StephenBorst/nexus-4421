@@ -917,18 +917,24 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
 
               {/* Identity */}
               <div style={{ flexGrow: 1, flexShrink: 0, flexBasis: 150, minWidth: 150, maxWidth: 240 }}>
-                <div style={{ fontFamily: "monospace", fontSize: 11, color: "#8aaa9a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {trader.displayName ?? shortAddr}
-                  {isOwn && <span style={{ color: "#00ff88", marginLeft: 6, fontSize: 9 }}>YOU</span>}
-                  {trader.graded && <span title="Calls graded from public price — trustless" style={{ marginLeft: 6, fontSize: 8, color: "#00ff88", border: "1px solid #1a4a2a", borderRadius: 2, padding: "1px 4px", background: "#0a1a0e" }}>✓ VERIFIED</span>}
-                  <span style={{ marginLeft: 6 }}><NexusTierBadge address={trader.wallet} /></span>
+                {/* Name line — name truncates with ellipsis, YOU stays put */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontFamily: "monospace", fontSize: 11, color: "#8aaa9a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+                    {trader.displayName ?? shortAddr}
+                  </span>
+                  {isOwn && <span style={{ color: "#00ff88", fontSize: 9, flexShrink: 0 }}>YOU</span>}
+                </div>
+                {/* Badge line — never clipped, wraps if needed */}
+                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 2 }}>
+                  {trader.graded && <span title="Calls graded from public price — trustless" style={{ fontSize: 8, color: "#00ff88", border: "1px solid #1a4a2a", borderRadius: 2, padding: "1px 4px", background: "#0a1a0e" }}>✓ VERIFIED</span>}
+                  <NexusTierBadge address={trader.wallet} />
                 </div>
                 {trader.graded ? (
-                  <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a6a4a" }}>
+                  <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a6a4a", marginTop: 2 }}>
                     {trader.graded.hitRate.toFixed(0)}% hit · {trader.graded.avgR > 0 ? "+" : ""}{trader.graded.avgR.toFixed(2)}R · {trader.graded.calls} graded calls
                   </div>
                 ) : (
-                  <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>{shortAddr}</div>
+                  <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", marginTop: 2 }}>{shortAddr}</div>
                 )}
               </div>
 
