@@ -49,12 +49,16 @@ type FeedThesis = {
   copyCount?: number;
 };
 
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
   ACTIVE:      { label: "ACTIVE",      color: "#4a9fff", bg: "#0a1a2a", border: "#1a3a5a" },
   HIT_TP:      { label: "HIT TP",      color: "#00ff88", bg: "#0a2a0a", border: "#1a4a2a" },
   STOPPED_OUT: { label: "STOPPED OUT", color: "#ff4444", bg: "#2a0a0a", border: "#4a1a1a" },
   INVALIDATED: { label: "INVALIDATED", color: "#fbbf24", bg: "#2a1a00", border: "#4a3a00" },
+  PENDING:     { label: "PENDING",     color: "#8aaa9a", bg: "#0d120d", border: "#2a4a3a" },
 };
+
+// Neutral fallback for any unrecognized / future status value so the row never crashes.
+const STATUS_FALLBACK = { label: "UNKNOWN", color: "#8aaa9a", bg: "#0d120d", border: "#2a4a3a" };
 
 // ─── Avatar ──────────────────────────────────────────────────────────────────
 function WalletIcon() {
@@ -120,7 +124,7 @@ function ThesisRow({
   const [expanded, setExpanded] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentCount, setCommentCount] = useState(0);
-  const cfg = STATUS_CONFIG[thesis.status];
+  const cfg = STATUS_CONFIG[thesis.status] ?? STATUS_FALLBACK;
   const ticker = thesis.symbol.replace("PERP_", "").replace("_USDC", "");
   const timeAgo = (() => {
     const diff = Date.now() - thesis.createdAt;
