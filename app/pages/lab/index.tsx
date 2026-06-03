@@ -48,7 +48,7 @@ interface ProcessedTrade {
 }
 
 // ─── Shared styles + helpers (extracted modules) ─────────
-import { cardStyle, labelStyle, navBtnStyle, inputStyle, fieldLabelStyle, STATUS_CONFIG, CLOSED_STATUSES } from "./styles";
+import { cardStyle, labelStyle, navBtnStyle, inputStyle, fieldLabelStyle, STATUS_CONFIG, CLOSED_STATUSES, agentCardStyle, agentLabelStyle, agentInputStyle, agentBtnStyle } from "./styles";
 import { formatPnl, getDayKey, daysInMonth, firstDayOfMonth, MONTH_NAMES } from "./helpers";
 
 // ─── PnL Chart ───────────────────────────────────────────
@@ -2262,35 +2262,6 @@ const DEFAULT_CONFIG: AgentConfig = {
   mode: "PAPER", // new users start in risk-free simulation by default
 };
 
-const agentCardStyle: React.CSSProperties = {
-  background: "#111318",
-  border: "1px solid #1a2a1a",
-  borderRadius: 6,
-  padding: 16,
-  marginBottom: 12,
-};
-
-const agentLabelStyle: React.CSSProperties = {
-  fontFamily: "monospace",
-  fontSize: 10,
-  color: "#4a7a5a",
-  textTransform: "uppercase" as const,
-  letterSpacing: "0.1em",
-  marginBottom: 4,
-};
-
-const agentInputStyle: React.CSSProperties = {
-  background: "#0a0e0a",
-  border: "1px solid #1e2d1e",
-  borderRadius: 3,
-  color: "#c0c0c0",
-  fontFamily: "monospace",
-  fontSize: 13,
-  padding: "6px 10px",
-  width: "100%",
-  outline: "none",
-};
-
 // ─── Agent Track Record (shared by live + paper) ─────────
 function AgentTrackRecord({ title, accent, trades, paper, onReset }: {
   title: string;
@@ -2352,19 +2323,6 @@ function AgentTrackRecord({ title, accent, trades, paper, onReset }: {
     </div>
   );
 }
-
-const agentBtnStyle = (active: boolean): React.CSSProperties => ({
-  background: active ? "#00ff8820" : "#1a1a2e",
-  border: `1px solid ${active ? "#00ff88" : "#2a2a3e"}`,
-  borderRadius: 4,
-  color: active ? "#00ff88" : "#6a6a8a",
-  fontFamily: "monospace",
-  fontSize: 11,
-  padding: "8px 16px",
-  cursor: "pointer",
-  letterSpacing: "0.05em",
-  textTransform: "uppercase" as const,
-});
 
 // Orderly SDK (@orderly.network/core LocalStorageStore) stores the delegated
 // trading key as JSON at `orderly_{networkId}_{address}`:

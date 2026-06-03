@@ -59,3 +59,46 @@ export const STATUS_CONFIG: Record<ThesisStatus, { label: string; color: string;
 };
 
 export const CLOSED_STATUSES: ThesisStatus[] = ["HIT_TP", "STOPPED_OUT", "INVALIDATED"];
+
+// ─── Agent (Trading Agent tab) styles ────────────────────
+export const agentCardStyle: CSSProperties = {
+  background: "#111318",
+  border: "1px solid #1a2a1a",
+  borderRadius: 6,
+  padding: 16,
+  marginBottom: 12,
+};
+
+export const agentLabelStyle: CSSProperties = {
+  fontFamily: "monospace",
+  fontSize: 10,
+  color: "#4a7a5a",
+  textTransform: "uppercase",
+  letterSpacing: "0.1em",
+  marginBottom: 4,
+};
+
+export const agentInputStyle: CSSProperties = {
+  background: "#0a0e0a",
+  border: "1px solid #1e2d1e",
+  borderRadius: 3,
+  color: "#c0c0c0",
+  fontFamily: "monospace",
+  fontSize: 13,
+  padding: "6px 10px",
+  width: "100%",
+  outline: "none",
+};
+
+export const agentBtnStyle = (active: boolean): CSSProperties => ({
+  background: active ? "#00ff8820" : "#1a1a2e",
+  border: `1px solid ${active ? "#00ff88" : "#2a2a3e"}`,
+  borderRadius: 4,
+  color: active ? "#00ff88" : "#6a6a8a",
+  fontFamily: "monospace",
+  fontSize: 11,
+  padding: "8px 16px",
+  cursor: "pointer",
+  letterSpacing: "0.05em",
+  textTransform: "uppercase",
+});
