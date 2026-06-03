@@ -1259,7 +1259,7 @@ export default function FeedPage() {
 
       {/* Tab bar / header */}
       <div style={{ display: "flex", gap: 8, padding: "8px 16px", borderBottom: "1px solid #1a2e1a", background: "#080c08", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", rowGap: 8 }}>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", rowGap: 6 }}>
+        <div style={{ display: "flex", gap: isMobile ? 4 : 6, flexWrap: isMobile ? "nowrap" : "wrap", rowGap: 6, width: isMobile ? "100%" : undefined }}>
           <button
             onClick={() => setView("feed")}
             style={{
@@ -1267,9 +1267,10 @@ export default function FeedPage() {
               border: `1px solid ${view === "feed" ? "#00ff88" : "#1a2e1a"}`,
               color: view === "feed" ? "#00ff88" : "#4a7a5a",
               fontFamily: "monospace", fontSize: 10,
-              padding: "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
+              padding: isMobile ? "6px 4px" : "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
+              flex: isMobile ? 1 : undefined, textAlign: "center",
             }}
-          >■ FEED</button>
+          >{isMobile ? "FEED" : "■ FEED"}</button>
           <button
             onClick={() => setView("ranks")}
             style={{
@@ -1277,9 +1278,10 @@ export default function FeedPage() {
               border: `1px solid ${view === "ranks" ? "#00ff88" : "#1a2e1a"}`,
               color: view === "ranks" ? "#00ff88" : "#4a7a5a",
               fontFamily: "monospace", fontSize: 10,
-              padding: "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
+              padding: isMobile ? "6px 4px" : "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
+              flex: isMobile ? 1 : undefined, textAlign: "center",
             }}
-          >◆ RANKS</button>
+          >{isMobile ? "RANKS" : "◆ RANKS"}</button>
           {/* Ph24: following tab — only when connected */}
           {walletAddress && (
             <button
@@ -1289,13 +1291,14 @@ export default function FeedPage() {
                 border: `1px solid ${view === "following" ? "#4a9fff" : "#1a2e1a"}`,
                 color: view === "following" ? "#4a9fff" : "#4a7a5a",
                 fontFamily: "monospace", fontSize: 10,
-                padding: "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
+                padding: isMobile ? "6px 4px" : "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
+                flex: isMobile ? 1 : undefined, textAlign: "center",
               }}
-            >◈ FOLLOWING{following.size > 0 ? ` (${following.size})` : ""}</button>
+            >{isMobile ? "FOLLOW" : "◈ FOLLOWING"}{following.size > 0 ? ` (${following.size})` : ""}</button>
           )}
           {view !== "ranks" && (
             <>
-              <div style={{ width: 1, height: 18, background: "#1a2e1a", alignSelf: "center" }} />
+              <div style={{ width: 1, height: 18, background: "#1a2e1a", alignSelf: "center", display: isMobile ? "none" : "block" }} />
               {(["latest", "trending"] as const).map((mode) => (
                 <button
                   key={mode}
@@ -1305,7 +1308,8 @@ export default function FeedPage() {
                     border: `1px solid ${sortMode === mode ? "#00ff88" : "#1a2e1a"}`,
                     color: sortMode === mode ? "#00ff88" : "#4a7a5a",
                     fontFamily: "monospace", fontSize: 10,
-                    padding: "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
+                    padding: isMobile ? "6px 4px" : "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
+                    flex: isMobile ? 1 : undefined, textAlign: "center",
                   }}
                 >
                   {mode === "latest" ? "LATEST" : "TRENDING"}

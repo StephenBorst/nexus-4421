@@ -84,7 +84,7 @@ export default function TheLabPage() {
     { id: "agent",          label: "[ TRADING AGENT ]",   short: "AGENT" },
     { id: "copies",         label: "[ COPY TRADES ]",     short: "COPY"  },
     { id: "tradelog",       label: "[ TRADING LOG ]",     short: "LOG"   },
-    { id: "holders",        label: "[ HOLDERS ROOM ]",    short: "HODL"  },
+    { id: "holders",        label: "[ HOLDERS ROOM ]",    short: "ROOM"  },
     { id: "analytics",      label: "[ ANALYTICS ]",       short: "STATS" },
   ];
 

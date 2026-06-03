@@ -385,6 +385,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
 
 // ─── Thesis Analytics View ───────────────────────────────
 export function ThesisAnalyticsView() {
+  const isMobile = useIsMobile();
   const { state: accountState } = useAccount();
   const walletAddress = (accountState as { address?: string })?.address ?? null;
   const { theses } = useLabStorage(walletAddress);
