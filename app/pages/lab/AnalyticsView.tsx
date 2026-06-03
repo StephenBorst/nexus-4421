@@ -5,6 +5,7 @@ import type { ProcessedTrade } from "./types";
 import { cardStyle, labelStyle } from "./styles";
 import { formatPnl } from "./helpers";
 import { PnlChart, EmptyState } from "./components";
+import { useIsMobile } from "./useIsMobile";
 
 // ─── Radar Chart ─────────────────────────────────────────
 function RadarChart({ scores }: { scores: { label: string; value: number }[] }) {
@@ -45,6 +46,7 @@ function RadarChart({ scores }: { scores: { label: string; value: number }[] }) 
 
 // ─── Trading Score ────────────────────────────────────────
 function TradingScoreSection({ orders, winRate }: { orders: ProcessedTrade[]; winRate: number }) {
+  const isMobile = useIsMobile();
   const metrics = useMemo(() => {
     if (!orders.length) return null;
     const wins = orders.filter((o) => o.pnl > 0);
@@ -101,9 +103,9 @@ function TradingScoreSection({ orders, winRate }: { orders: ProcessedTrade[]; wi
       <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 16, fontFamily: "monospace", display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ color: "#3a5a4a" }}>&#9632;</span> TRADING SCORE
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 24, alignItems: "center" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "280px 1fr", gap: isMobile ? 16 : 24, alignItems: "center", justifyItems: isMobile ? "center" : "stretch" }}>
         <RadarChart scores={metrics.scores} />
-        <div>
+        <div style={{ width: isMobile ? "100%" : undefined }}>
           <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: 4 }}>COMPOSITE SCORE</div>
           <div style={{ fontSize: 64, fontWeight: "bold", color: "#00ff88", fontFamily: "monospace", lineHeight: 1 }}>{metrics.composite}</div>
           <div style={{ height: 4, background: "#1a2e1a", borderRadius: 2, margin: "10px 0 16px" }}>
