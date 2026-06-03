@@ -102,7 +102,9 @@ export default function TheLabPage() {
           <span style={{ fontFamily: "monospace", fontSize: 11, color: "#fff", letterSpacing: "0.25em", fontWeight: "bold" }}>THE LAB</span>
           <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#00ff88", boxShadow: "0 0 8px #00ff88", animation: "pulse 2s infinite" }} />
         </div>
-        <div style={{ display: "flex", gap: isMobile ? 10 : 20, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={isMobile
+          ? { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px 6px", width: "100%", marginTop: 4 }
+          : { display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
           {[
             { label: "OPEN", val: connected ? String(openCount) : "—", color: openCount > 0 ? "#fbbf24" : "#3a6a4a" },
             { label: "CLOSED", val: connected ? String(processedTrades.length) : "—", color: "#4a9fff" },

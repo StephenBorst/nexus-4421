@@ -1256,8 +1256,8 @@ export default function FeedPage() {
       )}
 
       {/* Tab bar / header */}
-      <div style={{ display: "flex", gap: 8, padding: "8px 16px", borderBottom: "1px solid #1a2e1a", background: "#080c08", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", gap: 6 }}>
+      <div style={{ display: "flex", gap: 8, padding: "8px 16px", borderBottom: "1px solid #1a2e1a", background: "#080c08", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", rowGap: 8 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", rowGap: 6 }}>
           <button
             onClick={() => setView("feed")}
             style={{
