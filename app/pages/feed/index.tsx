@@ -908,7 +908,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               style={{ padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12, overflowX: "auto" }}
             >
               {/* Rank */}
-              <div style={{ fontFamily: "monospace", fontSize: RANK_MEDALS[rank] ? 16 : 12, minWidth: 28, textAlign: "center", color: "#3a5a4a" }}>
+              <div style={{ fontFamily: "monospace", fontSize: RANK_MEDALS[rank] ? 16 : 12, minWidth: 28, flexShrink: 0, textAlign: "center", color: "#3a5a4a" }}>
                 {RANK_MEDALS[rank] ?? `#${rank}`}
               </div>
 
@@ -916,7 +916,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               <Avatar pfp={trader.pfp} displayName={trader.displayName} size={32} />
 
               {/* Identity */}
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ flexGrow: 1, flexShrink: 0, flexBasis: 150, minWidth: 150, maxWidth: 240 }}>
                 <div style={{ fontFamily: "monospace", fontSize: 11, color: "#8aaa9a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {trader.displayName ?? shortAddr}
                   {isOwn && <span style={{ color: "#00ff88", marginLeft: 6, fontSize: 9 }}>YOU</span>}
@@ -933,7 +933,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               </div>
 
               {/* Win rate — hero stat */}
-              <div style={{ textAlign: "center", minWidth: 60 }}>
+              <div style={{ textAlign: "center", minWidth: 60, flexShrink: 0 }}>
                 <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>WIN RATE</div>
                 <div style={{
                   fontFamily: "monospace", fontSize: 16, fontWeight: "bold",
@@ -944,7 +944,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               </div>
 
               {/* W / L */}
-              <div style={{ textAlign: "center", minWidth: 44 }}>
+              <div style={{ textAlign: "center", minWidth: 44, flexShrink: 0 }}>
                 <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>W / L</div>
                 <div style={{ fontFamily: "monospace", fontSize: 12 }}>
                   <span style={{ color: "#00ff88" }}>{trader.wins}</span>
@@ -954,7 +954,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               </div>
 
               {/* Avg R:R */}
-              <div style={{ textAlign: "center", minWidth: 50 }}>
+              <div style={{ textAlign: "center", minWidth: 50, flexShrink: 0 }}>
                 <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>AVG R:R</div>
                 <div style={{ fontFamily: "monospace", fontSize: 12, color: trader.avgRR >= 2 ? "#00ff88" : "#fbbf24" }}>
                   1:{trader.avgRR.toFixed(1)}
@@ -962,7 +962,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               </div>
 
               {/* Active */}
-              <div style={{ textAlign: "center", minWidth: 40 }}>
+              <div style={{ textAlign: "center", minWidth: 40, flexShrink: 0 }}>
                 <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>ACTIVE</div>
                 <div style={{ fontFamily: "monospace", fontSize: 12, color: trader.active > 0 ? "#4a9fff" : "#3a5a4a" }}>
                   {trader.active}
@@ -975,7 +975,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                 const rep = onChain ?? calcRepScore(trader.wins, trader.losses, trader.avgRR);
                 const isOnChain = onChain != null;
                 return (
-                  <div style={{ textAlign: "center", minWidth: 44 }}>
+                  <div style={{ textAlign: "center", minWidth: 44, flexShrink: 0 }}>
                     <div style={{ fontSize: 8, color: isOnChain ? "#00ff88" : "#3a5a4a", fontFamily: "monospace" }}>
                       {isOnChain ? "⛓REP" : "REP"}
                     </div>
@@ -990,7 +990,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               })()}
 
               {/* Expand chevron */}
-              <div style={{ color: "#2a4a3a", fontSize: 10, fontFamily: "monospace" }}>
+              <div style={{ color: "#2a4a3a", fontSize: 10, fontFamily: "monospace", flexShrink: 0, paddingLeft: 4 }}>
                 {isExpanded ? "▲" : "▼"}
               </div>
             </div>
