@@ -8,9 +8,8 @@ compatibility_flags = ["nodejs_compat"]
 crons = ["0 * * * *"]
 
 [vars]
-# Set this to the deployed NexusLedgerAnchor address (Arbitrum). Until then the
-# worker no-ops safely.
-LEDGER_ANCHOR_CONTRACT = "0x0000000000000000000000000000000000000000"
+# Deployed NexusLedgerAnchor (Arbitrum One). Owner = the anchor signer wallet.
+LEDGER_ANCHOR_CONTRACT = "0x57a698df84a44F3dA3dac3E08CA455a55A4eff84"
 # Optional: override the default public Arbitrum RPC.
 # ARBITRUM_RPC_URL = "https://arb1.arbitrum.io/rpc"
 
