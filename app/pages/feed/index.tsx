@@ -806,12 +806,34 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
     });
   }, [board.length]);
 
-  // Ph26: Re-rank using on-chain Rep Score from NexusRepScore contract (trustless ordering)
+  // Trustless call grades (public-price graded, on-chain anchored) keyed by wallet.
+  const [graded, setGraded] = useState<Map<string, { hitRate: number; avgR: number; calls: number; score: number }>>(new Map());
+  const [callLedger, setCallLedger] = useState<{ ledgerHash?: string; onChain?: { verified?: boolean; explorer?: string } | null } | null>(null);
+  useEffect(() => {
+    let cancel = false;
+    Promise.all([
+      fetch(`${API_BASE}/theses/leaderboard`).then((r) => r.json()).catch(() => null),
+      fetch(`${API_BASE}/theses/ledger`).then((r) => r.json()).catch(() => null),
+    ]).then(([lb, led]) => {
+      if (cancel) return;
+      const m = new Map<string, { hitRate: number; avgR: number; calls: number; score: number }>();
+      for (const e of (lb?.leaderboard || [])) {
+        if (e.wallet) m.set(e.wallet.toLowerCase(), { hitRate: e.hitRate, avgR: e.avgR, calls: e.calls, score: e.score });
+      }
+      setGraded(m);
+      setCallLedger(led || null);
+    });
+    return () => { cancel = true; };
+  }, []);
+
+  // Re-rank: VERIFIED CALLERS (public-price graded) float to the top by graded
+  // score; everyone else falls back to on-chain Rep Score, then JS score.
   const sortedBoard = useMemo(() => {
     return [...board]
       .map((trader) => {
+        const g = graded.get(trader.wallet.toLowerCase()) || null;
         const oc = onChainStats.get(trader.wallet.toLowerCase());
-        if (!oc) return { ...trader, onChainRepScore: null as number | null };
+        if (!oc) return { ...trader, onChainRepScore: null as number | null, graded: g };
         const closed = oc.wins + oc.losses;
         return {
           ...trader,
@@ -821,16 +843,20 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
           avgRR: oc.avgRR,
           winRate: closed > 0 ? (oc.wins / closed) * 100 : 0,
           onChainRepScore: oc.repScore,
+          graded: g,
         };
       })
       .sort((a, b) => {
-        // Prefer on-chain score; fall back to JS score
+        // Verified callers first, ranked by trustless graded score.
+        if (a.graded && b.graded) return b.graded.score - a.graded.score;
+        if (a.graded && !b.graded) return -1;
+        if (!a.graded && b.graded) return 1;
         const aRep = a.onChainRepScore ?? calcRepScore(a.wins, a.losses, a.avgRR);
         const bRep = b.onChainRepScore ?? calcRepScore(b.wins, b.losses, b.avgRR);
         if (bRep !== aRep) return bRep - aRep;
         return b.total - a.total;
       });
-  }, [board, onChainStats]);
+  }, [board, onChainStats, graded]);
 
   if (board.length === 0) {
     return <FeedEmptyState variant="ranks" />;
@@ -839,11 +865,23 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, paddingLeft: 2 }}>
-        <div style={{ width: 6, height: 6, borderRadius: "50%", background: onChainLoading ? "#fbbf24" : onChainStats.size > 0 ? "#00ff88" : "#3a5a4a" }} />
+        <div style={{ width: 6, height: 6, borderRadius: "50%", background: onChainLoading ? "#fbbf24" : graded.size > 0 ? "#00ff88" : onChainStats.size > 0 ? "#00ff88" : "#3a5a4a" }} />
         <span style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>
-          {onChainLoading ? "VERIFYING ON-CHAIN STATS..." : onChainStats.size > 0 ? `⛓ ${onChainStats.size} TRADER${onChainStats.size !== 1 ? "S" : ""} VERIFIED ON-CHAIN` : "RANKED BY KV DATA"}
+          {graded.size > 0 ? `✓ ${graded.size} VERIFIED CALLER${graded.size !== 1 ? "S" : ""} · graded from public price` : onChainLoading ? "VERIFYING ON-CHAIN STATS..." : onChainStats.size > 0 ? `⛓ ${onChainStats.size} TRADER${onChainStats.size !== 1 ? "S" : ""} VERIFIED ON-CHAIN` : "RANKED BY KV DATA"}
         </span>
       </div>
+      {callLedger?.ledgerHash && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10, paddingLeft: 2 }}>
+          <span style={{ fontFamily: "monospace", fontSize: 9, color: "#00ff88" }}>🔗 CALL LEDGER</span>
+          <code style={{ fontFamily: "monospace", fontSize: 9, color: "#8aaa9a", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 3, padding: "2px 6px" }}>
+            {callLedger.ledgerHash.slice(0, 10)}…{callLedger.ledgerHash.slice(-8)}
+          </code>
+          <a href={`${API_BASE}/theses/ledger`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "monospace", fontSize: 9, color: "#4a9fff", textDecoration: "none" }}>verify ↗</a>
+          {callLedger.onChain?.verified && (
+            <a href={callLedger.onChain.explorer || "#"} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "monospace", fontSize: 9, color: "#00ff88", textDecoration: "none", border: "1px solid #1a4a2a", borderRadius: 3, padding: "2px 6px", background: "#0a1a0e" }}>⛓ ANCHORED ON-CHAIN ↗</a>
+          )}
+        </div>
+      )}
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {sortedBoard.map((trader, i) => {
         const rank = i + 1;
@@ -879,9 +917,16 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                 <div style={{ fontFamily: "monospace", fontSize: 11, color: "#8aaa9a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {trader.displayName ?? shortAddr}
                   {isOwn && <span style={{ color: "#00ff88", marginLeft: 6, fontSize: 9 }}>YOU</span>}
+                  {trader.graded && <span title="Calls graded from public price — trustless" style={{ marginLeft: 6, fontSize: 8, color: "#00ff88", border: "1px solid #1a4a2a", borderRadius: 2, padding: "1px 4px", background: "#0a1a0e" }}>✓ VERIFIED</span>}
                   <span style={{ marginLeft: 6 }}><NexusTierBadge address={trader.wallet} /></span>
                 </div>
-                <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>{shortAddr}</div>
+                {trader.graded ? (
+                  <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a6a4a" }}>
+                    {trader.graded.hitRate.toFixed(0)}% hit · {trader.graded.avgR > 0 ? "+" : ""}{trader.graded.avgR.toFixed(2)}R · {trader.graded.calls} graded calls
+                  </div>
+                ) : (
+                  <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>{shortAddr}</div>
+                )}
               </div>
 
               {/* Win rate — hero stat */}
@@ -1068,88 +1113,6 @@ function FeedEmptyState({ variant }: { variant: "feed" | "ranks" }) {
       >
         → OPEN THE LAB &amp; PUBLISH
       </button>
-    </div>
-  );
-}
-
-// ─── Verified Callers (trustless graded leaderboard) ─────────────────────────
-// Ranks traders on calls graded from PUBLIC price (Orderly /tv/history) and
-// anchored on-chain — no self-report, anyone can recompute.
-type CallerEntry = { rank: number; displayName: string | null; pfp: string | null; calls: number; hitRate: number; avgR: number; totalR: number; score: number };
-function VerifiedCallersBoard() {
-  const [board, setBoard] = useState<CallerEntry[] | null>(null);
-  const [ledger, setLedger] = useState<{ ledgerHash?: string; count?: number; onChain?: { verified?: boolean; explorer?: string } | null } | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancel = false;
-    Promise.all([
-      fetch(`${API_BASE}/theses/leaderboard`).then((r) => r.json()).catch(() => null),
-      fetch(`${API_BASE}/theses/ledger`).then((r) => r.json()).catch(() => null),
-    ]).then(([lb, led]) => {
-      if (cancel) return;
-      setBoard(Array.isArray(lb?.leaderboard) ? lb.leaderboard : []);
-      setLedger(led || null);
-      setLoading(false);
-    });
-    return () => { cancel = true; };
-  }, []);
-
-  const verifyStrip = ledger?.ledgerHash && (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 8, paddingTop: 8, borderTop: "1px solid #1a2e1a" }}>
-      <span style={{ fontFamily: "monospace", fontSize: 9, color: "#00ff88" }}>🔗 CALL LEDGER</span>
-      <code style={{ fontFamily: "monospace", fontSize: 9, color: "#8aaa9a", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 3, padding: "2px 6px" }}>
-        {ledger.ledgerHash.slice(0, 10)}…{ledger.ledgerHash.slice(-8)}
-      </code>
-      <a href={`${API_BASE}/theses/ledger`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "monospace", fontSize: 9, color: "#4a9fff", textDecoration: "none" }}>verify ↗</a>
-      {ledger.onChain?.verified && (
-        <a href={ledger.onChain.explorer || "#"} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "monospace", fontSize: 9, color: "#00ff88", textDecoration: "none", border: "1px solid #1a4a2a", borderRadius: 3, padding: "2px 6px", background: "#0a1a0e" }}>⛓ ANCHORED ON-CHAIN ↗</a>
-      )}
-    </div>
-  );
-
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ background: "#0d120d", border: "1px solid #1a3a2a", borderRadius: 4, padding: "12px 14px", marginBottom: 8 }}>
-        <div style={{ fontFamily: "monospace", fontSize: 11, color: "#00ff88", letterSpacing: "0.1em" }}>🏆 VERIFIED CALLERS</div>
-        <div style={{ fontFamily: "monospace", fontSize: 10, color: "#3a5a4a", marginTop: 5, lineHeight: 1.5 }}>
-          Ranked by call accuracy <strong style={{ color: "#8aaa9a" }}>graded from public price</strong> (TP1 vs SL, first-touch) over ≥5 resolved calls. No self-report — anyone can recompute.
-        </div>
-        {verifyStrip}
-      </div>
-      {loading ? (
-        <div style={{ textAlign: "center", padding: "30px 0", fontFamily: "monospace", fontSize: 11, color: "#2a4a3a" }}>grading calls…</div>
-      ) : !board || board.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "28px 16px", fontFamily: "monospace", fontSize: 11, color: "#3a5a4a", lineHeight: 1.6, border: "1px dashed #1a2e1a", borderRadius: 4 }}>
-          No verified callers yet — publish calls from your Lab. Once you have <strong style={{ color: "#8aaa9a" }}>5+ resolved</strong> calls graded net-positive, you rank here. Be first.
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {board.map((e) => {
-            const medal = e.rank === 1 ? "#ffd700" : e.rank === 2 ? "#c0c0c0" : e.rank === 3 ? "#cd7f32" : "#3a5a4a";
-            return (
-              <div key={e.rank} style={{ background: "#0d120d", border: "1px solid #1a3a2a", borderRadius: 4, padding: "10px 12px", display: "grid", gridTemplateColumns: "30px 1fr repeat(4, auto)", gap: 12, alignItems: "center" }}>
-                <div style={{ fontFamily: "monospace", fontSize: 16, fontWeight: 700, color: medal, textAlign: "center" }}>{e.rank}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                  {e.pfp ? <img src={e.pfp} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} /> : <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#0a1a0e", border: "1px solid #1a3a2a", flexShrink: 0 }} />}
-                  <span style={{ fontFamily: "monospace", fontSize: 12, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.displayName || "anon caller"}</span>
-                </div>
-                {[
-                  { label: "SCORE", val: e.score.toFixed(1), color: "#00ff88" },
-                  { label: "HIT", val: `${e.hitRate.toFixed(0)}%`, color: e.hitRate >= 50 ? "#00ff88" : "#ff8800" },
-                  { label: "AVG R", val: `${e.avgR > 0 ? "+" : ""}${e.avgR.toFixed(2)}`, color: e.avgR >= 0 ? "#00ff88" : "#ff4444" },
-                  { label: "CALLS", val: String(e.calls), color: "#c0c0c0" },
-                ].map(({ label, val, color }) => (
-                  <div key={label} style={{ textAlign: "right" }}>
-                    <div style={{ fontFamily: "monospace", fontSize: 8, color: "#3a5a4a", letterSpacing: "0.08em" }}>{label}</div>
-                    <div style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 600, color }}>{val}</div>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
@@ -1420,10 +1383,7 @@ export default function FeedPage() {
               </div>
             )}
             {!loading && !error && (
-              <>
-                <VerifiedCallersBoard />
-                <LeaderboardView feed={feed} walletAddress={walletAddress} onCopy={setCopyTarget} />
-              </>
+              <LeaderboardView feed={feed} walletAddress={walletAddress} onCopy={setCopyTarget} />
             )}
           </>
         )}
