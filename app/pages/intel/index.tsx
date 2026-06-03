@@ -376,7 +376,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
           <span style={{ color: BRIGHT, fontWeight: 700, width: "40px" }}>{sym}</span>
           <span style={{ color: sigC, fontSize: "11px" }}>{sig}</span>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", rowGap: "2px", fontSize: "12px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", rowGap: "2px", columnGap: "8px", fontSize: "12px" }}>
           <div><span style={{ color: DIM }}>FUNDING 8H  </span><span style={{ color: fc }}>{data ? fmtFunding(data.funding) : "—"}</span></div>
           <div><span style={{ color: DIM }}>OI  </span><span style={{ color: MUTED }}>{data ? fmtOI(data.oi) : "—"}</span></div>
           <div><span style={{ color: DIM }}>L/S  </span><span style={{ color: lsColor(ls) }}>{ls !== null ? ls.toFixed(2) : "—"}</span></div>

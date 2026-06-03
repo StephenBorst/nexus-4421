@@ -332,7 +332,7 @@ const allMenuItems = [
           >
             {isMobile && (
               <CustomLeftNav
-                menus={[...translatedEnabledMenus, ...labMenu, ...feedMenu, ...messagesMenu]}
+                menus={allMenuItems}
                 externalLinks={customMenus}
               />
             )}
