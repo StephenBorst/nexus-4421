@@ -1072,6 +1072,88 @@ function FeedEmptyState({ variant }: { variant: "feed" | "ranks" }) {
   );
 }
 
+// ─── Verified Callers (trustless graded leaderboard) ─────────────────────────
+// Ranks traders on calls graded from PUBLIC price (Orderly /tv/history) and
+// anchored on-chain — no self-report, anyone can recompute.
+type CallerEntry = { rank: number; displayName: string | null; pfp: string | null; calls: number; hitRate: number; avgR: number; totalR: number; score: number };
+function VerifiedCallersBoard() {
+  const [board, setBoard] = useState<CallerEntry[] | null>(null);
+  const [ledger, setLedger] = useState<{ ledgerHash?: string; count?: number; onChain?: { verified?: boolean; explorer?: string } | null } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancel = false;
+    Promise.all([
+      fetch(`${API_BASE}/theses/leaderboard`).then((r) => r.json()).catch(() => null),
+      fetch(`${API_BASE}/theses/ledger`).then((r) => r.json()).catch(() => null),
+    ]).then(([lb, led]) => {
+      if (cancel) return;
+      setBoard(Array.isArray(lb?.leaderboard) ? lb.leaderboard : []);
+      setLedger(led || null);
+      setLoading(false);
+    });
+    return () => { cancel = true; };
+  }, []);
+
+  const verifyStrip = ledger?.ledgerHash && (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 8, paddingTop: 8, borderTop: "1px solid #1a2e1a" }}>
+      <span style={{ fontFamily: "monospace", fontSize: 9, color: "#00ff88" }}>🔗 CALL LEDGER</span>
+      <code style={{ fontFamily: "monospace", fontSize: 9, color: "#8aaa9a", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 3, padding: "2px 6px" }}>
+        {ledger.ledgerHash.slice(0, 10)}…{ledger.ledgerHash.slice(-8)}
+      </code>
+      <a href={`${API_BASE}/theses/ledger`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "monospace", fontSize: 9, color: "#4a9fff", textDecoration: "none" }}>verify ↗</a>
+      {ledger.onChain?.verified && (
+        <a href={ledger.onChain.explorer || "#"} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "monospace", fontSize: 9, color: "#00ff88", textDecoration: "none", border: "1px solid #1a4a2a", borderRadius: 3, padding: "2px 6px", background: "#0a1a0e" }}>⛓ ANCHORED ON-CHAIN ↗</a>
+      )}
+    </div>
+  );
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ background: "#0d120d", border: "1px solid #1a3a2a", borderRadius: 4, padding: "12px 14px", marginBottom: 8 }}>
+        <div style={{ fontFamily: "monospace", fontSize: 11, color: "#00ff88", letterSpacing: "0.1em" }}>🏆 VERIFIED CALLERS</div>
+        <div style={{ fontFamily: "monospace", fontSize: 10, color: "#3a5a4a", marginTop: 5, lineHeight: 1.5 }}>
+          Ranked by call accuracy <strong style={{ color: "#8aaa9a" }}>graded from public price</strong> (TP1 vs SL, first-touch) over ≥5 resolved calls. No self-report — anyone can recompute.
+        </div>
+        {verifyStrip}
+      </div>
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "30px 0", fontFamily: "monospace", fontSize: 11, color: "#2a4a3a" }}>grading calls…</div>
+      ) : !board || board.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "28px 16px", fontFamily: "monospace", fontSize: 11, color: "#3a5a4a", lineHeight: 1.6, border: "1px dashed #1a2e1a", borderRadius: 4 }}>
+          No verified callers yet — publish calls from your Lab. Once you have <strong style={{ color: "#8aaa9a" }}>5+ resolved</strong> calls graded net-positive, you rank here. Be first.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {board.map((e) => {
+            const medal = e.rank === 1 ? "#ffd700" : e.rank === 2 ? "#c0c0c0" : e.rank === 3 ? "#cd7f32" : "#3a5a4a";
+            return (
+              <div key={e.rank} style={{ background: "#0d120d", border: "1px solid #1a3a2a", borderRadius: 4, padding: "10px 12px", display: "grid", gridTemplateColumns: "30px 1fr repeat(4, auto)", gap: 12, alignItems: "center" }}>
+                <div style={{ fontFamily: "monospace", fontSize: 16, fontWeight: 700, color: medal, textAlign: "center" }}>{e.rank}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                  {e.pfp ? <img src={e.pfp} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} /> : <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#0a1a0e", border: "1px solid #1a3a2a", flexShrink: 0 }} />}
+                  <span style={{ fontFamily: "monospace", fontSize: 12, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.displayName || "anon caller"}</span>
+                </div>
+                {[
+                  { label: "SCORE", val: e.score.toFixed(1), color: "#00ff88" },
+                  { label: "HIT", val: `${e.hitRate.toFixed(0)}%`, color: e.hitRate >= 50 ? "#00ff88" : "#ff8800" },
+                  { label: "AVG R", val: `${e.avgR > 0 ? "+" : ""}${e.avgR.toFixed(2)}`, color: e.avgR >= 0 ? "#00ff88" : "#ff4444" },
+                  { label: "CALLS", val: String(e.calls), color: "#c0c0c0" },
+                ].map(({ label, val, color }) => (
+                  <div key={label} style={{ textAlign: "right" }}>
+                    <div style={{ fontFamily: "monospace", fontSize: 8, color: "#3a5a4a", letterSpacing: "0.08em" }}>{label}</div>
+                    <div style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 600, color }}>{val}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Feed Page ───────────────────────────────────────────────────────────────
 type FilterStatus = "ALL" | "ACTIVE" | "HIT_TP" | "STOPPED_OUT" | "INVALIDATED";
 type DirFilter = "ALL" | "LONG" | "SHORT";
@@ -1338,7 +1420,10 @@ export default function FeedPage() {
               </div>
             )}
             {!loading && !error && (
-              <LeaderboardView feed={feed} walletAddress={walletAddress} onCopy={setCopyTarget} />
+              <>
+                <VerifiedCallersBoard />
+                <LeaderboardView feed={feed} walletAddress={walletAddress} onCopy={setCopyTarget} />
+              </>
             )}
           </>
         )}
