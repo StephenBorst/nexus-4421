@@ -357,7 +357,7 @@ function BreakdownRow({ orders }: { orders: ProcessedTrade[] }) {
   const maxDayTrades = Math.max(...weekday.days.map((d) => d.trades), 1);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 8 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginTop: 8 }}>
       <div style={cardStyle}>
         <div style={{ fontSize: 10, color: "#fbbf24", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "monospace" }}>&#9632; HOLD TIME</div>
         {holdTime.map((b) => (
@@ -438,7 +438,7 @@ function TopAssets({ orders }: { orders: ProcessedTrade[] }) {
   return (
     <div style={{ ...cardStyle, marginTop: 8 }}>
       <div style={{ fontSize: 10, color: "#4a9fff", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "monospace" }}>&#9632; TOP ASSETS</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(108px, 1fr))", gap: 8 }}>
         {assets.map(([sym, data]) => {
           const wr = Math.round((data.wins / data.trades) * 100);
           return (
@@ -543,7 +543,7 @@ function AnalyticsView({ orders, totalPnl, winRate, collateral }: { orders: Proc
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 8 }}>
         <div style={cardStyle}>
           <div style={labelStyle}>TOTAL PNL</div>
           <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "monospace", color: totalPnl >= 0 ? "#00ff88" : "#ff4444" }}>{formatPnl(totalPnl)}</div>
@@ -733,7 +733,7 @@ function TradeLogAllView({
     <div>
       {viewToggle}
       {/* ── Summary bar ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8, marginBottom: 16 }}>
         {[
           { label: "TOTAL PNL",   value: `${totalPnl >= 0 ? "+" : ""}$${Math.abs(totalPnl).toFixed(2)}`, color: totalPnl >= 0 ? "#00ff88" : "#ff4444" },
           { label: "TRADING DAYS", value: String(sortedDays.length),  color: "#4a9fff" },
@@ -885,7 +885,7 @@ function TradeLogView({ dayKey, data, onBack, initialNote, onSaveNote }: {
           <div style={{ fontSize: 9, color: "#2a4a3a", marginTop: 8, fontFamily: "monospace" }}>{new Date(trade.timestamp).toLocaleTimeString()}</div>
         </div>
       ))}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8, marginTop: 12 }}>
         <div style={cardStyle}><div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>TOTAL P&L</div><div style={{ fontSize: 14, color: data.pnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "monospace" }}>{formatPnl(data.pnl)}</div></div>
         <div style={cardStyle}><div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>WIN RATE</div><div style={{ fontSize: 14, color: "#00ff88", fontFamily: "monospace" }}>{data.trades ? `${Math.round((data.wins / data.trades) * 100)}%` : "—"}</div></div>
         <div style={cardStyle}><div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>TRADES</div><div style={{ fontSize: 14, color: "#00ff88", fontFamily: "monospace" }}>{data.trades}</div></div>
@@ -1163,7 +1163,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
         <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 16, fontFamily: "monospace" }}>
           <span style={{ color: "#3a5a4a" }}>&#9632;</span> ACCURACY BREAKDOWN
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(108px, 1fr))", gap: 8 }}>
           <div style={{ background: "#0a150a", border: "1px solid #1a4a2a", borderRadius: 4, padding: "10px 12px" }}>
             <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace", marginBottom: 6 }}>HIT TP</div>
             <div style={{ fontSize: 28, color: "#00ff88", fontFamily: "monospace", fontWeight: "bold" }}>{hits}</div>
@@ -1197,7 +1197,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
 
       {/* Best / Worst + Cumulative Chart */}
       {withPnl.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8 }}>
           {/* Best Thesis */}
           <div style={cardStyle}>
             <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "monospace" }}>&#9632; BEST THESIS</div>
@@ -1400,7 +1400,7 @@ function ThesisAnalyticsView() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* Summary stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
         {[
           { label: "TOTAL THESES", val: summaryStats.total.toString(), color: "#8aaa9a" as string },
           {
@@ -1440,7 +1440,7 @@ function ThesisAnalyticsView() {
       </div>
 
       {/* Streak + best/worst markets */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8 }}>
         {/* Win streak */}
         <div style={cardStyle}>
           <div style={{ fontFamily: "monospace", fontSize: 10, color: "#fbbf24", letterSpacing: "0.1em", marginBottom: 14 }}>◆ WIN STREAK</div>
@@ -2407,7 +2407,7 @@ function AgentTrackRecord({ title, accent, trades, paper, onReset }: {
         </div>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginTop: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(108px, 1fr))", gap: 12, marginTop: 8 }}>
             {[
               { label: "NET P&L", value: `${net >= 0 ? "+" : ""}$${Math.abs(net).toFixed(2)}`, color: net >= 0 ? "#00ff88" : "#ff4444" },
               { label: "WIN RATE", value: `${wr.toFixed(1)}%`, color: wr >= 50 ? "#00ff88" : "#ff4444" },
@@ -2914,7 +2914,7 @@ function AgentView() {
 
           <div style={agentCardStyle}>
             <div style={agentLabelStyle}>// RISK PARAMETERS</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginTop: 8 }}>
               {[
                 { key: "leverage", label: "LEVERAGE", suffix: "x", min: 1, max: 20, step: 1 },
                 { key: "capitalPerTrade", label: "CAPITAL / TRADE", suffix: "USDC", min: 10, max: 10000, step: 10 },
@@ -2944,7 +2944,7 @@ function AgentView() {
 
           <div style={agentCardStyle}>
             <div style={agentLabelStyle}>// RISK SUMMARY</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12, marginTop: 8 }}>
               {[
                 { label: "NOTIONAL / TRADE", value: `$${(config.capitalPerTrade * config.leverage).toFixed(0)}` },
                 { label: "MAX RISK / TRADE", value: `$${(config.capitalPerTrade * (config.slPercent / 100) * config.leverage).toFixed(2)}` },
@@ -3090,7 +3090,7 @@ function AgentView() {
 
           <div style={agentCardStyle}>
             <div style={agentLabelStyle}>// AGENT STATUS</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12, marginTop: 8 }}>
               <div>
                 <div style={{ ...agentLabelStyle, fontSize: 9 }}>STATE</div>
                 <div style={{ color: isActive ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>
@@ -3151,7 +3151,7 @@ function AgentView() {
                     <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", marginTop: 4 }}>stops opening new trades at cap</div>
                   </div>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 14, paddingTop: 12, borderTop: "1px solid #1a2e1a" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginTop: 14, paddingTop: 12, borderTop: "1px solid #1a2e1a" }}>
                   {[
                     { label: "MAX LEVERAGE", value: `${config.leverage}x` },
                     { label: "STOP / TRADE", value: `${config.slPercent}%` },
@@ -3179,7 +3179,7 @@ function AgentView() {
                   <span style={{ color: "#4a9fff", border: "1px solid #4a9fff40", borderRadius: 3, padding: "1px 6px", fontSize: 8 }}>🧪 PAPER</span>
                 )}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 12, marginTop: 8 }}>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>SYMBOL</div>
                   <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 14, fontWeight: 600 }}>
@@ -3231,7 +3231,7 @@ function AgentView() {
           {agentState?.last_signal && agentState.last_signal.symbol && (
             <div style={agentCardStyle}>
               <div style={agentLabelStyle}>// LAST SIGNAL</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12, marginTop: 8 }}>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>SYMBOL</div>
                   <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 13 }}>
@@ -3294,14 +3294,14 @@ function AgentView() {
                   : "No trades recorded yet. Agent will log trades here once active."}
               </div>
             ) : (
-              <div style={{ marginTop: 8 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr", gap: 8, padding: "6px 0", borderBottom: "1px solid #1e2d1e" }}>
+              <div style={{ marginTop: 8, overflowX: "auto" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr", gap: 8, minWidth: 480, padding: "6px 0", borderBottom: "1px solid #1e2d1e" }}>
                   {["SYMBOL", "DIR", "ENTRY", "EXIT", "P&L", "REASON"].map((h) => (
                     <span key={h} style={{ ...agentLabelStyle, fontSize: 9, marginBottom: 0 }}>{h}</span>
                   ))}
                 </div>
                 {histTrades.map((trade, i) => (
-                  <div key={trade.id || i} style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr", gap: 8, padding: "8px 0", borderBottom: "1px solid #0d1117" }}>
+                  <div key={trade.id || i} style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr", gap: 8, minWidth: 480, padding: "8px 0", borderBottom: "1px solid #0d1117" }}>
                     <span style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 12 }}>
                       {trade.symbol.replace("PERP_", "").replace("_USDC", "")}
                     </span>
@@ -3339,7 +3339,7 @@ function AgentView() {
                   // AGENT PERFORMANCE
                   {isPaperHist && <span style={{ color: "#4a9fff", border: "1px solid #4a9fff40", borderRadius: 3, padding: "1px 6px", fontSize: 8 }}>🧪 PAPER</span>}
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 12, marginTop: 8 }}>
                   {[
                     { label: "TOTAL P&L", value: `$${agentTotalPnl.toFixed(2)}`, color: agentTotalPnl >= 0 ? "#00ff88" : "#ff4444" },
                     { label: "WIN RATE", value: `${agentWinRate}%`, color: "#c0c0c0" },
@@ -3404,13 +3404,13 @@ function AgentView() {
               </div>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, overflowX: "auto" }}>
               {leaderboard.map((e) => {
                 const isMe = e.wallet.toLowerCase() === (walletAddress ?? "").toLowerCase();
                 const who = e.displayName || `${e.wallet.slice(0, 6)}…${e.wallet.slice(-4)}`;
                 const medal = e.rank === 1 ? "#ffd700" : e.rank === 2 ? "#c0c0c0" : e.rank === 3 ? "#cd7f32" : "#3a5a4a";
                 return (
-                  <div key={e.wallet} style={{ ...agentCardStyle, borderColor: isMe ? "#00ff88" : "#1a3a2a", display: "grid", gridTemplateColumns: "34px 1fr repeat(4, auto) 110px", gap: 12, alignItems: "center" }}>
+                  <div key={e.wallet} style={{ ...agentCardStyle, borderColor: isMe ? "#00ff88" : "#1a3a2a", display: "grid", gridTemplateColumns: "34px 1fr repeat(4, auto) 110px", gap: 12, minWidth: 520, alignItems: "center" }}>
                     <div style={{ fontFamily: "monospace", fontSize: 18, fontWeight: 700, color: medal, textAlign: "center" }}>{e.rank}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                       {e.pfp
