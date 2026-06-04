@@ -120,6 +120,32 @@ async function encryptSecret(plaintext, env) {
   return `v1:${b64(iv)}:${b64(ct)}`;
 }
 
+// base58 encode (Bitcoin alphabet) — matches the `bs58` npm pkg the exec signer
+// uses (it does bs58.decode(tradingKey) → 32-byte ed25519 seed).
+const B58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+function bs58Encode(bytes) {
+  let n = 0n;
+  for (const b of bytes) n = n * 256n + BigInt(b);
+  let out = "";
+  while (n > 0n) { out = B58_ALPHABET[Number(n % 58n)] + out; n = n / 58n; }
+  for (const b of bytes) { if (b === 0) out = "1" + out; else break; }
+  return out || "1";
+}
+
+// Derive the agent's trading secret from a wallet signature, the SAME way
+// /trade and bankr-register do: seed = SHA-256(sigBytes) (the 32-byte ed25519
+// seed), then bs58-encode so the exec's bs58.decode + noble signer reproduce the
+// exact registered key. Possessing a valid walletSig IS the auth — only the
+// wallet owner can produce it (via Bankr sign_message).
+async function agentSecretFromWalletSig(walletSig) {
+  const sigHex = walletSig.startsWith("0x") ? walletSig.slice(2) : walletSig;
+  const seedBytes = new Uint8Array(await crypto.subtle.digest(
+    "SHA-256",
+    new Uint8Array(sigHex.match(/.{2}/g).map((b) => parseInt(b, 16)))
+  ));
+  return bs58Encode(seedBytes);
+}
+
 // ── Ph27: notification helpers ────────────────────────────────────────────────
 async function appendNotification(env, wallet, notif) {
   const key = `notif:${wallet}`;
@@ -2651,6 +2677,80 @@ document.getElementById("btn").addEventListener("click",go);
           await AGENT_KV.put("agent:users", JSON.stringify(users));
         }
         return json({ ok: true, message: "Kill switch activated" }, request);
+      }
+
+      // ── POST /agent/:address/bankr/activate — deploy the agent from a Bankr chat ──
+      // PAPER needs no key. ASSISTED/AUTONOMOUS derive the order-only key from the
+      // provided walletSig (sign_message('nexus-trading-key-v1')) — same auth as
+      // /trade. AUTONOMOUS (live) requires explicit confirm:"GO LIVE".
+      if (request.method === "POST" && parts[2] === "bankr" && parts[3] === "activate") {
+        let body;
+        try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        const mode = ["PAPER", "ASSISTED", "AUTONOMOUS"].includes(body?.mode) ? body.mode : "PAPER";
+        if (mode === "AUTONOMOUS" && body?.confirm !== "GO LIVE") {
+          return json({ error: "confirm_required", hint: 'Live trading needs confirm:"GO LIVE". The agent uses an order-only key that cannot withdraw.' }, request, 409);
+        }
+        const defaults = { symbols: ["PERP_BTC_USDC"], leverage: 5, capitalPerTrade: 30, tpPercent: 1.5, slPercent: 0.75, maxHoldHours: 4, maxTradesPerDay: 10, maxDailyLossUsdc: 5, fundingThreshold: 0.01 };
+        const config = { ...defaults, ...(body?.config || {}), mode };
+
+        // Live modes need the delegated key. Derive it from the wallet signature
+        // (auth) + the registered accountId.
+        if (mode !== "PAPER") {
+          if (!body?.walletSig) return json({ error: "walletSig required", hint: "Call sign_message('nexus-trading-key-v1') and pass walletSig for live modes." }, request, 400);
+          const recRaw = await env.LAB_STORE.get("user:" + address);
+          if (!recRaw) return json({ error: "wallet_not_registered", hint: "Register first via POST /proxy/bankr-register, then retry." }, request, 401);
+          const rec = JSON.parse(recRaw);
+          if (!rec.accountId) return json({ error: "wallet_not_registered", hint: "No Orderly account on file — register first." }, request, 401);
+          const secret = await agentSecretFromWalletSig(body.walletSig);
+          const encryptedKey = await encryptSecret(secret, env);
+          await AGENT_KV.put(`agent:key:${address}`, JSON.stringify({ tradingKey: encryptedKey, accountId: rec.accountId, registeredAt: Date.now(), enc: "v1" }));
+        }
+
+        await AGENT_KV.put(`agent:config:${address}`, JSON.stringify(config));
+        await AGENT_KV.delete(`agent:kill:${address}`); // clear any stale kill flag from a prior KILL
+        const existingState = await AGENT_KV.get(`agent:state:${address}`);
+        const state = existingState ? JSON.parse(existingState) : { active: true, daily_pnl: 0, trades_today: 0, last_reset: Date.now(), current_position: null, last_signal: null };
+        state.active = true;
+        await AGENT_KV.put(`agent:state:${address}`, JSON.stringify(state));
+        const usersRaw = await AGENT_KV.get("agent:users");
+        const users = usersRaw ? JSON.parse(usersRaw) : [];
+        if (!users.includes(address)) { users.push(address); await AGENT_KV.put("agent:users", JSON.stringify(users)); }
+        return json({ ok: true, mode, config, state, note: "Order-only key — the agent can trade but never withdraw or transfer your funds." }, request);
+      }
+
+      // ── POST /agent/:address/bankr/mode — change execution mode by chat ──
+      // PAPER → immediate. ASSISTED/AUTONOMOUS need the key present (provision from
+      // walletSig if missing). AUTONOMOUS (live) requires confirm:"GO LIVE".
+      if (request.method === "POST" && parts[2] === "bankr" && parts[3] === "mode") {
+        let body;
+        try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        const mode = body?.mode;
+        if (!["PAPER", "ASSISTED", "AUTONOMOUS"].includes(mode)) return json({ error: "mode must be PAPER | ASSISTED | AUTONOMOUS" }, request, 400);
+        if (mode === "AUTONOMOUS" && body?.confirm !== "GO LIVE") {
+          return json({ error: "confirm_required", hint: 'Going live needs confirm:"GO LIVE".' }, request, 409);
+        }
+        const configRaw = await AGENT_KV.get(`agent:config:${address}`);
+        if (!configRaw) return json({ error: "no_agent", hint: "Activate the agent first via /agent/:address/bankr/activate." }, request, 400);
+        const config = JSON.parse(configRaw);
+
+        // Live modes require the order-only key to exist; provision it from the
+        // wallet signature if this agent was previously PAPER (no key stored).
+        if (mode !== "PAPER") {
+          const haveKey = await AGENT_KV.get(`agent:key:${address}`);
+          if (!haveKey) {
+            if (!body?.walletSig) return json({ error: "walletSig required", hint: "Going live needs walletSig (sign_message('nexus-trading-key-v1'))." }, request, 400);
+            const recRaw = await env.LAB_STORE.get("user:" + address);
+            if (!recRaw) return json({ error: "wallet_not_registered", hint: "Register first via POST /proxy/bankr-register." }, request, 401);
+            const rec = JSON.parse(recRaw);
+            const secret = await agentSecretFromWalletSig(body.walletSig);
+            const encryptedKey = await encryptSecret(secret, env);
+            await AGENT_KV.put(`agent:key:${address}`, JSON.stringify({ tradingKey: encryptedKey, accountId: rec.accountId, registeredAt: Date.now(), enc: "v1" }));
+          }
+        }
+
+        config.mode = mode;
+        await AGENT_KV.put(`agent:config:${address}`, JSON.stringify(config));
+        return json({ ok: true, mode }, request);
       }
 
       return json({ error: "not found" }, request, 404);
