@@ -196,7 +196,7 @@ export default function ThesisPage() {
   // ── Render helpers ────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div style={{ background: "#0a0e0a", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: "#0a0e0a", minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>loading thesis...</div>
       </div>
     );
@@ -204,7 +204,7 @@ export default function ThesisPage() {
 
   if (notFound || !thesis) {
     return (
-      <div style={{ background: "#0a0e0a", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
+      <div style={{ background: "#0a0e0a", minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
         <div style={{ fontSize: 24, color: "#2a4a3a" }}>◆</div>
         <div style={{ fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>thesis not found or not public</div>
         <button
@@ -232,7 +232,7 @@ export default function ThesisPage() {
   const isClosed = thesis.status === "HIT_TP" || thesis.status === "STOPPED_OUT";
 
   return (
-    <div style={{ background: "#0a0e0a", minHeight: "100vh", padding: 0 }}>
+    <div style={{ background: "#0a0e0a", minHeight: "100dvh", padding: 0 }}>
       {/* Top bar */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderBottom: "1px solid #1a2e1a", background: "#080c08" }}>
         <button

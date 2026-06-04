@@ -622,6 +622,7 @@ export default function MessagesPage() {
   return (
     <div style={S.page}>
       <div style={S.header}>
+        <button onClick={goBack} style={S.backBtn} aria-label="Back" title="Back">‹</button>
         <span style={S.headerLabel}>■ MESSAGES</span>
         <span style={{ fontFamily: "monospace", fontSize: 8, color: "#1a4a2a", marginLeft: "auto" }}>
           ⬡ XMTP · end-to-end encrypted

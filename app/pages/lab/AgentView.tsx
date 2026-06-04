@@ -403,7 +403,7 @@ export function AgentView() {
   return (
     <div>
       {/* ─── Header ──────────────────────────────────────── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, rowGap: 10, marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontFamily: "monospace", fontSize: 14, color: "#00ff88", fontWeight: 600 }}>
             // NEXUS AGENT
@@ -418,7 +418,7 @@ export function AgentView() {
             {isActive ? (hasPosition ? "● TRADING" : "● WATCHING") : "○ INACTIVE"}
           </span>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {(["config", "status", "history", "leaderboard"] as const).map((t) => (
             <button key={t} onClick={() => { setTab(t); if (t === "leaderboard" && !leaderboard) loadLeaderboard(); }} style={{
               background: tab === t ? "#0a1a0a" : "none",

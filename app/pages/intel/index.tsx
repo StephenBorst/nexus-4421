@@ -350,7 +350,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
   // ── Styles ──────────────────────────────────────────────────
   const page: React.CSSProperties = {
     background: embedded ? "transparent" : "#080b0d",
-    minHeight: embedded ? undefined : "100vh",
+    minHeight: embedded ? undefined : "100dvh",
     padding: embedded ? (isMobile ? "8px 0" : "4px 0") : (isMobile ? "12px" : "16px 20px"),
     fontFamily: "'Courier New', Courier, monospace",
     color: BRIGHT,

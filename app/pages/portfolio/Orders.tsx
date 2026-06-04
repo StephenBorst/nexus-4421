@@ -21,7 +21,7 @@ export default function PortfolioOrders() {
           minHeight: 379,
           maxHeight: 2560,
           overflow: "hidden",
-          height: "calc(100vh - 48px - 29px - 48px)",
+          height: "calc(100dvh - 48px - 29px - 48px)",
         }}
       >
         <OrdersModule.OrdersPage />
