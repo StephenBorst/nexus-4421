@@ -149,6 +149,32 @@ The public agents leaderboard ranks on a risk-adjusted score from live `agent_tr
 - ⚠️ Honest ceiling: verifying a human's *personal Orderly trades* server-side is NOT possible (position_history
   is private-auth; no public per-address endpoint) — that's why we grade the CALL vs public price instead.
 
+## $NEXUS token & holder perks (pure-meme + flywheel UI)
+$NEXUS = pure community meme token on **Base** (`0x3D958634ab725B627919EF8F2Ed59227309fDba3`, 100B supply,
+18 decimals). **Zero built-in utility / revenue share** — perks are cosmetic/access only; the framing is
+baked into the code comments. Keep it that way (Howey). The real lawyer-gate is the first buyback→burn.
+- **Tier hook** (`app/hooks/useNexusTier.ts`): reads $NEXUS balance on Base via viem with a CORS-friendly
+  RPC `fallback()` (llamarpc/publicnode/drpc — the default `mainnet.base.org` 403s/CORS-blocks the browser,
+  which silently hid badges). Module-cached, fail-soft. **Tiers (low→high): ▪ OPERATOR 50M / ◇ ARCHITECT 100M
+  / ◆ ORACLE 250M** (`TIER_THRESHOLDS`). Non-hook `fetchNexusTier` + `fetchBurnStats` for list/widget use.
+- **Badge** (`app/components/NexusTierBadge.tsx`): terminal-green chip, renders null for non-holders. On
+  Trader profiles + Feed (trader rows + thesis cards).
+- **Holders Room** (Lab tab, `app/components/HoldersRoom.tsx`): gated by connected wallet's tier. Thesis
+  visibility is a **3-state cycle PRIVATE → PUBLIC → ◆ HOLDERS** (`holdersOnly` flag in ThesisTrade); holders-only
+  theses are EXCLUDED from public `/feed` and shown only here. Server-gated endpoint **`GET /feed/holders?
+  address=&ts=&sig=`** in lab-api: verifies an EIP-191 signed+timestamped challenge via **secp256k1 ecrecover
+  (`@noble/curves`)** (recovered addr must match, ts fresh ≤10min) THEN on-chain balanceOf ≥ `OPERATOR_MIN`.
+  ⚠️ **`OPERATOR_MIN` in lab-api MUST match the frontend OPERATOR threshold** (currently 50M) or badges/gate drift.
+  Frontend caches the signature per-session (8min) to avoid re-prompting.
+- **Public flywheel strip** (Feed header + Lab header + landing): `NexusMarket` (live price/MC/vol/liq from
+  GeckoTerminal, **client-side fetch** — GeckoTerminal/CoinGecko 403 datacenter IPs; carries the GT link-back) +
+  `NexusTreasury` (USDC balance of the Safe on Arbitrum; renders NOTHING until `NEXUS_TREASURY_ADDRESS` is set —
+  one-line activation when the Safe exists) + `NexusBurnCounter` (on-chain $NEXUS at dead address as % of supply;
+  honest at 0 until first burn). All fail-soft.
+- **Landing** (`nexus-landing` repo, static `index.html`, `wrangler deploy` — no CI): has its own $NEXUS market
+  strip (inline GeckoTerminal fetch). ⚠️ `.assetsignore` excludes `.git` (the assets dir is repo root — was
+  publicly serving `.git/`). Announcement-tweet arc drafted: GeckoTerminal verified → Treasury Safe live → flywheel.
+
 ## Testing (money-path + trust-path)
 - Pure logic is extracted into `logic.mjs` next to each worker's `index.js` (which imports it, so
   tests cover the REAL deployed code, not a copy). Tests = zero-dep `node:test` in `logic.test.mjs`.
