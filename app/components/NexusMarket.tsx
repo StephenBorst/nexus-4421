@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { BuyNexusButton } from "@/components/BuyNexusButton";
 
 const NEXUS_TOKEN = "0x3D958634ab725B627919EF8F2Ed59227309fDba3";
 const GT_API = `https://api.geckoterminal.com/api/v2/networks/base/tokens/${NEXUS_TOKEN}`;
@@ -81,14 +82,17 @@ export function NexusMarket() {
       <Stat label="MARKET CAP" value={usd(m.marketCap)} />
       <Stat label="24H VOL" value={usd(m.volume24h)} />
       <Stat label="LIQUIDITY" value={usd(m.liquidity)} />
-      <a
-        href={GT_PAGE}
-        target="_blank" rel="noopener noreferrer"
-        style={{ marginLeft: "auto", fontSize: 9, color: "#5fd6a0", textDecoration: "none", letterSpacing: "0.06em", border: "1px solid #1a4a3a", borderRadius: 3, padding: "4px 8px" }}
-        title="View $NEXUS on GeckoTerminal"
-      >
-        GeckoTerminal ↗
-      </a>
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+        <a
+          href={GT_PAGE}
+          target="_blank" rel="noopener noreferrer"
+          style={{ fontSize: 9, color: "#5fd6a0", textDecoration: "none", letterSpacing: "0.06em", border: "1px solid #1a4a3a", borderRadius: 3, padding: "4px 8px" }}
+          title="View $NEXUS on GeckoTerminal"
+        >
+          GeckoTerminal ↗
+        </a>
+        <BuyNexusButton size="sm" />
+      </div>
     </div>
   );
 }
