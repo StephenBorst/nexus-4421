@@ -35,6 +35,33 @@ test("OI_ONLY: OI fires alone → trades; funding ignored", () => {
   assert.equal(s.confidence, 65);
 });
 
+test("MOMENTUM: price up over threshold → LONG (trade with the move)", () => {
+  const s = deriveSignal(raw({ priceChange: 0.01 }), { signalMode: "MOMENTUM", priceChangeThreshold: 0.5 });
+  assert.equal(s.direction, "LONG");
+  assert.equal(s.confidence, 60);
+});
+
+test("MOMENTUM: price down over threshold → SHORT", () => {
+  const s = deriveSignal(raw({ priceChange: -0.01 }), { signalMode: "MOMENTUM", priceChangeThreshold: 0.5 });
+  assert.equal(s.direction, "SHORT");
+});
+
+test("MEAN_REVERSION: price up over threshold → SHORT (fade)", () => {
+  const s = deriveSignal(raw({ priceChange: 0.01 }), { signalMode: "MEAN_REVERSION", priceChangeThreshold: 0.5 });
+  assert.equal(s.direction, "SHORT");
+  assert.equal(s.confidence, 60);
+});
+
+test("MOMENTUM/MEAN_REVERSION: move below threshold → NONE", () => {
+  // 0.2% move < 0.5% threshold
+  assert.equal(deriveSignal(raw({ priceChange: 0.002 }), { signalMode: "MOMENTUM", priceChangeThreshold: 0.5 }).direction, "NONE");
+  assert.equal(deriveSignal(raw({ priceChange: 0.002 }), { signalMode: "MEAN_REVERSION", priceChangeThreshold: 0.5 }).direction, "NONE");
+});
+
+test("MOMENTUM: no prior snapshot → NONE", () => {
+  assert.equal(deriveSignal(raw({ priceChange: 0.01, hasPrev: false }), { signalMode: "MOMENTUM", priceChangeThreshold: 0.5 }).direction, "NONE");
+});
+
 test("fundingThreshold respected: below threshold → no funding signal", () => {
   // funding 0.005% < 0.01% threshold
   const s = deriveSignal(raw({ fundingRate: 0.00005, priceChange: 0.01, oiChange: -0.01 }), { signalMode: "CONFLUENCE", fundingThreshold: 0.01 });

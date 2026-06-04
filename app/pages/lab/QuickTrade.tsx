@@ -11,6 +11,7 @@
 import { useMemo, useState } from "react";
 import { useOrderEntry, useLeverage, useCollateral, useAccount } from "@orderly.network/hooks";
 import { OrderSide, OrderType } from "@orderly.network/types";
+import { MiniPriceChart } from "@/components/MiniPriceChart";
 
 const SYMBOLS = [
   "PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC",
@@ -106,6 +107,9 @@ export function QuickTrade() {
         <div style={{ ...label, marginTop: 10, color: "#5a8a6a" }}>
           MARK: {markPrice ? `$${Number(markPrice).toLocaleString(undefined, { maximumFractionDigits: 4 })}` : "—"}
           {availableBalance != null && <span style={{ marginLeft: 14 }}>FREE: ${Number(availableBalance).toFixed(2)}</span>}
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <MiniPriceChart symbol={symbol} />
         </div>
       </div>
 

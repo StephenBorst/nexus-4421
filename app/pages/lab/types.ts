@@ -64,8 +64,9 @@ export interface AgentConfig {
   maxTradesPerDay: number;
   maxDailyLossUsdc: number;
   fundingThreshold: number;
-  signalMode: "CONFLUENCE" | "FUNDING_ONLY" | "OI_ONLY";
+  signalMode: "CONFLUENCE" | "FUNDING_ONLY" | "OI_ONLY" | "MOMENTUM" | "MEAN_REVERSION";
   oiChangeThreshold: number; // % min OI move for the OI-divergence rule to count (0 = any)
+  priceChangeThreshold: number; // % price move on the tick that triggers MOMENTUM / MEAN_REVERSION
   mode: "ASSISTED" | "AUTONOMOUS" | "PAPER";
 }
 
@@ -142,5 +143,6 @@ export const DEFAULT_CONFIG: AgentConfig = {
   fundingThreshold: 0.01,
   signalMode: "CONFLUENCE", // validated default — both funding + OI must agree
   oiChangeThreshold: 0, // any OI move counts by default
+  priceChangeThreshold: 0.5, // % tick move to trigger momentum / mean-reversion
   mode: "PAPER", // new users start in risk-free simulation by default
 };

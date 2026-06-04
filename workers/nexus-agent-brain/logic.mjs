@@ -3,9 +3,11 @@
 // a user's strategy config, derive that user's signal.
 //
 // Customization: signalMode lets users choose how funding + OI-divergence combine.
-//   CONFLUENCE (default, validated) — both rules must AGREE. Strictest, highest quality.
+//   CONFLUENCE (default, validated) — both funding + OI rules must AGREE. Strictest.
 //   FUNDING_ONLY                    — fade funding extremes only.
 //   OI_ONLY                         — OI-divergence only.
+//   MOMENTUM                        — trade WITH a tick price move > priceChangeThreshold (trend-follow).
+//   MEAN_REVERSION                  — FADE a tick price move > priceChangeThreshold (buy dip / sell rip).
 // Thresholds (per user): fundingThreshold (%), oiChangeThreshold (% min OI move to count).
 // Guardrails (loss cap, max trades, kill switch, order-only keys) live in exec and
 // are NOT tunable here — users tune the STRATEGY, never the seatbelts.
@@ -16,8 +18,9 @@ export function deriveSignal(raw, config = {}) {
   const oiChange = raw.oiChange || 0;
   const hasPrev = !!raw.hasPrev;
 
-  const fundingThreshold = (config.fundingThreshold ?? 0.01) / 100; // % → decimal
-  const oiChangeThreshold = (config.oiChangeThreshold ?? 0) / 100;   // % → decimal
+  const fundingThreshold = (config.fundingThreshold ?? 0.01) / 100;     // % → decimal
+  const oiChangeThreshold = (config.oiChangeThreshold ?? 0) / 100;       // % → decimal
+  const priceChangeThreshold = (config.priceChangeThreshold ?? 0.5) / 100; // % → decimal
   const mode = config.signalMode || "CONFLUENCE";
 
   // Rule 1 — funding extreme (fade the crowd).
@@ -44,6 +47,16 @@ export function deriveSignal(raw, config = {}) {
       break;
     case "OI_ONLY":
       if (oiSignal !== "NONE") { direction = oiSignal; confidence = 65; why = "oi-only"; }
+      break;
+    case "MOMENTUM":
+      if (hasPrev && Math.abs(priceChange) >= priceChangeThreshold) {
+        direction = priceChange > 0 ? "LONG" : "SHORT"; confidence = 60; why = "momentum";
+      }
+      break;
+    case "MEAN_REVERSION":
+      if (hasPrev && Math.abs(priceChange) >= priceChangeThreshold) {
+        direction = priceChange > 0 ? "SHORT" : "LONG"; confidence = 60; why = "mean-reversion";
+      }
       break;
     case "CONFLUENCE":
     default:

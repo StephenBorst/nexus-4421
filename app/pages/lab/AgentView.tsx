@@ -340,6 +340,7 @@ export function AgentView() {
       fundingThreshold: entry.config!.fundingThreshold ?? prev.fundingThreshold,
       signalMode: entry.config!.signalMode ?? prev.signalMode,
       oiChangeThreshold: entry.config!.oiChangeThreshold ?? prev.oiChangeThreshold,
+      priceChangeThreshold: entry.config!.priceChangeThreshold ?? prev.priceChangeThreshold,
       mode: "PAPER",
     }));
     setTab("config");
@@ -557,6 +558,8 @@ export function AgentView() {
                 { v: "CONFLUENCE", label: "CONFLUENCE", hint: "Funding AND OI must agree (strictest, validated default)" },
                 { v: "FUNDING_ONLY", label: "FUNDING", hint: "Fade funding extremes only" },
                 { v: "OI_ONLY", label: "OI DIVERGENCE", hint: "Open-interest divergence only" },
+                { v: "MOMENTUM", label: "MOMENTUM", hint: "Trade WITH the move (trend-follow)" },
+                { v: "MEAN_REVERSION", label: "MEAN REVERSION", hint: "Fade the move (buy dip / sell rip)" },
               ] as const).map(({ v, label, hint }) => {
                 const sel = (config.signalMode ?? "CONFLUENCE") === v;
                 return (
@@ -575,6 +578,8 @@ export function AgentView() {
                 CONFLUENCE: "Both funding + OI-divergence must agree. Fewest, highest-quality entries.",
                 FUNDING_ONLY: "Trades funding extremes alone. More entries, lower selectivity.",
                 OI_ONLY: "Trades OI-divergence alone. Funding ignored.",
+                MOMENTUM: "Trades WITH a price move above your threshold — rides strength. Noisy on short ticks; test in PAPER.",
+                MEAN_REVERSION: "FADES a price move above your threshold — buy the dip, sell the rip. Test in PAPER.",
               } as Record<string, string>)[config.signalMode ?? "CONFLUENCE"]}
             </div>
           </div>
@@ -620,6 +625,7 @@ export function AgentView() {
                 { key: "maxDailyLossUsdc", label: "MAX DAILY LOSS", suffix: "USDC", min: 1, max: 500, step: 1 },
                 { key: "fundingThreshold", label: "FUNDING THRESHOLD", suffix: "%", min: 0.001, max: 0.1, step: 0.001 },
                 { key: "oiChangeThreshold", label: "OI MOVE THRESHOLD", suffix: "%", min: 0, max: 10, step: 0.05 },
+                { key: "priceChangeThreshold", label: "PRICE MOVE THRESHOLD", suffix: "%", min: 0.1, max: 10, step: 0.1 },
               ].map(({ key, label, suffix, min, max, step }) => (
                 <div key={key}>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
