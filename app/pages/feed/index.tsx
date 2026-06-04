@@ -461,12 +461,14 @@ function FeedCard({
       <div style={{ display: "flex", alignItems: "center", gap: 10, rowGap: 6, flexWrap: "wrap", marginBottom: 12 }}>
         <Avatar pfp={thesis.pfp} displayName={thesis.displayName} size={34} />
         <div style={{ flex: 1, minWidth: 120 }}>
-          <div style={{ fontFamily: "monospace", fontSize: 11, color: "#8aaa9a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {thesis.agent ? "Nexus Agent" : (thesis.displayName ?? shortAddr)}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+            <span style={{ fontFamily: "monospace", fontSize: 11, color: "#8aaa9a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+              {thesis.agent ? "Nexus Agent" : (thesis.displayName ?? shortAddr)}
+            </span>
             {thesis.agent ? (
-              <span style={{ marginLeft: 6, fontSize: 8, letterSpacing: "0.08em", padding: "2px 5px", borderRadius: 3, background: "#0a1a2a", border: "1px solid #1a3a5a", color: "#4a9fff" }}>🤖 AGENT</span>
+              <span style={{ flexShrink: 0, fontSize: 8, letterSpacing: "0.08em", padding: "2px 5px", borderRadius: 3, background: "#0a1a2a", border: "1px solid #1a3a5a", color: "#4a9fff" }}>🤖 AGENT</span>
             ) : (
-              <span style={{ marginLeft: 6 }}><NexusTierBadge address={thesis.wallet} /></span>
+              <span style={{ flexShrink: 0 }}><NexusTierBadge address={thesis.wallet} /></span>
             )}
           </div>
           {!thesis.agent && thesis.displayName && <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>{shortAddr}</div>}

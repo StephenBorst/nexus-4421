@@ -124,7 +124,7 @@ export default function TheLabPage() {
       </div>
       {/* ── TAB BAR ── */}
       <div style={{ display: "flex", gap: 2, padding: isMobile ? "6px 8px" : "8px 16px", borderBottom: "1px solid #1a2e1a", background: "#080c08", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", gap: isMobile ? 4 : 2, flex: 1 }}>
+        <div style={{ display: "flex", gap: isMobile ? 4 : 2, flex: 1, flexWrap: isMobile ? "wrap" : "nowrap" }}>
           {tabs.map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
               background: activeTab === tab.id ? "#0a1a0a" : "none",
@@ -137,7 +137,7 @@ export default function TheLabPage() {
               letterSpacing: "0.05em",
               borderRadius: 3,
               minHeight: isMobile ? 36 : "auto",
-              flex: isMobile ? 1 : "none",
+              flex: isMobile ? "1 0 21%" : "none",
             }}>{isMobile ? tab.short : tab.label}</button>
           ))}
         </div>

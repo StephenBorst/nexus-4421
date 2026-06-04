@@ -673,10 +673,12 @@ export default function TraderPage() {
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, padding: "16px 20px", background: "#0d120d", border: "1px solid #1a3a1a", borderRadius: 6 }}>
               <Avatar pfp={pfp} displayName={displayName} size={56} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: "monospace", fontSize: 18, fontWeight: "bold", color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {displayName ?? shortAddr}
-                  {isOwn && <span style={{ color: "#00ff88", marginLeft: 10, fontSize: 11 }}>YOU</span>}
-                  {wallet && <span style={{ marginLeft: 10 }}><NexusTierBadge address={wallet} /></span>}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                  <span style={{ fontFamily: "monospace", fontSize: 18, fontWeight: "bold", color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+                    {displayName ?? shortAddr}
+                  </span>
+                  {isOwn && <span style={{ color: "#00ff88", fontSize: 11, flexShrink: 0 }}>YOU</span>}
+                  {wallet && <span style={{ flexShrink: 0 }}><NexusTierBadge address={wallet} /></span>}
                 </div>
                 <div style={{ fontFamily: "monospace", fontSize: 10, color: "#3a5a4a", marginTop: 2 }}>{shortAddr}</div>
                 <div style={{ fontFamily: "monospace", fontSize: 9, color: "#2a4a3a", marginTop: 4 }}>
