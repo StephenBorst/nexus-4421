@@ -5,6 +5,8 @@ import { useState, useEffect } from "react";
 import type { AgentConfig, AgentState, AgentTrade, AgentLeaderboardEntry, AgentPendingThesis } from "./types";
 import { DEFAULT_CONFIG } from "./types";
 import { agentCardStyle, agentLabelStyle, agentInputStyle, agentBtnStyle, navBtnStyle } from "./styles";
+import { useSubscription } from "@/hooks/useSubscription";
+import { isProStrategy } from "@/config/subscription";
 
 const AGENT_API = "https://og.nexustradinglabs.com";
 
@@ -180,6 +182,8 @@ export function AgentView() {
 
   const walletAddress = getWalletAddress();
   const tradingKey = findOrderlyTradingKey();
+  const { isPro } = useSubscription(walletAddress);
+  const [proNote, setProNote] = useState(false);
 
   useEffect(() => {
     if (!walletAddress) { setLoading(false); return; }
@@ -562,17 +566,25 @@ export function AgentView() {
                 { v: "MEAN_REVERSION", label: "MEAN REVERSION", hint: "Fade the move (buy dip / sell rip)" },
               ] as const).map(({ v, label, hint }) => {
                 const sel = (config.signalMode ?? "CONFLUENCE") === v;
+                const locked = isProStrategy(v) && !isPro;
                 return (
-                  <button key={v} title={hint} onClick={() => setConfig({ ...config, signalMode: v })} style={{
+                  <button key={v} title={locked ? "Advanced strategy — Nexus PRO" : hint}
+                    onClick={() => { if (locked) { setProNote(true); return; } setProNote(false); setConfig({ ...config, signalMode: v }); }}
+                    style={{
                     background: sel ? "#00ff8815" : "#0a0e0a",
                     border: `1px solid ${sel ? "#00ff8860" : "#1e2d1e"}`,
                     borderRadius: 3, padding: "4px 10px", cursor: "pointer",
-                    color: sel ? "#00ff88" : "#4a7a5a",
+                    color: locked ? "#3a5a4a" : sel ? "#00ff88" : "#4a7a5a",
                     fontFamily: "monospace", fontSize: 11,
-                  }}>{label}</button>
+                  }}>{label}{locked ? " ◆" : ""}</button>
                 );
               })}
             </div>
+            {proNote && (
+              <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 6, color: "#5fd6a0" }}>
+                ◆ Advanced strategies are Nexus PRO — hold $NEXUS or subscribe (see PRO in the Lab).
+              </div>
+            )}
             <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 8, color: "#3a6a4a" }}>
               {({
                 CONFLUENCE: "Both funding + OI-divergence must agree. Fewest, highest-quality entries.",

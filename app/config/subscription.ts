@@ -47,3 +47,15 @@ export const PRO_FEATURES: { key: ProFeatureKey; label: string; desc: string }[]
 
 export const nexusDiscountedPrice = () =>
   +(PRO_MONTHLY_USDC * (1 - NEXUS_PAY_DISCOUNT_PCT / 100)).toFixed(2);
+
+/**
+ * FREE vs PRO split (the spec gating reads from).
+ *  FREE: Thesis Engine, paper agent w/ CORE strategies, Quick Trade, Feed,
+ *        basic analytics — a genuinely useful free tier that attracts.
+ *  PRO:  advanced agent strategies, deep analytics, data API, unlimited theses,
+ *        priority copy.
+ * Advanced (PRO-only) agent signal modes — the rest are free.
+ */
+export const PRO_AGENT_STRATEGIES = ["MOMENTUM", "MEAN_REVERSION"] as const;
+export const isProStrategy = (mode: string) =>
+  (PRO_AGENT_STRATEGIES as readonly string[]).includes(mode);
