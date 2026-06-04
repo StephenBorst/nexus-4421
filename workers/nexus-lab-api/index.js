@@ -3036,7 +3036,7 @@ document.getElementById("btn").addEventListener("click",go);
         return json({ error: "invalid signature" }, request, 401);
       }
       const NEXUS_TOKEN = "0x3D958634ab725B627919EF8F2Ed59227309fDba3";
-      const OPERATOR_MIN = 12000000n * (10n ** 18n); // matches frontend TIER_THRESHOLDS
+      const OPERATOR_MIN = 50000000n * (10n ** 18n); // matches frontend TIER_THRESHOLDS (OPERATOR)
       // eth_call balanceOf(address)
       const callData = "0x70a08231000000000000000000000000" + claimed.slice(2);
       let isHolder = false;

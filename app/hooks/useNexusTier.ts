@@ -23,16 +23,14 @@ export const NEXUS_TOKEN_ADDRESS =
 
 export type NexusTier = "NONE" | "OPERATOR" | "ARCHITECT" | "ORACLE";
 
-// ⚠️ TUNE THESE: thresholds are in whole $NEXUS tokens.
-// Supply is 100,000,000,000 (100B). At ~$79K MC that's ~$0.0000008/token, so
-// these defaults map roughly to ~$10 / ~$50 / ~$200 of $NEXUS *at launch MC*.
-// As price moves, the dollar value of each tier moves with it — revisit when
-// you decide the holder distribution you actually want to gate on.
+// Thresholds in whole $NEXUS tokens (supply 100,000,000,000 = 100B).
+// ⚠️ If you change OPERATOR's min, also update OPERATOR_MIN in
+// workers/nexus-lab-api/index.js (the Holders Room gate) to match.
 // Order matters: highest tier first when resolving.
 export const TIER_THRESHOLDS: { tier: Exclude<NexusTier, "NONE">; min: number }[] = [
   { tier: "ORACLE", min: 250_000_000 },
-  { tier: "ARCHITECT", min: 63_000_000 },
-  { tier: "OPERATOR", min: 12_000_000 },
+  { tier: "ARCHITECT", min: 100_000_000 },
+  { tier: "OPERATOR", min: 50_000_000 },
 ];
 
 // Brand-consistent styling per tier (monospace terminal / green).
