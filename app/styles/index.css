@@ -11,10 +11,19 @@
   display: none;
 }
 
-/* Fix mobile dead space below bottom nav — 100vh includes browser chrome,
-   100dvh (dynamic) correctly sizes to the visible viewport */
+/* Fix mobile dead space — two parts:
+   1) 100vh includes browser chrome; 100dvh sizes to the visible viewport.
+   2) The Orderly scaffold footer ("Charts powered by TradingView" + socials) is
+      a position:fixed dark bar pinned to the layout-viewport bottom. On a mobile
+      in-app browser the layout viewport is taller than the visible area, so that
+      fixed bar (plus the h-full container overflow) shows up as a dead dark band
+      above the browser toolbar. It's low-value chrome on a phone — hide it on
+      mobile and let the content area reclaim the space. */
 @media (max-width: 767px) {
   .oui-scaffold-root {
     height: 100dvh !important;
+  }
+  .oui-scaffold-footer {
+    display: none !important;
   }
 }
