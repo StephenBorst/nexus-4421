@@ -45,6 +45,7 @@ type FeedThesis = {
   onChainId?: number;
   onChainTxHash?: string;
   copyCount?: number;
+  agent?: boolean; // autonomous-agent call (surfaced from agent:feed:* by lab-api)
 };
 
 const STATUS_CONFIG = {
@@ -461,10 +462,15 @@ function FeedCard({
         <Avatar pfp={thesis.pfp} displayName={thesis.displayName} size={34} />
         <div style={{ flex: 1, minWidth: 120 }}>
           <div style={{ fontFamily: "monospace", fontSize: 11, color: "#8aaa9a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {thesis.displayName ?? shortAddr}
-            <span style={{ marginLeft: 6 }}><NexusTierBadge address={thesis.wallet} /></span>
+            {thesis.agent ? "Nexus Agent" : (thesis.displayName ?? shortAddr)}
+            {thesis.agent ? (
+              <span style={{ marginLeft: 6, fontSize: 8, letterSpacing: "0.08em", padding: "2px 5px", borderRadius: 3, background: "#0a1a2a", border: "1px solid #1a3a5a", color: "#4a9fff" }}>🤖 AGENT</span>
+            ) : (
+              <span style={{ marginLeft: 6 }}><NexusTierBadge address={thesis.wallet} /></span>
+            )}
           </div>
-          {thesis.displayName && <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>{shortAddr}</div>}
+          {!thesis.agent && thesis.displayName && <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>{shortAddr}</div>}
+          {thesis.agent && <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>autonomous · funding-edge bot</div>}
         </div>
         <div style={{
           fontFamily: "monospace", fontSize: 9, letterSpacing: "0.08em",

@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-agent-exec/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus } from "./logic.mjs";
 
 // ─── snapQty ───────────────────────────────────────────────
 test("snapQty: snaps cleanly to base_tick (no float artifacts)", () => {
@@ -98,4 +98,30 @@ test("exitReason: TP/SL/timeout priority", () => {
   assert.equal(exitReason(0.5, 1 * 3600_000, cfg), null); // still holding
   // TP takes priority even if also timed out
   assert.equal(exitReason(2, 5 * 3600_000, cfg), "TP");
+});
+
+// ─── agent → feed bridge ───────────────────────────────────
+test("agentThesisLevels: LONG projects TP up / SL down + R:R", () => {
+  const r = agentThesisLevels({ entryPrice: 100, direction: "LONG", tpPercent: 1.5, slPercent: 0.75 });
+  assert.ok(Math.abs(r.takeProfit1 - 101.5) < 1e-9);
+  assert.ok(Math.abs(r.stopLoss - 99.25) < 1e-9);
+  assert.ok(Math.abs(r.riskReward - 2) < 1e-9);
+});
+
+test("agentThesisLevels: SHORT inverts TP/SL", () => {
+  const r = agentThesisLevels({ entryPrice: 100, direction: "SHORT", tpPercent: 2, slPercent: 1 });
+  assert.ok(Math.abs(r.takeProfit1 - 98) < 1e-9);   // TP below entry
+  assert.ok(Math.abs(r.stopLoss - 101) < 1e-9);     // SL above entry
+  assert.ok(Math.abs(r.riskReward - 2) < 1e-9);
+});
+
+test("agentThesisLevels: zero slPercent → R:R 0 (no divide-by-zero)", () => {
+  assert.equal(agentThesisLevels({ entryPrice: 100, direction: "LONG", tpPercent: 1, slPercent: 0 }).riskReward, 0);
+});
+
+test("agentCloseStatus: maps exit reason → feed status", () => {
+  assert.equal(agentCloseStatus("TP"), "HIT_TP");
+  assert.equal(agentCloseStatus("SL"), "STOPPED_OUT");
+  assert.equal(agentCloseStatus("TIMEOUT"), "CLOSED");
+  assert.equal(agentCloseStatus("KILLED"), "CLOSED");
 });

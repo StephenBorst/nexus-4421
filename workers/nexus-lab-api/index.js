@@ -3005,6 +3005,29 @@ document.getElementById("btn").addEventListener("click",go);
         }
       }
 
+      // Merge autonomous-agent calls (written per-user by nexus-agent-exec to
+      // agent:feed:{address}). Gives the public feed a live heartbeat from the
+      // bot's real trades instead of looking abandoned. Tagged agent:true under a
+      // single "Nexus Agent" identity. Best-effort — never break /feed if the
+      // agent namespace is unavailable. NOTE: these are NOT in lab:, so they never
+      // leak into /theses/leaderboard or /theses/ledger (those read lab: only).
+      try {
+        const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+        const agentListed = await AGENT_KV.list({ prefix: "agent:feed:" });
+        for (const key of agentListed.keys) {
+          const raw = await AGENT_KV.get(key.name);
+          if (!raw) continue;
+          const items = JSON.parse(raw);
+          const address = key.name.replace("agent:feed:", "");
+          for (const t of items) {
+            if (t.isPublic === false) continue;
+            feedItems.push({ ...t, wallet: address, agent: true, pfp: null, displayName: "Nexus Agent" });
+          }
+        }
+      } catch (e) {
+        console.error("[feed] agent merge failed:", e);
+      }
+
       // Sort newest first
       feedItems.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       return json({ feed: feedItems }, request);

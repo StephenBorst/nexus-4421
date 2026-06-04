@@ -70,3 +70,30 @@ export function exitReason(pnlPct, holdMs, config) {
   if (holdMs >= config.maxHoldHours * 60 * 60 * 1000) return "TIMEOUT";
   return null;
 }
+
+/**
+ * Derive thesis-style TP/SL price levels for an agent entry from its plan
+ * percentages. tpPercent/slPercent are PRICE-move percents (exitReason compares
+ * them directly to the price-move pnlPct from computePnl), so the levels are a
+ * straight projection off the entry price. Used to publish agent trades to the
+ * public feed in the same shape as human theses.
+ * @returns {{ stopLoss:number, takeProfit1:number, riskReward:number }}
+ */
+export function agentThesisLevels({ entryPrice, direction, tpPercent, slPercent }) {
+  const tpMove = entryPrice * (tpPercent / 100);
+  const slMove = entryPrice * (slPercent / 100);
+  const takeProfit1 = direction === "LONG" ? entryPrice + tpMove : entryPrice - tpMove;
+  const stopLoss = direction === "LONG" ? entryPrice - slMove : entryPrice + slMove;
+  const riskReward = slPercent > 0 ? tpPercent / slPercent : 0;
+  return { stopLoss, takeProfit1, riskReward };
+}
+
+/**
+ * Map an internal exit reason to a public feed thesis status.
+ * TP→HIT_TP, SL→STOPPED_OUT, everything else (TIMEOUT/KILLED/manual)→CLOSED.
+ */
+export function agentCloseStatus(reason) {
+  if (reason === "TP") return "HIT_TP";
+  if (reason === "SL") return "STOPPED_OUT";
+  return "CLOSED";
+}

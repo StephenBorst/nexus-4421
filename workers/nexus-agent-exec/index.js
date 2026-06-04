@@ -13,10 +13,71 @@
 
 import * as ed from "@noble/ed25519";
 import bs58 from "bs58";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus } from "./logic.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const COOLDOWN_MS = 15 * 60 * 1000; // 15 min between trades
+
+// ── Agent → public Feed bridge ────────────────────────────────────────────────
+// Surfaces the bot's real autonomous trades on the public feed so it has a live
+// heartbeat instead of looking abandoned (cold-start fix). Records are written
+// per-user to agent:feed:{address} (single-writer: only this user's processUser
+// touches its own key, so no cross-user race). lab-api's /feed merges them.
+const PUBLISH_AGENT_FEED = true;
+// Keep simulated PAPER trades OUT of the public feed — the feed is the "these are
+// real calls" surface and mixing sims (even labeled) dilutes the trust moat.
+const PUBLISH_PAPER_TO_FEED = false;
+const AGENT_FEED_CAP = 12; // keep the last N agent calls per user
+
+// Build + store a public feed thesis for a fresh agent entry; returns its id so
+// the close path can find and resolve it. Shape matches the human-thesis feed
+// record so the existing feed UI renders it unchanged.
+async function publishAgentEntry(address, env, { config, signal, markPrice, qty }) {
+  const now = Date.now();
+  const { stopLoss, takeProfit1, riskReward } = agentThesisLevels({
+    entryPrice: markPrice, direction: signal.direction,
+    tpPercent: config.tpPercent, slPercent: config.slPercent,
+  });
+  const record = {
+    id: `agent_${address.slice(2, 8)}_${now}`,
+    symbol: signal.symbol,
+    direction: signal.direction,
+    entryPrice: markPrice,
+    stopLoss,
+    takeProfit1,
+    takeProfit2: 0,
+    riskReward,
+    positionSize: qty * markPrice,
+    leverage: config.leverage,
+    status: "ACTIVE",
+    actualPnl: null,
+    createdAt: now,
+    notes: `Autonomous agent entry on a funding + OI-divergence confluence signal (confidence ${signal.confidence}%). Plan: TP +${config.tpPercent}% / SL -${config.slPercent}% / ${config.maxHoldHours}h max hold.`,
+    isPublic: true,
+    agent: true,
+  };
+  const raw = await env.NEXUS_AGENT.get(`agent:feed:${address}`);
+  const list = raw ? JSON.parse(raw) : [];
+  list.unshift(record);
+  if (list.length > AGENT_FEED_CAP) list.length = AGENT_FEED_CAP;
+  await env.NEXUS_AGENT.put(`agent:feed:${address}`, JSON.stringify(list));
+  return record.id;
+}
+
+// Resolve a published agent thesis when its position closes.
+async function publishAgentClose(address, env, feedId, { reason, pnlUsdc, exitPrice }) {
+  if (!feedId) return;
+  const raw = await env.NEXUS_AGENT.get(`agent:feed:${address}`);
+  if (!raw) return;
+  const list = JSON.parse(raw);
+  const item = list.find((t) => t.id === feedId);
+  if (!item) return;
+  item.status = agentCloseStatus(reason);
+  item.actualPnl = pnlUsdc;
+  item.exitPrice = exitPrice;
+  item.closedAt = Date.now();
+  await env.NEXUS_AGENT.put(`agent:feed:${address}`, JSON.stringify(list));
+}
 
 // ── Decrypt the trading key stored at rest (AES-256-GCM, "v1:<iv>:<ct>") ──────
 // Legacy plaintext keys (no "v1:" prefix) are passed through for backward compat
@@ -307,6 +368,18 @@ async function enterPosition(address, state, config, signal, env, cache) {
   };
   state.last_trade_time = Date.now();
   state.trades_today = (state.trades_today || 0) + 1;
+
+  // Publish to the public feed (real trades only by default). Store the feed id
+  // on the position so the close path can resolve it. Best-effort — a feed write
+  // failure must never block the actual trade lifecycle.
+  if (PUBLISH_AGENT_FEED && (!paper || PUBLISH_PAPER_TO_FEED)) {
+    try {
+      state.current_position.feed_id = await publishAgentEntry(address, env, { config, signal, markPrice, qty });
+    } catch (e) {
+      console.error(`[exec] ${address.slice(0, 10)} agent feed publish failed:`, e.message);
+    }
+  }
+
   await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
 
   console.log(`[exec] ${address.slice(0, 10)} ${paper ? "PAPER " : ""}ENTER ${signal.direction} ${symbol} @ ${markPrice} qty=${qty}`);
@@ -456,6 +529,15 @@ async function closePosition(address, state, env, reason, cache) {
       }
     } catch (e) {
       console.error(`[exec] ${address.slice(0, 10)} supabase log failed:`, e.message);
+    }
+  }
+
+  // Resolve the published feed thesis (if this trade was published on entry).
+  if (PUBLISH_AGENT_FEED && pos.feed_id) {
+    try {
+      await publishAgentClose(address, env, pos.feed_id, { reason, pnlUsdc, exitPrice });
+    } catch (e) {
+      console.error(`[exec] ${address.slice(0, 10)} agent feed close failed:`, e.message);
     }
   }
 
