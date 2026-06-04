@@ -64,7 +64,7 @@ export interface AgentConfig {
   maxTradesPerDay: number;
   maxDailyLossUsdc: number;
   fundingThreshold: number;
-  signalMode: "CONFLUENCE" | "FUNDING_ONLY" | "OI_ONLY" | "EITHER";
+  signalMode: "CONFLUENCE" | "FUNDING_ONLY" | "OI_ONLY";
   oiChangeThreshold: number; // % min OI move for the OI-divergence rule to count (0 = any)
   mode: "ASSISTED" | "AUTONOMOUS" | "PAPER";
 }

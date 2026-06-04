@@ -8,6 +8,38 @@ import { agentCardStyle, agentLabelStyle, agentInputStyle, agentBtnStyle, navBtn
 
 const AGENT_API = "https://og.nexustradinglabs.com";
 
+/**
+ * Number input that holds its own text state so you can clear/edit freely
+ * (empty, "0.", "1.2" mid-type) without the controlled value snapping back to 0
+ * or fighting the cursor. Commits a valid number as you type; normalizes on blur.
+ */
+function NumberField({ value, onCommit, min, max, step }: {
+  value: number; onCommit: (n: number) => void; min?: number; max?: number; step?: number;
+}) {
+  const [text, setText] = useState(String(value));
+  useEffect(() => { setText(String(value)); }, [value]);
+  return (
+    <input
+      type="number"
+      inputMode="decimal"
+      value={text}
+      min={min} max={max} step={step}
+      onChange={(e) => {
+        setText(e.target.value);
+        const n = parseFloat(e.target.value);
+        if (!isNaN(n)) onCommit(n);
+      }}
+      onBlur={() => {
+        const n = parseFloat(text);
+        const final = isNaN(n) ? (min ?? 0) : n;
+        onCommit(final);
+        setText(String(final));
+      }}
+      style={{ ...agentInputStyle, width: "70%" }}
+    />
+  );
+}
+
 const AVAILABLE_SYMBOLS = [
   "PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC", "PERP_ARB_USDC",
   "PERP_HYPE_USDC", "PERP_ORDER_USDC", "PERP_AVAX_USDC", "PERP_XMR_USDC",
@@ -525,7 +557,6 @@ export function AgentView() {
                 { v: "CONFLUENCE", label: "CONFLUENCE", hint: "Funding AND OI must agree (strictest, validated default)" },
                 { v: "FUNDING_ONLY", label: "FUNDING", hint: "Fade funding extremes only" },
                 { v: "OI_ONLY", label: "OI DIVERGENCE", hint: "Open-interest divergence only" },
-                { v: "EITHER", label: "EITHER", hint: "Take whichever fires; confluence scores higher; conflicts skip" },
               ] as const).map(({ v, label, hint }) => {
                 const sel = (config.signalMode ?? "CONFLUENCE") === v;
                 return (
@@ -544,7 +575,6 @@ export function AgentView() {
                 CONFLUENCE: "Both funding + OI-divergence must agree. Fewest, highest-quality entries.",
                 FUNDING_ONLY: "Trades funding extremes alone. More entries, lower selectivity.",
                 OI_ONLY: "Trades OI-divergence alone. Funding ignored.",
-                EITHER: "Either rule can trigger; agreement = higher confidence; conflicting signals are skipped.",
               } as Record<string, string>)[config.signalMode ?? "CONFLUENCE"]}
             </div>
           </div>
@@ -594,12 +624,10 @@ export function AgentView() {
                 <div key={key}>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <input
-                      type="number"
+                    <NumberField
                       value={(config as any)[key]}
                       min={min} max={max} step={step}
-                      onChange={(e) => setConfig({ ...config, [key]: parseFloat(e.target.value) || 0 })}
-                      style={{ ...agentInputStyle, width: "70%" }}
+                      onCommit={(n) => setConfig({ ...config, [key]: n })}
                     />
                     <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>{suffix}</span>
                   </div>

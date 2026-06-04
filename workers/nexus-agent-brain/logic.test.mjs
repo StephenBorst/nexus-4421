@@ -35,20 +35,6 @@ test("OI_ONLY: OI fires alone → trades; funding ignored", () => {
   assert.equal(s.confidence, 65);
 });
 
-test("EITHER: confluence still scores higher (80)", () => {
-  const s = deriveSignal(raw({ fundingRate: 0.0002, priceChange: 0.01, oiChange: -0.01 }), { signalMode: "EITHER", fundingThreshold: 0.01 });
-  assert.equal(s.direction, "SHORT");
-  assert.equal(s.confidence, 80);
-});
-
-test("EITHER: single signal trades at 65; conflicting → NONE", () => {
-  const single = deriveSignal(raw({ fundingRate: 0.0002, priceChange: 0, oiChange: 0 }), { signalMode: "EITHER", fundingThreshold: 0.01 });
-  assert.equal(single.direction, "SHORT");
-  assert.equal(single.confidence, 65);
-  const conflict = deriveSignal(raw({ fundingRate: 0.0002, priceChange: -0.01, oiChange: 0.01 }), { signalMode: "EITHER", fundingThreshold: 0.01 });
-  assert.equal(conflict.direction, "NONE");
-});
-
 test("fundingThreshold respected: below threshold → no funding signal", () => {
   // funding 0.005% < 0.01% threshold
   const s = deriveSignal(raw({ fundingRate: 0.00005, priceChange: 0.01, oiChange: -0.01 }), { signalMode: "CONFLUENCE", fundingThreshold: 0.01 });

@@ -6,8 +6,6 @@
 //   CONFLUENCE (default, validated) — both rules must AGREE. Strictest, highest quality.
 //   FUNDING_ONLY                    — fade funding extremes only.
 //   OI_ONLY                         — OI-divergence only.
-//   EITHER                          — take whichever fires; confluence = higher confidence;
-//                                     CONFLICTING signals → no trade (never trade against itself).
 // Thresholds (per user): fundingThreshold (%), oiChangeThreshold (% min OI move to count).
 // Guardrails (loss cap, max trades, kill switch, order-only keys) live in exec and
 // are NOT tunable here — users tune the STRATEGY, never the seatbelts.
@@ -46,12 +44,6 @@ export function deriveSignal(raw, config = {}) {
       break;
     case "OI_ONLY":
       if (oiSignal !== "NONE") { direction = oiSignal; confidence = 65; why = "oi-only"; }
-      break;
-    case "EITHER":
-      if (fundingSignal !== "NONE" && fundingSignal === oiSignal) { direction = fundingSignal; confidence = 80; why = "confluence"; }
-      else if (fundingSignal !== "NONE" && oiSignal === "NONE") { direction = fundingSignal; confidence = 65; why = "funding"; }
-      else if (oiSignal !== "NONE" && fundingSignal === "NONE") { direction = oiSignal; confidence = 65; why = "oi"; }
-      // funding vs oi conflict → NONE (never trade against itself)
       break;
     case "CONFLUENCE":
     default:
