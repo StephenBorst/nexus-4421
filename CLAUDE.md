@@ -195,6 +195,33 @@ baked into the code comments. Keep it that way (Howey). The real lawyer-gate is 
   Reviving it would upgrade GENERAL swaps over the WooFi widget (majors/cross-chain) but does **NOT** solve buying
   $NEXUS (can't route the v4 pool). That mismatch is likely why it never shipped.
 
+## Nexus PRO — subscriptions / revenue (freemium model)
+The business-model layer. **PRO is a SOFTWARE subscription** (ordinary commerce, real USDC revenue) — NOT a
+token-value scheme. $NEXUS only adds **consumptive use** (pay-in-$NEXUS discount) + **access** (hold-to-unlock).
+⚠️ NO revenue-share / yield / dividends to holders — that's the security-maker line; do NOT add.
+- **Built + LIVE (frontend):** `config/subscription.ts` (single source of truth — prices, benefits, `PAYMENTS_LIVE`
+  flag, `PRO_AGENT_STRATEGIES`), `useSubscription` hook (resolves PRO via holder-unlock today OR paid record later;
+  fail-soft → FREE), `NexusPro` card (active-state for PRO / upsell for free; shown in Lab under the market strip).
+- **Tune (locked, all in subscription.ts):** `$19/mo` USDC · `25%` off paying in $NEXUS · hold **ARCHITECT (100M)**
+  → PRO free (dollar cost of unlock rises with token price — cheap now to drive buying, real commitment later).
+- **First gate LIVE:** advanced agent strategies (**MOMENTUM + MEAN_REVERSION**) are PRO; 3 core modes (CONFLUENCE/
+  FUNDING/OI) stay free. UI gate only for now (`isProStrategy` + `useSubscription` in AgentView) — a determined free
+  user could force it via API until server-side enforcement (phase 3c) lands.
+- **⚠️ PAYMENT RAIL — SCOPED, shovel-ready, BLOCKED on the treasury Safe (the receiver address):**
+  - Insight: NO indexer/processor needed. A sub payment = an ERC-20 transfer to the treasury. Worker verifies via ONE
+    `eth_getTransactionReceipt` (read the `Transfer` log). **Grant PRO to the tx's `from` address** → spoofing
+    impossible, no signature dance.
+  - Worker `POST /sub/verify {txHash,chain}`: verify success + correct token (USDC/$NEXUS) + `to`===treasury +
+    amount≥price + **txHash not already redeemed** (replay guard) → write `sub:{from}`={expiresAt:now+30d, extend if
+    active} + mark hash used. `GET /sub/:address`→{expiresAt,active} (already read by useSubscription; flip PAYMENTS_LIVE).
+  - Phases: **3a** USDC/Arbitrum (core, ~80%) → **3c** server-side enforcement (brain checks sub before PRO strategy;
+    makes gates real) → **3b** pay-in-$NEXUS/Base (live USD→$NEXUS quote w/ tolerance band; drives token demand).
+  - Effort ~3–4 days, ~$0 infra (public RPC + existing KV). No recurring billing (crypto = manual 30-day renewal).
+  - Legal: USDC-for-software = plain commerce (not Howey); pay-in-$NEXUS = consumptive use. Low-stakes vs the buyback;
+    one-line mention to the lawyer during the treasury chat.
+- **⚠️ The Safe unblocks THREE things at once:** buyback flywheel + public treasury banner (`NEXUS_TREASURY_ADDRESS`)
+  + PRO revenue (`SUBSCRIPTION_RECEIVER`). Standing up the Safe (app.safe.global, ~10 min) is the highest-leverage move.
+
 ## Testing (money-path + trust-path)
 - Pure logic is extracted into `logic.mjs` next to each worker's `index.js` (which imports it, so
   tests cover the REAL deployed code, not a copy). Tests = zero-dep `node:test` in `logic.test.mjs`.
