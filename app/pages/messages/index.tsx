@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAccount } from "@orderly.network/hooks";
 import { useXMTP } from "@/hooks/useXMTP";
 import type { Conversation, DecodedMessage } from "@/hooks/useXMTP";
@@ -68,7 +68,7 @@ async function resolvePeer(convo: Conversation, myInboxId: string | null): Promi
 const S = {
   page: {
     background: "#0a0e0a",
-    minHeight: "100vh",
+    minHeight: "100dvh",
     display: "flex",
     flexDirection: "column" as const,
   },
@@ -86,11 +86,22 @@ const S = {
     letterSpacing: "0.12em",
     color: "#3a5a4a",
   },
+  backBtn: {
+    background: "none",
+    border: "none",
+    color: "#00ff88",
+    fontFamily: "monospace",
+    fontSize: 18,
+    lineHeight: 1,
+    cursor: "pointer",
+    padding: "2px 8px 2px 0",
+    marginRight: 2,
+  },
   body: {
     flex: 1,
     display: "flex",
     overflow: "hidden",
-    height: "calc(100vh - 42px)",
+    height: "calc(100dvh - 42px)",
   },
   sidebar: {
     width: 260,
@@ -469,6 +480,12 @@ export default function MessagesPage() {
   const { state: accountState } = useAccount();
   const walletAddress = (accountState as { address?: string })?.address ?? null;
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  // Reliable back: step out of an open thread first; else history; else home feed.
+  const goBack = useCallback(() => {
+    if (typeof window !== "undefined" && window.history.length > 1) navigate(-1);
+    else navigate("/feed");
+  }, [navigate]);
   const dmParam = searchParams.get("dm");
 
   const xmtp = useXMTP();
@@ -567,6 +584,7 @@ export default function MessagesPage() {
     return (
       <div style={S.page}>
         <div style={S.header}>
+          <button onClick={goBack} style={S.backBtn} aria-label="Back" title="Back">‹</button>
           <span style={S.headerLabel}>■ MESSAGES</span>
         </div>
         <div style={S.center}>
@@ -580,6 +598,7 @@ export default function MessagesPage() {
     return (
       <div style={S.page}>
         <div style={S.header}>
+          <button onClick={goBack} style={S.backBtn} aria-label="Back" title="Back">‹</button>
           <span style={S.headerLabel}>■ MESSAGES</span>
         </div>
         <div style={S.center}>
