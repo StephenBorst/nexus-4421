@@ -648,6 +648,11 @@ export function ThesisView() {
   const isWalletReady = !!(accountState && (accountState as { status?: number }).status !== undefined && (accountState as { status?: number }).status !== 0);
 
   const calc = useMemo(() => calcThesis(form), [form]);
+  // A thesis is only valid to save if it produces a real, finite, positive size
+  // (catches missing fields, entry===stop, 0 risk → $0 / Infinity positions).
+  const formValid = !!form.symbol && !!calc
+    && Number.isFinite(calc.positionSize) && calc.positionSize > 0
+    && Number.isFinite(calc.riskReward) && calc.riskReward > 0;
   const set = (field: string, value: string) => setForm((f) => ({ ...f, [field]: value }));
 
   const persist = (updated: ThesisTrade[]) => saveTheses(updated);
@@ -679,7 +684,7 @@ export function ThesisView() {
     setForm((f) => ({ ...f, symbol: "", entryPrice: "", stopLoss: "", takeProfit1: "", takeProfit2: "", notes: "" }));
 
   const deployPaper = () => {
-    if (!calc || !form.symbol) return;
+    if (!formValid) return;
     persist([buildThesisTrade(), ...trades]);
     setDeployed(true);
     setTimeout(() => setDeployed(false), 2500);
@@ -687,7 +692,7 @@ export function ThesisView() {
   };
 
   const deployLive = async () => {
-    if (!calc || !form.symbol) return;
+    if (!formValid) return;
     setLiveConfirm(false);
     setLiveStatus("submitting");
     setLiveError(null);
@@ -812,7 +817,7 @@ export function ThesisView() {
       <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #1a2e1a", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <div style={{ fontSize: 10, color: "#00ff88", fontFamily: "monospace", letterSpacing: "0.12em", marginBottom: 4 }}>
-            &#9632; THESIS EXECUTOR — PAPER MODE
+            &#9632; NEXUS THESIS ENGINE
           </div>
           <div style={{ fontSize: 11, color: "#3a5a4a", fontFamily: "monospace" }}>
           </div>
@@ -1031,22 +1036,27 @@ export function ThesisView() {
                 {/* Deploy buttons */}
                 {!liveConfirm && liveStatus !== "submitting" && (
                   <>
-                    <button onClick={deployPaper} disabled={!form.symbol} style={{
+                    {form.symbol && !formValid && (
+                      <div style={{ fontFamily: "monospace", fontSize: 9, color: "#fbbf24", marginBottom: 6, lineHeight: 1.4 }}>
+                        Enter valid entry, stop &amp; targets — size must be &gt; $0 (check entry ≠ stop and risk % &gt; 0).
+                      </div>
+                    )}
+                    <button onClick={deployPaper} disabled={!formValid} style={{
                       width: "100%", padding: "9px 0", fontFamily: "monospace", fontSize: 11,
-                      cursor: form.symbol ? "pointer" : "not-allowed", borderRadius: 3,
+                      cursor: formValid ? "pointer" : "not-allowed", borderRadius: 3,
                       border: `1px solid ${deployed ? "#00ff88" : "#1a4a2a"}`,
                       background: deployed ? "#0a2a0a" : "#080c08",
-                      color: deployed ? "#00ff88" : form.symbol ? "#4a9fff" : "#2a4a3a",
+                      color: deployed ? "#00ff88" : formValid ? "#4a9fff" : "#2a4a3a",
                       letterSpacing: "0.08em", marginBottom: 6,
                     }}>
                       {deployed ? "&#9632; DEPLOYED" : "&#9632; DEPLOY (PAPER)"}
                     </button>
                     <button
-                      onClick={() => { if (form.symbol && calc) setLiveConfirm(true); }}
-                      disabled={!form.symbol || !isWalletReady}
+                      onClick={() => { if (formValid) setLiveConfirm(true); }}
+                      disabled={!formValid || !isWalletReady}
                       style={{
                         width: "100%", padding: "9px 0", fontFamily: "monospace", fontSize: 11,
-                        cursor: form.symbol && isWalletReady ? "pointer" : "not-allowed", borderRadius: 3,
+                        cursor: formValid && isWalletReady ? "pointer" : "not-allowed", borderRadius: 3,
                         border: `1px solid ${!form.symbol || !isWalletReady ? "#2a1a0a" : "#ff6600"}`,
                         background: "#0a0500",
                         color: !form.symbol || !isWalletReady ? "#2a1a0a" : "#ff6600",

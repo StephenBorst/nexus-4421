@@ -80,7 +80,20 @@ export function QuickTrade() {
   const [lev, setLev] = useState<number>(5);
   const { availableBalance } = useCollateral();
   const [busy, setBusy] = useState<null | "BUY" | "SELL">(null);
+  const [confirmSide, setConfirmSide] = useState<null | "BUY" | "SELL">(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const CONFIRM_OVER = 100; // orders above this $ notional require a confirm tap
+
+  // Small orders fire instantly; larger ones arm a confirm first (fat-finger guard).
+  function tap(side: "BUY" | "SELL") {
+    if (notional > CONFIRM_OVER && confirmSide !== side) {
+      setConfirmSide(side);
+      setTimeout(() => setConfirmSide((c) => (c === side ? null : c)), 3000);
+      return;
+    }
+    setConfirmSide(null);
+    place(side);
+  }
 
   const { submit, setValues, markPrice, symbolInfo, isMutating } = useOrderEntry(symbol, {});
   const [{ rows: positionRows }] = usePositionStream();
@@ -184,16 +197,16 @@ export function QuickTrade() {
 
       {/* One-tap LONG / SHORT */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <button onClick={() => place("BUY")} disabled={tooSmall || !!busy || isMutating} style={{
+        <button onClick={() => tap("BUY")} disabled={tooSmall || !!busy || isMutating} style={{
           background: tooSmall ? "#0a1a0a" : "#00ff88", color: tooSmall ? "#3a6a4a" : "#04130c", border: "1px solid #00ff88",
           borderRadius: 4, padding: "14px 0", cursor: tooSmall ? "not-allowed" : "pointer", fontFamily: "monospace",
           fontSize: 14, fontWeight: "bold", letterSpacing: "0.08em", opacity: busy === "SELL" ? 0.4 : 1,
-        }}>{busy === "BUY" ? "PLACING…" : "↑ LONG"}</button>
-        <button onClick={() => place("SELL")} disabled={tooSmall || !!busy || isMutating} style={{
+        }}>{busy === "BUY" ? "PLACING…" : confirmSide === "BUY" ? "TAP TO CONFIRM ✓" : "↑ LONG"}</button>
+        <button onClick={() => tap("SELL")} disabled={tooSmall || !!busy || isMutating} style={{
           background: tooSmall ? "#1a0a0a" : "#ff4444", color: tooSmall ? "#6a3a3a" : "#fff", border: "1px solid #ff4444",
           borderRadius: 4, padding: "14px 0", cursor: tooSmall ? "not-allowed" : "pointer", fontFamily: "monospace",
           fontSize: 14, fontWeight: "bold", letterSpacing: "0.08em", opacity: busy === "BUY" ? 0.4 : 1,
-        }}>{busy === "SELL" ? "PLACING…" : "↓ SHORT"}</button>
+        }}>{busy === "SELL" ? "PLACING…" : confirmSide === "SELL" ? "TAP TO CONFIRM ✓" : "↓ SHORT"}</button>
       </div>
 
       {msg && (
