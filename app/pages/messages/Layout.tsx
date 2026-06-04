@@ -1,22 +1,15 @@
 import { Outlet } from "react-router-dom";
-import { useOrderlyConfig } from "@/utils/config";
-import { Scaffold } from "@orderly.network/ui-scaffold";
-import { useNav } from "@/hooks/useNav";
 
+/**
+ * Messages is a focused, full-screen DM client: it ships its own header (with a
+ * working '‹' back button) and its own compose bar, so it deliberately does NOT
+ * wrap in the Orderly <Scaffold>. Wrapping it added redundant chrome on mobile —
+ * a second top-bar back button stacked above ours, plus reserved bottom-nav space
+ * that left dead space below the fold. Rendering the page bare fixes both.
+ *
+ * Orderly data hooks (useAccount, XMTP) come from the app-level provider in
+ * main.tsx, not from Scaffold, so nothing functional is lost here.
+ */
 export default function MessagesLayout() {
-  const config = useOrderlyConfig();
-  const { onRouteChange } = useNav();
-  return (
-    <Scaffold
-      mainNavProps={{
-        ...config.scaffold.mainNavProps,
-        initialMenu: "/messages",
-      }}
-      footerProps={config.scaffold.footerProps}
-      routerAdapter={{ onRouteChange }}
-      bottomNavProps={config.scaffold.bottomNavProps}
-    >
-      <Outlet />
-    </Scaffold>
-  );
+  return <Outlet />;
 }
