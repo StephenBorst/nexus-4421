@@ -640,6 +640,11 @@ export function AgentView() {
                 </div>
               ))}
             </div>
+            <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 10, color: "#3a6a4a", lineHeight: 1.5 }}>
+              Entry params (mode, thresholds, symbols, leverage, capital) apply to your NEXT trade.
+              <br />
+              ⚡ TP / SL / max-hold apply LIVE — changing them adjusts an open position immediately.
+            </div>
           </div>
 
           <div style={agentCardStyle}>
