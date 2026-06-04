@@ -106,7 +106,7 @@ export function QuickTrade() {
         </div>
         <div style={{ ...label, marginTop: 10, color: "#5a8a6a" }}>
           MARK: {markPrice ? `$${Number(markPrice).toLocaleString(undefined, { maximumFractionDigits: 4 })}` : "—"}
-          {availableBalance != null && <span style={{ marginLeft: 14 }}>FREE: ${Number(availableBalance).toFixed(2)}</span>}
+          {availableBalance != null && <span style={{ marginLeft: 14 }} title="Free collateral — USDC available to open positions (not locked as margin)">FREE: ${Number(availableBalance).toFixed(2)}</span>}
         </div>
         <div style={{ marginTop: 10 }}>
           <MiniPriceChart symbol={symbol} />
