@@ -175,6 +175,26 @@ baked into the code comments. Keep it that way (Howey). The real lawyer-gate is 
   strip (inline GeckoTerminal fetch). ⚠️ `.assetsignore` excludes `.git` (the assets dir is repo root — was
   publicly serving `.git/`). Announcement-tweet arc drafted: GeckoTerminal verified → Treasury Safe live → flywheel.
 
+## Buy $NEXUS / swap (investigated in depth — don't re-derive)
+- **v1 SHIPPED:** `BuyNexusButton` deeplinks to Uniswap on Base (`app.uniswap.org/swap?chain=base&inputCurrency=ETH&
+  outputCurrency=<NEXUS>`), lives in `NexusMarket` so it shows on Feed + Lab + landing. This is the ONLY reliable
+  $NEXUS buy path today (Uniswap natively handles the pool's hook + dynamic fee).
+- **The pool (Uniswap v4 on Base):** poolId `0xdc5be7…2009`. PoolKey = currency0 **$NEXUS** / currency1 **WETH**
+  (`0x4200…0006`), **dynamic fee** (`0x800000`), tickSpacing 200, **custom hook `0xbb7784a4d481184283ed89619a3e3ed143e1adc0`**
+  (launchpad/Clanker-style). PoolManager `0x498581ff…2652b2b`, V4Quoter `0x0d5e0F97…532048D`. Only ~$63K liq.
+- **Hook vetting (DONE, swap-friendly):** flags = beforeInitialize/add-liq/remove-liq + **beforeSwap/afterSwap**,
+  **NO returnsDelta** (doesn't skim swaps). `V4Quoter.quoteExactInputSingle` returns clean numbers through it with
+  empty `hookData` (verified: 0.01 WETH → ~25.2M NEXUS). So an **embedded in-app swap is GO-able + low-risk** (~1wk):
+  Universal Router `V4_SWAP` w/ the full PoolKey, `zeroForOne:false` for WETH→NEXUS, `WRAP_ETH` for native ETH in.
+- **⚠️ NO aggregator routes $NEXUS yet:** LiFi AND Fabric (`route.withfabric.xyz/v1/quote`, header `X-App-Id`) both
+  return **"No route found"** for WETH→NEXUS while routing majors (WETH→USDC) fine. It's the **v4-hook indexing gap**,
+  NOT pool-specific — they'll auto-route NEXUS once they index v4 hooks OR the pool deepens. So embedded $NEXUS swap =
+  hand-build (vetted) OR wait. Real lever = **liquidity depth** (treasury buyback / LP seeding).
+- **Spandex/Fabric:** `spanDEX/spandex` = cloned `github.com/withfabricxyz/spandex` (Fabric's OSS aggregator).
+  `app/components/SpanDEX/*` + `useSpanDEX.ts` = a SCAFFOLD (placeholder `api.fabric.com/quote` URL, never wired).
+  Reviving it would upgrade GENERAL swaps over the WooFi widget (majors/cross-chain) but does **NOT** solve buying
+  $NEXUS (can't route the v4 pool). That mismatch is likely why it never shipped.
+
 ## Testing (money-path + trust-path)
 - Pure logic is extracted into `logic.mjs` next to each worker's `index.js` (which imports it, so
   tests cover the REAL deployed code, not a copy). Tests = zero-dep `node:test` in `logic.test.mjs`.
