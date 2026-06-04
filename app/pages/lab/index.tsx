@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useCollateral, usePrivateQuery, useAccount } from "@orderly.network/hooks";
 import { useLabStorage } from "@/hooks/useLabStorage";
 import { HoldersRoom } from "@/components/HoldersRoom";
+import { QuickTrade } from "./QuickTrade";
 import { NexusMarket } from "@/components/NexusMarket";
 import type { TabId, DayGroup, ProcessedTrade } from "./types";
 import { getDayKey } from "./helpers";
@@ -82,6 +83,7 @@ export default function TheLabPage() {
     { id: "intel",          label: "[ MARKET INTEL ]",    short: "INTEL" },
     { id: "thesis",         label: "[ NEXUS THESIS ENGINE ]", short: "LAB"   },
     { id: "agent",          label: "[ TRADING AGENT ]",   short: "AGENT" },
+    { id: "quicktrade",     label: "[ QUICK TRADE ]",     short: "TRADE" },
     { id: "copies",         label: "[ COPY TRADES ]",     short: "COPY"  },
     { id: "tradelog",       label: "[ TRADING LOG ]",     short: "LOG"   },
     { id: "holders",        label: "[ HOLDERS ROOM ]",    short: "ROOM"  },
@@ -188,6 +190,7 @@ export default function TheLabPage() {
         )}
         {activeTab === "agent" && <AgentView />}
         {activeTab === "holders" && <HoldersRoom walletAddress={rootWalletAddress} />}
+        {activeTab === "quicktrade" && <QuickTrade />}
       </div>
     </div>
   );

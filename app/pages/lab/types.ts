@@ -32,7 +32,7 @@ export interface ThesisTrade {
 }
 
 // ─── Lab view + agent types (extracted from index.tsx) ───────────────────────
-export type TabId = "analytics" | "tradelog" | "thesis" | "copies" | "intel" | "agent" | "holders";
+export type TabId = "analytics" | "tradelog" | "thesis" | "copies" | "intel" | "agent" | "holders" | "quicktrade";
 
 export interface DayGroup {
   pnl: number;
