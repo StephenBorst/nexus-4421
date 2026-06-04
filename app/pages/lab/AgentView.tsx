@@ -306,6 +306,8 @@ export function AgentView() {
       maxHoldHours: entry.config!.maxHoldHours ?? prev.maxHoldHours,
       maxTradesPerDay: entry.config!.maxTradesPerDay ?? prev.maxTradesPerDay,
       fundingThreshold: entry.config!.fundingThreshold ?? prev.fundingThreshold,
+      signalMode: entry.config!.signalMode ?? prev.signalMode,
+      oiChangeThreshold: entry.config!.oiChangeThreshold ?? prev.oiChangeThreshold,
       mode: "PAPER",
     }));
     setTab("config");
@@ -517,6 +519,37 @@ export function AgentView() {
           </div>
 
           <div style={agentCardStyle}>
+            <div style={agentLabelStyle}>// STRATEGY — SIGNAL MODE</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+              {([
+                { v: "CONFLUENCE", label: "CONFLUENCE", hint: "Funding AND OI must agree (strictest, validated default)" },
+                { v: "FUNDING_ONLY", label: "FUNDING", hint: "Fade funding extremes only" },
+                { v: "OI_ONLY", label: "OI DIVERGENCE", hint: "Open-interest divergence only" },
+                { v: "EITHER", label: "EITHER", hint: "Take whichever fires; confluence scores higher; conflicts skip" },
+              ] as const).map(({ v, label, hint }) => {
+                const sel = (config.signalMode ?? "CONFLUENCE") === v;
+                return (
+                  <button key={v} title={hint} onClick={() => setConfig({ ...config, signalMode: v })} style={{
+                    background: sel ? "#00ff8815" : "#0a0e0a",
+                    border: `1px solid ${sel ? "#00ff8860" : "#1e2d1e"}`,
+                    borderRadius: 3, padding: "4px 10px", cursor: "pointer",
+                    color: sel ? "#00ff88" : "#4a7a5a",
+                    fontFamily: "monospace", fontSize: 11,
+                  }}>{label}</button>
+                );
+              })}
+            </div>
+            <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 8, color: "#3a6a4a" }}>
+              {({
+                CONFLUENCE: "Both funding + OI-divergence must agree. Fewest, highest-quality entries.",
+                FUNDING_ONLY: "Trades funding extremes alone. More entries, lower selectivity.",
+                OI_ONLY: "Trades OI-divergence alone. Funding ignored.",
+                EITHER: "Either rule can trigger; agreement = higher confidence; conflicting signals are skipped.",
+              } as Record<string, string>)[config.signalMode ?? "CONFLUENCE"]}
+            </div>
+          </div>
+
+          <div style={agentCardStyle}>
             <div style={agentLabelStyle}>// WATCHLIST — SELECT SYMBOLS</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
               {AVAILABLE_SYMBOLS.map((sym) => {
@@ -556,6 +589,7 @@ export function AgentView() {
                 { key: "maxTradesPerDay", label: "MAX TRADES / DAY", suffix: "", min: 1, max: 50, step: 1 },
                 { key: "maxDailyLossUsdc", label: "MAX DAILY LOSS", suffix: "USDC", min: 1, max: 500, step: 1 },
                 { key: "fundingThreshold", label: "FUNDING THRESHOLD", suffix: "%", min: 0.001, max: 0.1, step: 0.001 },
+                { key: "oiChangeThreshold", label: "OI MOVE THRESHOLD", suffix: "%", min: 0, max: 10, step: 0.05 },
               ].map(({ key, label, suffix, min, max, step }) => (
                 <div key={key}>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>

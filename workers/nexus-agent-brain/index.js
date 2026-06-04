@@ -15,6 +15,8 @@
 //   Entry: BOTH rules must agree (confluence). Single signal = no trade.
 // ═══════════════════════════════════════════════════════════
 
+import { deriveSignal } from "./logic.mjs";
+
 const ORDERLY_API = "https://api-evm.orderly.org";
 
 export default {
@@ -29,7 +31,7 @@ export default {
 
       // Load each active user's config up front.
       const userConfigs = {};
-      const symbolThresholds = {}; // symbol → smallest funding threshold among watchers
+      const symbolSet = new Set(); // every symbol any active user watches
       for (const address of users) {
         const configRaw = await env.NEXUS_AGENT.get(`agent:config:${address}`);
         const stateRaw = await env.NEXUS_AGENT.get(`agent:state:${address}`);
@@ -38,32 +40,32 @@ export default {
         const state = JSON.parse(stateRaw);
         if (!state.active || state.current_position) continue;
         userConfigs[address] = { config, state };
-        for (const sym of config.symbols || []) {
-          const thr = (config.fundingThreshold || 0.01) / 100; // % → decimal
-          symbolThresholds[sym] = symbolThresholds[sym] === undefined
-            ? thr : Math.min(symbolThresholds[sym], thr);
-        }
+        for (const sym of config.symbols || []) symbolSet.add(sym);
       }
 
-      // Evaluate each unique symbol exactly once this cycle.
-      const signalsBySymbol = {};
-      for (const symbol of Object.keys(symbolThresholds)) {
+      // Evaluate each unique symbol exactly once this cycle → RAW market deltas.
+      // Strategy interpretation (mode/thresholds) is applied PER USER below, so a
+      // symbol is still fetched once but each user gets their own signal from it.
+      const rawBySymbol = {};
+      for (const symbol of symbolSet) {
         try {
-          signalsBySymbol[symbol] = await evaluateSymbol(symbol, symbolThresholds[symbol], env);
+          rawBySymbol[symbol] = await evaluateSymbol(symbol, env);
         } catch (e) {
           console.error(`[brain] ${symbol} eval error:`, e.message);
         }
       }
 
-      // Assign the best qualifying signal to each user from their watchlist.
-      for (const [address, { config, state }] of Object.entries(userConfigs)) {
+      // Assign the best qualifying signal to each user from their watchlist,
+      // honoring THEIR strategy config (signalMode + thresholds).
+      for (const [address, { config }] of Object.entries(userConfigs)) {
         try {
-          let best = { symbol: null, direction: "NONE", funding: 0, oi: 0, confidence: 0, price: 0, reason: "no confluence" };
+          let best = { symbol: null, direction: "NONE", funding: 0, oi: 0, confidence: 0, price: 0, reason: "no signal" };
           for (const sym of config.symbols || []) {
-            const s = signalsBySymbol[sym];
-            // Re-check this user's own threshold (a stricter user shouldn't inherit a looser fire).
-            if (s && s.direction !== "NONE" && Math.abs(s.funding) >= (config.fundingThreshold || 0.01) / 100) {
-              if (s.confidence > best.confidence) best = s;
+            const raw = rawBySymbol[sym];
+            if (!raw) continue;
+            const sig = deriveSignal(raw, config);
+            if (sig.direction !== "NONE" && sig.confidence > best.confidence) {
+              best = { symbol: sym, direction: sig.direction, funding: raw.fundingRate, oi: raw.oi, price: raw.price, confidence: sig.confidence, reason: sig.reason };
             }
           }
           const signalData = { ...best, timestamp: Date.now(), user: address };
@@ -89,9 +91,10 @@ export default {
   },
 };
 
-// Evaluate one symbol with funding + OI-divergence confluence.
-// `prevKey` state is stored per symbol so price/OI deltas are real.
-async function evaluateSymbol(symbol, fundingThreshold, env) {
+// Fetch one symbol's market data and compute RAW deltas vs last cycle.
+// No strategy interpretation here — deriveSignal() applies each user's mode +
+// thresholds. `market:prev:{symbol}` is stored so price/OI deltas are real.
+async function evaluateSymbol(symbol, env) {
   const res = await fetch(`${ORDERLY_API}/v1/public/futures/${symbol}`);
   if (!res.ok) throw new Error(`API ${res.status}`);
   const json = await res.json();
@@ -107,34 +110,10 @@ async function evaluateSymbol(symbol, fundingThreshold, env) {
   const priceChange = prev && prev.price ? (markPrice - prev.price) / prev.price : 0;
   const oiChange = prev && prev.oi ? (openInterest - prev.oi) / prev.oi : 0;
 
-  // Rule 1 — funding extreme (fade the crowd).
-  const fundingSignal =
-    fundingRate >= fundingThreshold ? "SHORT" :
-    fundingRate <= -fundingThreshold ? "LONG" : "NONE";
-
-  // Rule 2 — OI divergence (needs a prior snapshot to compute).
-  let oiSignal = "NONE";
-  if (prev) {
-    if (priceChange > 0 && oiChange < 0) oiSignal = "SHORT";
-    else if (priceChange < 0 && oiChange > 0) oiSignal = "LONG";
-    else if (priceChange > 0 && oiChange > 0) oiSignal = "LONG";
-    else if (priceChange < 0 && oiChange < 0) oiSignal = "SHORT";
-  }
-
-  // Confluence: both rules must agree.
-  let direction = "NONE";
-  let confidence = 0;
-  let reason = "no confluence";
-  if (fundingSignal !== "NONE" && fundingSignal === oiSignal) {
-    direction = fundingSignal;
-    confidence = 80;
-    reason = `funding=${fundingRate.toFixed(6)} oiChange=${(oiChange * 100).toFixed(3)}% priceChange=${(priceChange * 100).toFixed(3)}%`;
-  }
-
   // Update the snapshot for next cycle.
   await env.NEXUS_AGENT.put(`market:prev:${symbol}`, JSON.stringify({
     price: markPrice, oi: openInterest, timestamp: Date.now(),
   }));
 
-  return { symbol, direction, funding: fundingRate, oi: openInterest, price: markPrice, confidence, reason };
+  return { symbol, price: markPrice, oi: openInterest, fundingRate, priceChange, oiChange, hasPrev: !!prev };
 }

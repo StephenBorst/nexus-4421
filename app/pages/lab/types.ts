@@ -64,6 +64,8 @@ export interface AgentConfig {
   maxTradesPerDay: number;
   maxDailyLossUsdc: number;
   fundingThreshold: number;
+  signalMode: "CONFLUENCE" | "FUNDING_ONLY" | "OI_ONLY" | "EITHER";
+  oiChangeThreshold: number; // % min OI move for the OI-divergence rule to count (0 = any)
   mode: "ASSISTED" | "AUTONOMOUS" | "PAPER";
 }
 
@@ -138,5 +140,7 @@ export const DEFAULT_CONFIG: AgentConfig = {
   maxTradesPerDay: 10,
   maxDailyLossUsdc: 5,
   fundingThreshold: 0.01,
+  signalMode: "CONFLUENCE", // validated default — both funding + OI must agree
+  oiChangeThreshold: 0, // any OI move counts by default
   mode: "PAPER", // new users start in risk-free simulation by default
 };
