@@ -4,6 +4,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import VhDebug from './components/VhDebug';
 import { withBasePath } from './utils/base-path';
 import { getRuntimeConfig } from './utils/runtime-config';
 
@@ -222,6 +223,7 @@ loadRuntimeConfig().then(() => {
     <React.StrictMode>
       <HelmetProvider>
         <RouterProvider router={router} />
+        <VhDebug />
       </HelmetProvider>
     </React.StrictMode>
   );
