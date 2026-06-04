@@ -9,9 +9,46 @@
  */
 
 import { useMemo, useState } from "react";
-import { useOrderEntry, useLeverage, useCollateral, useAccount } from "@orderly.network/hooks";
+import { useOrderEntry, useLeverage, useCollateral, useAccount, usePositionStream, usePositionClose } from "@orderly.network/hooks";
 import { OrderSide, OrderType } from "@orderly.network/types";
 import { MiniPriceChart } from "@/components/MiniPriceChart";
+
+/**
+ * One open position + a one-tap CLOSE (market, full size). Rendered only when a
+ * position exists, so usePositionClose always has a valid position object.
+ */
+function PositionRow({ position }: { position: Record<string, unknown> }) {
+  const qty = Number(position.position_qty) || 0;
+  const isLong = qty > 0;
+  const entry = Number(position.average_open_price) || 0;
+  const uPnl = Number(position.unrealized_pnl) || 0;
+  const sym = String(position.symbol || "");
+  const ticker = sym.replace("PERP_", "").replace("_USDC", "");
+  const { submit, isMutating } = usePositionClose({
+    position: position as never,
+    order: { type: OrderType.MARKET, quantity: String(Math.abs(qty)), price: "" },
+  });
+  const [err, setErr] = useState<string | null>(null);
+
+  async function close() {
+    setErr(null);
+    try { await submit(); } catch (e) { setErr((e as Error)?.message || "close failed"); }
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 4, flexWrap: "wrap" }}>
+      <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: "bold", color: "#fff", minWidth: 56 }}>{ticker}</span>
+      <span style={{ fontFamily: "monospace", fontSize: 10, color: isLong ? "#00ff88" : "#ff4444" }}>{isLong ? "↑ LONG" : "↓ SHORT"}</span>
+      <span style={{ fontFamily: "monospace", fontSize: 10, color: "#8aaa9a" }}>{Math.abs(qty)} @ ${entry.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
+      <span style={{ fontFamily: "monospace", fontSize: 11, fontWeight: "bold", color: uPnl >= 0 ? "#00ff88" : "#ff4444" }}>{uPnl >= 0 ? "+" : ""}${uPnl.toFixed(2)}</span>
+      <button onClick={close} disabled={isMutating} style={{
+        marginLeft: "auto", background: "#1a0a0a", color: "#ff7a7a", border: "1px solid #4a1a1a", borderRadius: 3,
+        padding: "5px 12px", cursor: isMutating ? "wait" : "pointer", fontFamily: "monospace", fontSize: 11, fontWeight: "bold", letterSpacing: "0.06em",
+      }}>{isMutating ? "CLOSING…" : "CLOSE"}</button>
+      {err && <span style={{ fontFamily: "monospace", fontSize: 9, color: "#ff4444", width: "100%" }}>{err}</span>}
+    </div>
+  );
+}
 
 const SYMBOLS = [
   "PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC",
@@ -46,6 +83,8 @@ export function QuickTrade() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const { submit, setValues, markPrice, symbolInfo, isMutating } = useOrderEntry(symbol, {});
+  const [{ rows: positionRows }] = usePositionStream();
+  const openPositions = (positionRows ?? []).filter((p) => Number((p as { position_qty?: number }).position_qty) !== 0);
 
   const cap = Math.max(1, Math.min(maxLeverage || 20, 50));
   const levClamped = Math.min(lev, cap);
@@ -160,6 +199,17 @@ export function QuickTrade() {
       {msg && (
         <div style={{ fontFamily: "monospace", fontSize: 11, color: msg.ok ? "#00ff88" : "#ff4444", textAlign: "center" }}>{msg.text}</div>
       )}
+
+      {/* Open positions — close any without leaving the tab (full loop) */}
+      {openPositions.length > 0 && (
+        <div style={{ ...card, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={label}>OPEN POSITIONS</div>
+          {openPositions.map((p, i) => (
+            <PositionRow key={String((p as { symbol?: string }).symbol) || i} position={p as unknown as Record<string, unknown>} />
+          ))}
+        </div>
+      )}
+
       <div style={{ ...label, textAlign: "center", color: "#2a4a3a" }}>
         Real market order on Orderly · for limit / TP-SL use the full trade page
       </div>
