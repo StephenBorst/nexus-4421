@@ -25,8 +25,10 @@ export const PROVIDERS: Record<ProviderId, ProviderDef> = {
     id: "anthropic",
     label: "Anthropic (Claude)",
     endpoint: "https://api.anthropic.com/v1/messages",
-    defaultModel: "claude-3-5-sonnet-latest",
-    models: ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"],
+    // Current 4.x defaults shown before a key is entered; the live /v1/models
+    // list (fetched from the user's key) replaces these once available.
+    defaultModel: "claude-sonnet-4-6",
+    models: ["claude-sonnet-4-6", "claude-opus-4-8", "claude-haiku-4-5"],
     keyHint: "sk-ant-…",
   },
   openai: {

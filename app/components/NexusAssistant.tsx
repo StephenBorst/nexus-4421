@@ -29,6 +29,13 @@ const GREEN = "#00ff88";
 
 type DisplayMsg = ChatMsg & { tools?: string[] };
 
+// Load the stored model for a provider, migrating dead "-latest" aliases (which
+// now 404) to the current default.
+function loadModel(p: ProviderId): string {
+  const stored = typeof window !== "undefined" ? window.localStorage.getItem(LS_MODEL(p)) : null;
+  return stored && !/-latest$/.test(stored) ? stored : PROVIDERS[p].defaultModel;
+}
+
 const CHAT_KEY = "nexus_ai_chat";
 const CHAT_CAP = 40; // keep the last N messages
 function loadChat(): DisplayMsg[] {
@@ -61,9 +68,7 @@ export default function NexusAssistant() {
   const [provider, setProvider] = useState<ProviderId>(
     () => (typeof window !== "undefined" && (window.localStorage.getItem(LS_PROVIDER) as ProviderId)) || "anthropic"
   );
-  const [model, setModel] = useState<string>(
-    () => (typeof window !== "undefined" && window.localStorage.getItem(LS_MODEL(provider))) || PROVIDERS[provider].defaultModel
-  );
+  const [model, setModel] = useState<string>(() => loadModel(provider));
   const [apiKey, setApiKey] = useState<string>(
     () => (typeof window !== "undefined" && window.localStorage.getItem(LS_KEY(provider))) || ""
   );
@@ -97,7 +102,7 @@ export default function NexusAssistant() {
   // provider remembers its own — never carry a Claude model id onto OpenAI).
   useEffect(() => {
     setApiKey(window.localStorage.getItem(LS_KEY(provider)) || "");
-    setModel(window.localStorage.getItem(LS_MODEL(provider)) || PROVIDERS[provider].defaultModel);
+    setModel(loadModel(provider));
   }, [provider]);
 
   // Pull agent state when the panel opens (best-effort).
@@ -314,6 +319,7 @@ function SettingsView({
   onDone: () => void;
 }) {
   const def = PROVIDERS[provider];
+  const modelChoices = availableModels.length ? availableModels : def.models;
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ fontFamily: mono, fontSize: 10, color: "#8aaa9a", lineHeight: 1.6 }}>
@@ -336,22 +342,21 @@ function SettingsView({
       </Field>
 
       <Field label={availableModels.length ? "MODEL (from your key)" : "MODEL"}>
-        {availableModels.length > 0 ? (
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxHeight: 120, overflowY: "auto" }}>
-            {availableModels.map((mdl) => (
-              <button key={mdl} onClick={() => setModel(mdl)}
-                style={{
-                  background: model === mdl ? "#0a1a0a" : "#0d120d",
-                  border: `1px solid ${model === mdl ? GREEN : "#1a2e1a"}`, borderRadius: 4,
-                  color: model === mdl ? GREEN : "#5a8a6a", fontFamily: mono, fontSize: 9, padding: "5px 9px", cursor: "pointer",
-                }}>
-                {mdl}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div style={{ fontFamily: mono, fontSize: 9, color: "#3a6a4a", lineHeight: 1.5 }}>
-            Enter your {def.label.split(" ")[0]} API key below to load the models it can access.
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxHeight: 120, overflowY: "auto" }}>
+          {modelChoices.map((mdl) => (
+            <button key={mdl} onClick={() => setModel(mdl)}
+              style={{
+                background: model === mdl ? "#0a1a0a" : "#0d120d",
+                border: `1px solid ${model === mdl ? GREEN : "#1a2e1a"}`, borderRadius: 4,
+                color: model === mdl ? GREEN : "#5a8a6a", fontFamily: mono, fontSize: 9, padding: "5px 9px", cursor: "pointer",
+              }}>
+              {mdl}
+            </button>
+          ))}
+        </div>
+        {!availableModels.length && (
+          <div style={{ fontFamily: mono, fontSize: 8, color: "#3a6a4a" }}>
+            Enter your key below to load your account's exact model list.
           </div>
         )}
         <input
