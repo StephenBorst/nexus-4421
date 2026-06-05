@@ -143,6 +143,18 @@ async function runMonitor(env) {
     // don't alert (avoids a false positive on first rollout).
   } catch (e) { console.error("[monitor] brain:", e.message); }
 
+  // 3b) Exec liveness — the 1-min execution cron stamps ops:exec:heartbeat every
+  // tick (whether or not it trades). This distinguishes "agents idle by design"
+  // (heartbeat fresh, signal=NONE) from "exec cron actually stopped" (heartbeat
+  // stale) — the exact ambiguity that cost us a 27h false-alarm investigation.
+  try {
+    const hb = await env.NEXUS_AGENT.get("ops:exec:heartbeat");
+    if (hb) {
+      const ageMin = (Date.now() - Number(hb)) / 60000;
+      if (ageMin > 10) issues.push({ key: "exec", msg: `⚙️ Exec down: last tick was <b>${ageMin.toFixed(0)} min</b> ago (cron runs every 1 min). Agents are not being executed/monitored.` });
+    }
+  } catch (e) { console.error("[monitor] exec:", e.message); }
+
   // Alert per-issue, debounced 3h so we don't spam an ongoing problem.
   for (const { key, msg } of issues) {
     if (await shouldAlert(env, key, 3 * HOUR)) await sendTg(env, `🚨 <b>Nexus ops alert</b>\n\n${msg}`);
@@ -150,7 +162,7 @@ async function runMonitor(env) {
 
   // Daily heartbeat so a dead monitor isn't mistaken for "all healthy".
   if (issues.length === 0 && await shouldAlert(env, "heartbeat", 24 * HOUR)) {
-    await sendTg(env, "✅ <b>Nexus ops</b> — all healthy. Anchoring live, brain emitting signals, gas OK.");
+    await sendTg(env, "✅ <b>Nexus ops</b> — all healthy. Anchoring live, brain + exec crons ticking, gas OK.");
   }
   return { issues: issues.map((i) => i.key) };
 }
