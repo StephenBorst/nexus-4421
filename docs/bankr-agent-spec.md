@@ -3,7 +3,9 @@
 > Level-up for the Bankr skill: let a Bankr/Farcaster user **deploy, fund, and
 > control a non-custodial autonomous trading agent by chatting** — the agent can
 > trade but never withdraw. Additive only; does not change existing skill routes.
-> Status: SPEC (not yet built). API base: `https://og.nexustradinglabs.com`.
+> Status: **Phase A + B SHIPPED & LIVE** (2026-06-02) — `/bankr/activate` + `/bankr/mode`
+> deployed on lab-api + smoke-tested (confirm gate 409, unregistered 401, PAPER ok).
+> Skill-side drop-in: `bankr-skill-agent-module.md`. API base: `https://og.nexustradinglabs.com`.
 
 ---
 

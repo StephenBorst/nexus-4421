@@ -110,6 +110,22 @@ Migrated the single-user bot → full multi-user, non-custodial, autonomous agen
   deploy.yml redeploys nexus-lab-api from committed source — so COMMIT worker changes or CI overwrites manual deploys.
   Worker observability logs enabled in each wrangler.toml (`[observability.logs] enabled=true`).
 
+## Bankr agent control (chat-deploy the agent — Phase A+B SHIPPED, 2026-06-02)
+Bankr/Farcaster users can deploy/control the autonomous agent by chat. Two additive lab-api routes
+(spec: `docs/bankr-agent-spec.md`; skill drop-in: `docs/bankr-skill-agent-module.md`):
+- **`POST /agent/:address/bankr/activate`** `{mode, config?, walletSig?, confirm?}` — PAPER needs no key;
+  ASSISTED/AUTONOMOUS derive the order-only key from `walletSig` (sign_message('nexus-trading-key-v1'),
+  same auth as `/trade`) + the registered `accountId` (from `user:{addr}` in LAB_STORE), encrypt at rest,
+  store `agent:key`. **AUTONOMOUS requires `confirm:"GO LIVE"`** (else 409). Clears stale `agent:kill` on activate.
+- **`POST /agent/:address/bankr/mode`** `{mode, walletSig?, confirm?}` — flip mode; provisions the key on
+  the first live flip; AUTONOMOUS gated by confirm.
+- **Key derivation (ground truth):** `seed = SHA-256(walletSigBytes)` (32-byte ed25519 seed) → `bs58Encode(seed)`
+  = the secret the exec's `bs58.decode`+noble signer expects. Helpers `bs58Encode` + `agentSecretFromWalletSig`
+  in lab-api (verified round-trip with the `bs58` pkg). Auth = possession of a valid walletSig (only the wallet
+  owner can produce it via Bankr) — NEVER address-only (would let anyone arm someone else's agent).
+- Status/fund/kill reuse existing routes (`GET /agent/:addr`, `/deposit/prepare`, `DELETE`, `/kill`). Capital
+  guardrail (avoid -1101): suggest `capitalPerTrade ≈ floor(freeCollateral*0.6)`.
+
 ## Leaderboard integrity (cypherpunk hardening — tiers 1-3)
 The public agents leaderboard ranks on a risk-adjusted score from live `agent_trades`
 (Supabase). Trust hardening, all on `main`:
