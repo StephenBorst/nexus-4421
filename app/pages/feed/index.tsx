@@ -1179,6 +1179,52 @@ function ContributePrompt() {
   );
 }
 
+// ─── Autonomous agent track-record card ──────────────────────────────────────
+// Surfaces the bot's REAL, trustless-anchored closed-trade history as social
+// proof on the default feed — "this platform runs a working autonomous agent".
+function AgentTrackRecord() {
+  const navigate = useNavigate();
+  const [s, setS] = useState<{ trades: number; winRate: number; net: number; anchored: boolean } | null>(null);
+  useEffect(() => {
+    let cancel = false;
+    fetch(`${API_BASE}/agents/ledger`).then((r) => r.json()).then((d) => {
+      if (cancel) return;
+      const recs: { pnl?: number }[] = d?.records || [];
+      if (!recs.length) return;
+      const wins = recs.filter((r) => Number(r.pnl) > 0).length;
+      const net = recs.reduce((a, r) => a + Number(r.pnl || 0), 0);
+      setS({ trades: recs.length, winRate: Math.round((wins / recs.length) * 100), net, anchored: !!d?.onChain?.verified });
+    }).catch(() => {});
+    return () => { cancel = true; };
+  }, []);
+  if (!s) return null;
+  return (
+    <div
+      onClick={() => navigate("/lab?tab=agent")}
+      style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", padding: "12px 16px", background: "linear-gradient(180deg,#0a160e,#0a0e0a)", border: "1px solid #1a4a2a", borderRadius: 6, marginBottom: 14 }}
+    >
+      <div style={{ flexShrink: 0 }}>
+        <div style={{ fontFamily: "monospace", fontSize: 12, color: "#00ff88", fontWeight: "bold" }}>🤖 NEXUS AUTONOMOUS AGENT</div>
+        <div style={{ fontFamily: "monospace", fontSize: 8.5, color: "#3a6a4a", marginTop: 2 }}>
+          {s.anchored ? "⛓ trustless · on-chain-anchored track record" : "trustless · publicly graded track record"}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 16, marginLeft: "auto", flexWrap: "wrap" }}>
+        {[
+          { label: "TRADES", val: String(s.trades), color: "#fff" },
+          { label: "WIN RATE", val: `${s.winRate}%`, color: s.winRate >= 50 ? "#00ff88" : "#fbbf24" },
+          { label: "NET P&L", val: `${s.net >= 0 ? "+" : ""}$${Math.abs(s.net).toFixed(2)}`, color: s.net >= 0 ? "#00ff88" : "#ff4444" },
+        ].map((x) => (
+          <div key={x.label} style={{ textAlign: "right", lineHeight: 1.25 }}>
+            <div style={{ fontFamily: "monospace", fontSize: 14, fontWeight: "bold", color: x.color }}>{x.val}</div>
+            <div style={{ fontFamily: "monospace", fontSize: 7.5, color: "#3a5a4a", letterSpacing: "0.06em" }}>{x.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Live pulse strip ────────────────────────────────────────────────────────
 // At-a-glance activity so even a thin feed reads as a living system, not a ghost
 // town. Derived entirely from the already-loaded feed — no extra fetch.
@@ -1502,6 +1548,7 @@ export default function FeedPage() {
         {view === "feed" && (
           <>
             {!loading && !error && <FeedPulse feed={feed} />}
+            {!loading && !error && <AgentTrackRecord />}
             {/* Filters */}
             <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
               {(["ALL", "ACTIVE", "HIT_TP", "STOPPED_OUT", "INVALIDATED"] as FilterStatus[]).map((f) => (
