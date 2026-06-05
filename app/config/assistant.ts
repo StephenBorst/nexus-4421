@@ -41,8 +41,8 @@ export const PROVIDERS: Record<ProviderId, ProviderDef> = {
 
 // localStorage keys (client-side only).
 export const LS_PROVIDER = "nexus_ai_provider";
-export const LS_MODEL = "nexus_ai_model";
-export const LS_KEY = (p: ProviderId) => `nexus_ai_key_${p}`; // per-provider key
+export const LS_MODEL = (p: ProviderId) => `nexus_ai_model_${p}`; // per-provider model
+export const LS_KEY = (p: ProviderId) => `nexus_ai_key_${p}`;     // per-provider key
 
 import { anthropicTools, openaiTools, TOOL_BY_NAME, type ToolCtx } from "@/config/assistantTools";
 

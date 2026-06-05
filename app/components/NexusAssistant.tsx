@@ -45,7 +45,7 @@ export default function NexusAssistant() {
     () => (typeof window !== "undefined" && (window.localStorage.getItem(LS_PROVIDER) as ProviderId)) || "anthropic"
   );
   const [model, setModel] = useState<string>(
-    () => (typeof window !== "undefined" && window.localStorage.getItem(LS_MODEL)) || PROVIDERS[provider].defaultModel
+    () => (typeof window !== "undefined" && window.localStorage.getItem(LS_MODEL(provider))) || PROVIDERS[provider].defaultModel
   );
   const [apiKey, setApiKey] = useState<string>(
     () => (typeof window !== "undefined" && window.localStorage.getItem(LS_KEY(provider))) || ""
@@ -75,11 +75,12 @@ export default function NexusAssistant() {
 
   // Persist settings.
   useEffect(() => { window.localStorage.setItem(LS_PROVIDER, provider); }, [provider]);
-  useEffect(() => { window.localStorage.setItem(LS_MODEL, model); }, [model]);
-  // When provider changes, load that provider's stored key + default model.
+  useEffect(() => { window.localStorage.setItem(LS_MODEL(provider), model); }, [provider, model]);
+  // When provider changes, load that provider's own stored key + model (each
+  // provider remembers its own — never carry a Claude model id onto OpenAI).
   useEffect(() => {
     setApiKey(window.localStorage.getItem(LS_KEY(provider)) || "");
-    setModel(window.localStorage.getItem(LS_MODEL) || PROVIDERS[provider].defaultModel);
+    setModel(window.localStorage.getItem(LS_MODEL(provider)) || PROVIDERS[provider].defaultModel);
   }, [provider]);
 
   // Pull agent state when the panel opens (best-effort).
@@ -288,7 +289,6 @@ function SettingsView({
   onDone: () => void;
 }) {
   const def = PROVIDERS[provider];
-  const modelChoices = availableModels.length ? availableModels : def.models;
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ fontFamily: mono, fontSize: 10, color: "#8aaa9a", lineHeight: 1.6 }}>
@@ -311,18 +311,24 @@ function SettingsView({
       </Field>
 
       <Field label={availableModels.length ? "MODEL (from your key)" : "MODEL"}>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxHeight: 120, overflowY: "auto" }}>
-          {modelChoices.map((mdl) => (
-            <button key={mdl} onClick={() => setModel(mdl)}
-              style={{
-                background: model === mdl ? "#0a1a0a" : "#0d120d",
-                border: `1px solid ${model === mdl ? GREEN : "#1a2e1a"}`, borderRadius: 4,
-                color: model === mdl ? GREEN : "#5a8a6a", fontFamily: mono, fontSize: 9, padding: "5px 9px", cursor: "pointer",
-              }}>
-              {mdl}
-            </button>
-          ))}
-        </div>
+        {availableModels.length > 0 ? (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxHeight: 120, overflowY: "auto" }}>
+            {availableModels.map((mdl) => (
+              <button key={mdl} onClick={() => setModel(mdl)}
+                style={{
+                  background: model === mdl ? "#0a1a0a" : "#0d120d",
+                  border: `1px solid ${model === mdl ? GREEN : "#1a2e1a"}`, borderRadius: 4,
+                  color: model === mdl ? GREEN : "#5a8a6a", fontFamily: mono, fontSize: 9, padding: "5px 9px", cursor: "pointer",
+                }}>
+                {mdl}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div style={{ fontFamily: mono, fontSize: 9, color: "#3a6a4a", lineHeight: 1.5 }}>
+            Enter your {def.label.split(" ")[0]} API key below to load the models it can access.
+          </div>
+        )}
         <input
           value={model} onChange={(e) => setModel(e.target.value)}
           placeholder="or type a model id"
