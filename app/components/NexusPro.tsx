@@ -6,6 +6,7 @@
  * USDC subscribe + pay-in-$NEXUS paths show "soon" until PAYMENTS_LIVE.
  */
 
+import { useState } from "react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useNexusTier, TIER_META, TIER_THRESHOLDS } from "@/hooks/useNexusTier";
 import {
@@ -18,10 +19,23 @@ import { BuyNexusButton } from "@/components/BuyNexusButton";
 const card: React.CSSProperties = { background: "#0d120d", border: "1px solid #1a4a2a", borderRadius: 6, padding: 16 };
 const mono = "monospace";
 
+const DISMISS_KEY = "nexus_pro_dismissed";
+
 export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
   const { isPro, via } = useSubscription(walletAddress);
   const { tier } = useNexusTier(walletAddress);
+  const [dismissed, setDismissed] = useState(
+    () => typeof window !== "undefined" && window.localStorage.getItem(DISMISS_KEY) === "1"
+  );
   const holderMin = TIER_THRESHOLDS.find((t) => t.tier === PRO_HOLDER_TIER)?.min ?? 0;
+
+  const dismiss = () => {
+    if (typeof window !== "undefined") window.localStorage.setItem(DISMISS_KEY, "1");
+    setDismissed(true);
+  };
+
+  // Dismissed (free users only — keep showing the PRO/ACTIVE badge for subscribers).
+  if (dismissed && !isPro) return null;
 
   // Active PRO → compact confirmation.
   if (isPro) {
@@ -41,6 +55,16 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
         <span style={{ fontFamily: mono, fontSize: 13, fontWeight: "bold", color: "#00ff88", letterSpacing: "0.1em" }}>◆ NEXUS PRO</span>
         <span style={{ fontFamily: mono, fontSize: 10, color: "#5a8a6a" }}>unlock the full terminal</span>
+        <button
+          onClick={dismiss}
+          style={{
+            marginLeft: "auto", background: "none", border: "1px solid #1a2e1a", borderRadius: 3,
+            color: "#3a5a4a", fontFamily: mono, fontSize: 9, padding: "3px 10px",
+            cursor: "pointer", letterSpacing: "0.05em", alignSelf: "center",
+          }}
+        >
+          DISMISS
+        </button>
       </div>
 
       {/* Benefits */}

@@ -17,7 +17,7 @@
 
 import type { NexusTier } from "@/hooks/useNexusTier";
 
-export const PRO_MONTHLY_USDC = 19;          // USD/month, billed in USDC
+export const PRO_MONTHLY_USDC = 20;          // USD/month, billed in USDC
 export const NEXUS_PAY_DISCOUNT_PCT = 25;    // % off when paying in $NEXUS
 export const PRO_HOLDER_TIER: NexusTier = "ARCHITECT"; // hold this tier → PRO free
 export const PAYMENTS_LIVE = false;          // flip on when the USDC rail is wired
