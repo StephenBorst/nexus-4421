@@ -231,6 +231,16 @@ export default function ThesisPage() {
   const markPrice = livePrices[thesis.symbol] ?? null;
   const isClosed = thesis.status === "HIT_TP" || thesis.status === "STOPPED_OUT";
 
+  // Outbound share — pre-filled X / Farcaster posts that pull external eyes back
+  // into the feed. The page already emits rich OG cards, so the link unfurls.
+  const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+  const shareText =
+    `📡 ${ticker} ${thesis.direction} ${thesis.leverage.toFixed(1)}x\n\n` +
+    `Entry $${thesis.entryPrice.toFixed(2)} · Stop $${thesis.stopLoss.toFixed(2)} · TP $${thesis.takeProfit1.toFixed(2)} (R:R 1:${thesis.riskReward.toFixed(2)})\n\n` +
+    `Graded on-chain vs public price on Nexus Trading Labs 👇`;
+  const shareX = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+  const shareFc = `https://warpcast.com/~/compose?text=${encodeURIComponent(shareText + "\n\n" + shareUrl)}&embeds[]=${encodeURIComponent(shareUrl)}`;
+
   return (
     <div style={{ background: "#0a0e0a", minHeight: "100dvh", padding: 0 }}>
       {/* Top bar */}
@@ -240,16 +250,27 @@ export default function ThesisPage() {
           style={{ background: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, padding: "4px 10px", cursor: "pointer" }}
         >← BACK</button>
         <div style={{ flex: 1 }} />
-        {/* Share button */}
+        {/* Outbound share — X / Farcaster / copy link */}
+        <a
+          href={shareX} target="_blank" rel="noopener noreferrer"
+          title="Share on X"
+          style={{ textDecoration: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#8aaa9a", fontFamily: "monospace", fontSize: 9, padding: "4px 9px", letterSpacing: "0.05em" }}
+        >𝕏 SHARE</a>
+        <a
+          href={shareFc} target="_blank" rel="noopener noreferrer"
+          title="Share on Farcaster"
+          style={{ textDecoration: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#8a7aff", fontFamily: "monospace", fontSize: 9, padding: "4px 9px", letterSpacing: "0.05em" }}
+        >✦ CAST</a>
         <button
           onClick={handleShare}
+          title="Copy link"
           style={{
             background: copied ? "#0a1a0a" : "none",
             border: `1px solid ${copied ? "#00ff88" : "#1a2e1a"}`,
             borderRadius: 3, color: copied ? "#00ff88" : "#3a5a4a",
             fontFamily: "monospace", fontSize: 9, padding: "4px 10px", cursor: "pointer", letterSpacing: "0.05em",
           }}
-        >{copied ? "✓ COPIED" : "SHARE LINK"}</button>
+        >{copied ? "✓ COPIED" : "⧉ LINK"}</button>
       </div>
 
       <div style={{ padding: 16, maxWidth: 720, margin: "0 auto" }}>
