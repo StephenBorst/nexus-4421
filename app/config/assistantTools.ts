@@ -16,6 +16,9 @@ export interface ToolCtx {
   // Client-side navigation (react-router). Action tools use this to take the
   // user somewhere — they never execute orders or move funds.
   navigate?: (path: string) => void;
+  // The user's live open positions (from the Orderly private query in the
+  // assistant component) — provided so the position tool needs no extra auth.
+  openPositions?: { symbol: string; qty: number; entry: number; mark: number; pnl: number }[];
 }
 
 export const THESIS_DRAFT_KEY = "nexus_thesis_draft";
@@ -82,6 +85,17 @@ export const TOOLS: ToolDef[] = [
         daily_pnl: s.daily_pnl ?? 0,
         recent_paper_trades: (s.paper_trades ?? []).slice(0, 5),
       });
+    },
+  },
+  {
+    name: "get_open_positions",
+    description:
+      "Get the user's LIVE open perp positions on Nexus: symbol, signed size, entry price, mark price, and unrealized PnL. Use for 'my positions', 'how am I doing right now', live exposure/risk questions. (This is live exchange data, distinct from their planned theses.)",
+    input_schema: { type: "object", properties: {} },
+    run: async (_args, ctx) => {
+      const pos = ctx.openPositions ?? [];
+      if (!pos.length) return JSON.stringify({ positions: [], note: "no open positions (or wallet not authenticated to Orderly)" });
+      return JSON.stringify({ count: pos.length, positions: pos, total_unrealized_pnl: pos.reduce((s, p) => s + (p.pnl || 0), 0) });
     },
   },
   {

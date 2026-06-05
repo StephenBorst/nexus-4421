@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAccount } from "@orderly.network/hooks";
+import { useAccount, usePrivateQuery } from "@orderly.network/hooks";
 import { useLabStorage } from "@/hooks/useLabStorage";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import {
@@ -42,14 +42,29 @@ function loadChat(): DisplayMsg[] {
   try { const r = window.localStorage.getItem(CHAT_KEY); return r ? JSON.parse(r) : []; } catch { return []; }
 }
 
-// Minimal inline formatter (no dep): render **bold** + `code`; keep newlines
-// (the container is pre-wrap). Good enough for the terminal aesthetic.
-function renderRich(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
-  return parts.map((p, i) => {
+// Minimal markdown renderer (no dep): **bold**, `code`, bullet lists, and
+// #/##/### headers — enough polish for the narrow terminal panel.
+function inline(text: string): React.ReactNode {
+  return text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((p, i) => {
     if (p.startsWith("**") && p.endsWith("**")) return <b key={i} style={{ color: "#fff" }}>{p.slice(2, -2)}</b>;
     if (p.startsWith("`") && p.endsWith("`")) return <code key={i} style={{ color: "#00ff88", background: "#0a1a0a", padding: "0 3px", borderRadius: 2 }}>{p.slice(1, -1)}</code>;
     return p;
+  });
+}
+function renderRich(text: string): React.ReactNode {
+  return text.split("\n").map((line, i) => {
+    const t = line.trimEnd();
+    if (t.trim() === "") return <div key={i} style={{ height: 5 }} />;
+    const hdr = t.match(/^(#{1,3})\s+(.*)/);
+    if (hdr) return <div key={i} style={{ color: "#fff", fontWeight: "bold", marginTop: 4 }}>{inline(hdr[2])}</div>;
+    const bullet = t.match(/^\s*[-*•]\s+(.*)/);
+    if (bullet) return (
+      <div key={i} style={{ display: "flex", gap: 6 }}>
+        <span style={{ color: GREEN }}>•</span>
+        <span>{inline(bullet[1])}</span>
+      </div>
+    );
+    return <div key={i}>{inline(t)}</div>;
   });
 }
 
@@ -57,6 +72,7 @@ export default function NexusAssistant() {
   const { state: acct } = useAccount();
   const walletAddress = (acct as { address?: string })?.address ?? null;
   const { theses } = useLabStorage(walletAddress);
+  const { data: posData } = usePrivateQuery("/v1/positions", { revalidateOnFocus: false });
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -161,7 +177,19 @@ export default function NexusAssistant() {
         provider, model, apiKey: apiKey.trim(),
         system: `${SYSTEM_PROMPT}\n\n${context}`,
         history: next.map(({ role, content }) => ({ role, content })),
-        ctx: { wallet: walletAddress, navigate: (p: string) => navigate(p) },
+        ctx: {
+          wallet: walletAddress,
+          navigate: (p: string) => navigate(p),
+          openPositions: (((posData as { rows?: Record<string, unknown>[] })?.rows) ?? [])
+            .map((p) => ({
+              symbol: String(p.symbol ?? ""),
+              qty: Number(p.position_qty ?? 0),
+              entry: Number(p.average_open_price ?? 0),
+              mark: Number(p.mark_price ?? 0),
+              pnl: Number(p.unrealized_pnl ?? p.unsettled_pnl ?? 0),
+            }))
+            .filter((p) => Math.abs(p.qty) > 0),
+        },
       });
       setMessages((m) => [...m, { role: "assistant", content: reply, tools: toolsUsed }]);
     } catch (e) {
