@@ -35,6 +35,17 @@ function loadChat(): DisplayMsg[] {
   try { const r = window.localStorage.getItem(CHAT_KEY); return r ? JSON.parse(r) : []; } catch { return []; }
 }
 
+// Minimal inline formatter (no dep): render **bold** + `code`; keep newlines
+// (the container is pre-wrap). Good enough for the terminal aesthetic.
+function renderRich(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  return parts.map((p, i) => {
+    if (p.startsWith("**") && p.endsWith("**")) return <b key={i} style={{ color: "#fff" }}>{p.slice(2, -2)}</b>;
+    if (p.startsWith("`") && p.endsWith("`")) return <code key={i} style={{ color: "#00ff88", background: "#0a1a0a", padding: "0 3px", borderRadius: 2 }}>{p.slice(1, -1)}</code>;
+    return p;
+  });
+}
+
 export default function NexusAssistant() {
   const { state: acct } = useAccount();
   const walletAddress = (acct as { address?: string })?.address ?? null;
@@ -246,7 +257,7 @@ export default function NexusAssistant() {
                   fontFamily: mono, fontSize: 11, lineHeight: 1.55,
                   color: m.role === "user" ? GREEN : "#c8d8c8", whiteSpace: "pre-wrap", wordBreak: "break-word",
                 }}>
-                  {m.content}
+                  {m.role === "assistant" ? renderRich(m.content) : m.content}
                 </div>
               </div>
             ))}
