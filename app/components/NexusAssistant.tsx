@@ -45,8 +45,10 @@ function loadChat(): DisplayMsg[] {
 // Minimal markdown renderer (no dep): **bold**, `code`, bullet lists, and
 // #/##/### headers — enough polish for the narrow terminal panel.
 function inline(text: string): React.ReactNode {
-  return text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((p, i) => {
+  // Order matters: match **bold** before *italic*.
+  return text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).map((p, i) => {
     if (p.startsWith("**") && p.endsWith("**")) return <b key={i} style={{ color: "#fff" }}>{p.slice(2, -2)}</b>;
+    if (p.startsWith("*") && p.endsWith("*")) return <i key={i} style={{ color: "#a8c8b8" }}>{p.slice(1, -1)}</i>;
     if (p.startsWith("`") && p.endsWith("`")) return <code key={i} style={{ color: "#00ff88", background: "#0a1a0a", padding: "0 3px", borderRadius: 2 }}>{p.slice(1, -1)}</code>;
     return p;
   });
