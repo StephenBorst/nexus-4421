@@ -142,6 +142,12 @@ export default function NexusAssistant() {
 
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"chat" | "settings">("chat");
+  // First-run discovery: pulse + one-time tooltip until the panel is first opened.
+  const [seen, setSeen] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("nexus_ai_seen") === "1");
+  const openPanel = () => {
+    setOpen(true);
+    if (!seen) { setSeen(true); try { window.localStorage.setItem("nexus_ai_seen", "1"); } catch { /* ignore */ } }
+  };
 
   // BYOK settings (persisted client-side).
   const [provider, setProvider] = useState<ProviderId>(
@@ -317,21 +323,40 @@ export default function NexusAssistant() {
   // ── Floating launcher ──
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        aria-label="Nexus AI Assistant"
-        title="Nexus AI Assistant"
-        style={{
-          position: "fixed", right: 16, bottom: 16, zIndex: 99998,
-          width: 52, height: 52, borderRadius: "50%",
-          background: "#0a1a0a", border: `1px solid ${GREEN}`,
-          color: GREEN, fontFamily: mono, fontSize: 20, cursor: "pointer",
-          boxShadow: "0 0 16px rgba(0,255,136,0.35)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}
-      >
-        ◆
-      </button>
+      <div style={{ position: "fixed", right: 16, bottom: 16, zIndex: 99998, display: "flex", alignItems: "center", gap: 10 }}>
+        {!seen && (
+          <>
+            <style>{`@keyframes nexAiPulse{0%,100%{box-shadow:0 0 14px rgba(0,255,136,0.35)}50%{box-shadow:0 0 22px rgba(0,255,136,0.85)}}`}</style>
+            <div
+              onClick={openPanel}
+              style={{
+                cursor: "pointer", background: "#0a1a0a", border: `1px solid ${GREEN}`, borderRadius: 6,
+                padding: "8px 12px", maxWidth: 200, boxShadow: "0 0 16px rgba(0,0,0,0.5)",
+              }}
+            >
+              <div style={{ fontFamily: mono, fontSize: 10, color: GREEN, fontWeight: "bold", letterSpacing: "0.06em" }}>✦ Meet // NEXUS AI</div>
+              <div style={{ fontFamily: mono, fontSize: 8.5, color: "#8aaa9a", lineHeight: 1.5, marginTop: 2 }}>
+                Your trading copilot — ask about the market, your positions, or your track record.
+              </div>
+            </div>
+          </>
+        )}
+        <button
+          onClick={openPanel}
+          aria-label="Nexus AI Assistant"
+          title="Nexus AI Assistant"
+          style={{
+            width: 52, height: 52, borderRadius: "50%",
+            background: "#0a1a0a", border: `1px solid ${GREEN}`,
+            color: GREEN, fontFamily: mono, fontSize: 20, cursor: "pointer",
+            boxShadow: "0 0 16px rgba(0,255,136,0.35)", flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            animation: seen ? undefined : "nexAiPulse 2s infinite",
+          }}
+        >
+          ◆
+        </button>
+      </div>
     );
   }
 
