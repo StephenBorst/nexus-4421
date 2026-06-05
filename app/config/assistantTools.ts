@@ -98,6 +98,30 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "get_market_regime",
+    description:
+      "Get the broad market regime signals: crypto Fear & Greed index (0-100 + classification), total market-cap 24h change, and BTC dominance. Use for 'how's the market', risk-on/risk-off, or sentiment questions.",
+    input_schema: { type: "object", properties: {} },
+    run: async () => {
+      const out: Record<string, unknown> = {};
+      try {
+        const fng = await (await fetch("https://api.alternative.me/fng/?limit=1")).json();
+        const d = fng?.data?.[0];
+        if (d) out.fear_greed = { value: Number(d.value), classification: d.value_classification };
+      } catch { /* skip */ }
+      try {
+        const g = (await (await fetch("https://api.coingecko.com/api/v3/global")).json())?.data;
+        if (g) {
+          out.total_mcap_change_24h_pct = g.market_cap_change_percentage_24h_usd;
+          out.btc_dominance_pct = g.market_cap_percentage?.btc;
+          out.eth_dominance_pct = g.market_cap_percentage?.eth;
+        }
+      } catch { /* skip */ }
+      if (!Object.keys(out).length) return JSON.stringify({ error: "regime data unavailable" });
+      return JSON.stringify(out);
+    },
+  },
+  {
     name: "get_verified_callers",
     description:
       "Get the TRUSTLESS human-caller leaderboard: traders ranked by objectively-graded public thesis calls (first-touch TP-vs-SL vs public price), needing >=5 resolved calls. Use for 'best callers' or social-proof questions.",

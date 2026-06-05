@@ -29,6 +29,12 @@ const GREEN = "#00ff88";
 
 type DisplayMsg = ChatMsg & { tools?: string[] };
 
+const CHAT_KEY = "nexus_ai_chat";
+const CHAT_CAP = 40; // keep the last N messages
+function loadChat(): DisplayMsg[] {
+  try { const r = window.localStorage.getItem(CHAT_KEY); return r ? JSON.parse(r) : []; } catch { return []; }
+}
+
 export default function NexusAssistant() {
   const { state: acct } = useAccount();
   const walletAddress = (acct as { address?: string })?.address ?? null;
@@ -51,7 +57,7 @@ export default function NexusAssistant() {
     () => (typeof window !== "undefined" && window.localStorage.getItem(LS_KEY(provider))) || ""
   );
 
-  const [messages, setMessages] = useState<DisplayMsg[]>([]);
+  const [messages, setMessages] = useState<DisplayMsg[]>(loadChat);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +108,11 @@ export default function NexusAssistant() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
+
+  // Persist the conversation (capped) so it survives close/reload.
+  useEffect(() => {
+    try { window.localStorage.setItem(CHAT_KEY, JSON.stringify(messages.slice(-CHAT_CAP))); } catch { /* ignore quota */ }
+  }, [messages]);
 
   const saveKey = (k: string) => {
     setApiKey(k);
@@ -181,7 +192,10 @@ export default function NexusAssistant() {
     >
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid #1a2e1a", background: "#0a1a0a" }}>
-        <span style={{ fontFamily: mono, fontSize: 12, fontWeight: "bold", color: GREEN, letterSpacing: "0.08em" }}>◆ NEXUS AI</span>
+        <span style={{ fontFamily: mono, fontSize: 12, fontWeight: "bold", letterSpacing: "0.18em" }}>
+          <span style={{ color: GREEN, textShadow: "0 0 10px rgba(0,255,136,0.5)" }}>//</span>
+          <span style={{ color: "#fff" }}> NEXUS AI</span>
+        </span>
         <span style={{ fontFamily: mono, fontSize: 8, color: "#3a6a4a" }}>{PROVIDERS[provider].label.split(" ")[0]} · {model}</span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
           <button onClick={() => setView(view === "settings" ? "chat" : "settings")} title="Settings"
