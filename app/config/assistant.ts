@@ -260,6 +260,40 @@ async function runTool(name: string, input: Record<string, unknown>, ctx: ToolCt
   }
 }
 
+/**
+ * List the models the given key can actually access, so the UI never offers a
+ * stale/retired model id (the cause of 404s). Best-effort: returns [] on failure
+ * and the UI falls back to the static defaults + the free-text model field.
+ */
+export async function listModels(provider: ProviderId, apiKey: string): Promise<string[]> {
+  try {
+    if (provider === "anthropic") {
+      const res = await fetch("https://api.anthropic.com/v1/models?limit=100", {
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data?.data ?? []).map((m: { id: string }) => m.id).filter(Boolean);
+    }
+    // openai — filter the (large) list to chat-capable model families.
+    const res = await fetch("https://api.openai.com/v1/models", {
+      headers: { authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data?.data ?? [])
+      .map((m: { id: string }) => m.id)
+      .filter((id: string) => /^(gpt-|chatgpt|o\d)/.test(id) && !/(audio|realtime|transcribe|tts|image|search|embedding)/.test(id))
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
 async function errText(res: Response): Promise<string> {
   let detail = "";
   try {

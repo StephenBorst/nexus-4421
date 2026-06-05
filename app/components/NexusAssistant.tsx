@@ -15,8 +15,13 @@ import { useLabStorage } from "@/hooks/useLabStorage";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import {
   PROVIDERS, LS_PROVIDER, LS_MODEL, LS_KEY, SYSTEM_PROMPT,
-  buildContextBlock, runChat, type ProviderId, type ChatMsg,
+  buildContextBlock, runChat, listModels, type ProviderId, type ChatMsg,
 } from "@/config/assistant";
+
+function pickDefaultModel(provider: ProviderId, ids: string[]): string {
+  if (provider === "anthropic") return ids.find((i) => /sonnet/.test(i)) || ids.find((i) => /opus/.test(i)) || ids[0];
+  return ids.find((i) => i === "gpt-4o") || ids.find((i) => /^gpt-4/.test(i)) || ids[0];
+}
 
 const AGENT_API = "https://og.nexustradinglabs.com";
 const mono = "monospace";
@@ -50,8 +55,22 @@ export default function NexusAssistant() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [agent, setAgent] = useState<{ mode?: string; active?: boolean; hasPosition?: boolean } | null>(null);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Fetch the models this key can actually access → avoids stale/retired model
+  // ids (the 404 cause). Auto-correct the selected model if it's not in the list.
+  useEffect(() => {
+    if (!apiKey.trim()) { setAvailableModels([]); return; }
+    let cancelled = false;
+    listModels(provider, apiKey.trim()).then((ids) => {
+      if (cancelled || !ids.length) return;
+      setAvailableModels(ids);
+      setModel((cur) => (ids.includes(cur) ? cur : pickDefaultModel(provider, ids)));
+    });
+    return () => { cancelled = true; };
+  }, [provider, apiKey]);
 
   // Persist settings.
   useEffect(() => { window.localStorage.setItem(LS_PROVIDER, provider); }, [provider]);
@@ -175,6 +194,7 @@ export default function NexusAssistant() {
           provider={provider} setProvider={setProvider}
           model={model} setModel={setModel}
           apiKey={apiKey} saveKey={saveKey}
+          availableModels={availableModels}
           onDone={() => setView("chat")}
         />
       ) : (
@@ -258,14 +278,16 @@ function btn(active: boolean): React.CSSProperties {
 }
 
 function SettingsView({
-  provider, setProvider, model, setModel, apiKey, saveKey, onDone,
+  provider, setProvider, model, setModel, apiKey, saveKey, availableModels, onDone,
 }: {
   provider: ProviderId; setProvider: (p: ProviderId) => void;
   model: string; setModel: (m: string) => void;
   apiKey: string; saveKey: (k: string) => void;
+  availableModels: string[];
   onDone: () => void;
 }) {
   const def = PROVIDERS[provider];
+  const modelChoices = availableModels.length ? availableModels : def.models;
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ fontFamily: mono, fontSize: 10, color: "#8aaa9a", lineHeight: 1.6 }}>
@@ -287,9 +309,9 @@ function SettingsView({
         </div>
       </Field>
 
-      <Field label="MODEL">
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {def.models.map((mdl) => (
+      <Field label={availableModels.length ? "MODEL (from your key)" : "MODEL"}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxHeight: 120, overflowY: "auto" }}>
+          {modelChoices.map((mdl) => (
             <button key={mdl} onClick={() => setModel(mdl)}
               style={{
                 background: model === mdl ? "#0a1a0a" : "#0d120d",
