@@ -44,10 +44,19 @@ export const LS_PROVIDER = "nexus_ai_provider";
 export const LS_MODEL = "nexus_ai_model";
 export const LS_KEY = (p: ProviderId) => `nexus_ai_key_${p}`; // per-provider key
 
+import { anthropicTools, openaiTools, TOOL_BY_NAME, type ToolCtx } from "@/config/assistantTools";
+
 export interface ChatMsg {
   role: "user" | "assistant";
   content: string;
 }
+
+export interface RunResult {
+  text: string;
+  toolsUsed: string[];
+}
+
+const MAX_TOOL_ROUNDS = 5; // bound the agentic loop
 
 /**
  * System prompt — the assistant's identity + the advice/Howey guardrail. Trading
@@ -63,7 +72,9 @@ HARD RULES:
 - Be precise and concise. This is a terminal; traders want signal, not fluff.
 - When you reference the user's data, use the context provided — don't invent positions or numbers.
 - If asked about something outside the provided context or your knowledge, say so plainly.
-- Match the terminal's voice: sharp, technical, no hype.`;
+- Match the terminal's voice: sharp, technical, no hype.
+
+You have TOOLS to pull live data on demand: market data (price/funding/OI), the user's agent status, the trustless top-agents leaderboard, and the verified human-caller leaderboard. Call them whenever a question needs current numbers — don't guess prices or stats you can fetch.`;
 
 /** Build the per-request context block injected after the system prompt. */
 export function buildContextBlock(ctx: {
@@ -143,6 +154,110 @@ export async function sendChat(opts: {
   if (!res.ok) throw new Error(await errText(res));
   const data = await res.json();
   return data?.choices?.[0]?.message?.content ?? "(empty response)";
+}
+
+/**
+ * Agentic chat: runs a bounded tool-use loop so the model can pull live Nexus
+ * data (market, agent status, leaderboards) before answering. Same BYOK,
+ * client-side, both providers. Returns the final text + which tools were used.
+ */
+export async function runChat(opts: {
+  provider: ProviderId;
+  model: string;
+  apiKey: string;
+  system: string;
+  history: ChatMsg[];
+  ctx: ToolCtx;
+}): Promise<RunResult> {
+  return opts.provider === "anthropic" ? runAnthropic(opts) : runOpenAI(opts);
+}
+
+async function runAnthropic(opts: {
+  model: string; apiKey: string; system: string; history: ChatMsg[]; ctx: ToolCtx;
+}): Promise<RunResult> {
+  const { model, apiKey, system, history, ctx } = opts;
+  const messages: { role: string; content: unknown }[] = history.map((m) => ({ role: m.role, content: m.content }));
+  const toolsUsed: string[] = [];
+
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const res = await fetch(PROVIDERS.anthropic.endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({ model, max_tokens: 1024, system, tools: anthropicTools(), messages }),
+    });
+    if (!res.ok) throw new Error(await errText(res));
+    const data = await res.json();
+    const content: { type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }[] = data?.content ?? [];
+
+    if (data?.stop_reason === "tool_use") {
+      messages.push({ role: "assistant", content });
+      const results: unknown[] = [];
+      for (const block of content) {
+        if (block.type !== "tool_use" || !block.name) continue;
+        toolsUsed.push(block.name);
+        const out = await runTool(block.name, block.input ?? {}, ctx);
+        results.push({ type: "tool_result", tool_use_id: block.id, content: out });
+      }
+      messages.push({ role: "user", content: results });
+      continue;
+    }
+
+    const text = content.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
+    return { text: text || "(empty response)", toolsUsed };
+  }
+  return { text: "Stopped after too many tool calls — try narrowing the question.", toolsUsed };
+}
+
+async function runOpenAI(opts: {
+  model: string; apiKey: string; system: string; history: ChatMsg[]; ctx: ToolCtx;
+}): Promise<RunResult> {
+  const { model, apiKey, system, history, ctx } = opts;
+  const messages: Record<string, unknown>[] = [
+    { role: "system", content: system },
+    ...history.map((m) => ({ role: m.role, content: m.content })),
+  ];
+  const toolsUsed: string[] = [];
+
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const res = await fetch(PROVIDERS.openai.endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages, tools: openaiTools(), tool_choice: "auto" }),
+    });
+    if (!res.ok) throw new Error(await errText(res));
+    const data = await res.json();
+    const msg = data?.choices?.[0]?.message;
+    const toolCalls: { id: string; function: { name: string; arguments: string } }[] = msg?.tool_calls ?? [];
+
+    if (toolCalls.length) {
+      messages.push(msg);
+      for (const tc of toolCalls) {
+        toolsUsed.push(tc.function.name);
+        let args: Record<string, unknown> = {};
+        try { args = JSON.parse(tc.function.arguments || "{}"); } catch { /* keep {} */ }
+        const out = await runTool(tc.function.name, args, ctx);
+        messages.push({ role: "tool", tool_call_id: tc.id, content: out });
+      }
+      continue;
+    }
+    return { text: msg?.content ?? "(empty response)", toolsUsed };
+  }
+  return { text: "Stopped after too many tool calls — try narrowing the question.", toolsUsed };
+}
+
+async function runTool(name: string, input: Record<string, unknown>, ctx: ToolCtx): Promise<string> {
+  const tool = TOOL_BY_NAME[name];
+  if (!tool) return JSON.stringify({ error: `unknown tool: ${name}` });
+  try {
+    return await tool.run(input, ctx);
+  } catch (e) {
+    return JSON.stringify({ error: e instanceof Error ? e.message : "tool failed" });
+  }
 }
 
 async function errText(res: Response): Promise<string> {

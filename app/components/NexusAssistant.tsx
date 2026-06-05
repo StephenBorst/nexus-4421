@@ -15,12 +15,14 @@ import { useLabStorage } from "@/hooks/useLabStorage";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import {
   PROVIDERS, LS_PROVIDER, LS_MODEL, LS_KEY, SYSTEM_PROMPT,
-  buildContextBlock, sendChat, type ProviderId, type ChatMsg,
+  buildContextBlock, runChat, type ProviderId, type ChatMsg,
 } from "@/config/assistant";
 
 const AGENT_API = "https://og.nexustradinglabs.com";
 const mono = "monospace";
 const GREEN = "#00ff88";
+
+type DisplayMsg = ChatMsg & { tools?: string[] };
 
 export default function NexusAssistant() {
   const { state: acct } = useAccount();
@@ -43,7 +45,7 @@ export default function NexusAssistant() {
     () => (typeof window !== "undefined" && window.localStorage.getItem(LS_KEY(provider))) || ""
   );
 
-  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [messages, setMessages] = useState<DisplayMsg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +94,7 @@ export default function NexusAssistant() {
     if (!text || loading) return;
     if (!hasKey) { setView("settings"); return; }
 
-    const next: ChatMsg[] = [...messages, { role: "user", content: text }];
+    const next: DisplayMsg[] = [...messages, { role: "user", content: text }];
     setMessages(next);
     setInput("");
     setError(null);
@@ -107,12 +109,13 @@ export default function NexusAssistant() {
     });
 
     try {
-      const reply = await sendChat({
+      const { text: reply, toolsUsed } = await runChat({
         provider, model, apiKey: apiKey.trim(),
         system: `${SYSTEM_PROMPT}\n\n${context}`,
-        history: next,
+        history: next.map(({ role, content }) => ({ role, content })),
+        ctx: { wallet: walletAddress },
       });
-      setMessages((m) => [...m, { role: "assistant", content: reply }]);
+      setMessages((m) => [...m, { role: "assistant", content: reply, tools: toolsUsed }]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed.");
     } finally {
@@ -184,7 +187,7 @@ export default function NexusAssistant() {
                   ? "Ask about your theses, agent, the market, or a trade idea. I can see your live session context."
                   : "Bring your own API key (Anthropic or OpenAI) to start — it stays on your device, never sent to Nexus. Tap ⚙ to set it up."}
                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-                  {["Grade my open theses by R:R", "What's my agent doing right now?", "Explain funding-rate edge trading"].map((s) => (
+                  {["What's BTC's funding rate right now?", "What's my agent doing right now?", "Who are the top agents on the leaderboard?"].map((s) => (
                     <button key={s} onClick={() => setInput(s)} disabled={!hasKey}
                       style={{ textAlign: "left", background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 4, color: hasKey ? "#8aaa9a" : "#2a4a3a", fontFamily: mono, fontSize: 10, padding: "6px 9px", cursor: hasKey ? "pointer" : "default" }}>
                       → {s}
@@ -194,15 +197,21 @@ export default function NexusAssistant() {
               </div>
             )}
             {messages.map((m, i) => (
-              <div key={i} style={{
-                alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%",
-                background: m.role === "user" ? "#0a1a0a" : "#0d120d",
-                border: `1px solid ${m.role === "user" ? "#1a4a2a" : "#1a2e1a"}`,
-                borderRadius: 8, padding: "8px 11px",
-                fontFamily: mono, fontSize: 11, lineHeight: 1.55,
-                color: m.role === "user" ? GREEN : "#c8d8c8", whiteSpace: "pre-wrap", wordBreak: "break-word",
-              }}>
-                {m.content}
+              <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%", display: "flex", flexDirection: "column", gap: 4 }}>
+                {m.tools && m.tools.length > 0 && (
+                  <div style={{ fontFamily: mono, fontSize: 8, color: "#3a6a4a", letterSpacing: "0.04em" }}>
+                    ⚡ {[...new Set(m.tools)].join(" · ")}
+                  </div>
+                )}
+                <div style={{
+                  background: m.role === "user" ? "#0a1a0a" : "#0d120d",
+                  border: `1px solid ${m.role === "user" ? "#1a4a2a" : "#1a2e1a"}`,
+                  borderRadius: 8, padding: "8px 11px",
+                  fontFamily: mono, fontSize: 11, lineHeight: 1.55,
+                  color: m.role === "user" ? GREEN : "#c8d8c8", whiteSpace: "pre-wrap", wordBreak: "break-word",
+                }}>
+                  {m.content}
+                </div>
               </div>
             ))}
             {loading && <div style={{ fontFamily: mono, fontSize: 10, color: "#3a6a4a" }}>thinking…</div>}
