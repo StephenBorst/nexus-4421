@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAccount } from "@orderly.network/hooks";
 import { useLabStorage } from "@/hooks/useLabStorage";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
@@ -34,6 +34,7 @@ export default function NexusAssistant() {
   const walletAddress = (acct as { address?: string })?.address ?? null;
   const { theses } = useLabStorage(walletAddress);
   const location = useLocation();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
 
   const [open, setOpen] = useState(false);
@@ -132,7 +133,7 @@ export default function NexusAssistant() {
         provider, model, apiKey: apiKey.trim(),
         system: `${SYSTEM_PROMPT}\n\n${context}`,
         history: next.map(({ role, content }) => ({ role, content })),
-        ctx: { wallet: walletAddress },
+        ctx: { wallet: walletAddress, navigate: (p: string) => navigate(p) },
       });
       setMessages((m) => [...m, { role: "assistant", content: reply, tools: toolsUsed }]);
     } catch (e) {

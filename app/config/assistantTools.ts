@@ -13,7 +13,12 @@ const AGENT_API = "https://og.nexustradinglabs.com";
 
 export interface ToolCtx {
   wallet: string | null;
+  // Client-side navigation (react-router). Action tools use this to take the
+  // user somewhere — they never execute orders or move funds.
+  navigate?: (path: string) => void;
 }
+
+export const THESIS_DRAFT_KEY = "nexus_thesis_draft";
 
 export interface ToolDef {
   name: string;
@@ -23,10 +28,14 @@ export interface ToolDef {
   run: (args: Record<string, unknown>, ctx: ToolCtx) => Promise<string>;
 }
 
+// Bare ticker, e.g. "perp_btc_usdc" / "BTC-USD" → "BTC".
+function shortTicker(raw: string): string {
+  return (raw || "").toUpperCase().replace("PERP_", "").replace("_USDC", "").replace("-USD", "").replace("USDT", "").replace("USDC", "").replace(/[^A-Z0-9]/g, "");
+}
+// Full Orderly perp symbol, e.g. "BTC" → "PERP_BTC_USDC".
 function normSymbol(raw: string): string {
-  const s = (raw || "").toUpperCase().trim();
-  if (s.startsWith("PERP_")) return s;
-  return `PERP_${s.replace("-USD", "").replace("USDT", "").replace("USDC", "").replace(/[^A-Z0-9]/g, "")}_USDC`;
+  const t = shortTicker(raw);
+  return t ? `PERP_${t}_USDC` : "";
 }
 
 export const TOOLS: ToolDef[] = [
@@ -101,6 +110,84 @@ export const TOOLS: ToolDef[] = [
     },
   },
 ];
+
+// ── ACTION tools (client-side navigation + thesis drafting) ──
+// Still ZERO order execution / fund movement — they only take the user somewhere
+// or pre-fill a planning form. The user reviews & commits everything themselves.
+TOOLS.push(
+  {
+    name: "open_symbol",
+    description: "Open the live trading page for a perp symbol (chart + order ticket). Use when the user wants to look at or trade a coin. Does NOT place any order.",
+    input_schema: {
+      type: "object",
+      properties: { symbol: { type: "string", description: "Ticker like BTC, ETH, SOL." } },
+      required: ["symbol"],
+    },
+    run: async (args, ctx) => {
+      const sym = normSymbol(String(args.symbol ?? ""));
+      ctx.navigate?.(`/perp/${sym}`);
+      return JSON.stringify({ navigated: `/perp/${sym}`, note: "Opened the trading page. The user places any order themselves." });
+    },
+  },
+  {
+    name: "open_trader",
+    description: "Open a trader's public profile (track record, theses, rep score) by wallet address.",
+    input_schema: {
+      type: "object",
+      properties: { wallet: { type: "string", description: "0x… wallet address." } },
+      required: ["wallet"],
+    },
+    run: async (args, ctx) => {
+      const w = String(args.wallet ?? "").trim();
+      if (!/^0x[0-9a-fA-F]{40}$/.test(w)) return JSON.stringify({ error: "invalid wallet address" });
+      ctx.navigate?.(`/feed/trader/${w}`);
+      return JSON.stringify({ navigated: `/feed/trader/${w}` });
+    },
+  },
+  {
+    name: "open_leaderboard",
+    description: "Open the social Feed (ranks / verified callers). Use for 'show me the leaderboard' or to browse public theses.",
+    input_schema: { type: "object", properties: {} },
+    run: async (_args, ctx) => {
+      ctx.navigate?.(`/feed`);
+      return JSON.stringify({ navigated: "/feed" });
+    },
+  },
+  {
+    name: "draft_thesis",
+    description:
+      "Pre-fill the Nexus Thesis Engine with a trade plan (symbol, direction, entry, stop, take-profit, notes) and open it for the user to review. This DRAFTS a plan only — it never places an order; the user reviews, adjusts sizing/risk, and saves or executes themselves.",
+    input_schema: {
+      type: "object",
+      properties: {
+        symbol: { type: "string", description: "Ticker like BTC, ETH, SOL." },
+        direction: { type: "string", enum: ["LONG", "SHORT"] },
+        entryPrice: { type: "number" },
+        stopLoss: { type: "number" },
+        takeProfit1: { type: "number" },
+        notes: { type: "string", description: "Short rationale for the thesis." },
+      },
+      required: ["symbol", "direction", "entryPrice", "stopLoss", "takeProfit1"],
+    },
+    run: async (args, ctx) => {
+      const dir = String(args.direction ?? "").toUpperCase();
+      if (dir !== "LONG" && dir !== "SHORT") return JSON.stringify({ error: "direction must be LONG or SHORT" });
+      const entry = Number(args.entryPrice), stop = Number(args.stopLoss), tp = Number(args.takeProfit1);
+      if (![entry, stop, tp].every((n) => Number.isFinite(n) && n > 0)) return JSON.stringify({ error: "entry/stop/takeProfit must be positive numbers" });
+      const draft = {
+        symbol: shortTicker(String(args.symbol ?? "")), // form expects bare ticker (e.g. "BTC")
+        direction: dir,
+        entryPrice: String(entry),
+        stopLoss: String(stop),
+        takeProfit1: String(tp),
+        notes: String(args.notes ?? ""),
+      };
+      try { window.localStorage.setItem(THESIS_DRAFT_KEY, JSON.stringify(draft)); } catch { /* ignore */ }
+      ctx.navigate?.(`/lab?tab=thesis`);
+      return JSON.stringify({ drafted: draft, note: "Opened the Thesis Engine pre-filled. The user reviews risk/size and saves or executes — no order was placed." });
+    },
+  }
+);
 
 export const TOOL_BY_NAME: Record<string, ToolDef> = Object.fromEntries(TOOLS.map((t) => [t.name, t]));
 

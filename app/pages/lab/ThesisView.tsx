@@ -1,6 +1,7 @@
 // Thesis Engine tab: the thesis calculator, thesis cards, and the thesis
 // analytics (accuracy/streaks/equity). Extracted from index.tsx (god-file split).
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
 import { useAccount, useMutation } from "@orderly.network/hooks";
 import { useLabStorage } from "@/hooks/useLabStorage";
 import { useThesisRegistry } from "@/hooks/useThesisRegistry";
@@ -638,6 +639,26 @@ export function ThesisView() {
 
   const [deployed, setDeployed] = useState(false);
   const [filter, setFilter] = useState<ThesisStatus | "ALL">("ALL");
+
+  // Consume a thesis draft handed off by the AI assistant (draft_thesis tool):
+  // pre-fill the form once, then clear the draft so it doesn't re-apply.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(THESIS_DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      setForm((f) => ({
+        ...f,
+        symbol: d.symbol ?? f.symbol,
+        direction: d.direction === "SHORT" ? "SHORT" : "LONG",
+        entryPrice: d.entryPrice ?? f.entryPrice,
+        stopLoss: d.stopLoss ?? f.stopLoss,
+        takeProfit1: d.takeProfit1 ?? f.takeProfit1,
+        notes: d.notes ?? f.notes,
+      }));
+      window.localStorage.removeItem(THESIS_DRAFT_KEY);
+    } catch { /* ignore malformed draft */ }
+  }, []);
 
   // ── Live execution ──────────────────────────────────────
   const [doOrder] = useMutation("/v1/order", "POST");

@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useCollateral, usePrivateQuery, useAccount } from "@orderly.network/hooks";
 import { useLabStorage } from "@/hooks/useLabStorage";
 import { HoldersRoom } from "@/components/HoldersRoom";
@@ -17,7 +18,13 @@ import { CopiesView } from "./CopiesView";
 import { MarketIntelView } from "./MarketIntel";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
 export default function TheLabPage() {
-  const [activeTab, setActiveTab] = useState<TabId>("intel");
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<TabId>(() => (searchParams.get("tab") as TabId) || "intel");
+  // Honor ?tab= deep-links (e.g. the AI assistant's draft_thesis → /lab?tab=thesis).
+  useEffect(() => {
+    const t = searchParams.get("tab") as TabId | null;
+    if (t) setActiveTab(t);
+  }, [searchParams]);
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const today = new Date();
