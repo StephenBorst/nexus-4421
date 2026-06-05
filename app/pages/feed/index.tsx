@@ -1146,6 +1146,39 @@ function FeedEmptyState({ variant }: { variant: "feed" | "ranks" }) {
   );
 }
 
+// ─── Thin-feed contribute prompt ─────────────────────────────────────────────
+// Shown when the feed has a few theses but is still sparse — converts "looks
+// quiet" into "be one of the first" instead of letting a recruit bounce.
+function ContributePrompt() {
+  const navigate = useNavigate();
+  return (
+    <div style={{
+      background: "linear-gradient(180deg,#0a1a0e,#0a0e0a)", border: "1px solid #1a4a2a",
+      borderRadius: 6, padding: "16px 18px", display: "flex", alignItems: "center",
+      gap: 14, flexWrap: "wrap", marginTop: 4,
+    }}>
+      <div style={{ flex: 1, minWidth: 200 }}>
+        <div style={{ fontFamily: "monospace", fontSize: 12, color: "#00ff88", fontWeight: "bold", marginBottom: 3 }}>
+          📡 The feed's still early — claim your spot
+        </div>
+        <div style={{ fontFamily: "monospace", fontSize: 10, color: "#5a7a6a", lineHeight: 1.55 }}>
+          Publish a thesis and it's graded against public price, on-chain. Early callers build rep fastest — get to 5 graded calls and you're a Verified Caller.
+        </div>
+      </div>
+      <button
+        onClick={() => navigate("/lab?tab=thesis")}
+        style={{
+          background: "#00ff8815", border: "1px solid #00ff88", borderRadius: 4,
+          color: "#00ff88", fontFamily: "monospace", fontSize: 11, fontWeight: "bold",
+          padding: "9px 16px", cursor: "pointer", letterSpacing: "0.05em", flexShrink: 0,
+        }}
+      >
+        → PUBLISH A THESIS
+      </button>
+    </div>
+  );
+}
+
 // ─── Feed Page ───────────────────────────────────────────────────────────────
 type FilterStatus = "ALL" | "ACTIVE" | "HIT_TP" | "STOPPED_OUT" | "INVALIDATED";
 type DirFilter = "ALL" | "LONG" | "SHORT";
@@ -1506,6 +1539,8 @@ export default function FeedPage() {
                     onFollowToggle={handleFollowToggle}
                   />
                 ))}
+                {/* Thin feed → invite contribution instead of just trailing off. */}
+                {feed.length < 12 && <ContributePrompt />}
               </div>
             )}
           </>
