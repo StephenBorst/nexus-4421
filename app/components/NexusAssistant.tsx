@@ -97,6 +97,7 @@ export default function NexusAssistant() {
   const [availableModels, setAvailableModels] = useState<string[]>([]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Fetch the models this key can actually access → avoids stale/retired model
   // ids (the 404 cause). Auto-correct the selected model if it's not in the list.
@@ -172,9 +173,12 @@ export default function NexusAssistant() {
       regime: null,
     });
 
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const { text: reply, toolsUsed } = await runChat({
         provider, model, apiKey: apiKey.trim(),
+        signal: controller.signal,
         system: `${SYSTEM_PROMPT}\n\n${context}`,
         history: next.map(({ role, content }) => ({ role, content })),
         ctx: {
@@ -193,10 +197,18 @@ export default function NexusAssistant() {
       });
       setMessages((m) => [...m, { role: "assistant", content: reply, tools: toolsUsed }]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Request failed.");
+      // User-initiated stop is not an error.
+      if (!(e instanceof DOMException && e.name === "AbortError")) {
+        setError(e instanceof Error ? e.message : "Request failed.");
+      }
     } finally {
+      abortRef.current = null;
       setLoading(false);
     }
+  }
+
+  function stop() {
+    abortRef.current?.abort();
   }
 
   // ── Floating launcher ──
@@ -292,6 +304,7 @@ export default function NexusAssistant() {
                 }}>
                   {m.role === "assistant" ? renderRich(m.content) : m.content}
                 </div>
+                {m.role === "assistant" && <CopyBtn text={m.content} />}
               </div>
             ))}
             {loading && <div style={{ fontFamily: mono, fontSize: 10, color: "#3a6a4a" }}>thinking…</div>}
@@ -312,13 +325,18 @@ export default function NexusAssistant() {
                 resize: "none", maxHeight: 100, minHeight: 36,
               }}
             />
-            <button onClick={send} disabled={loading || !input.trim()}
-              style={{
-                background: input.trim() && !loading ? "#0a1a0a" : "#080c08",
-                border: `1px solid ${input.trim() && !loading ? GREEN : "#1a2e1a"}`,
-                borderRadius: 4, color: input.trim() && !loading ? GREEN : "#2a4a3a",
-                fontFamily: mono, fontSize: 14, padding: "8px 12px", cursor: input.trim() && !loading ? "pointer" : "default",
-              }}>↑</button>
+            {loading ? (
+              <button onClick={stop} title="Stop"
+                style={{ background: "#1a0a0a", border: "1px solid #ff6b6b", borderRadius: 4, color: "#ff6b6b", fontFamily: mono, fontSize: 13, padding: "8px 12px", cursor: "pointer" }}>■</button>
+            ) : (
+              <button onClick={send} disabled={!input.trim()}
+                style={{
+                  background: input.trim() ? "#0a1a0a" : "#080c08",
+                  border: `1px solid ${input.trim() ? GREEN : "#1a2e1a"}`,
+                  borderRadius: 4, color: input.trim() ? GREEN : "#2a4a3a",
+                  fontFamily: mono, fontSize: 14, padding: "8px 12px", cursor: input.trim() ? "pointer" : "default",
+                }}>↑</button>
+            )}
           </div>
           <div style={{ fontFamily: mono, fontSize: 7.5, color: "#2a4a3a", textAlign: "center", padding: "0 8px 6px" }}>
             Analysis & education only — not financial advice. Key stays on your device.
@@ -326,6 +344,18 @@ export default function NexusAssistant() {
         </>
       )}
     </div>
+  );
+}
+
+function CopyBtn({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => { navigator.clipboard?.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {}); }}
+      style={{ alignSelf: "flex-start", background: "none", border: "none", color: copied ? GREEN : "#2a4a3a", fontFamily: mono, fontSize: 8, cursor: "pointer", padding: "1px 0" }}
+    >
+      {copied ? "✓ copied" : "⧉ copy"}
+    </button>
   );
 }
 

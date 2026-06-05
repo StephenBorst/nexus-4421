@@ -173,14 +173,15 @@ export async function runChat(opts: {
   system: string;
   history: ChatMsg[];
   ctx: ToolCtx;
+  signal?: AbortSignal;
 }): Promise<RunResult> {
   return opts.provider === "anthropic" ? runAnthropic(opts) : runOpenAI(opts);
 }
 
 async function runAnthropic(opts: {
-  model: string; apiKey: string; system: string; history: ChatMsg[]; ctx: ToolCtx;
+  model: string; apiKey: string; system: string; history: ChatMsg[]; ctx: ToolCtx; signal?: AbortSignal;
 }): Promise<RunResult> {
-  const { model, apiKey, system, history, ctx } = opts;
+  const { model, apiKey, system, history, ctx, signal } = opts;
   const messages: { role: string; content: unknown }[] = history.map((m) => ({ role: m.role, content: m.content }));
   const toolsUsed: string[] = [];
 
@@ -194,6 +195,7 @@ async function runAnthropic(opts: {
         "anthropic-dangerous-direct-browser-access": "true",
       },
       body: JSON.stringify({ model, max_tokens: 1024, system, tools: anthropicTools(), messages }),
+      signal,
     });
     if (!res.ok) throw new Error(await errText(res));
     const data = await res.json();
@@ -219,9 +221,9 @@ async function runAnthropic(opts: {
 }
 
 async function runOpenAI(opts: {
-  model: string; apiKey: string; system: string; history: ChatMsg[]; ctx: ToolCtx;
+  model: string; apiKey: string; system: string; history: ChatMsg[]; ctx: ToolCtx; signal?: AbortSignal;
 }): Promise<RunResult> {
-  const { model, apiKey, system, history, ctx } = opts;
+  const { model, apiKey, system, history, ctx, signal } = opts;
   const messages: Record<string, unknown>[] = [
     { role: "system", content: system },
     ...history.map((m) => ({ role: m.role, content: m.content })),
@@ -233,6 +235,7 @@ async function runOpenAI(opts: {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ model, messages, tools: openaiTools(), tool_choice: "auto" }),
+      signal,
     });
     if (!res.ok) throw new Error(await errText(res));
     const data = await res.json();
