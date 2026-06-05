@@ -118,6 +118,19 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
                 🔔 ALERTS
               </a>
             )}
+            {t.isPublic && walletAddress && (() => {
+              // Share your own public call → pulls external eyes back to the feed.
+              const tk = t.symbol.replace("PERP_", "").replace("_USDC", "");
+              const url = `${window.location.origin}/feed/thesis/${walletAddress.toLowerCase()}/${t.id}`;
+              const text = `📡 ${tk} ${t.direction} ${t.leverage.toFixed(1)}x\n\nEntry $${t.entryPrice.toFixed(2)} · Stop $${t.stopLoss.toFixed(2)} · TP $${t.takeProfit1.toFixed(2)} (R:R 1:${t.riskReward.toFixed(2)})\n\nGraded on-chain vs public price on Nexus Trading Labs 👇`;
+              const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+              return (
+                <a href={xUrl} target="_blank" rel="noopener noreferrer" title="Share this call on X"
+                  style={{ ...navBtnStyle, fontSize: 10, color: "#8aaa9a", borderColor: "#1a2e1a", textDecoration: "none", display: "inline-block", textAlign: "center", minHeight: 36, lineHeight: "22px", padding: "6px 12px" }}>
+                  𝕏 SHARE
+                </a>
+              );
+            })()}
             {(() => {
               // 3-state visibility cycle: PRIVATE → PUBLIC → HOLDERS → PRIVATE
               const vis = t.holdersOnly ? "HOLDERS" : t.isPublic ? "PUBLIC" : "PRIVATE";
