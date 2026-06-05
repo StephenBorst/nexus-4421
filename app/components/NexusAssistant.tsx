@@ -8,7 +8,7 @@
  * inference (pay in $NEXUS / USDC) is a later iteration.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAccount, usePrivateQuery } from "@orderly.network/hooks";
 import { useLabStorage } from "@/hooks/useLabStorage";
@@ -77,7 +77,37 @@ export default function NexusAssistant() {
   const walletAddress = (acct as { address?: string })?.address ?? null;
   const { theses } = useLabStorage(walletAddress);
   const { data: posData } = usePrivateQuery("/v1/positions", { revalidateOnFocus: false });
+  const { data: histData } = usePrivateQuery("/v1/position_history?limit=500", { revalidateOnFocus: false });
   const location = useLocation();
+
+  // Realized-performance summary from closed trades (same source as the Lab).
+  const performance = useMemo(() => {
+    const rows = Array.isArray(histData) ? histData : ((histData as { rows?: unknown[] })?.rows ?? []);
+    const trades = (rows as Record<string, unknown>[])
+      .filter((o) => o.position_status === "closed")
+      .map((o) => ({ symbol: String(o.symbol ?? ""), pnl: parseFloat(String(o.realized_pnl ?? 0)) }));
+    if (!trades.length) return null;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const losses = trades.filter((t) => t.pnl < 0).length;
+    const totalPnl = trades.reduce((s, t) => s + t.pnl, 0);
+    const best = trades.reduce<{ symbol: string; pnl: number } | null>((a, t) => (!a || t.pnl > a.pnl ? t : a), null);
+    const worst = trades.reduce<{ symbol: string; pnl: number } | null>((a, t) => (!a || t.pnl < a.pnl ? t : a), null);
+    const bySym: Record<string, { trades: number; pnl: number }> = {};
+    for (const t of trades) {
+      const k = t.symbol.replace("PERP_", "").replace("_USDC", "");
+      bySym[k] = bySym[k] || { trades: 0, pnl: 0 };
+      bySym[k].trades += 1; bySym[k].pnl += t.pnl;
+    }
+    const clean = (s: string) => s.replace("PERP_", "").replace("_USDC", "");
+    return {
+      closed_trades: trades.length, wins, losses,
+      win_rate_pct: wins + losses ? Math.round((wins / (wins + losses)) * 100) : null,
+      total_pnl: +totalPnl.toFixed(2),
+      best_trade: best ? { symbol: clean(best.symbol), pnl: +best.pnl.toFixed(2) } : null,
+      worst_trade: worst ? { symbol: clean(worst.symbol), pnl: +worst.pnl.toFixed(2) } : null,
+      by_symbol: Object.entries(bySym).map(([s, v]) => ({ symbol: s, trades: v.trades, pnl: +v.pnl.toFixed(2) })).sort((a, b) => b.trades - a.trades).slice(0, 8),
+    };
+  }, [histData]);
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
@@ -230,6 +260,7 @@ export default function NexusAssistant() {
               pnl: Number(p.unrealized_pnl ?? p.unsettled_pnl ?? 0),
             }))
             .filter((p) => Math.abs(p.qty) > 0),
+          performance,
         },
         onDelta: (chunk) => appendToLast((last) => ({ ...last, content: last.content + chunk })),
       });

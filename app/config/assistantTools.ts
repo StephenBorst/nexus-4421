@@ -19,6 +19,8 @@ export interface ToolCtx {
   // The user's live open positions (from the Orderly private query in the
   // assistant component) — provided so the position tool needs no extra auth.
   openPositions?: { symbol: string; qty: number; entry: number; mark: number; pnl: number }[];
+  // Pre-computed realized-performance summary (from /v1/position_history).
+  performance?: Record<string, unknown> | null;
 }
 
 export const THESIS_DRAFT_KEY = "nexus_thesis_draft";
@@ -96,6 +98,16 @@ export const TOOLS: ToolDef[] = [
       const pos = ctx.openPositions ?? [];
       if (!pos.length) return JSON.stringify({ positions: [], note: "no open positions (or wallet not authenticated to Orderly)" });
       return JSON.stringify({ count: pos.length, positions: pos, total_unrealized_pnl: pos.reduce((s, p) => s + (p.pnl || 0), 0) });
+    },
+  },
+  {
+    name: "get_my_performance",
+    description:
+      "Get the user's REALIZED trading track record from their closed trades on Nexus: win rate, total PnL, best/worst trade, and per-symbol breakdown. Use for 'how have I been trading', 'review my performance', 'what am I doing wrong', or any coaching on their actual results (distinct from planned theses or live positions).",
+    input_schema: { type: "object", properties: {} },
+    run: async (_args, ctx) => {
+      if (!ctx.performance) return JSON.stringify({ error: "no closed trades found (or wallet not authenticated to Orderly)" });
+      return JSON.stringify(ctx.performance);
     },
   },
   {
