@@ -1179,6 +1179,48 @@ function ContributePrompt() {
   );
 }
 
+// ─── Live pulse strip ────────────────────────────────────────────────────────
+// At-a-glance activity so even a thin feed reads as a living system, not a ghost
+// town. Derived entirely from the already-loaded feed — no extra fetch.
+function FeedPulse({ feed }: { feed: FeedThesis[] }) {
+  if (feed.length === 0) return null;
+  const callers = new Set(feed.filter((t) => !t.agent).map((t) => t.wallet.toLowerCase())).size;
+  const live = feed.filter((t) => t.status === "ACTIVE").length;
+  const resolved = feed.filter((t) => t.status === "HIT_TP" || t.status === "STOPPED_OUT" || t.status === "CLOSED").length;
+  const agents = feed.filter((t) => t.agent).length;
+  const newest = Math.max(...feed.map((t) => t.createdAt || 0));
+  const ageStr = (() => {
+    const d = Date.now() - newest, h = Math.floor(d / 3600000), dd = Math.floor(h / 24);
+    if (dd > 0) return `${dd}d ago`;
+    if (h > 0) return `${h}h ago`;
+    const m = Math.floor(d / 60000);
+    return m > 0 ? `${m}m ago` : "just now";
+  })();
+  const stats: { label: string; val: string; color?: string }[] = [
+    { label: "CALLERS", val: String(callers) },
+    { label: "PUBLIC CALLS", val: String(feed.length) },
+    { label: "LIVE", val: String(live), color: "#4a9fff" },
+    { label: "RESOLVED", val: String(resolved) },
+    ...(agents > 0 ? [{ label: "🤖 AGENT", val: String(agents), color: "#00ff88" }] : []),
+    { label: "LAST CALL", val: ageStr },
+  ];
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", padding: "10px 14px", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 6, marginBottom: 14 }}>
+      <style>{`@keyframes feedPulse{0%,100%{opacity:1;box-shadow:0 0 8px #00ff88}50%{opacity:0.4;box-shadow:0 0 2px #00ff88}}`}</style>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#00ff88", animation: "feedPulse 2s infinite" }} />
+        <span style={{ fontFamily: "monospace", fontSize: 10, color: "#00ff88", fontWeight: "bold", letterSpacing: "0.1em" }}>LIVE</span>
+      </div>
+      {stats.map((s) => (
+        <div key={s.label} style={{ display: "flex", flexDirection: "column", lineHeight: 1.25 }}>
+          <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: "bold", color: s.color || "#fff" }}>{s.val}</span>
+          <span style={{ fontFamily: "monospace", fontSize: 7.5, color: "#3a5a4a", letterSpacing: "0.06em" }}>{s.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Feed Page ───────────────────────────────────────────────────────────────
 type FilterStatus = "ALL" | "ACTIVE" | "HIT_TP" | "STOPPED_OUT" | "INVALIDATED";
 type DirFilter = "ALL" | "LONG" | "SHORT";
@@ -1459,6 +1501,7 @@ export default function FeedPage() {
         {/* ── FEED VIEW ── */}
         {view === "feed" && (
           <>
+            {!loading && !error && <FeedPulse feed={feed} />}
             {/* Filters */}
             <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
               {(["ALL", "ACTIVE", "HIT_TP", "STOPPED_OUT", "INVALIDATED"] as FilterStatus[]).map((f) => (
