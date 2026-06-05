@@ -236,6 +236,27 @@ export default function NexusAssistant() {
 
   const hasKey = apiKey.trim().length > 0;
 
+  // Locally-computed (no API call) personalized hook — drives the first
+  // conversation by surfacing a real leak the moment the panel opens.
+  const personalInsight = (() => {
+    const wr = performance?.win_rate_pct as number | null | undefined;
+    const pnl = performance?.total_pnl as number | undefined;
+    const worst = performance?.worst_trade as { symbol: string; pnl: number } | null | undefined;
+    if (wr != null && wr >= 50 && typeof pnl === "number" && pnl < 0) {
+      return {
+        text: `You win ${wr}% of trades but you're down $${Math.abs(pnl).toFixed(0)} overall — ask me why.`,
+        prompt: "I win more often than I lose but I'm down overall — analyze my closed trades and tell me exactly what to fix.",
+      };
+    }
+    if (worst && typeof pnl === "number" && worst.pnl < 0 && Math.abs(worst.pnl) > Math.abs(pnl) && pnl < 0) {
+      return {
+        text: `One ${worst.symbol} trade (-$${Math.abs(worst.pnl).toFixed(0)}) is sinking your record — ask me how to fix it.`,
+        prompt: `My worst trade was ${worst.symbol}. Analyze my closed trades and tell me how to stop single positions from blowing up my account.`,
+      };
+    }
+    return null;
+  })();
+
   // Context-aware starter prompts based on the page the user is on.
   const pageSuggestions = (() => {
     const p = location.pathname;
@@ -406,6 +427,19 @@ export default function NexusAssistant() {
                 {hasKey
                   ? "Ask about your theses, agent, the market, or a trade idea. I can see your live session context."
                   : "Bring your own API key (Anthropic or OpenAI) to start — it stays on your device, never sent to Nexus. Tap ⚙ to set it up."}
+                {personalInsight && (
+                  <div
+                    onClick={() => hasKey && setInput(personalInsight.prompt)}
+                    style={{
+                      marginTop: 12, padding: "9px 11px", borderRadius: 5,
+                      background: "#1a1206", border: "1px solid #4a3a00",
+                      cursor: hasKey ? "pointer" : "default",
+                    }}
+                  >
+                    <div style={{ fontFamily: mono, fontSize: 9, color: "#fbbf24", fontWeight: "bold", letterSpacing: "0.04em", marginBottom: 2 }}>⚠ TRADING INSIGHT</div>
+                    <div style={{ fontFamily: mono, fontSize: 10, color: "#d8c89a", lineHeight: 1.5 }}>{personalInsight.text}</div>
+                  </div>
+                )}
                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
                   {pageSuggestions.map((s) => (
                     <button key={s} onClick={() => setInput(s)} disabled={!hasKey}
