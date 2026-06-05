@@ -4,6 +4,7 @@ import { Helmet } from "react-helmet-async";
 import OrderlyProvider from "@/components/orderlyProvider";
 import { HttpsRequiredWarning } from "@/components/HttpsRequiredWarning";
 import OnboardingModal from "@/components/OnboardingModal";
+import NexusAssistant from "@/components/NexusAssistant";
 import { withBasePath } from "./utils/base-path";
 import { getSEOConfig, getUserLanguage } from "./utils/seo";
 export default function App() {
@@ -39,6 +40,7 @@ export default function App() {
       )}
       <OrderlyProvider>
         <Outlet />
+        <NexusAssistant />
       </OrderlyProvider>
     </>
   );

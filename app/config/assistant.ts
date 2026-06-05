@@ -1,0 +1,159 @@
+/**
+ * Nexus AI Assistant — config + provider plumbing (single source of truth).
+ *
+ * v1 is BYOK, CLIENT-SIDE ONLY: the user's API key lives in localStorage and the
+ * browser calls the model provider directly. The key NEVER touches a Nexus
+ * server, so we carry zero key-custody liability. Hosted inference (pay in
+ * $NEXUS / USDC) is a later iteration that routes through a worker.
+ *
+ * No SDKs — we hit the providers' REST APIs with fetch to keep the bundle light.
+ */
+
+export type ProviderId = "anthropic" | "openai";
+
+export interface ProviderDef {
+  id: ProviderId;
+  label: string;
+  endpoint: string;
+  defaultModel: string;
+  models: string[];
+  keyHint: string;
+}
+
+export const PROVIDERS: Record<ProviderId, ProviderDef> = {
+  anthropic: {
+    id: "anthropic",
+    label: "Anthropic (Claude)",
+    endpoint: "https://api.anthropic.com/v1/messages",
+    defaultModel: "claude-3-5-sonnet-latest",
+    models: ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"],
+    keyHint: "sk-ant-…",
+  },
+  openai: {
+    id: "openai",
+    label: "OpenAI (GPT)",
+    endpoint: "https://api.openai.com/v1/chat/completions",
+    defaultModel: "gpt-4o",
+    models: ["gpt-4o", "gpt-4o-mini"],
+    keyHint: "sk-…",
+  },
+};
+
+// localStorage keys (client-side only).
+export const LS_PROVIDER = "nexus_ai_provider";
+export const LS_MODEL = "nexus_ai_model";
+export const LS_KEY = (p: ProviderId) => `nexus_ai_key_${p}`; // per-provider key
+
+export interface ChatMsg {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/**
+ * System prompt — the assistant's identity + the advice/Howey guardrail. Trading
+ * commentary stays analytical and educational; never a personalized "buy/sell"
+ * directive. Nexus-specific context is appended at call time.
+ */
+export const SYSTEM_PROMPT = `You are the Nexus AI Assistant, a copilot built into Nexus Trading Labs — a perpetual DEX trading terminal on Arbitrum (powered by Orderly Network).
+
+Your job: help the trader understand the market, reason about their own theses, agent, and track record, and become a better, more disciplined trader. You have access to live context about the user's session (current page, their planned theses, autonomous agent state, market regime) which is provided below.
+
+HARD RULES:
+- You are NOT a licensed financial advisor. Never give personalized investment advice or direct "buy/sell/hold this now" instructions. Frame everything as analysis, education, and helping the user reason — the decision is always theirs.
+- Be precise and concise. This is a terminal; traders want signal, not fluff.
+- When you reference the user's data, use the context provided — don't invent positions or numbers.
+- If asked about something outside the provided context or your knowledge, say so plainly.
+- Match the terminal's voice: sharp, technical, no hype.`;
+
+/** Build the per-request context block injected after the system prompt. */
+export function buildContextBlock(ctx: {
+  page: string;
+  wallet: string | null;
+  theses: { symbol: string; direction: string; status: string; riskReward?: number }[];
+  agent: { mode?: string; active?: boolean; hasPosition?: boolean } | null;
+  regime?: string | null;
+}): string {
+  const lines: string[] = ["--- LIVE SESSION CONTEXT ---"];
+  lines.push(`Current page: ${ctx.page}`);
+  lines.push(`Wallet: ${ctx.wallet ? ctx.wallet : "not connected"}`);
+  if (ctx.regime) lines.push(`Market regime: ${ctx.regime}`);
+  if (ctx.agent) {
+    lines.push(
+      `Agent: ${ctx.agent.active ? "ACTIVE" : "inactive"}` +
+        (ctx.agent.mode ? ` (${ctx.agent.mode})` : "") +
+        (ctx.agent.hasPosition ? " — holding a position" : "")
+    );
+  }
+  if (ctx.theses.length) {
+    lines.push(`User's theses (${ctx.theses.length}):`);
+    for (const t of ctx.theses.slice(0, 12)) {
+      const sym = t.symbol.replace("PERP_", "").replace("_USDC", "");
+      lines.push(`  • ${sym} ${t.direction} — ${t.status}${t.riskReward ? ` (R:R 1:${t.riskReward.toFixed(2)})` : ""}`);
+    }
+  } else {
+    lines.push("User has no saved theses yet.");
+  }
+  lines.push("--- END CONTEXT ---");
+  return lines.join("\n");
+}
+
+/**
+ * Send a chat turn to the selected provider directly from the browser.
+ * Returns the assistant's reply text. Throws on auth/network errors.
+ */
+export async function sendChat(opts: {
+  provider: ProviderId;
+  model: string;
+  apiKey: string;
+  system: string;
+  history: ChatMsg[];
+}): Promise<string> {
+  const { provider, model, apiKey, system, history } = opts;
+
+  if (provider === "anthropic") {
+    const res = await fetch(PROVIDERS.anthropic.endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 1024,
+        system,
+        messages: history.map((m) => ({ role: m.role, content: m.content })),
+      }),
+    });
+    if (!res.ok) throw new Error(await errText(res));
+    const data = await res.json();
+    return data?.content?.[0]?.text ?? "(empty response)";
+  }
+
+  // openai
+  const res = await fetch(PROVIDERS.openai.endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "system", content: system }, ...history.map((m) => ({ role: m.role, content: m.content }))],
+    }),
+  });
+  if (!res.ok) throw new Error(await errText(res));
+  const data = await res.json();
+  return data?.choices?.[0]?.message?.content ?? "(empty response)";
+}
+
+async function errText(res: Response): Promise<string> {
+  let detail = "";
+  try {
+    const j = await res.json();
+    detail = j?.error?.message || JSON.stringify(j).slice(0, 200);
+  } catch {
+    detail = await res.text().catch(() => "");
+  }
+  if (res.status === 401) return "Invalid API key (401). Check your key in settings.";
+  if (res.status === 429) return "Rate limited / quota exceeded (429).";
+  return `Request failed (${res.status}). ${detail}`.trim();
+}
