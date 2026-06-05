@@ -55,21 +55,50 @@ function inline(text: string): React.ReactNode {
     return p;
   });
 }
+const isTableSep = (l: string) => /\|/.test(l) && /^[\s:|-]+$/.test(l.trim()) && l.includes("-");
+const splitRow = (l: string) => l.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+
 function renderRich(text: string): React.ReactNode {
-  return text.split("\n").map((line, i) => {
-    const t = line.trimEnd();
-    if (t.trim() === "") return <div key={i} style={{ height: 5 }} />;
+  const lines = text.split("\n");
+  const out: React.ReactNode[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trimEnd();
+
+    // Table: header row + separator row + body rows.
+    if (t.includes("|") && i + 1 < lines.length && isTableSep(lines[i + 1])) {
+      const header = splitRow(t);
+      const rows: string[][] = [];
+      let j = i + 2;
+      while (j < lines.length && lines[j].includes("|")) { rows.push(splitRow(lines[j])); j++; }
+      out.push(
+        <table key={i} style={{ borderCollapse: "collapse", margin: "4px 0", fontSize: 10 }}>
+          <thead><tr>{header.map((h, k) => (
+            <th key={k} style={{ textAlign: "left", color: "#5a8a6a", borderBottom: "1px solid #1a2e1a", padding: "2px 8px 2px 0", fontWeight: "bold" }}>{inline(h)}</th>
+          ))}</tr></thead>
+          <tbody>{rows.map((r, ri) => (
+            <tr key={ri}>{r.map((c, ci) => (
+              <td key={ci} style={{ padding: "2px 8px 2px 0", color: "#c8d8c8", verticalAlign: "top" }}>{inline(c)}</td>
+            ))}</tr>
+          ))}</tbody>
+        </table>
+      );
+      i = j - 1;
+      continue;
+    }
+
+    if (t.trim() === "") { out.push(<div key={i} style={{ height: 5 }} />); continue; }
     const hdr = t.match(/^(#{1,3})\s+(.*)/);
-    if (hdr) return <div key={i} style={{ color: "#fff", fontWeight: "bold", marginTop: 4 }}>{inline(hdr[2])}</div>;
+    if (hdr) { out.push(<div key={i} style={{ color: "#fff", fontWeight: "bold", marginTop: 4 }}>{inline(hdr[2])}</div>); continue; }
     const bullet = t.match(/^\s*[-*•]\s+(.*)/);
-    if (bullet) return (
+    if (bullet) { out.push(
       <div key={i} style={{ display: "flex", gap: 6 }}>
         <span style={{ color: GREEN }}>•</span>
         <span>{inline(bullet[1])}</span>
       </div>
-    );
-    return <div key={i}>{inline(t)}</div>;
-  });
+    ); continue; }
+    out.push(<div key={i}>{inline(t)}</div>);
+  }
+  return out;
 }
 
 export default function NexusAssistant() {
