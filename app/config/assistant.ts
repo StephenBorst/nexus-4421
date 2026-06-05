@@ -258,6 +258,165 @@ async function runOpenAI(opts: {
   return { text: "Stopped after too many tool calls — try narrowing the question.", toolsUsed };
 }
 
+// ── STREAMING ──────────────────────────────────────────────────────────────
+// Same bounded tool loop, but text streams to onDelta token-by-token. The
+// non-streaming runChat above stays as an instant fallback.
+
+export async function runChatStream(opts: {
+  provider: ProviderId; model: string; apiKey: string; system: string;
+  history: ChatMsg[]; ctx: ToolCtx; signal?: AbortSignal;
+  onDelta: (chunk: string) => void;
+}): Promise<RunResult> {
+  return opts.provider === "anthropic" ? runAnthropicStream(opts) : runOpenAIStream(opts);
+}
+
+// Read an SSE response body line-by-line and hand each parsed `data:` JSON to cb.
+async function readSSE(res: Response, cb: (json: Record<string, unknown>) => void): Promise<void> {
+  const reader = res.body?.getReader();
+  if (!reader) return;
+  const dec = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let nl: number;
+    while ((nl = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim();
+      if (data === "[DONE]") return;
+      try { cb(JSON.parse(data)); } catch { /* keep-alive / partial */ }
+    }
+  }
+}
+
+async function runAnthropicStream(opts: {
+  model: string; apiKey: string; system: string; history: ChatMsg[]; ctx: ToolCtx; signal?: AbortSignal;
+  onDelta: (c: string) => void;
+}): Promise<RunResult> {
+  const { model, apiKey, system, history, ctx, signal, onDelta } = opts;
+  const messages: { role: string; content: unknown }[] = history.map((m) => ({ role: m.role, content: m.content }));
+  const toolsUsed: string[] = [];
+  let fullText = "";
+
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const res = await fetch(PROVIDERS.anthropic.endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json", "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({ model, max_tokens: 1024, system, tools: anthropicTools(), messages, stream: true }),
+      signal,
+    });
+    if (!res.ok) throw new Error(await errText(res));
+
+    const blocks: Record<number, { type: string; text?: string; id?: string; name?: string; json?: string }> = {};
+    let stopReason: string | null = null;
+    await readSSE(res, (ev) => {
+      const type = ev.type as string;
+      if (type === "content_block_start") {
+        const cb = (ev.content_block as { type: string; id?: string; name?: string }) || { type: "text" };
+        blocks[ev.index as number] = cb.type === "tool_use"
+          ? { type: "tool_use", id: cb.id, name: cb.name, json: "" }
+          : { type: "text", text: "" };
+      } else if (type === "content_block_delta") {
+        const b = blocks[ev.index as number];
+        const delta = ev.delta as { type: string; text?: string; partial_json?: string };
+        if (!b) return;
+        if (delta.type === "text_delta" && delta.text) { b.text = (b.text || "") + delta.text; fullText += delta.text; onDelta(delta.text); }
+        else if (delta.type === "input_json_delta" && delta.partial_json) { b.json = (b.json || "") + delta.partial_json; }
+      } else if (type === "message_delta") {
+        const sr = (ev.delta as { stop_reason?: string })?.stop_reason;
+        if (sr) stopReason = sr;
+      }
+    });
+
+    const content = Object.keys(blocks).map(Number).sort((a, b) => a - b).map((k) => {
+      const b = blocks[k];
+      if (b.type === "text") return { type: "text", text: b.text || "" };
+      let input: Record<string, unknown> = {};
+      try { input = JSON.parse(b.json || "{}"); } catch { /* empty */ }
+      return { type: "tool_use", id: b.id, name: b.name, input };
+    });
+
+    if (stopReason === "tool_use") {
+      messages.push({ role: "assistant", content });
+      const results: unknown[] = [];
+      for (const b of content) {
+        if (b.type !== "tool_use" || !b.name) continue;
+        toolsUsed.push(b.name);
+        const out = await runTool(b.name, (b as { input?: Record<string, unknown> }).input ?? {}, ctx);
+        results.push({ type: "tool_result", tool_use_id: b.id, content: out });
+      }
+      messages.push({ role: "user", content: results });
+      continue;
+    }
+    return { text: fullText.trim() || "(empty response)", toolsUsed };
+  }
+  return { text: fullText.trim() || "Stopped after too many tool calls.", toolsUsed };
+}
+
+async function runOpenAIStream(opts: {
+  model: string; apiKey: string; system: string; history: ChatMsg[]; ctx: ToolCtx; signal?: AbortSignal;
+  onDelta: (c: string) => void;
+}): Promise<RunResult> {
+  const { model, apiKey, system, history, ctx, signal, onDelta } = opts;
+  const messages: Record<string, unknown>[] = [
+    { role: "system", content: system },
+    ...history.map((m) => ({ role: m.role, content: m.content })),
+  ];
+  const toolsUsed: string[] = [];
+  let fullText = "";
+
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const res = await fetch(PROVIDERS.openai.endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages, tools: openaiTools(), tool_choice: "auto", stream: true }),
+      signal,
+    });
+    if (!res.ok) throw new Error(await errText(res));
+
+    const calls: Record<number, { id: string; name: string; args: string }> = {};
+    let finish: string | null = null;
+    let roundText = "";
+    await readSSE(res, (ev) => {
+      const ch = (ev.choices as { delta?: Record<string, unknown>; finish_reason?: string }[] | undefined)?.[0];
+      if (!ch) return;
+      const d = (ch.delta || {}) as { content?: string; tool_calls?: { index: number; id?: string; function?: { name?: string; arguments?: string } }[] };
+      if (d.content) { roundText += d.content; fullText += d.content; onDelta(d.content); }
+      if (d.tool_calls) {
+        for (const tc of d.tool_calls) {
+          const c = calls[tc.index] || { id: "", name: "", args: "" };
+          if (tc.id) c.id = tc.id;
+          if (tc.function?.name) c.name += tc.function.name;
+          if (tc.function?.arguments) c.args += tc.function.arguments;
+          calls[tc.index] = c;
+        }
+      }
+      if (ch.finish_reason) finish = ch.finish_reason;
+    });
+
+    const callList = Object.keys(calls).map(Number).sort((a, b) => a - b).map((k) => calls[k]);
+    if (finish === "tool_calls" && callList.length) {
+      messages.push({ role: "assistant", content: roundText || null, tool_calls: callList.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: c.args } })) });
+      for (const c of callList) {
+        toolsUsed.push(c.name);
+        let args: Record<string, unknown> = {};
+        try { args = JSON.parse(c.args || "{}"); } catch { /* empty */ }
+        const out = await runTool(c.name, args, ctx);
+        messages.push({ role: "tool", tool_call_id: c.id, content: out });
+      }
+      continue;
+    }
+    return { text: fullText.trim() || "(empty response)", toolsUsed };
+  }
+  return { text: fullText.trim() || "Stopped after too many tool calls.", toolsUsed };
+}
+
 async function runTool(name: string, input: Record<string, unknown>, ctx: ToolCtx): Promise<string> {
   const tool = TOOL_BY_NAME[name];
   if (!tool) return JSON.stringify({ error: `unknown tool: ${name}` });

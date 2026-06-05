@@ -15,7 +15,7 @@ import { useLabStorage } from "@/hooks/useLabStorage";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import {
   PROVIDERS, LS_PROVIDER, LS_MODEL, LS_KEY, SYSTEM_PROMPT,
-  buildContextBlock, runChat, listModels, type ProviderId, type ChatMsg,
+  buildContextBlock, runChatStream, listModels, type ProviderId, type ChatMsg,
 } from "@/config/assistant";
 
 function pickDefaultModel(provider: ProviderId, ids: string[]): string {
@@ -141,7 +141,8 @@ export default function NexusAssistant() {
   }, [open, walletAddress]);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    // Instant (not smooth) — keeps pinned to bottom during rapid token streaming.
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, loading]);
 
   // Persist the conversation (capped) so it survives close/reload.
@@ -162,7 +163,8 @@ export default function NexusAssistant() {
     if (!hasKey) { setView("settings"); return; }
 
     const next: DisplayMsg[] = [...messages, { role: "user", content: text }];
-    setMessages(next);
+    // Add an empty assistant placeholder that streamed tokens append to.
+    setMessages([...next, { role: "assistant", content: "" }]);
     setInput("");
     setError(null);
     setLoading(true);
@@ -175,10 +177,18 @@ export default function NexusAssistant() {
       regime: null,
     });
 
+    const appendToLast = (patch: (last: DisplayMsg) => DisplayMsg) =>
+      setMessages((m) => {
+        const copy = m.slice();
+        const last = copy[copy.length - 1];
+        if (last && last.role === "assistant") copy[copy.length - 1] = patch(last);
+        return copy;
+      });
+
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const { text: reply, toolsUsed } = await runChat({
+      const { toolsUsed } = await runChatStream({
         provider, model, apiKey: apiKey.trim(),
         signal: controller.signal,
         system: `${SYSTEM_PROMPT}\n\n${context}`,
@@ -196,12 +206,18 @@ export default function NexusAssistant() {
             }))
             .filter((p) => Math.abs(p.qty) > 0),
         },
+        onDelta: (chunk) => appendToLast((last) => ({ ...last, content: last.content + chunk })),
       });
-      setMessages((m) => [...m, { role: "assistant", content: reply, tools: toolsUsed }]);
+      appendToLast((last) => ({ ...last, tools: toolsUsed }));
     } catch (e) {
-      // User-initiated stop is not an error.
+      // User-initiated stop keeps whatever streamed so far.
       if (!(e instanceof DOMException && e.name === "AbortError")) {
         setError(e instanceof Error ? e.message : "Request failed.");
+        // Drop the empty placeholder if nothing streamed.
+        setMessages((m) => {
+          const last = m[m.length - 1];
+          return last && last.role === "assistant" && !last.content ? m.slice(0, -1) : m;
+        });
       }
     } finally {
       abortRef.current = null;
@@ -309,7 +325,9 @@ export default function NexusAssistant() {
                 {m.role === "assistant" && <CopyBtn text={m.content} />}
               </div>
             ))}
-            {loading && <div style={{ fontFamily: mono, fontSize: 10, color: "#3a6a4a" }}>thinking…</div>}
+            {loading && !messages[messages.length - 1]?.content && (
+              <div style={{ fontFamily: mono, fontSize: 10, color: "#3a6a4a" }}>thinking…</div>
+            )}
             {error && <div style={{ fontFamily: mono, fontSize: 10, color: "#ff6b6b", lineHeight: 1.5 }}>⚠ {error}</div>}
           </div>
 
