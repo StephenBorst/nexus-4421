@@ -29,11 +29,13 @@ const GREEN = "#00ff88";
 
 type DisplayMsg = ChatMsg & { tools?: string[] };
 
-// Load the stored model for a provider, migrating dead "-latest" aliases (which
-// now 404) to the current default.
+// Load the stored model for a provider. Reject dead "-latest" aliases (404) and
+// cross-provider ids (e.g. a Claude model stored under OpenAI) → default.
 function loadModel(p: ProviderId): string {
   const stored = typeof window !== "undefined" ? window.localStorage.getItem(LS_MODEL(p)) : null;
-  return stored && !/-latest$/.test(stored) ? stored : PROVIDERS[p].defaultModel;
+  if (!stored || /-latest$/.test(stored)) return PROVIDERS[p].defaultModel;
+  const matchesFamily = p === "anthropic" ? /^claude/i.test(stored) : /^(gpt|o\d|chatgpt)/i.test(stored);
+  return matchesFamily ? stored : PROVIDERS[p].defaultModel;
 }
 
 const CHAT_KEY = "nexus_ai_chat";
@@ -109,14 +111,26 @@ export default function NexusAssistant() {
     listModels(provider, apiKey.trim()).then((ids) => {
       if (cancelled || !ids.length) return;
       setAvailableModels(ids);
-      setModel((cur) => (ids.includes(cur) ? cur : pickDefaultModel(provider, ids)));
+      setModel((cur) => {
+        const corrected = ids.includes(cur) ? cur : pickDefaultModel(provider, ids);
+        if (corrected !== cur) window.localStorage.setItem(LS_MODEL(provider), corrected);
+        return corrected;
+      });
     });
     return () => { cancelled = true; };
   }, [provider, apiKey]);
 
-  // Persist settings.
+  // Set + persist the model for the CURRENT provider. Used by explicit user
+  // choices (and auto-correct) — NOT by the provider-switch loader, which would
+  // otherwise write the previous provider's model into the new provider's slot
+  // (an effect-ordering race).
+  const chooseModel = (m: string) => {
+    setModel(m);
+    window.localStorage.setItem(LS_MODEL(provider), m);
+  };
+
+  // Persist provider.
   useEffect(() => { window.localStorage.setItem(LS_PROVIDER, provider); }, [provider]);
-  useEffect(() => { window.localStorage.setItem(LS_MODEL(provider), model); }, [provider, model]);
   // When provider changes, load that provider's own stored key + model (each
   // provider remembers its own — never carry a Claude model id onto OpenAI).
   useEffect(() => {
@@ -282,7 +296,7 @@ export default function NexusAssistant() {
       {view === "settings" ? (
         <SettingsView
           provider={provider} setProvider={setProvider}
-          model={model} setModel={setModel}
+          model={model} setModel={chooseModel}
           apiKey={apiKey} saveKey={saveKey}
           availableModels={availableModels}
           onDone={() => setView("chat")}

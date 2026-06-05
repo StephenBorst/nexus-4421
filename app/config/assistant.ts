@@ -36,7 +36,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDef> = {
     label: "OpenAI (GPT)",
     endpoint: "https://api.openai.com/v1/chat/completions",
     defaultModel: "gpt-4o",
-    models: ["gpt-4o", "gpt-4o-mini"],
+    models: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "o4-mini"],
     keyHint: "sk-…",
   },
 };
