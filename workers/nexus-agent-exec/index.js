@@ -158,8 +158,24 @@ function getMarkPrice(symbol, env, cache) {
 const BATCH_SIZE = 10; // bounded concurrency — fast without hammering the APIs
 
 export default {
+  // Read-only health/heartbeat endpoint for ops monitoring.
+  async fetch(request, env) {
+    let users = 0, lastTick = null;
+    try {
+      const u = await env.NEXUS_AGENT.get("agent:users");
+      users = u ? JSON.parse(u).length : 0;
+      lastTick = await env.NEXUS_AGENT.get("ops:exec:heartbeat");
+    } catch (e) { return new Response("boot error: " + e.message, { status: 500 }); }
+    const tickAgeSec = lastTick ? Math.round((Date.now() - Number(lastTick)) / 1000) : null;
+    return new Response(JSON.stringify({ ok: true, users, lastTickAgeSec: tickAgeSec }), { headers: { "content-type": "application/json" } });
+  },
+
   async scheduled(event, env) {
     try {
+      // Heartbeat so ops can monitor that the 1-min cron is firing (mirrors the
+      // brain's ops:brain:heartbeat). Cheap; lets us distinguish "agent idle by
+      // design" from "exec cron actually stopped".
+      await env.NEXUS_AGENT.put("ops:exec:heartbeat", String(Date.now()));
       const usersRaw = await env.NEXUS_AGENT.get("agent:users");
       if (!usersRaw) return;
       const users = JSON.parse(usersRaw);
@@ -218,12 +234,15 @@ async function processUser(address, env, cache) {
   if (!configRaw) return;
   const config = JSON.parse(configRaw);
 
-  // Daily reset check
+  // Daily reset check. Persist immediately when it fires — otherwise the reset
+  // only mutates the in-memory state and is lost unless the agent happens to
+  // trade this tick, leaving the API/UI showing a stale trades_today/daily_pnl.
   const now = Date.now();
   if (shouldResetDaily(state.last_reset, now)) {
     state.daily_pnl = 0;
     state.trades_today = 0;
     state.last_reset = now;
+    await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
   }
 
   // Daily limits check (tested in logic.mjs)
