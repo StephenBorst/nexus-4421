@@ -2998,8 +2998,30 @@ document.getElementById("btn").addEventListener("click",go);
         return { rank: i + 1, displayName: p.displayName || null, pfp: p.pfp || null, ...e };
       }));
 
+      // Emerging callers — 1..MIN_CALLS-1 resolved calls (not yet ranked). Surfaced
+      // so contribution is visible immediately at cold-start instead of an empty
+      // board, and shows each author how many more resolved calls to qualify.
+      const emerging = [];
+      for (const [wallet, a] of Object.entries(byWallet)) {
+        if (a.calls >= MIN_CALLS || a.calls < 1) continue;
+        emerging.push({
+          wallet, calls: a.calls,
+          hitRate: Math.round((a.wins / a.calls) * 1000) / 10,
+          avgR: Math.round((a.rSum / a.calls) * 100) / 100,
+          totalR: Math.round(a.rSum * 100) / 100,
+          callsToQualify: MIN_CALLS - a.calls,
+        });
+      }
+      emerging.sort((x, y) => y.calls - x.calls || y.avgR - x.avgR);
+      const emergingEnriched = await Promise.all(emerging.slice(0, 15).map(async (e) => {
+        const profileRaw = await env.LAB_STORE.get(`profile:${e.wallet}`);
+        const p = profileRaw ? JSON.parse(profileRaw) : {};
+        return { displayName: p.displayName || null, pfp: p.pfp || null, ...e };
+      }));
+
       return json({
         leaderboard: enriched,
+        emerging: emergingEnriched,
         criteria: {
           minCalls: MIN_CALLS,
           grading: "Objective first-touch vs public Orderly OHLC (/tv/history, 1h). TP1-first = WIN (+planned R), SL-first = LOSS (-1R), same-candle = LOSS (conservative). PENDING excluded. Anyone can recompute.",

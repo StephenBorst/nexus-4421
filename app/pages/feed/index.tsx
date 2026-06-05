@@ -820,6 +820,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
 
   // Trustless call grades (public-price graded, on-chain anchored) keyed by wallet.
   const [graded, setGraded] = useState<Map<string, { hitRate: number; avgR: number; calls: number; score: number }>>(new Map());
+  const [emerging, setEmerging] = useState<Map<string, { calls: number; toQualify: number }>>(new Map());
   const [callLedger, setCallLedger] = useState<{ ledgerHash?: string; onChain?: { verified?: boolean; explorer?: string } | null } | null>(null);
   useEffect(() => {
     let cancel = false;
@@ -833,6 +834,11 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
         if (e.wallet) m.set(e.wallet.toLowerCase(), { hitRate: e.hitRate, avgR: e.avgR, calls: e.calls, score: e.score });
       }
       setGraded(m);
+      const em = new Map<string, { calls: number; toQualify: number }>();
+      for (const e of (lb?.emerging || [])) {
+        if (e.wallet) em.set(e.wallet.toLowerCase(), { calls: e.calls, toQualify: e.callsToQualify });
+      }
+      setEmerging(em);
       setCallLedger(led || null);
     });
     return () => { cancel = true; };
@@ -877,9 +883,9 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, paddingLeft: 2 }}>
-        <div style={{ width: 6, height: 6, borderRadius: "50%", background: onChainLoading ? "#fbbf24" : graded.size > 0 ? "#00ff88" : onChainStats.size > 0 ? "#00ff88" : "#3a5a4a" }} />
+        <div style={{ width: 6, height: 6, borderRadius: "50%", background: onChainLoading ? "#fbbf24" : graded.size > 0 ? "#00ff88" : emerging.size > 0 ? "#fbbf24" : onChainStats.size > 0 ? "#00ff88" : "#3a5a4a" }} />
         <span style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>
-          {graded.size > 0 ? `✓ ${graded.size} VERIFIED CALLER${graded.size !== 1 ? "S" : ""} · graded from public price` : onChainLoading ? "VERIFYING ON-CHAIN STATS..." : onChainStats.size > 0 ? `⛓ ${onChainStats.size} TRADER${onChainStats.size !== 1 ? "S" : ""} VERIFIED ON-CHAIN` : "RANKED BY KV DATA"}
+          {graded.size > 0 ? `✓ ${graded.size} VERIFIED CALLER${graded.size !== 1 ? "S" : ""} · graded from public price` : emerging.size > 0 ? `◆ ${emerging.size} EMERGING CALLER${emerging.size !== 1 ? "S" : ""} · building toward verification (5 graded calls)` : onChainLoading ? "VERIFYING ON-CHAIN STATS..." : onChainStats.size > 0 ? `⛓ ${onChainStats.size} TRADER${onChainStats.size !== 1 ? "S" : ""} VERIFIED ON-CHAIN` : "RANKED BY KV DATA"}
         </span>
       </div>
       {callLedger?.ledgerHash && (
@@ -936,6 +942,11 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                 {/* Badge line — never clipped, wraps if needed */}
                 <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 2 }}>
                   {trader.graded && <span title="Calls graded from public price — trustless" style={{ fontSize: 8, color: "#00ff88", border: "1px solid #1a4a2a", borderRadius: 2, padding: "1px 4px", background: "#0a1a0e" }}>✓ VERIFIED</span>}
+                  {!trader.graded && emerging.has(trader.wallet.toLowerCase()) && (
+                    <span title="Resolved public-price-graded calls — 5 needed to become a Verified Caller" style={{ fontSize: 8, color: "#fbbf24", border: "1px solid #4a3a00", borderRadius: 2, padding: "1px 4px", background: "#1a1206" }}>
+                      ◆ EMERGING · {emerging.get(trader.wallet.toLowerCase())!.toQualify} to verify
+                    </span>
+                  )}
                   <NexusTierBadge address={trader.wallet} />
                 </div>
                 {trader.graded ? (
