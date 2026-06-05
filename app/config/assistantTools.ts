@@ -136,6 +136,35 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "get_trader",
+    description:
+      "Analyze a specific trader by wallet: their PUBLIC published theses and a win/loss summary (graded by status). Use when the user is viewing or asks about a trader's track record. Only public theses are returned.",
+    input_schema: {
+      type: "object",
+      properties: { wallet: { type: "string", description: "0x… wallet address." } },
+      required: ["wallet"],
+    },
+    run: async (args) => {
+      const w = String(args.wallet ?? "").trim();
+      if (!/^0x[0-9a-fA-F]{40}$/.test(w)) return JSON.stringify({ error: "invalid wallet address" });
+      const res = await fetch(`${AGENT_API}/feed`);
+      if (!res.ok) return JSON.stringify({ error: `feed fetch failed (${res.status})` });
+      const all = (await res.json())?.feed ?? [];
+      const theses = all.filter((t: { wallet?: string }) => String(t.wallet ?? "").toLowerCase() === w.toLowerCase());
+      const wins = theses.filter((t: { status?: string }) => t.status === "HIT_TP").length;
+      const losses = theses.filter((t: { status?: string }) => t.status === "STOPPED_OUT").length;
+      return JSON.stringify({
+        wallet: w,
+        public_theses: theses.length,
+        wins, losses,
+        win_rate_pct: wins + losses ? Math.round((wins / (wins + losses)) * 100) : null,
+        theses: theses.slice(0, 15).map((t: Record<string, unknown>) => ({
+          symbol: t.symbol, direction: t.direction, status: t.status, rr: t.riskReward, entry: t.entryPrice, pnl: t.actualPnl,
+        })),
+      });
+    },
+  },
+  {
     name: "get_verified_callers",
     description:
       "Get the TRUSTLESS human-caller leaderboard: traders ranked by objectively-graded public thesis calls (first-touch TP-vs-SL vs public price), needing >=5 resolved calls. Use for 'best callers' or social-proof questions.",

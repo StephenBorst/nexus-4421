@@ -171,6 +171,17 @@ export default function NexusAssistant() {
 
   const hasKey = apiKey.trim().length > 0;
 
+  // Context-aware starter prompts based on the page the user is on.
+  const pageSuggestions = (() => {
+    const p = location.pathname;
+    const trader = p.match(/\/feed\/trader\/(0x[0-9a-fA-F]{40})/);
+    if (trader) return ["Analyze this trader's track record", "How do they compare to the top callers?", "What's their best setup?"];
+    const sym = p.match(/\/perp\/PERP_([A-Z0-9]+)_USDC/i);
+    if (sym) { const s = sym[1].toUpperCase(); return [`What's ${s}'s funding & OI right now?`, `Draft me a thesis on ${s}`, `Is now a risky time to trade ${s}?`]; }
+    if (p.startsWith("/lab")) return ["How's my track record?", "Draft me a thesis on BTC", "What's my agent doing right now?"];
+    return ["What's BTC's funding rate right now?", "What's my agent doing right now?", "Who are the top agents on the leaderboard?"];
+  })();
+
   async function send() {
     const text = input.trim();
     if (!text || loading) return;
@@ -311,7 +322,7 @@ export default function NexusAssistant() {
                   ? "Ask about your theses, agent, the market, or a trade idea. I can see your live session context."
                   : "Bring your own API key (Anthropic or OpenAI) to start — it stays on your device, never sent to Nexus. Tap ⚙ to set it up."}
                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-                  {["What's BTC's funding rate right now?", "What's my agent doing right now?", "Who are the top agents on the leaderboard?"].map((s) => (
+                  {pageSuggestions.map((s) => (
                     <button key={s} onClick={() => setInput(s)} disabled={!hasKey}
                       style={{ textAlign: "left", background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 4, color: hasKey ? "#8aaa9a" : "#2a4a3a", fontFamily: mono, fontSize: 10, padding: "6px 9px", cursor: hasKey ? "pointer" : "default" }}>
                       → {s}
