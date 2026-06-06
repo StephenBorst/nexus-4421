@@ -299,6 +299,39 @@ token-value scheme. $NEXUS only adds **consumptive use** (pay-in-$NEXUS discount
 - Pre-existing `tsc --noEmit` baseline ≈ 18 error lines in OTHER files (walletConnector, useNav,
   useSpanDEX, intel) — not from our work. Verify our files add 0 new errors.
 
+## // NEXUS AI — floating AI copilot (Session 2026-06-05, on main)
+Terminal-wide floating ◆ assistant; flagship "make-you-a-better-trader" feature. **BYOK, client-side
+only** (user's Anthropic/OpenAI key in localStorage; browser calls provider REST directly via `fetch`,
+no SDK — key never hits a Nexus server). Files: `app/components/NexusAssistant.tsx` (mounted in
+`App.tsx` inside `<OrderlyProvider>`), `app/config/assistant.ts` (`runChat`/`runChatStream`+`readSSE`,
+`SYSTEM_PROMPT` w/ advice-line guardrail, `listModels`, per-provider `LS_MODEL(p)`/`LS_KEY(p)`),
+`app/config/assistantTools.ts` (12 tools, `ToolCtx`). **Streaming** (SSE) keeps the full bounded
+tool-loop (max 5) for both providers; non-streaming `runChat` is the fallback. **Models fetched live
+from the key's `/v1/models`** (stale `*-latest` ids 404 — `loadModel()` migrates them + rejects
+cross-provider ids; Anthropic browser calls need header `anthropic-dangerous-direct-browser-access`).
+**12 tools**: read (market, regime, open positions, my performance, agent status, get_trader, top
+agents, verified callers) + action/no-execution (open_symbol/trader/leaderboard, draft_thesis →
+localStorage `nexus_thesis_draft` + `/lab?tab=thesis`; Lab reads `?tab=`, ThesisView consumes draft).
+Persists chat (`nexus_ai_chat`), markdown render (incl. tables), discovery nudge (`nexus_ai_seen`),
+local personal-insight teaser. ⚠️ Thesis form symbol = BARE ticker ("BTC"), not PERP_. Next: **hosted
+inference** (pay-in-$NEXUS/USDC worker proxy) — the BYOK-wall unlock, BLOCKED on the treasury Safe; fold
+into PRO rail. Open call: free-forever BYOK vs gate behind PRO.
+
+## Agent ops + feed liveness (Session 2026-06-05, on main)
+- ⚠️ **"Agents down" is usually a false alarm.** Before declaring an exec outage, check Cloudflare dash →
+  Workers → nexus-agent-exec → Triggers → **View events** (per-minute Success log). Agents sit idle BY
+  DESIGN when the brain emits `direction:NONE` (no funding+OI confluence). **CF "CPU time" ≠ wall time**
+  (awaiting I/O is free) so ~2ms ticks are normal early-returns, not crashes.
+- exec now stamps `ops:exec:heartbeat` every tick + has `GET /health` ({ok,users,lastTickAgeSec}); the
+  hourly `nexus-ledger-anchor` monitor alerts "⚙️ Exec down" if >10min stale. Fixed a daily-reset
+  persistence bug (state only saved on a trade → stale trades_today). 2 agent wallets: `0x325da3…95de`,
+  `0x9a3012…cb28` (AUTONOMOUS, BTC).
+- **Feed cold-start liveness** (`app/pages/feed/index.tsx` + lab-api `/theses/leaderboard`): emerging
+  callers tier (1-4 graded calls + `callsToQualify`), FeedPulse strip, AgentTrackRecord social-proof
+  card, ContributePrompt (feed<12), and **outbound 𝕏/Farcaster share** on theses (Lab ThesisView +
+  thesis detail page) → links unfurl via existing `/og/thesis/:wallet/:id(.png)` cards. The
+  create→distribute→recruit loop = the real fix for thin supply (rest is go-to-market).
+
 ## Strategic framing (for partner/Orderly convos)
 The DEX is a commodity (anyone can clone the Orderly template). The moat is the Lab + social graph:
 plan→automate→grade retention loop, autonomous agent driving net-new volume into Orderly's book, and
