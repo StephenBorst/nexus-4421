@@ -126,6 +126,37 @@ Bankr/Farcaster users can deploy/control the autonomous agent by chat. Two addit
 - Status/fund/kill reuse existing routes (`GET /agent/:addr`, `/deposit/prepare`, `DELETE`, `/kill`). Capital
   guardrail (avoid -1101): suggest `capitalPerTrade ≈ floor(freeCollateral*0.6)`.
 
+## Agent signal modes + config control surface (`brain/logic.mjs` `deriveSignal`)
+- **`signalMode`** (user-picked): `CONFLUENCE` (default, conf 80 — funding extreme AND OI-divergence must agree),
+  `FUNDING_ONLY` (65), `OI_ONLY` (65) = FREE; `MOMENTUM` (60, trade WITH a price move > threshold) and
+  `MEAN_REVERSION` (60, FADE the move) = **PRO** (`PRO_AGENT_STRATEGIES` in `app/config/subscription.ts`).
+- **Thresholds (per user):** `fundingThreshold` (%, def 0.01), `oiChangeThreshold` (%, def 0), `priceChangeThreshold`
+  (%, def 0.5 — for momentum/mean-rev). Plus risk/exec: `symbols`, `leverage`, `capitalPerTrade`, `tpPercent`,
+  `slPercent`, `maxHoldHours`, `maxTradesPerDay`, `maxDailyLossUsdc`. ALL user-set, read LIVE each cycle (changes
+  apply to next signal + to managing an open position). Brain is per-symbol RAW deltas; `deriveSignal(raw,config)`
+  applies each user's mode/thresholds.
+
+## Bankr SKILL + marketing assets (where things live)
+- **Bankr skill** = `github.com/BankrBot/skills` → `nexus-trading-labs/SKILL.md` + `references/*.md` (markdown skill,
+  YAML frontmatter `name: nexus` + trigger `description`). Published/maintained by Nexus. Update = edit SKILL.md/refs,
+  PR to BankrBot/skills. Our fork = **`StephenBorst/skills`**, branch **`add-autonomous-agent`** (agent control +
+  full config surface) — PR pending at `github.com/StephenBorst/skills/pull/new/add-autonomous-agent` → base
+  `BankrBot/skills:main`. Local staging clone: `C:\Users\steph\bankr-skills-stage`.
+- **Repo source-of-truth copies:** `docs/SKILL.md` (full updated skill), `docs/bankr-skill-agent-module.md` (=
+  `references/agent.md`), `docs/bankr-agent-spec.md` (build spec), `docs/skill-agent-additions.md` (apply guide).
+- **Marketing:** `marketing/lab-article.md` (flagship X long-form article + 3 hook tweets + pull-quotes),
+  `marketing/build-in-public-series.md` (7 daily founder posts grounded in shipped work). Voice = landing/brand
+  register (cypherpunk-terminal, "verify don't trust"). $NEXUS framed cosmetic-only (Howey).
+- **⚠️ Bankr "signer rejected it" = Bankr-side wallet signing failure, NOT our skill/code.** Even a plain native
+  `sign hello` fails → it's the Bankr agent wallet (needs funding/init) or a Bankr outage, OR the API key lacks
+  Wallet+Agent API / has an allowed-recipients restriction. Our endpoints never get hit if the sig fails. Don't
+  reinstall the skill for this. Isolation test: ask Bankr to sign a trivial message; if that fails too → 100% Bankr.
+- **Agent→public-feed bridge (exec):** `PUBLISH_AGENT_FEED=true` writes the bot's REAL autonomous entries/closes to
+  `agent:feed:{addr}` (lab-api /feed merges them) so the agent has a live heartbeat (cold-start fix). PAPER trades
+  excluded (`PUBLISH_PAPER_TO_FEED=false`) to keep the feed = "real calls only."
+- **Landing fix (this session):** removed a hardcoded fabricated `TVL $18.3M` (no live source) → hero now 3 live
+  stats (Volume/OI/Markets); standardized "93+"→"90+" markets. Deployed + pushed to `StephenBorst/nexus-landing`.
+
 ## Leaderboard integrity (cypherpunk hardening — tiers 1-3)
 The public agents leaderboard ranks on a risk-adjusted score from live `agent_trades`
 (Supabase). Trust hardening, all on `main`:
