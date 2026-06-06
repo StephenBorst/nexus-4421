@@ -149,6 +149,63 @@ export default function NexusAssistant() {
     if (!seen) { setSeen(true); try { window.localStorage.setItem("nexus_ai_seen", "1"); } catch { /* ignore */ } }
   };
 
+  // ── Draggable launcher ──
+  // The bubble can be press-and-dragged anywhere; a tap (no real movement) still
+  // opens the panel. Position (top-left px) is persisted so it stays put.
+  const loadPos = (): { x: number; y: number } | null => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem("nexus_ai_pos");
+      if (raw) { const p = JSON.parse(raw); if (typeof p?.x === "number" && typeof p?.y === "number") return p; }
+    } catch { /* ignore */ }
+    return null;
+  };
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(loadPos);
+  const launcherRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef({ sx: 0, sy: 0, ox: 0, oy: 0, moved: false, active: false, lx: 0, ly: 0 });
+
+  const onLauncherDown = (e: React.PointerEvent) => {
+    const el = launcherRef.current; if (!el) return;
+    const r = el.getBoundingClientRect();
+    dragRef.current = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top, moved: false, active: true, lx: r.left, ly: r.top };
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+  const onLauncherMove = (e: React.PointerEvent) => {
+    const d = dragRef.current; if (!d.active) return;
+    const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+    if (!d.moved && Math.hypot(dx, dy) < 4) return; // tap threshold — below this it's a click
+    d.moved = true;
+    const el = launcherRef.current;
+    const w = el?.offsetWidth ?? 52, h = el?.offsetHeight ?? 52;
+    const nx = Math.min(Math.max(0, d.ox + dx), window.innerWidth - w);
+    const ny = Math.min(Math.max(0, d.oy + dy), window.innerHeight - h);
+    d.lx = nx; d.ly = ny;
+    setPos({ x: nx, y: ny });
+  };
+  const onLauncherUp = (e: React.PointerEvent) => {
+    const d = dragRef.current; if (!d.active) return;
+    d.active = false;
+    (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+    if (d.moved) { try { window.localStorage.setItem("nexus_ai_pos", JSON.stringify({ x: d.lx, y: d.ly })); } catch { /* ignore */ } }
+    else { openPanel(); } // it was a tap, not a drag
+  };
+  // Keep a saved position on-screen if the window shrinks.
+  useEffect(() => {
+    if (!pos) return;
+    const clamp = () => {
+      const el = launcherRef.current;
+      const w = el?.offsetWidth ?? 52, h = el?.offsetHeight ?? 52;
+      setPos((p) => {
+        if (!p) return p;
+        const nx = Math.min(Math.max(0, p.x), window.innerWidth - w);
+        const ny = Math.min(Math.max(0, p.y), window.innerHeight - h);
+        return nx === p.x && ny === p.y ? p : { x: nx, y: ny };
+      });
+    };
+    window.addEventListener("resize", clamp);
+    return () => window.removeEventListener("resize", clamp);
+  }, [pos]);
+
   // BYOK settings (persisted client-side).
   const [provider, setProvider] = useState<ProviderId>(
     () => (typeof window !== "undefined" && (window.localStorage.getItem(LS_PROVIDER) as ProviderId)) || "anthropic"
@@ -344,8 +401,14 @@ export default function NexusAssistant() {
   // ── Floating launcher ──
   if (!open) {
     return (
-      <div style={{ position: "fixed", right: 16, bottom: 16, zIndex: 99998, display: "flex", alignItems: "center", gap: 10 }}>
-        {!seen && (
+      <div
+        ref={launcherRef}
+        style={{
+          position: "fixed", zIndex: 99998, display: "flex", alignItems: "center", gap: 10,
+          ...(pos ? { left: pos.x, top: pos.y } : { right: 16, bottom: 16 }),
+        }}
+      >
+        {!seen && !pos && (
           <>
             <style>{`@keyframes nexAiPulse{0%,100%{box-shadow:0 0 14px rgba(0,255,136,0.35)}50%{box-shadow:0 0 22px rgba(0,255,136,0.85)}}`}</style>
             <div
@@ -363,16 +426,20 @@ export default function NexusAssistant() {
           </>
         )}
         <button
-          onClick={openPanel}
-          aria-label="Nexus AI Assistant"
-          title="Nexus AI Assistant"
+          onPointerDown={onLauncherDown}
+          onPointerMove={onLauncherMove}
+          onPointerUp={onLauncherUp}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPanel(); } }}
+          aria-label="Nexus AI Assistant (drag to move, tap to open)"
+          title="Nexus AI — tap to open, hold & drag to move"
           style={{
             width: 52, height: 52, borderRadius: "50%",
             background: "#0a1a0a", border: `1px solid ${GREEN}`,
-            color: GREEN, fontFamily: mono, fontSize: 20, cursor: "pointer",
+            color: GREEN, fontFamily: mono, fontSize: 20, cursor: "grab",
             boxShadow: "0 0 16px rgba(0,255,136,0.35)", flexShrink: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
             animation: seen ? undefined : "nexAiPulse 2s infinite",
+            touchAction: "none", userSelect: "none",
           }}
         >
           ◆

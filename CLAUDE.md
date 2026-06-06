@@ -249,7 +249,7 @@ token-value scheme. $NEXUS only adds **consumptive use** (pay-in-$NEXUS discount
 - **Built + LIVE (frontend):** `config/subscription.ts` (single source of truth — prices, benefits, `PAYMENTS_LIVE`
   flag, `PRO_AGENT_STRATEGIES`), `useSubscription` hook (resolves PRO via holder-unlock today OR paid record later;
   fail-soft → FREE), `NexusPro` card (active-state for PRO / upsell for free; shown in Lab under the market strip).
-- **Tune (locked, all in subscription.ts):** `$19/mo` USDC · `25%` off paying in $NEXUS · hold **ARCHITECT (100M)**
+- **Tune (locked, all in subscription.ts):** `$20/mo` USDC · `25%` off paying in $NEXUS (→ `$15`) · hold **ARCHITECT (100M)**
   → PRO free (dollar cost of unlock rises with token price — cheap now to drive buying, real commitment later).
 - **First gate LIVE + SERVER-ENFORCED:** advanced agent strategies (**MOMENTUM + MEAN_REVERSION**) are PRO; 3 core
   modes (CONFLUENCE/FUNDING/OI) stay free. UI gates it (`isProStrategy` + `useSubscription` in AgentView) AND lab-api
