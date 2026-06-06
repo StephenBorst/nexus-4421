@@ -220,9 +220,13 @@ token-value scheme. $NEXUS only adds **consumptive use** (pay-in-$NEXUS discount
   fail-soft → FREE), `NexusPro` card (active-state for PRO / upsell for free; shown in Lab under the market strip).
 - **Tune (locked, all in subscription.ts):** `$19/mo` USDC · `25%` off paying in $NEXUS · hold **ARCHITECT (100M)**
   → PRO free (dollar cost of unlock rises with token price — cheap now to drive buying, real commitment later).
-- **First gate LIVE:** advanced agent strategies (**MOMENTUM + MEAN_REVERSION**) are PRO; 3 core modes (CONFLUENCE/
-  FUNDING/OI) stay free. UI gate only for now (`isProStrategy` + `useSubscription` in AgentView) — a determined free
-  user could force it via API until server-side enforcement (phase 3c) lands.
+- **First gate LIVE + SERVER-ENFORCED:** advanced agent strategies (**MOMENTUM + MEAN_REVERSION**) are PRO; 3 core
+  modes (CONFLUENCE/FUNDING/OI) stay free. UI gates it (`isProStrategy` + `useSubscription` in AgentView) AND lab-api
+  now ENFORCES it server-side: every config-write site (`PUT /agent/:addr`, `PUT /agent/:addr/config`, `POST
+  /agent/:addr/bankr/activate`) rejects a PRO `signalMode` from a non-PRO wallet with **402 `pro_strategy_locked`**.
+  PRO resolved by `walletIsPro(address, env)`: paid `sub:{addr}` (future) OR holder-unlock = $NEXUS `balanceOf` ≥
+  ARCHITECT (100M) on Base via `eth_call` (reuses the `/feed/holders` RPC pattern; fails CLOSED if RPC unreachable).
+  Gate only fires for PRO strategies — free modes skip the RPC. So the paywall is real on web AND Bankr chat now.
 - **⚠️ PAYMENT RAIL — SCOPED, shovel-ready, BLOCKED on the treasury Safe (the receiver address):**
   - Insight: NO indexer/processor needed. A sub payment = an ERC-20 transfer to the treasury. Worker verifies via ONE
     `eth_getTransactionReceipt` (read the `Transfer` log). **Grant PRO to the tx's `from` address** → spoofing

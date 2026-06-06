@@ -146,6 +146,36 @@ async function agentSecretFromWalletSig(walletSig) {
   return bs58Encode(seedBytes);
 }
 
+// ── Nexus PRO gate (server-side, source of truth) ─────────────────────────────
+// PRO agent strategies (MOMENTUM, MEAN_REVERSION) require Nexus PRO. PRO resolves
+// two ways: (1) an active paid subscription record (sub:{addr} — paid rail, when
+// live) OR (2) holder-unlock = holding ARCHITECT-tier $NEXUS (100M) on Base. The
+// UI gated these before; this makes the paywall real at the API too.
+const PRO_STRATEGIES = ["MOMENTUM", "MEAN_REVERSION"];
+async function walletIsPro(address, env) {
+  // 1) Paid subscription (future-proof — no-ops until the payment rail writes sub:{addr}).
+  try {
+    const subRaw = await env.LAB_STORE.get(`sub:${address}`);
+    if (subRaw) { const s = JSON.parse(subRaw); if (s.expiresAt && s.expiresAt > Date.now()) return true; }
+  } catch { /* ignore */ }
+  // 2) Holder-unlock: $NEXUS balanceOf(address) >= ARCHITECT tier (100M) on Base.
+  const NEXUS_TOKEN = "0x3D958634ab725B627919EF8F2Ed59227309fDba3";
+  const ARCHITECT_MIN = 100000000n * (10n ** 18n); // PRO_HOLDER_TIER = ARCHITECT
+  const callData = "0x70a08231000000000000000000000000" + address.slice(2);
+  for (const rpc of ["https://base-rpc.publicnode.com", "https://mainnet.base.org", "https://base.llamarpc.com"]) {
+    try {
+      const res = await fetch(rpc, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to: NEXUS_TOKEN, data: callData }, "latest"] }),
+      });
+      const j = await res.json();
+      if (j.result) return BigInt(j.result) >= ARCHITECT_MIN;
+    } catch { /* try next rpc */ }
+  }
+  return false; // RPC unreachable → fail closed (paywall stays shut)
+}
+
 // ── Ph27: notification helpers ────────────────────────────────────────────────
 async function appendNotification(env, wallet, notif) {
   const key = `notif:${wallet}`;
@@ -2620,6 +2650,9 @@ document.getElementById("btn").addEventListener("click",go);
         // trading key is required or stored.
         const isPaper = config?.mode === "PAPER";
         if (!config || (!isPaper && !tradingKey)) return json({ error: "config and tradingKey required" }, request, 400);
+        if (config.signalMode && PRO_STRATEGIES.includes(config.signalMode) && !(await walletIsPro(address, env))) {
+          return json({ error: "pro_strategy_locked", strategy: config.signalMode, hint: "MOMENTUM and MEAN_REVERSION require Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe. Free: CONFLUENCE, FUNDING_ONLY, OI_ONLY." }, request, 402);
+        }
         await AGENT_KV.put(`agent:config:${address}`, JSON.stringify(config));
         if (!isPaper) {
           // Encrypt the trading key at rest — KV never holds it in plaintext.
@@ -2642,6 +2675,9 @@ document.getElementById("btn").addEventListener("click",go);
         try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
         const { config } = body;
         if (!config) return json({ error: "config required" }, request, 400);
+        if (config.signalMode && PRO_STRATEGIES.includes(config.signalMode) && !(await walletIsPro(address, env))) {
+          return json({ error: "pro_strategy_locked", strategy: config.signalMode, hint: "MOMENTUM and MEAN_REVERSION require Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe. Free: CONFLUENCE, FUNDING_ONLY, OI_ONLY." }, request, 402);
+        }
         await AGENT_KV.put(`agent:config:${address}`, JSON.stringify(config));
         return json({ ok: true }, request);
       }
@@ -2692,6 +2728,11 @@ document.getElementById("btn").addEventListener("click",go);
         }
         const defaults = { symbols: ["PERP_BTC_USDC"], leverage: 5, capitalPerTrade: 30, tpPercent: 1.5, slPercent: 0.75, maxHoldHours: 4, maxTradesPerDay: 10, maxDailyLossUsdc: 5, fundingThreshold: 0.01 };
         const config = { ...defaults, ...(body?.config || {}), mode };
+
+        // PRO strategy gate — reject before doing any key/crypto work.
+        if (config.signalMode && PRO_STRATEGIES.includes(config.signalMode) && !(await walletIsPro(address, env))) {
+          return json({ error: "pro_strategy_locked", strategy: config.signalMode, hint: "MOMENTUM and MEAN_REVERSION require Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe. Free strategies: CONFLUENCE, FUNDING_ONLY, OI_ONLY." }, request, 402);
+        }
 
         // Live modes need the delegated key. Derive it from the wallet signature
         // (auth) + the registered accountId.
