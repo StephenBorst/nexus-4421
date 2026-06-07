@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAccount, usePrivateQuery } from "@orderly.network/hooks";
+import { useAccount, usePrivateQuery, usePositionStream } from "@orderly.network/hooks";
 import { useLabStorage } from "@/hooks/useLabStorage";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import {
@@ -105,7 +105,11 @@ export default function NexusAssistant() {
   const { state: acct } = useAccount();
   const walletAddress = (acct as { address?: string })?.address ?? null;
   const { theses } = useLabStorage(walletAddress);
-  const { data: posData } = usePrivateQuery("/v1/positions", { revalidateOnFocus: false });
+  // ⚠️ Do NOT use usePrivateQuery("/v1/positions") here — it shares the SWR key the
+  // SDK's own account/collateral pipeline owns, and a competing config poisons it
+  // (blanks Total value / buying power, stalls Enable Trading). Join the SDK's shared
+  // position stream instead so we read the same managed data without conflict.
+  const [posStream] = usePositionStream();
   const { data: histData } = usePrivateQuery("/v1/position_history?limit=500", { revalidateOnFocus: false });
   const location = useLocation();
 
@@ -364,7 +368,7 @@ export default function NexusAssistant() {
         ctx: {
           wallet: walletAddress,
           navigate: (p: string) => navigate(p),
-          openPositions: (((posData as { rows?: Record<string, unknown>[] })?.rows) ?? [])
+          openPositions: ((posStream?.rows as unknown as Record<string, unknown>[] | undefined) ?? [])
             .map((p) => ({
               symbol: String(p.symbol ?? ""),
               qty: Number(p.position_qty ?? 0),
