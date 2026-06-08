@@ -511,6 +511,11 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <a href="/analyze" style={{ fontSize: 10, color: "#00ff88", fontFamily: "monospace", letterSpacing: "0.08em", textDecoration: "none", border: "1px solid #1a3a2a", borderRadius: 4, padding: "5px 10px" }}>
+          ▶ X-RAY ANY WALLET
+        </a>
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 8 }}>
         <div style={cardStyle}>
           <div style={labelStyle}>TOTAL PNL</div>
