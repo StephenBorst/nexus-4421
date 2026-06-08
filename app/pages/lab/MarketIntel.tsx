@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { navBtnStyle } from "./styles";
 import { useIsMobile } from "./useIsMobile";
 import IntelPage from "@/pages/intel";
+import { MarketRegime } from "./MarketRegime";
 
 // ─── News helpers ─────────────────────────────────────────
 interface NewsItem { title: string; description: string; link: string; pubDate: string; source: string; category: string; }
@@ -155,6 +156,7 @@ export function MarketIntelView() {
   const [sub, setSub] = useState<"intel" | "news">("intel");
   return (
     <div>
+      <MarketRegime />
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
         {([
           { id: "intel" as const, label: "INTEL" },
