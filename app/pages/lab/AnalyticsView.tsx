@@ -303,6 +303,131 @@ function TopAssets({ orders }: { orders: ProcessedTrade[] }) {
   );
 }
 
+// ─── Timing & Risk (peak hours, streaks, sample-gated ratios) ─
+// ⚠️ Risk ratios are gated behind a minimum sample size — small-sample Sharpe/
+// Sortino are statistically meaningless (the "Sharpe 16 on 7 trades" vanity trap).
+// We show the honest "need N more trades" state instead of an inflated number.
+const RISK_SAMPLE_GATE = 20;
+function hourWinColor(wr: number, trades: number) {
+  if (!trades) return "#0a150a";
+  if (wr >= 60) return "#1a4a2a";
+  if (wr >= 40) return "#3a3a1a";
+  return "#3a1a1a";
+}
+function TimingAndRisk({ orders }: { orders: ProcessedTrade[] }) {
+  const isMobile = useIsMobile();
+  const stats = useMemo(() => {
+    if (!orders.length) return null;
+    const sorted = [...orders].sort((a, b) => a.timestamp - b.timestamp);
+    let run = 0, sign = 0, bestWin = 0, worstLoss = 0;
+    for (const o of sorted) {
+      const s = o.pnl > 0 ? 1 : o.pnl < 0 ? -1 : 0;
+      if (s === 0) continue;
+      if (s === sign) run += 1; else { sign = s; run = 1; }
+      if (sign === 1) bestWin = Math.max(bestWin, run);
+      if (sign === -1) worstLoss = Math.max(worstLoss, run);
+    }
+    const current = run * sign; // signed: + win streak, - loss streak
+    const hours = Array.from({ length: 24 }, (_, h) => ({ h, trades: 0, wins: 0, pnl: 0 }));
+    for (const o of orders) {
+      const h = new Date(o.timestamp).getHours();
+      hours[h].trades++; hours[h].pnl += o.pnl; if (o.pnl > 0) hours[h].wins++;
+    }
+    const peak = hours.filter((b) => b.trades > 0)
+      .sort((a, b) => (b.wins / b.trades) - (a.wins / a.trades) || b.trades - a.trades)
+      .slice(0, 3);
+    const pnls = orders.map((o) => o.pnl);
+    const n = pnls.length;
+    const mean = pnls.reduce((s, v) => s + v, 0) / n;
+    const variance = pnls.reduce((s, v) => s + (v - mean) ** 2, 0) / n;
+    const std = Math.sqrt(variance);
+    const downside = Math.sqrt(pnls.filter((v) => v < 0).reduce((s, v) => s + v * v, 0) / n);
+    const sharpe = std > 0 ? (mean / std) * Math.sqrt(n) : 0;
+    const sortino = downside > 0 ? (mean / downside) * Math.sqrt(n) : 0;
+    return { current, bestWin, worstLoss, hours, peak, sharpe, sortino, expectancy: mean, n };
+  }, [orders]);
+
+  if (!stats) return null;
+  const maxHourTrades = Math.max(...stats.hours.map((h) => h.trades), 1);
+  const gated = stats.n < RISK_SAMPLE_GATE;
+  const fmtHr = (h: number) => `${String(h).padStart(2, "0")}:00`;
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8, marginTop: 8 }}>
+      {/* Streaks */}
+      <div style={cardStyle}>
+        <div style={{ fontSize: 10, color: "#fbbf24", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "monospace" }}>&#9632; STREAKS</div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>CURRENT</div>
+          <div style={{ fontSize: 28, fontWeight: "bold", fontFamily: "monospace", color: stats.current >= 0 ? "#00ff88" : "#ff4444" }}>
+            {Math.abs(stats.current)} {stats.current >= 0 ? "W" : "L"}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>BEST WIN</div>
+            <div style={{ fontSize: 18, color: "#00ff88", fontFamily: "monospace" }}>{stats.bestWin}</div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>WORST LOSS</div>
+            <div style={{ fontSize: 18, color: "#ff4444", fontFamily: "monospace" }}>{stats.worstLoss}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Risk-adjusted (gated) */}
+      <div style={cardStyle}>
+        <div style={{ fontSize: 10, color: "#a855f7", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "monospace" }}>&#9632; RISK-ADJUSTED</div>
+        {gated ? (
+          <div style={{ fontSize: 11, color: "#3a5a4a", fontFamily: "monospace", lineHeight: 1.7 }}>
+            need <span style={{ color: "#fbbf24" }}>{RISK_SAMPLE_GATE - stats.n}</span> more closed trades<br />
+            <span style={{ color: "#2a4a3a" }}>ratios are meaningless under {RISK_SAMPLE_GATE} samples — we won&apos;t fake them</span>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {[
+              { label: "SHARPE", value: stats.sharpe.toFixed(2) },
+              { label: "SORTINO", value: stats.sortino.toFixed(2) },
+              { label: "EXPECTANCY", value: formatPnl(stats.expectancy) },
+            ].map((r) => (
+              <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "monospace", letterSpacing: "0.06em" }}>{r.label}</span>
+                <span style={{ fontSize: 18, color: "#00ff88", fontFamily: "monospace" }}>{r.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Peak hours + heatmap */}
+      <div style={{ ...cardStyle, gridColumn: isMobile ? "auto" : "span 2" }}>
+        <div style={{ fontSize: 10, color: "#4a9fff", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "monospace" }}>&#9632; PEAK HOURS <span style={{ color: "#2a4a3a" }}>(local)</span></div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(24, 1fr)", gap: 2, marginBottom: 12 }}>
+          {stats.hours.map((b) => {
+            const wr = b.trades ? Math.round((b.wins / b.trades) * 100) : 0;
+            return (
+              <div key={b.h} title={`${fmtHr(b.h)} — ${b.trades} trades, ${wr}% WR`} style={{
+                height: 22, borderRadius: 2, background: hourWinColor(wr, b.trades),
+                border: "1px solid #0e1a0e", opacity: b.trades ? Math.max(0.4, b.trades / maxHourTrades) : 1,
+              }} />
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {stats.peak.length === 0
+            ? <span style={{ fontSize: 11, color: "#2a4a3a", fontFamily: "monospace" }}>no timing data</span>
+            : stats.peak.map((b) => (
+              <div key={b.h} style={{ background: "#0a150a", border: "1px solid #1a3a1a", borderRadius: 4, padding: "6px 10px" }}>
+                <div style={{ fontSize: 12, color: "#fff", fontFamily: "monospace" }}>{fmtHr(b.h)}-{fmtHr((b.h + 1) % 24)}</div>
+                <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>{b.trades} trades · <span style={{ color: "#00ff88" }}>{Math.round((b.wins / b.trades) * 100)}%</span></div>
+              </div>
+            ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Performance Analysis ─────────────────────────────────
 function PerformanceAnalysis({ orders }: { orders: ProcessedTrade[] }) {
   const data = useMemo(() => {
@@ -433,6 +558,7 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
 
       <TradingScoreSection orders={orders} winRate={winRate} />
       <BreakdownRow orders={orders} />
+      <TimingAndRisk orders={orders} />
       <PerformanceAnalysis orders={orders} />
       <TopAssets orders={orders} />
 
