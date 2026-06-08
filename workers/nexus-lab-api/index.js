@@ -796,8 +796,9 @@ export default {
         if (recoverEthAddress(aiAccessMessage(addr, ts), sig) !== addr) return json({ error: "bad signature" }, request, 401);
         if (!(await walletIsPro(addr, env))) return json({ error: "pro_required", hint: "Hosted NEXUS AI is a PRO benefit — subscribe or hold ARCHITECT $NEXUS." }, request, 402);
 
-        // Per-wallet daily spend cap.
-        const CAP = parseInt(env.HOSTED_AI_DAILY_CAP || "300", 10);
+        // Per-wallet daily spend cap. 80/day keeps the worst-case heavy user near
+        // break-even on the $15-20 sub (with prompt caching below); env-tunable.
+        const CAP = parseInt(env.HOSTED_AI_DAILY_CAP || "80", 10);
         const usageKey = `ai:usage:${addr}:${new Date().toISOString().slice(0, 10)}`;
         const used = parseInt((await env.LAB_STORE.get(usageKey)) || "0", 10);
         if (used >= CAP) return json({ error: "daily_limit", hint: `Hosted AI cap is ${CAP} requests/day (resets 00:00 UTC).` }, request, 429);
@@ -807,7 +808,23 @@ export default {
         const upstreamBody = { ...body };
         delete upstreamBody._addr; delete upstreamBody._ts; delete upstreamBody._sig;
         upstreamBody.model = env.HOSTED_AI_MODEL || "claude-haiku-4-5";
-        upstreamBody.max_tokens = Math.min(Number(upstreamBody.max_tokens) || 1024, 2048);
+        upstreamBody.max_tokens = Math.min(Number(upstreamBody.max_tokens) || 1024, 1024);
+
+        // Prompt caching — the system prompt + 12 tool schemas are identical every
+        // call, so cache that stable prefix → repeat calls bill at ~0.1x instead of
+        // 1x (the dominant input cost). Breakpoints: the last tool (caches the tool
+        // defs) + the system block (render order tools→system→messages, so a system
+        // breakpoint caches tools+system together). 5-min TTL covers a tool loop.
+        if (Array.isArray(upstreamBody.tools) && upstreamBody.tools.length) {
+          const lastTool = upstreamBody.tools[upstreamBody.tools.length - 1];
+          if (lastTool && typeof lastTool === "object") lastTool.cache_control = { type: "ephemeral" };
+        }
+        if (typeof upstreamBody.system === "string" && upstreamBody.system.length) {
+          upstreamBody.system = [{ type: "text", text: upstreamBody.system, cache_control: { type: "ephemeral" } }];
+        } else if (Array.isArray(upstreamBody.system) && upstreamBody.system.length) {
+          const lastSys = upstreamBody.system[upstreamBody.system.length - 1];
+          if (lastSys && typeof lastSys === "object") lastSys.cache_control = { type: "ephemeral" };
+        }
 
         const upstream = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",

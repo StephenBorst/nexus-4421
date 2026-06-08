@@ -1,7 +1,8 @@
 // Deployable agent-strategy presets — the "Strategy Library", but executable.
 // Each preset is a Partial<AgentConfig> a user can one-click load into the agent,
-// review, and save. All presets stay in PAPER mode for safety; the user opts into
-// live. PRO presets use advanced signal modes and are gated by useSubscription.
+// review, and save. Presets set strategy + risk params only — they do NOT set
+// `mode`, so loading preserves the user's current mode (PAPER / ASSISTED /
+// AUTONOMOUS). PRO presets use advanced signal modes and are gated by useSubscription.
 import type { AgentConfig } from "@/pages/lab/types";
 
 export interface StrategyPreset {
@@ -24,7 +25,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
     config: {
       symbols: ["PERP_BTC_USDC"], signalMode: "CONFLUENCE", leverage: 3, capitalPerTrade: 30,
       tpPercent: 1.2, slPercent: 0.6, maxHoldHours: 6, maxTradesPerDay: 6, maxDailyLossUsdc: 10,
-      fundingThreshold: 0.015, oiChangeThreshold: 0, mode: "PAPER",
+      fundingThreshold: 0.015, oiChangeThreshold: 0,
     },
   },
   {
@@ -36,7 +37,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
     config: {
       symbols: ["PERP_BTC_USDC", "PERP_ETH_USDC"], signalMode: "CONFLUENCE", leverage: 5, capitalPerTrade: 40,
       tpPercent: 1.5, slPercent: 0.75, maxHoldHours: 4, maxTradesPerDay: 8, maxDailyLossUsdc: 12,
-      fundingThreshold: 0.01, mode: "PAPER",
+      fundingThreshold: 0.01,
     },
   },
   {
@@ -48,7 +49,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
     config: {
       symbols: ["PERP_BTC_USDC", "PERP_ETH_USDC"], signalMode: "OI_ONLY", leverage: 5, capitalPerTrade: 40,
       tpPercent: 1.5, slPercent: 0.8, maxHoldHours: 4, maxTradesPerDay: 8, maxDailyLossUsdc: 12,
-      oiChangeThreshold: 0.5, mode: "PAPER",
+      oiChangeThreshold: 0.5,
     },
   },
   {
@@ -60,7 +61,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
     config: {
       symbols: ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC"], signalMode: "FUNDING_ONLY", leverage: 8,
       capitalPerTrade: 30, tpPercent: 0.8, slPercent: 0.5, maxHoldHours: 2, maxTradesPerDay: 14,
-      maxDailyLossUsdc: 12, fundingThreshold: 0.008, mode: "PAPER",
+      maxDailyLossUsdc: 12, fundingThreshold: 0.008,
     },
   },
   {
@@ -73,7 +74,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
     config: {
       symbols: ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC"], signalMode: "MOMENTUM", leverage: 8,
       capitalPerTrade: 40, tpPercent: 2, slPercent: 1, maxHoldHours: 4, maxTradesPerDay: 10,
-      maxDailyLossUsdc: 15, priceChangeThreshold: 0.6, mode: "PAPER",
+      maxDailyLossUsdc: 15, priceChangeThreshold: 0.6,
     },
   },
   {
@@ -86,7 +87,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
     config: {
       symbols: ["PERP_BTC_USDC", "PERP_ETH_USDC"], signalMode: "MEAN_REVERSION", leverage: 6, capitalPerTrade: 30,
       tpPercent: 1.5, slPercent: 1, maxHoldHours: 3, maxTradesPerDay: 10, maxDailyLossUsdc: 12,
-      priceChangeThreshold: 0.7, mode: "PAPER",
+      priceChangeThreshold: 0.7,
     },
   },
 ];
