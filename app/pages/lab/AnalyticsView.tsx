@@ -386,13 +386,13 @@ function TimingAndRisk({ orders }: { orders: ProcessedTrade[] }) {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {[
-              { label: "SHARPE", value: stats.sharpe.toFixed(2) },
-              { label: "SORTINO", value: stats.sortino.toFixed(2) },
-              { label: "EXPECTANCY", value: formatPnl(stats.expectancy) },
+              { label: "SHARPE", num: stats.sharpe, value: stats.sharpe.toFixed(2) },
+              { label: "SORTINO", num: stats.sortino, value: stats.sortino.toFixed(2) },
+              { label: "EXPECTANCY", num: stats.expectancy, value: formatPnl(stats.expectancy) },
             ].map((r) => (
               <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <span style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "monospace", letterSpacing: "0.06em" }}>{r.label}</span>
-                <span style={{ fontSize: 18, color: "#00ff88", fontFamily: "monospace" }}>{r.value}</span>
+                <span style={{ fontSize: 18, color: r.num >= 0 ? "#00ff88" : "#ff4c6a", fontFamily: "monospace" }}>{r.value}</span>
               </div>
             ))}
           </div>
