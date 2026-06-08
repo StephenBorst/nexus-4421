@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits } from "./logic.mjs";
 
 // Recover the signer address from an EIP-191 personal_sign signature.
 function recoverEthAddress(message, sigHex) {
@@ -304,6 +304,21 @@ function getArbRpc(env) {
   return env.ALCHEMY_KEY
     ? `https://arb-mainnet.g.alchemy.com/v2/${env.ALCHEMY_KEY}`
     : "https://arb1.arbitrum.io/rpc";
+}
+
+// Live $NEXUS/USD price for the pay-in-$NEXUS subscription path. DexScreener is
+// server-friendly (no key, unlike GeckoTerminal which 403s worker IPs). Returns
+// the deepest Base pair's USD price, or null → caller fails closed (use USDC).
+async function getNexusPriceUsd() {
+  try {
+    const r = await fetch("https://api.dexscreener.com/latest/dex/tokens/0x3D958634ab725B627919EF8F2Ed59227309fDba3");
+    const j = await r.json();
+    const pairs = (j && j.pairs) || [];
+    const base = pairs.filter((p) => String(p.chainId || "").toLowerCase() === "base");
+    const best = base.sort((a, b) => ((b.liquidity && b.liquidity.usd) || 0) - ((a.liquidity && a.liquidity.usd) || 0))[0] || pairs[0];
+    const price = best && parseFloat(best.priceUsd);
+    return price && isFinite(price) && price > 0 ? price : null;
+  } catch { return null; }
 }
 const THESIS_REGISTRY = "0x2f4eda890f96a7979d6f26bcb210cedad68346bc";
 const ONCHAIN_CACHE_KEY = "cache:onchain-wallets";
@@ -677,7 +692,9 @@ export default {
     {
       const SUB_RECEIVER = "0x06cd9c281e6ab09906b46a10e059f2770efde49a";
       const USDC_ARBITRUM = "0xaf88d065e77c8cc2239327c5edb3a432268e5831";
-      const SUB_MIN_UNITS = 198n * 100000n; // 19.8 USDC (6 decimals) — 1% tolerance under $20
+      const NEXUS_BASE = "0x3d958634ab725b627919ef8f2ed59227309fdba3";
+      const NEXUS_DISCOUNT_USD = 15;  // $20 - 25% = $15 when paying in $NEXUS
+      const NEXUS_TOLERANCE = 0.12;   // accept ≥88% of target (low-liq token slippage)
       const SUB_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 
       // GET /sub/:address → { expiresAt, active }  (read by useSubscription)
@@ -690,34 +707,62 @@ export default {
         } catch { return json({ expiresAt: 0, active: false }, request); }
       }
 
-      // POST /sub/verify { txHash, chain } → verify payment + grant 30 days
+      // POST /sub/verify { txHash, chain } → verify payment + grant 30 days.
+      // arbitrum = USDC ($20, fixed). base = $NEXUS ($15 worth, live-priced).
       if (parts[0] === "sub" && parts[1] === "verify" && request.method === "POST") {
         try {
           const body = await request.json().catch(() => ({}));
           const txHash = String(body?.txHash || "").trim().toLowerCase();
           const chain = String(body?.chain || "arbitrum").toLowerCase();
           if (!/^0x[0-9a-f]{64}$/.test(txHash)) return json({ error: "invalid txHash" }, request, 400);
-          if (chain !== "arbitrum") return json({ error: "only USDC on Arbitrum is supported right now" }, request, 400);
+
+          // Resolve chain → token + min amount + RPC endpoints.
+          let token, minUnits, rpcs;
+          if (chain === "arbitrum") {
+            token = USDC_ARBITRUM;
+            minUnits = 198n * 100000n; // 19.8 USDC (6 dec) — 1% under $20
+            rpcs = [getArbRpc(env)];
+          } else if (chain === "base") {
+            token = NEXUS_BASE;
+            const price = await getNexusPriceUsd();
+            minUnits = nexusMinUnits(price, NEXUS_DISCOUNT_USD, NEXUS_TOLERANCE);
+            if (!minUnits) return json({ error: "could not price $NEXUS right now — please pay with USDC on Arbitrum" }, request, 503);
+            rpcs = ["https://base-rpc.publicnode.com", "https://mainnet.base.org", "https://base.llamarpc.com"];
+          } else {
+            return json({ error: "unsupported chain" }, request, 400);
+          }
 
           // Replay guard — a tx can only ever buy one period.
           if (await env.LAB_STORE.get(`sub:redeemed:${txHash}`)) return json({ error: "this transaction was already redeemed" }, request, 409);
 
-          const res = await fetch(getArbRpc(env), {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionReceipt", params: [txHash] }),
-          });
-          const receipt = (await res.json())?.result;
+          // Fetch the receipt (try RPCs in order for reliability).
+          let receipt = null;
+          for (const rpc of rpcs) {
+            try {
+              const res = await fetch(rpc, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionReceipt", params: [txHash] }),
+              });
+              const j = await res.json();
+              if (j && j.result) { receipt = j.result; break; }
+            } catch { /* try next rpc */ }
+          }
           if (!receipt) return json({ error: "tx not found or still pending — wait for confirmation, then retry" }, request, 404);
 
-          const v = verifyErc20Payment(receipt, { token: USDC_ARBITRUM, receiver: SUB_RECEIVER, minAmount: SUB_MIN_UNITS });
-          if (!v.ok) return json({ error: v.reason || "verification failed", hint: `Send ≥ 20 USDC on Arbitrum to ${SUB_RECEIVER}` }, request, 400);
+          const v = verifyErc20Payment(receipt, { token, receiver: SUB_RECEIVER, minAmount: minUnits });
+          if (!v.ok) {
+            const hint = chain === "base"
+              ? `Send $NEXUS worth ≥ $${NEXUS_DISCOUNT_USD} on Base to ${SUB_RECEIVER}`
+              : `Send ≥ 20 USDC on Arbitrum to ${SUB_RECEIVER}`;
+            return json({ error: v.reason || "verification failed", hint }, request, 400);
+          }
 
           const now = Date.now();
           const existingRaw = await env.LAB_STORE.get(`sub:${v.from}`);
           const existing = existingRaw ? JSON.parse(existingRaw) : null;
           const base = existing?.expiresAt && existing.expiresAt > now ? existing.expiresAt : now;
           const expiresAt = base + SUB_PERIOD_MS;
-          await env.LAB_STORE.put(`sub:${v.from}`, JSON.stringify({ expiresAt, lastTx: txHash, chain, amount: v.amount, updatedAt: now }));
+          await env.LAB_STORE.put(`sub:${v.from}`, JSON.stringify({ expiresAt, lastTx: txHash, chain, token, amount: v.amount, updatedAt: now }));
           await env.LAB_STORE.put(`sub:redeemed:${txHash}`, v.from);
           return json({ ok: true, address: v.from, expiresAt, active: true }, request);
         } catch (e) {

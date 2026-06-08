@@ -114,3 +114,23 @@ test("verifyErc20Payment: wrong token contract → not ok", () => {
   const v = verifyErc20Payment({ status: "0x1", logs }, { token: USDC, receiver: RECV, minAmount: MIN });
   assert.equal(v.ok, false);
 });
+
+// ── nexusMinUnits (PRO $NEXUS discount path) ────────────────
+import { nexusMinUnits } from "./logic.mjs";
+
+test("nexusMinUnits: $15 at $0.0000005, 12% tol → ~26.4M tokens in 18-dec units", () => {
+  const u = nexusMinUnits(0.0000005, 15, 0.12);
+  // 15/0.0000005 = 30,000,000 * 0.88 = 26,400,000 tokens
+  assert.equal(u, 26400000n * (10n ** 18n));
+});
+
+test("nexusMinUnits: zero/invalid price → null", () => {
+  assert.equal(nexusMinUnits(0, 15, 0.12), null);
+  assert.equal(nexusMinUnits(-1, 15, 0.12), null);
+});
+
+test("nexusMinUnits: higher price → fewer tokens required", () => {
+  const lo = nexusMinUnits(0.0000005, 15, 0.12);
+  const hi = nexusMinUnits(0.000001, 15, 0.12);
+  assert.ok(hi < lo);
+});

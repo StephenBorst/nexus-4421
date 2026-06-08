@@ -62,3 +62,14 @@ export function verifyErc20Payment(receipt, { token, receiver, minAmount }) {
   }
   return { ok: false, reason: "no qualifying transfer to receiver" };
 }
+
+// Minimum token units we'll accept for a $NEXUS-denominated payment, given a live
+// USD price, the target USD amount, and a tolerance band (low-liquidity token moves
+// between quote and settlement). Pure — caller supplies the price. Returns BigInt
+// (token base units) or null if unpriceable.
+export function nexusMinUnits(priceUsd, discountUsd, tolerance, decimals = 18) {
+  if (!(priceUsd > 0) || !(discountUsd > 0)) return null;
+  const wholeTokens = Math.floor((discountUsd / priceUsd) * (1 - tolerance));
+  if (!(wholeTokens > 0)) return null;
+  return BigInt(wholeTokens) * (10n ** BigInt(decimals));
+}

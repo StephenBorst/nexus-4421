@@ -6,12 +6,12 @@
  * USDC subscribe + pay-in-$NEXUS paths show "soon" until PAYMENTS_LIVE.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useNexusTier, TIER_META, TIER_THRESHOLDS } from "@/hooks/useNexusTier";
 import {
   PRO_FEATURES, PRO_MONTHLY_USDC, NEXUS_PAY_DISCOUNT_PCT, PRO_HOLDER_TIER,
-  PAYMENTS_LIVE, nexusDiscountedPrice, SUBSCRIPTION_RECEIVER, SUBSCRIPTION_CHAIN,
+  PAYMENTS_LIVE, nexusDiscountedPrice, SUBSCRIPTION_RECEIVER, NEXUS_BASE_TOKEN,
 } from "@/config/subscription";
 import { NexusTierBadge } from "@/components/NexusTierBadge";
 import { BuyNexusButton } from "@/components/BuyNexusButton";
@@ -30,12 +30,32 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
   );
   const holderMin = TIER_THRESHOLDS.find((t) => t.tier === PRO_HOLDER_TIER)?.min ?? 0;
 
-  // USDC subscribe flow: send USDC → paste tx hash → verify → 30 days PRO.
+  // Subscribe flow: pick method → send tokens → paste tx hash → verify → 30 days.
   const [subOpen, setSubOpen] = useState(false);
+  const [method, setMethod] = useState<"usdc" | "nexus">("usdc");
   const [txHash, setTxHash] = useState("");
   const [subStatus, setSubStatus] = useState<"idle" | "verifying" | "ok" | "err">("idle");
   const [subMsg, setSubMsg] = useState("");
   const [copied, setCopied] = useState(false);
+  const [nexusAmt, setNexusAmt] = useState<string | null>(null);
+
+  // Live $NEXUS quote (client-side DexScreener) → required tokens with a small buffer
+  // so the user clears the worker's tolerance band. The worker re-prices on verify.
+  useEffect(() => {
+    if (!subOpen || method !== "nexus") return;
+    let alive = true;
+    setNexusAmt(null);
+    fetch(`https://api.dexscreener.com/latest/dex/tokens/${NEXUS_BASE_TOKEN}`)
+      .then((r) => r.json())
+      .then((j) => {
+        const pairs = (j?.pairs || []).filter((p: { chainId?: string }) => String(p.chainId || "").toLowerCase() === "base");
+        const best = pairs.sort((a: { liquidity?: { usd?: number } }, b: { liquidity?: { usd?: number } }) => ((b.liquidity?.usd) || 0) - ((a.liquidity?.usd) || 0))[0];
+        const price = best && parseFloat(best.priceUsd);
+        if (alive && price > 0) setNexusAmt(Math.ceil((nexusDiscountedPrice() / price) * 1.08).toLocaleString());
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [subOpen, method]);
 
   const copyReceiver = () => {
     navigator.clipboard?.writeText(SUBSCRIPTION_RECEIVER).then(() => {
@@ -50,7 +70,7 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
     try {
       const r = await fetch(`${API_BASE}/sub/verify`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ txHash: tx, chain: SUBSCRIPTION_CHAIN }),
+        body: JSON.stringify({ txHash: tx, chain: method === "nexus" ? "base" : "arbitrum" }),
       });
       const d = await r.json();
       if (r.ok && d.ok) {
@@ -140,8 +160,18 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
             <button onClick={() => setSubOpen(true)} style={{ fontFamily: mono, fontSize: 10, color: "#04130c", background: "#00ff88", border: "none", borderRadius: 3, padding: "7px 10px", cursor: "pointer", fontWeight: "bold", letterSpacing: "0.06em" }}>SUBSCRIBE — USDC</button>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", gap: 4 }}>
+                {([["usdc", `$${PRO_MONTHLY_USDC} USDC`], ["nexus", `$${nexusDiscountedPrice()} $NEXUS`]] as const).map(([m, lbl]) => (
+                  <button key={m} onClick={() => { setMethod(m); setSubStatus("idle"); setSubMsg(""); }}
+                    style={{ flex: 1, fontFamily: mono, fontSize: 8.5, cursor: "pointer", borderRadius: 3, padding: "4px 6px",
+                      background: method === m ? "#00ff8815" : "#0a0e0a", border: `1px solid ${method === m ? "#00ff88" : "#1a2e1a"}`,
+                      color: method === m ? "#00ff88" : "#5a8a6a" }}>{lbl}{m === "nexus" ? " · 25% off" : ""}</button>
+                ))}
+              </div>
               <div style={{ fontFamily: mono, fontSize: 8.5, color: "#5a8a6a", lineHeight: 1.5 }}>
-                1. Send <span style={{ color: "#fff" }}>${PRO_MONTHLY_USDC} USDC on Arbitrum</span> to:
+                {method === "usdc"
+                  ? <>1. Send <span style={{ color: "#fff" }}>${PRO_MONTHLY_USDC} USDC on Arbitrum</span> to:</>
+                  : <>1. Send <span style={{ color: "#fff" }}>{nexusAmt ? `~${nexusAmt}` : "…"} $NEXUS on Base</span> to:</>}
               </div>
               <button onClick={copyReceiver} title="Copy" style={{ fontFamily: mono, fontSize: 8.5, color: "#00ff88", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 3, padding: "6px 8px", cursor: "pointer", textAlign: "left", wordBreak: "break-all" }}>
                 {SUBSCRIPTION_RECEIVER} {copied ? "✓ copied" : "⧉"}

@@ -28,6 +28,8 @@ export const PAYMENTS_LIVE = true;           // USDC-on-Arbitrum rail is live (P
 export const SUBSCRIPTION_RECEIVER = "0x06cD9c281E6ab09906B46a10e059F2770EfdE49A";
 export const SUBSCRIPTION_CHAIN = "arbitrum";
 export const USDC_ARBITRUM = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
+// Pay-in-$NEXUS discount path (Base). Same receiver; worker live-prices via DexScreener.
+export const NEXUS_BASE_TOKEN = "0x3D958634ab725B627919EF8F2Ed59227309fDba3";
 
 // Tier ranking for "hold X → unlock" comparisons.
 export const TIER_RANK: Record<NexusTier, number> = {
