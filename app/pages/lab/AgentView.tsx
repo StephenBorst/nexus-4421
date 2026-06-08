@@ -7,6 +7,7 @@ import { DEFAULT_CONFIG } from "./types";
 import { agentCardStyle, agentLabelStyle, agentInputStyle, agentBtnStyle, navBtnStyle } from "./styles";
 import { useSubscription } from "@/hooks/useSubscription";
 import { isProStrategy } from "@/config/subscription";
+import { STRATEGY_PRESETS } from "@/config/strategyPresets";
 
 const AGENT_API = "https://og.nexustradinglabs.com";
 
@@ -453,6 +454,38 @@ export function AgentView() {
       {/* ─── CONFIG TAB ──────────────────────────────────── */}
       {tab === "config" && (
         <div>
+          {/* Strategy library — one-click deployable presets. Loads into config for
+              review; user still saves explicitly. PRO presets gated by isPro. */}
+          <div style={agentCardStyle}>
+            <div style={agentLabelStyle}>// STRATEGY LIBRARY <span style={{ color: "#3a6a4a" }}>— load a preset, review, save</span></div>
+            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginTop: 10 }}>
+              {STRATEGY_PRESETS.map((p) => {
+                const locked = !!p.pro && !isPro;
+                return (
+                  <button key={p.id} title={locked ? "Advanced strategy — Nexus PRO" : p.blurb}
+                    onClick={() => {
+                      if (locked) { setProNote(true); return; }
+                      setProNote(false);
+                      setConfig((prev) => ({ ...prev, ...p.config }));
+                      setSuccess(`Loaded "${p.name}" — review params & Save below.`);
+                      setTimeout(() => setSuccess(null), 5000);
+                    }}
+                    style={{
+                      flex: "0 0 200px", textAlign: "left", cursor: "pointer",
+                      background: "#0a0e0a", border: `1px solid ${locked ? "#1e2d1e" : p.accent + "40"}`,
+                      borderRadius: 6, padding: "10px 12px",
+                    }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, color: locked ? "#3a5a4a" : "#fff", fontFamily: "monospace", fontWeight: "bold" }}>{p.name}{locked ? " ◆" : ""}</span>
+                    </div>
+                    <div style={{ fontSize: 8, color: p.accent, fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: 6 }}>{p.tag}</div>
+                    <div style={{ fontSize: 9.5, color: "#6a8a7a", fontFamily: "monospace", lineHeight: 1.5 }}>{p.blurb}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Track record — surfaced before activation so users judge on real numbers.
               Live (Supabase) and Paper (state ledger) are kept strictly separate. */}
           {(config.mode === "PAPER" || (agentState?.paper_trades?.length ?? 0) > 0) && (
