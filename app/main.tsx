@@ -44,6 +44,10 @@ const LabLayout = lazy(() => import('./pages/lab/Layout'));
 const FeedPage = lazy(() => import('./pages/feed'));
 const FeedLayout = lazy(() => import('./pages/feed/Layout'));
 
+// ✅ ANALYZE PAGE (public Hyperliquid wallet x-ray)
+const AnalyzePage = lazy(() => import('./pages/analyze'));
+const AnalyzeLayout = lazy(() => import('./pages/analyze/Layout'));
+
 // ✅ TRADER PROFILE PAGE
 const TraderPage = lazy(() => import('./pages/trader'));
 
@@ -114,6 +118,15 @@ const router = createBrowserRouter([
         element: <LabLayout />,
         children: [
           { index: true, element: <TheLabPage /> },
+        ],
+      },
+
+      // ✅ ANALYZE ROUTE (public wallet x-ray)
+      {
+        path: 'analyze',
+        element: <AnalyzeLayout />,
+        children: [
+          { index: true, element: <AnalyzePage /> },
         ],
       },
 
