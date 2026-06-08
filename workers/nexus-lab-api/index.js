@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment } from "./logic.mjs";
 
 // Recover the signer address from an EIP-191 personal_sign signature.
 function recoverEthAddress(message, sigHex) {
@@ -667,6 +667,62 @@ export default {
         }, request);
       } catch (e) {
         return json({ error: "price fetch failed", detail: String(e) }, request, 502);
+      }
+    }
+
+    // ── Nexus PRO — subscription payment rail (USDC on Arbitrum) ──
+    // A sub payment = an ERC-20 transfer to the treasury receiver. We verify ONE
+    // tx receipt (no indexer): success + correct token + to===receiver + amount≥price
+    // + txHash not already redeemed → grant PRO to the tx's `from` (spoof-proof).
+    {
+      const SUB_RECEIVER = "0x06cd9c281e6ab09906b46a10e059f2770efde49a";
+      const USDC_ARBITRUM = "0xaf88d065e77c8cc2239327c5edb3a432268e5831";
+      const SUB_MIN_UNITS = 198n * 100000n; // 19.8 USDC (6 decimals) — 1% tolerance under $20
+      const SUB_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+
+      // GET /sub/:address → { expiresAt, active }  (read by useSubscription)
+      if (parts[0] === "sub" && parts[1] && parts[1] !== "verify" && request.method === "GET") {
+        try {
+          const raw = await env.LAB_STORE.get(`sub:${parts[1].toLowerCase()}`);
+          const s = raw ? JSON.parse(raw) : null;
+          const expiresAt = s?.expiresAt || 0;
+          return json({ expiresAt, active: expiresAt > Date.now() }, request);
+        } catch { return json({ expiresAt: 0, active: false }, request); }
+      }
+
+      // POST /sub/verify { txHash, chain } → verify payment + grant 30 days
+      if (parts[0] === "sub" && parts[1] === "verify" && request.method === "POST") {
+        try {
+          const body = await request.json().catch(() => ({}));
+          const txHash = String(body?.txHash || "").trim().toLowerCase();
+          const chain = String(body?.chain || "arbitrum").toLowerCase();
+          if (!/^0x[0-9a-f]{64}$/.test(txHash)) return json({ error: "invalid txHash" }, request, 400);
+          if (chain !== "arbitrum") return json({ error: "only USDC on Arbitrum is supported right now" }, request, 400);
+
+          // Replay guard — a tx can only ever buy one period.
+          if (await env.LAB_STORE.get(`sub:redeemed:${txHash}`)) return json({ error: "this transaction was already redeemed" }, request, 409);
+
+          const res = await fetch(getArbRpc(env), {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionReceipt", params: [txHash] }),
+          });
+          const receipt = (await res.json())?.result;
+          if (!receipt) return json({ error: "tx not found or still pending — wait for confirmation, then retry" }, request, 404);
+
+          const v = verifyErc20Payment(receipt, { token: USDC_ARBITRUM, receiver: SUB_RECEIVER, minAmount: SUB_MIN_UNITS });
+          if (!v.ok) return json({ error: v.reason || "verification failed", hint: `Send ≥ 20 USDC on Arbitrum to ${SUB_RECEIVER}` }, request, 400);
+
+          const now = Date.now();
+          const existingRaw = await env.LAB_STORE.get(`sub:${v.from}`);
+          const existing = existingRaw ? JSON.parse(existingRaw) : null;
+          const base = existing?.expiresAt && existing.expiresAt > now ? existing.expiresAt : now;
+          const expiresAt = base + SUB_PERIOD_MS;
+          await env.LAB_STORE.put(`sub:${v.from}`, JSON.stringify({ expiresAt, lastTx: txHash, chain, amount: v.amount, updatedAt: now }));
+          await env.LAB_STORE.put(`sub:redeemed:${txHash}`, v.from);
+          return json({ ok: true, address: v.from, expiresAt, active: true }, request);
+        } catch (e) {
+          return json({ error: "verify failed", detail: String((e && e.message) || e) }, request, 500);
+        }
       }
     }
 

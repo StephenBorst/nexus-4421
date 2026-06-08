@@ -37,3 +37,28 @@ export function gradeCall(t, cd) {
   }
   return { outcome: "PENDING", r: 0 };
 }
+
+// ── PRO subscription payment verification ───────────────────────────────────
+// Pure: given an eth_getTransactionReceipt result, decide whether it contains a
+// qualifying ERC-20 (USDC) Transfer to the subscription receiver, and who paid.
+// No network here — the caller fetches the receipt and persists the grant.
+export const ERC20_TRANSFER_TOPIC =
+  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+
+export function verifyErc20Payment(receipt, { token, receiver, minAmount }) {
+  if (!receipt || receipt.status !== "0x1") return { ok: false, reason: "tx not successful" };
+  const tokenL = String(token).toLowerCase();
+  const recvTopic = "0x" + String(receiver).toLowerCase().slice(2).padStart(64, "0");
+  for (const log of receipt.logs || []) {
+    if ((log.address || "").toLowerCase() !== tokenL) continue;
+    if (!log.topics || log.topics[0] !== ERC20_TRANSFER_TOPIC) continue;
+    if ((log.topics[2] || "").toLowerCase() !== recvTopic) continue;
+    let amount;
+    try { amount = BigInt(log.data); } catch { continue; }
+    if (amount >= minAmount) {
+      const from = "0x" + (log.topics[1] || "").slice(-40);
+      return { ok: true, from: from.toLowerCase(), amount: amount.toString() };
+    }
+  }
+  return { ok: false, reason: "no qualifying transfer to receiver" };
+}

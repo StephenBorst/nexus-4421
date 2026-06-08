@@ -20,7 +20,14 @@ import type { NexusTier } from "@/hooks/useNexusTier";
 export const PRO_MONTHLY_USDC = 20;          // USD/month, billed in USDC
 export const NEXUS_PAY_DISCOUNT_PCT = 25;    // % off when paying in $NEXUS
 export const PRO_HOLDER_TIER: NexusTier = "ARCHITECT"; // hold this tier → PRO free
-export const PAYMENTS_LIVE = false;          // flip on when the USDC rail is wired
+export const PAYMENTS_LIVE = true;           // USDC-on-Arbitrum rail is live (POST /sub/verify)
+
+// USDC subscription rail (Arbitrum). Pay USDC to the receiver, then verify the tx
+// hash → lab-api grants 30 days. Receiver = dedicated LLC revenue address (not the
+// broker-fee address, not personal). USDC = native Arbitrum USDC (6 decimals).
+export const SUBSCRIPTION_RECEIVER = "0x06cD9c281E6ab09906B46a10e059F2770EfdE49A";
+export const SUBSCRIPTION_CHAIN = "arbitrum";
+export const USDC_ARBITRUM = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
 
 // Tier ranking for "hold X → unlock" comparisons.
 export const TIER_RANK: Record<NexusTier, number> = {

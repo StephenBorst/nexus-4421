@@ -66,3 +66,51 @@ test("default R is 1 when riskReward missing/invalid", () => {
   const noRR = { direction: "LONG", entryPrice: 100, stopLoss: 95, takeProfit1: 110, createdAt: t0 * 1000 };
   assert.equal(gradeCall(noRR, series(t0, [{ h: 111, l: 99 }])).r, 1);
 });
+
+// ── verifyErc20Payment (PRO subscription rail) ──────────────
+import { verifyErc20Payment, ERC20_TRANSFER_TOPIC } from "./logic.mjs";
+
+const USDC = "0xaf88d065e77c8cc2239327c5edb3a432268e5831";
+const RECV = "0x06cD9c281E6ab09906B46a10e059F2770EfdE49A";
+const PAYER = "0x1111111111111111111111111111111111111111";
+const toTopic = (a) => "0x" + a.toLowerCase().slice(2).padStart(64, "0");
+const mkReceipt = (over = {}) => ({
+  status: "0x1",
+  logs: [{
+    address: USDC,
+    topics: [ERC20_TRANSFER_TOPIC, toTopic(PAYER), toTopic(RECV)],
+    data: "0x" + (20n * 1000000n).toString(16), // 20 USDC (6 decimals)
+  }],
+  ...over,
+});
+const MIN = 198n * 100000n; // 19.8 USDC
+
+test("verifyErc20Payment: valid 20 USDC transfer to receiver → ok + payer", () => {
+  const v = verifyErc20Payment(mkReceipt(), { token: USDC, receiver: RECV, minAmount: MIN });
+  assert.equal(v.ok, true);
+  assert.equal(v.from, PAYER.toLowerCase());
+});
+
+test("verifyErc20Payment: failed tx → not ok", () => {
+  const v = verifyErc20Payment(mkReceipt({ status: "0x0" }), { token: USDC, receiver: RECV, minAmount: MIN });
+  assert.equal(v.ok, false);
+});
+
+test("verifyErc20Payment: amount below min → not ok", () => {
+  const logs = [{ address: USDC, topics: [ERC20_TRANSFER_TOPIC, toTopic(PAYER), toTopic(RECV)], data: "0x" + (5n * 1000000n).toString(16) }];
+  const v = verifyErc20Payment({ status: "0x1", logs }, { token: USDC, receiver: RECV, minAmount: MIN });
+  assert.equal(v.ok, false);
+});
+
+test("verifyErc20Payment: transfer to a DIFFERENT receiver → not ok", () => {
+  const other = "0x9999999999999999999999999999999999999999";
+  const logs = [{ address: USDC, topics: [ERC20_TRANSFER_TOPIC, toTopic(PAYER), toTopic(other)], data: "0x" + (20n * 1000000n).toString(16) }];
+  const v = verifyErc20Payment({ status: "0x1", logs }, { token: USDC, receiver: RECV, minAmount: MIN });
+  assert.equal(v.ok, false);
+});
+
+test("verifyErc20Payment: wrong token contract → not ok", () => {
+  const logs = [{ address: "0xdead000000000000000000000000000000000000", topics: [ERC20_TRANSFER_TOPIC, toTopic(PAYER), toTopic(RECV)], data: "0x" + (20n * 1000000n).toString(16) }];
+  const v = verifyErc20Payment({ status: "0x1", logs }, { token: USDC, receiver: RECV, minAmount: MIN });
+  assert.equal(v.ok, false);
+});
