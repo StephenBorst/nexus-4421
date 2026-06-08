@@ -50,6 +50,11 @@ function holdersRoomMessage(address, ts) {
   return `Nexus Holders Room\nAddress: ${address.toLowerCase()}\nTimestamp: ${ts}`;
 }
 
+// Hosted-AI access challenge (proves the caller owns a PRO wallet).
+function aiAccessMessage(address, ts) {
+  return `Nexus AI Access\nAddress: ${address.toLowerCase()}\nTimestamp: ${ts}`;
+}
+
 let resvgReady = false;
 let fontCache = null;
 
@@ -768,6 +773,57 @@ export default {
         } catch (e) {
           return json({ error: "verify failed", detail: String((e && e.message) || e) }, request, 500);
         }
+      }
+    }
+
+    // ── Hosted NEXUS AI inference (PRO-gated proxy) ──────────────
+    // PRO subscribers use NEXUS AI with no API key of their own — we inject ours
+    // server-side. Auth = wallet-signed challenge (proves PRO wallet ownership, so
+    // nobody freeloads on our LLM bill); per-wallet daily call cap controls spend.
+    // The client keeps orchestrating its tool loop — this is a thin authed forwarder.
+    if (parts[0] === "ai" && parts[1] === "chat" && request.method === "POST") {
+      try {
+        if (!env.ANTHROPIC_API_KEY) return json({ error: "hosted inference not configured", hint: "set ANTHROPIC_API_KEY on nexus-lab-api" }, request, 503);
+        const body = await request.json().catch(() => null);
+        if (!body) return json({ error: "bad request" }, request, 400);
+
+        // Auth (in body to avoid CORS preflight on custom headers).
+        const addr = String(body._addr || "").toLowerCase();
+        const ts = Number(body._ts || 0);
+        const sig = String(body._sig || "");
+        if (!/^0x[a-f0-9]{40}$/.test(addr) || !ts || !sig) return json({ error: "auth required" }, request, 401);
+        if (Math.abs(Date.now() - ts) > 30 * 60 * 1000) return json({ error: "auth expired — re-sign" }, request, 401);
+        if (recoverEthAddress(aiAccessMessage(addr, ts), sig) !== addr) return json({ error: "bad signature" }, request, 401);
+        if (!(await walletIsPro(addr, env))) return json({ error: "pro_required", hint: "Hosted NEXUS AI is a PRO benefit — subscribe or hold ARCHITECT $NEXUS." }, request, 402);
+
+        // Per-wallet daily spend cap.
+        const CAP = parseInt(env.HOSTED_AI_DAILY_CAP || "300", 10);
+        const usageKey = `ai:usage:${addr}:${new Date().toISOString().slice(0, 10)}`;
+        const used = parseInt((await env.LAB_STORE.get(usageKey)) || "0", 10);
+        if (used >= CAP) return json({ error: "daily_limit", hint: `Hosted AI cap is ${CAP} requests/day (resets 00:00 UTC).` }, request, 429);
+        await env.LAB_STORE.put(usageKey, String(used + 1), { expirationTtl: 60 * 60 * 48 });
+
+        // Forward to Anthropic — force our model + clamp tokens (cost control).
+        const upstreamBody = { ...body };
+        delete upstreamBody._addr; delete upstreamBody._ts; delete upstreamBody._sig;
+        upstreamBody.model = env.HOSTED_AI_MODEL || "claude-haiku-4-5";
+        upstreamBody.max_tokens = Math.min(Number(upstreamBody.max_tokens) || 1024, 2048);
+
+        const upstream = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify(upstreamBody),
+        });
+
+        if (upstreamBody.stream) {
+          return new Response(upstream.body, {
+            status: upstream.status,
+            headers: { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache", ...cors(request) },
+          });
+        }
+        return json(await upstream.json(), request, upstream.status);
+      } catch (e) {
+        return json({ error: "inference error", detail: String((e && e.message) || e) }, request, 500);
       }
     }
 

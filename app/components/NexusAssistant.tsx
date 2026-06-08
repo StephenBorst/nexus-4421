@@ -13,9 +13,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAccount, usePrivateQuery, usePositionStream } from "@orderly.network/hooks";
 import { useLabStorage } from "@/hooks/useLabStorage";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
+import { useSubscription } from "@/hooks/useSubscription";
 import {
   PROVIDERS, LS_PROVIDER, LS_MODEL, LS_KEY, SYSTEM_PROMPT,
-  buildContextBlock, runChatStream, listModels, type ProviderId, type ChatMsg,
+  buildContextBlock, runChatStream, listModels, getHostedAccess, type ProviderId, type ChatMsg,
 } from "@/config/assistant";
 
 function pickDefaultModel(provider: ProviderId, ids: string[]): string {
@@ -104,6 +105,9 @@ function renderRich(text: string): React.ReactNode {
 export default function NexusAssistant() {
   const { state: acct } = useAccount();
   const walletAddress = (acct as { address?: string })?.address ?? null;
+  const { isPro } = useSubscription(walletAddress);
+  const [useHosted, setUseHosted] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("nexus_ai_hosted") === "1");
+  const setHosted = (v: boolean) => { setUseHosted(v); try { window.localStorage.setItem("nexus_ai_hosted", v ? "1" : "0"); } catch { /* ignore */ } };
   const { theses } = useLabStorage(walletAddress);
   // ⚠️ Do NOT use usePrivateQuery("/v1/positions") here — it shares the SWR key the
   // SDK's own account/collateral pipeline owns, and a competing config poisons it
@@ -296,6 +300,9 @@ export default function NexusAssistant() {
   };
 
   const hasKey = apiKey.trim().length > 0;
+  // Hosted PRO inference: PRO wallet → no key needed (we inject ours server-side).
+  const hostedActive = useHosted && isPro && !!walletAddress;
+  const ready = hostedActive || hasKey; // can the user chat?
 
   // Locally-computed (no API call) personalized hook — drives the first
   // conversation by surfacing a real leak the moment the panel opens.
@@ -332,7 +339,7 @@ export default function NexusAssistant() {
   async function send() {
     const text = input.trim();
     if (!text || loading) return;
-    if (!hasKey) { setView("settings"); return; }
+    if (!ready) { setView("settings"); return; }
 
     const next: DisplayMsg[] = [...messages, { role: "user", content: text }];
     // Add an empty assistant placeholder that streamed tokens append to.
@@ -360,8 +367,14 @@ export default function NexusAssistant() {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
+      // Hosted (PRO): sign a short-lived access challenge once, then route through
+      // our proxy (no user key). Falls back to BYOK otherwise.
+      const hosted = hostedActive && walletAddress ? await getHostedAccess(walletAddress) : undefined;
       const { toolsUsed } = await runChatStream({
-        provider, model, apiKey: apiKey.trim(),
+        provider: hosted ? "anthropic" : provider,
+        model: hosted ? "hosted" : model,
+        apiKey: hosted ? "" : apiKey.trim(),
+        hosted,
         signal: controller.signal,
         system: `${SYSTEM_PROMPT}\n\n${context}`,
         history: next.map(({ role, content }) => ({ role, content })),
@@ -487,6 +500,7 @@ export default function NexusAssistant() {
           model={model} setModel={chooseModel}
           apiKey={apiKey} saveKey={saveKey}
           availableModels={availableModels}
+          isPro={isPro} useHosted={useHosted} setHosted={setHosted}
           onDone={() => setView("chat")}
         />
       ) : (
@@ -495,16 +509,16 @@ export default function NexusAssistant() {
           <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
             {messages.length === 0 && (
               <div style={{ fontFamily: mono, fontSize: 10, color: "#3a6a4a", lineHeight: 1.7 }}>
-                {hasKey
+                {ready
                   ? "Ask about your theses, agent, the market, or a trade idea. I can see your live session context."
-                  : "Bring your own API key (Anthropic or OpenAI) to start — it stays on your device, never sent to Nexus. Tap ⚙ to set it up."}
+                  : "Start with Nexus Hosted (PRO — no key needed) or bring your own API key. Tap ⚙ to set it up."}
                 {personalInsight && (
                   <div
-                    onClick={() => hasKey && setInput(personalInsight.prompt)}
+                    onClick={() => ready && setInput(personalInsight.prompt)}
                     style={{
                       marginTop: 12, padding: "9px 11px", borderRadius: 5,
                       background: "#1a1206", border: "1px solid #4a3a00",
-                      cursor: hasKey ? "pointer" : "default",
+                      cursor: ready ? "pointer" : "default",
                     }}
                   >
                     <div style={{ fontFamily: mono, fontSize: 9, color: "#fbbf24", fontWeight: "bold", letterSpacing: "0.04em", marginBottom: 2 }}>⚠ TRADING INSIGHT</div>
@@ -513,8 +527,8 @@ export default function NexusAssistant() {
                 )}
                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
                   {pageSuggestions.map((s) => (
-                    <button key={s} onClick={() => setInput(s)} disabled={!hasKey}
-                      style={{ textAlign: "left", background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 4, color: hasKey ? "#8aaa9a" : "#2a4a3a", fontFamily: mono, fontSize: 10, padding: "6px 9px", cursor: hasKey ? "pointer" : "default" }}>
+                    <button key={s} onClick={() => setInput(s)} disabled={!ready}
+                      style={{ textAlign: "left", background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 4, color: ready ? "#8aaa9a" : "#2a4a3a", fontFamily: mono, fontSize: 10, padding: "6px 9px", cursor: ready ? "pointer" : "default" }}>
                       → {s}
                     </button>
                   ))}
@@ -552,7 +566,7 @@ export default function NexusAssistant() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder={hasKey ? "Ask Nexus AI…" : "Set your API key in ⚙ first"}
+              placeholder={ready ? "Ask Nexus AI…" : "Enable hosted (PRO) or set a key in ⚙"}
               rows={1}
               style={{
                 flex: 1, background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 4,
@@ -603,20 +617,48 @@ function btn(active: boolean): React.CSSProperties {
 }
 
 function SettingsView({
-  provider, setProvider, model, setModel, apiKey, saveKey, availableModels, onDone,
+  provider, setProvider, model, setModel, apiKey, saveKey, availableModels, isPro, useHosted, setHosted, onDone,
 }: {
   provider: ProviderId; setProvider: (p: ProviderId) => void;
   model: string; setModel: (m: string) => void;
   apiKey: string; saveKey: (k: string) => void;
   availableModels: string[];
+  isPro: boolean; useHosted: boolean; setHosted: (v: boolean) => void;
   onDone: () => void;
 }) {
   const def = PROVIDERS[provider];
   const modelChoices = availableModels.length ? availableModels : def.models;
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* Hosted (PRO) — no key needed; we inject ours server-side for PRO wallets. */}
+      <div style={{ border: `1px solid ${useHosted && isPro ? GREEN : "#1a2e1a"}`, borderRadius: 6, padding: 12, background: "#0a120a" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div>
+            <div style={{ fontFamily: mono, fontSize: 11, color: GREEN, fontWeight: "bold" }}>◆ NEXUS HOSTED <span style={{ color: "#5a8a6a", fontWeight: "normal" }}>· PRO</span></div>
+            <div style={{ fontFamily: mono, fontSize: 9, color: "#5a8a6a", lineHeight: 1.5, marginTop: 3 }}>
+              {isPro ? "Run NEXUS AI with no API key — we host it. One wallet signature per session." : "Hosted AI is a PRO benefit. Subscribe or hold ARCHITECT $NEXUS to enable."}
+            </div>
+          </div>
+          <button
+            onClick={() => { if (isPro) setHosted(!useHosted); }}
+            disabled={!isPro}
+            title={isPro ? "Toggle hosted inference" : "PRO required"}
+            style={{
+              flexShrink: 0, fontFamily: mono, fontSize: 10, fontWeight: "bold", borderRadius: 3, padding: "6px 14px",
+              cursor: isPro ? "pointer" : "default",
+              background: useHosted && isPro ? "#00ff8815" : "#0d120d",
+              border: `1px solid ${useHosted && isPro ? GREEN : "#1a2e1a"}`,
+              color: !isPro ? "#3a5a4a" : useHosted ? GREEN : "#5a8a6a",
+            }}>
+            {useHosted && isPro ? "ON" : "OFF"}
+          </button>
+        </div>
+      </div>
+
       <div style={{ fontFamily: mono, fontSize: 10, color: "#8aaa9a", lineHeight: 1.6 }}>
-        Bring your own model key. It's stored only in this browser (localStorage) and sent <b style={{ color: GREEN }}>directly</b> to the provider — never to Nexus servers.
+        {useHosted && isPro
+          ? "Hosted is ON — no key needed. Or bring your own key below to use a different provider/model."
+          : <>Bring your own model key. It's stored only in this browser (localStorage) and sent <b style={{ color: GREEN }}>directly</b> to the provider — never to Nexus servers.</>}
       </div>
 
       <Field label="PROVIDER">

@@ -47,6 +47,48 @@ export const LS_MODEL = (p: ProviderId) => `nexus_ai_model_${p}`; // per-provide
 export const LS_KEY = (p: ProviderId) => `nexus_ai_key_${p}`;     // per-provider key
 
 import { anthropicTools, openaiTools, TOOL_BY_NAME, type ToolCtx } from "@/config/assistantTools";
+import { createWalletClient, custom } from "viem";
+
+// ── Hosted inference (PRO) — route the Anthropic format through our authed proxy
+// so PRO users need no API key of their own (we inject ours server-side). ──────
+export interface HostedAuth { addr: string; ts: number; sig: string; }
+const HOSTED_BASE = "https://og.nexustradinglabs.com";
+const aiAccessMessage = (address: string, ts: number) =>
+  `Nexus AI Access\nAddress: ${address.toLowerCase()}\nTimestamp: ${ts}`;
+
+// Sign-once (cached ~25 min) wallet challenge proving PRO wallet ownership.
+export async function getHostedAccess(address: string): Promise<HostedAuth> {
+  const key = `nexus_ai_access_${address.toLowerCase()}`;
+  try {
+    const c = JSON.parse(sessionStorage.getItem(key) || "null");
+    if (c && Date.now() - c.ts < 25 * 60 * 1000) return c;
+  } catch { /* ignore */ }
+  const eth = (window as unknown as { ethereum?: unknown }).ethereum;
+  if (!eth) throw new Error("No wallet found — connect your wallet to use hosted AI.");
+  const client = createWalletClient({ transport: custom(eth as Parameters<typeof custom>[0]) });
+  const ts = Date.now();
+  const sig = await client.signMessage({ account: address as `0x${string}`, message: aiAccessMessage(address, ts) });
+  const access: HostedAuth = { addr: address.toLowerCase(), ts, sig };
+  try { sessionStorage.setItem(key, JSON.stringify(access)); } catch { /* ignore */ }
+  return access;
+}
+
+// Anthropic-format request target: direct provider (BYOK) or our PRO proxy (hosted).
+function anthropicTarget(apiKey: string, hosted?: HostedAuth) {
+  if (hosted) return {
+    endpoint: `${HOSTED_BASE}/ai/chat`,
+    headers: { "content-type": "application/json" } as Record<string, string>,
+    authBody: { _addr: hosted.addr, _ts: hosted.ts, _sig: hosted.sig } as Record<string, unknown>,
+  };
+  return {
+    endpoint: PROVIDERS.anthropic.endpoint,
+    headers: {
+      "content-type": "application/json", "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true",
+    } as Record<string, string>,
+    authBody: {} as Record<string, unknown>,
+  };
+}
 
 export interface ChatMsg {
   role: "user" | "assistant";
@@ -174,27 +216,24 @@ export async function runChat(opts: {
   history: ChatMsg[];
   ctx: ToolCtx;
   signal?: AbortSignal;
+  hosted?: HostedAuth;
 }): Promise<RunResult> {
-  return opts.provider === "anthropic" ? runAnthropic(opts) : runOpenAI(opts);
+  return (opts.provider === "anthropic" || opts.hosted) ? runAnthropic(opts) : runOpenAI(opts);
 }
 
 async function runAnthropic(opts: {
-  model: string; apiKey: string; system: string; history: ChatMsg[]; ctx: ToolCtx; signal?: AbortSignal;
+  model: string; apiKey: string; system: string; history: ChatMsg[]; ctx: ToolCtx; signal?: AbortSignal; hosted?: HostedAuth;
 }): Promise<RunResult> {
-  const { model, apiKey, system, history, ctx, signal } = opts;
+  const { model, apiKey, system, history, ctx, signal, hosted } = opts;
   const messages: { role: string; content: unknown }[] = history.map((m) => ({ role: m.role, content: m.content }));
   const toolsUsed: string[] = [];
+  const t = anthropicTarget(apiKey, hosted);
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const res = await fetch(PROVIDERS.anthropic.endpoint, {
+    const res = await fetch(t.endpoint, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify({ model, max_tokens: 1024, system, tools: anthropicTools(), messages }),
+      headers: t.headers,
+      body: JSON.stringify({ model, max_tokens: 1024, system, tools: anthropicTools(), messages, ...t.authBody }),
       signal,
     });
     if (!res.ok) throw new Error(await errText(res));
@@ -266,8 +305,9 @@ export async function runChatStream(opts: {
   provider: ProviderId; model: string; apiKey: string; system: string;
   history: ChatMsg[]; ctx: ToolCtx; signal?: AbortSignal;
   onDelta: (chunk: string) => void;
+  hosted?: HostedAuth;
 }): Promise<RunResult> {
-  return opts.provider === "anthropic" ? runAnthropicStream(opts) : runOpenAIStream(opts);
+  return (opts.provider === "anthropic" || opts.hosted) ? runAnthropicStream(opts) : runOpenAIStream(opts);
 }
 
 // Read an SSE response body line-by-line and hand each parsed `data:` JSON to cb.
@@ -294,21 +334,19 @@ async function readSSE(res: Response, cb: (json: Record<string, unknown>) => voi
 
 async function runAnthropicStream(opts: {
   model: string; apiKey: string; system: string; history: ChatMsg[]; ctx: ToolCtx; signal?: AbortSignal;
-  onDelta: (c: string) => void;
+  onDelta: (c: string) => void; hosted?: HostedAuth;
 }): Promise<RunResult> {
-  const { model, apiKey, system, history, ctx, signal, onDelta } = opts;
+  const { model, apiKey, system, history, ctx, signal, onDelta, hosted } = opts;
   const messages: { role: string; content: unknown }[] = history.map((m) => ({ role: m.role, content: m.content }));
   const toolsUsed: string[] = [];
   let fullText = "";
+  const t = anthropicTarget(apiKey, hosted);
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const res = await fetch(PROVIDERS.anthropic.endpoint, {
+    const res = await fetch(t.endpoint, {
       method: "POST",
-      headers: {
-        "content-type": "application/json", "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify({ model, max_tokens: 1024, system, tools: anthropicTools(), messages, stream: true }),
+      headers: t.headers,
+      body: JSON.stringify({ model, max_tokens: 1024, system, tools: anthropicTools(), messages, stream: true, ...t.authBody }),
       signal,
     });
     if (!res.ok) throw new Error(await errText(res));
