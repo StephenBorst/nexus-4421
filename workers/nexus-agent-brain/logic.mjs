@@ -12,7 +12,34 @@
 // Guardrails (loss cap, max trades, kill switch, order-only keys) live in exec and
 // are NOT tunable here — users tune the STRATEGY, never the seatbelts.
 
-export function deriveSignal(raw, config = {}) {
+// Market-wide regime from a full futures snapshot (all symbols). Pure + testable.
+// Mirrors the frontend MarketRegime: breadth (50%) + BTC trend (40%) + funding
+// crowding (10%) → 0-100 score → RISK_ON / NEUTRAL / RISK_OFF. Used ONLY to gate
+// new entries for users who opt into respectRegime (it never flips direction).
+export function computeRegime(rows) {
+  if (!Array.isArray(rows) || !rows.length) return null;
+  const chg = (m) => {
+    const o = parseFloat(m["24h_open"]); const c = parseFloat(m["24h_close"]);
+    if (!o || !c) return 0;
+    const p = ((c - o) / o) * 100;
+    return Math.abs(p) > 50 ? 0 : p; // guard bad ticks
+  };
+  const changes = rows.map(chg);
+  const up = changes.filter((c) => c > 0).length;
+  const breadth = (up / changes.length) * 100;
+  const btc = rows.find((m) => m.symbol === "PERP_BTC_USDC");
+  const btcChg = btc ? chg(btc) : 0;
+  const fundings = rows.map((m) => parseFloat(m.last_funding_rate)).filter((f) => !isNaN(f));
+  const fundPos = fundings.filter((f) => f > 0).length;
+  const fundSkew = fundings.length ? (fundPos / fundings.length) * 100 : 50;
+  const btcScore = Math.max(0, Math.min(100, 50 + btcChg * 6));
+  const fundScore = 100 - Math.abs(fundSkew - 50) * 2;
+  const score = Math.round(breadth * 0.5 + btcScore * 0.4 + fundScore * 0.1);
+  const label = score >= 60 ? "RISK_ON" : score >= 42 ? "NEUTRAL" : "RISK_OFF";
+  return { score, label };
+}
+
+export function deriveSignal(raw, config = {}, regime = null) {
   const fundingRate = raw.fundingRate || 0;
   const priceChange = raw.priceChange || 0;
   const oiChange = raw.oiChange || 0;
@@ -62,6 +89,17 @@ export function deriveSignal(raw, config = {}) {
     default:
       if (fundingSignal !== "NONE" && fundingSignal === oiSignal) { direction = fundingSignal; confidence = 80; why = "confluence"; }
       break;
+  }
+
+  // Opt-in regime filter — skip NEW entries that fight a STRONG tape. It never
+  // flips direction or touches open positions; it only suppresses a fresh entry.
+  if (direction !== "NONE" && config.respectRegime && regime && regime.label !== "NEUTRAL") {
+    const fightsTape =
+      (regime.label === "RISK_OFF" && direction === "LONG") ||
+      (regime.label === "RISK_ON" && direction === "SHORT");
+    if (fightsTape) {
+      return { direction: "NONE", confidence: 0, reason: `regime-gated (${regime.label} vs ${direction})` };
+    }
   }
 
   const reason = direction === "NONE"

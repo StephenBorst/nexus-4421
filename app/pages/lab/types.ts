@@ -67,6 +67,7 @@ export interface AgentConfig {
   signalMode: "CONFLUENCE" | "FUNDING_ONLY" | "OI_ONLY" | "MOMENTUM" | "MEAN_REVERSION";
   oiChangeThreshold: number; // % min OI move for the OI-divergence rule to count (0 = any)
   priceChangeThreshold: number; // % price move on the tick that triggers MOMENTUM / MEAN_REVERSION
+  respectRegime?: boolean; // opt-in: brain skips NEW entries that fight a strong market regime
   mode: "ASSISTED" | "AUTONOMOUS" | "PAPER";
 }
 

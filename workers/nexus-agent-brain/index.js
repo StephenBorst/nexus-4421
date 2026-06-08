@@ -15,7 +15,7 @@
 //   Entry: BOTH rules must agree (confluence). Single signal = no trade.
 // ═══════════════════════════════════════════════════════════
 
-import { deriveSignal } from "./logic.mjs";
+import { deriveSignal, computeRegime } from "./logic.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 
@@ -55,6 +55,17 @@ export default {
         }
       }
 
+      // Market-wide regime — computed once per tick, only if someone opted in.
+      // Gates entries that fight a strong tape for users with respectRegime on.
+      let regime = null;
+      if (Object.values(userConfigs).some(({ config }) => config.respectRegime)) {
+        try {
+          const res = await fetch(`${ORDERLY_API}/v1/public/futures`);
+          if (res.ok) { const j = await res.json(); regime = computeRegime(j?.data?.rows || []); }
+          console.log(`[brain] regime: ${regime ? `${regime.label} (${regime.score})` : "n/a"}`);
+        } catch (e) { console.error("[brain] regime fetch error:", e.message); }
+      }
+
       // Assign the best qualifying signal to each user from their watchlist,
       // honoring THEIR strategy config (signalMode + thresholds).
       for (const [address, { config }] of Object.entries(userConfigs)) {
@@ -63,7 +74,7 @@ export default {
           for (const sym of config.symbols || []) {
             const raw = rawBySymbol[sym];
             if (!raw) continue;
-            const sig = deriveSignal(raw, config);
+            const sig = deriveSignal(raw, config, config.respectRegime ? regime : null);
             if (sig.direction !== "NONE" && sig.confidence > best.confidence) {
               best = { symbol: sym, direction: sig.direction, funding: raw.fundingRate, oi: raw.oi, price: raw.price, confidence: sig.confidence, reason: sig.reason };
             }

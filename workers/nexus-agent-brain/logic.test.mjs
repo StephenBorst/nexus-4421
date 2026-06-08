@@ -84,3 +84,57 @@ test("default config = CONFLUENCE behavior", () => {
   assert.equal(s.direction, "SHORT");
   assert.equal(s.confidence, 80);
 });
+
+// ── Regime filter (opt-in) ──────────────────────────────────
+import { computeRegime } from "./logic.mjs";
+
+const mkRows = (n, upFrac, btcChg, fundPosFrac) =>
+  Array.from({ length: n }, (_, i) => ({
+    symbol: i === 0 ? "PERP_BTC_USDC" : `PERP_X${i}_USDC`,
+    "24h_open": "100",
+    "24h_close": String(i === 0 ? 100 + btcChg : (i / n < upFrac ? 101 : 99)),
+    last_funding_rate: i / n < fundPosFrac ? "0.0001" : "-0.0001",
+  }));
+
+test("computeRegime: broad strength → RISK_ON", () => {
+  const r = computeRegime(mkRows(20, 0.95, 5, 0.5));
+  assert.equal(r.label, "RISK_ON");
+  assert.ok(r.score >= 60);
+});
+
+test("computeRegime: broad weakness → RISK_OFF", () => {
+  const r = computeRegime(mkRows(20, 0.1, -5, 0.5));
+  assert.equal(r.label, "RISK_OFF");
+  assert.ok(r.score < 42);
+});
+
+test("computeRegime: empty → null", () => {
+  assert.equal(computeRegime([]), null);
+});
+
+test("respectRegime OFF: regime never gates (back-compat)", () => {
+  const s = deriveSignal(raw({ fundingRate: 0.0002, priceChange: 0.01, oiChange: -0.01 }), { signalMode: "CONFLUENCE" }, { label: "RISK_ON", score: 80 });
+  assert.equal(s.direction, "SHORT"); // not gated because respectRegime is absent
+});
+
+test("respectRegime ON: SHORT gated in RISK_ON", () => {
+  const s = deriveSignal(raw({ fundingRate: 0.0002, priceChange: 0.01, oiChange: -0.01 }), { signalMode: "CONFLUENCE", respectRegime: true }, { label: "RISK_ON", score: 80 });
+  assert.equal(s.direction, "NONE");
+  assert.match(s.reason, /regime-gated/);
+});
+
+test("respectRegime ON: LONG gated in RISK_OFF", () => {
+  // funding -0.02% → LONG; price down + OI up → LONG (confluence LONG)
+  const s = deriveSignal(raw({ fundingRate: -0.0002, priceChange: -0.01, oiChange: 0.01 }), { signalMode: "CONFLUENCE", respectRegime: true }, { label: "RISK_OFF", score: 20 });
+  assert.equal(s.direction, "NONE");
+});
+
+test("respectRegime ON: aligned trade passes (LONG in RISK_ON)", () => {
+  const s = deriveSignal(raw({ fundingRate: -0.0002, priceChange: -0.01, oiChange: 0.01 }), { signalMode: "CONFLUENCE", respectRegime: true }, { label: "RISK_ON", score: 80 });
+  assert.equal(s.direction, "LONG"); // aligned with tape → allowed
+});
+
+test("respectRegime ON: NEUTRAL never gates", () => {
+  const s = deriveSignal(raw({ fundingRate: 0.0002, priceChange: 0.01, oiChange: -0.01 }), { signalMode: "CONFLUENCE", respectRegime: true }, { label: "NEUTRAL", score: 50 });
+  assert.equal(s.direction, "SHORT");
+});
