@@ -62,13 +62,14 @@ export default function MiniApp() {
   }, []);
 
   async function buyNexus() {
+    // Stay 100% native to Warpcast: try the in-app swap sheet, else the native
+    // token page (where the user can buy/swap in-wallet). No external redirect.
     try {
-      const res = await sdk.actions.swapToken({ buyToken: NEXUS_CAIP19 });
-      if (!res?.success) {
-        await sdk.actions.openUrl(`https://app.uniswap.org/swap?chain=base&inputCurrency=ETH&outputCurrency=${NEXUS}`);
-      }
+      const res = await sdk.actions.swapToken({ sellToken: "eip155:8453/native", buyToken: NEXUS_CAIP19 });
+      if (res?.success || res?.reason === "rejected_by_user") return; // done / user cancelled
+      await sdk.actions.viewToken({ token: NEXUS_CAIP19 });            // couldn't swap → native token page
     } catch {
-      try { await sdk.actions.openUrl(`https://app.uniswap.org/swap?chain=base&inputCurrency=ETH&outputCurrency=${NEXUS}`); } catch { /* ignore */ }
+      try { await sdk.actions.viewToken({ token: NEXUS_CAIP19 }); } catch { /* ignore */ }
     }
   }
 
