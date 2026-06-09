@@ -14,8 +14,9 @@ import { useEffect, useState } from "react";
 import { createPublicClient, http, fallback, formatUnits } from "viem";
 import { arbitrum } from "viem/chains";
 
-// Empty until the public Safe is live. Paste the Safe address here to activate.
-export const NEXUS_TREASURY_ADDRESS = "";
+// Nexus Trading Labs Treasury — Safe (1/1) on Arbitrum + Base, deployed 2026-06-06.
+// Receives swept USDC (broker fees + PRO subs) and $NEXUS; funds future buyback/burn.
+export const NEXUS_TREASURY_ADDRESS = "0x4Fe2c01bbeFaFFa35706C994646a3F8493B1C733";
 
 // Native USDC on Arbitrum (6 decimals) — how Orderly pays builder fees.
 const USDC_ARBITRUM = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831" as const;

@@ -16,6 +16,21 @@ is everything built on top:
 - **Messages** — global top-right envelope icon w/ live unread badge (`app/components/MessagesNavButton.tsx`),
   real-time via XMTP `streamAllMessages`. Deep-linked from Feed/Trader as `/messages?dm=0x…`.
 
+## ✅ Revenue + AI + Treasury (LIVE — 2026-06-06; full detail in memory `revenue-ai-treasury-2026-06-06`)
+- **Money map:** broker fees → `borst.eth` (Orderly-registered, don't churn) · subs/AI revenue → EOA
+  `0x06cD9c281E6ab09906B46a10e059F2770EfdE49A` (`SUBSCRIPTION_RECEIVER`) · **treasury Safe**
+  `0x4Fe2c01bbeFaFFa35706C994646a3F8493B1C733` (1/1, Arbitrum+Base, signer `0x53Ce…9D33`). Sweep the
+  two receivers → the Safe on a cadence. Safe is set as `NEXUS_TREASURY_ADDRESS` → public treasury banner live.
+- **PRO payment rail LIVE** (`PAYMENTS_LIVE=true`): `POST /sub/verify {txHash,chain}` verifies ONE tx receipt
+  → grants 30d PRO to the tx's `from` (spoof-proof, replay-guarded). USDC/Arbitrum $20 · $NEXUS/Base $15
+  (DexScreener-priced, 12% tolerance, fails closed). `walletIsPro` reads `sub:{addr}`. Logic+tests in lab-api `logic.mjs`.
+- **Hosted AI inference LIVE** (PRO benefit): `POST /ai/chat` = authed (wallet-signed) PRO-gated proxy to Anthropic
+  with our key + prompt caching + per-wallet daily cap. Model `claude-opus-4-8`, cap **20/day**, env-tunable
+  (`HOSTED_AI_MODEL`/`HOSTED_AI_DAILY_CAP`); needs `ANTHROPIC_API_KEY` secret (set). Free users keep BYOK.
+- **`/analyze`** public Hyperliquid wallet x-ray (HL public API → Lab AnalyticsView; in nav). **Strategy presets**
+  (`config/strategyPresets.ts`) load in PAPER/ASSISTED/AUTONOMOUS (no longer force PAPER). **Agent regime filter**
+  `respectRegime` (opt-in; brain `computeRegime` gates trend-fighting entries). Bankr skill updated for both.
+
 ## Stack
 - React + Vite + react-router-dom, TypeScript. Orderly SDK (`@orderly.network/*`), `@xmtp/browser-sdk` v7, wagmi.
 - Nav config + global chrome: `app/utils/config.tsx` (top-nav order is hardcoded by href in `NAV_HREF_ORDER`).
