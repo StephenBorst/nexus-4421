@@ -25,8 +25,13 @@ is everything built on top:
   → grants 30d PRO to the tx's `from` (spoof-proof, replay-guarded). USDC/Arbitrum $20 · $NEXUS/Base $15
   (DexScreener-priced, 12% tolerance, fails closed). `walletIsPro` reads `sub:{addr}`. Logic+tests in lab-api `logic.mjs`.
 - **Hosted AI inference LIVE** (PRO benefit): `POST /ai/chat` = authed (wallet-signed) PRO-gated proxy to Anthropic
-  with our key + prompt caching + per-wallet daily cap. Model `claude-opus-4-8`, cap **20/day**, env-tunable
-  (`HOSTED_AI_MODEL`/`HOSTED_AI_DAILY_CAP`); needs `ANTHROPIC_API_KEY` secret (set). Free users keep BYOK.
+  with our key + prompt caching + **per-MODEL daily cap**. PRO user PICKS the tier (UI ⚙): **Haiku 4.5
+  100/day · Sonnet 4.6 40/day (default) · Opus 4.8 20/day** — stronger model = lower cap (spend scales with
+  cost). `resolveHostedModel`/`hostedCaps` in lab-api `logic.mjs` whitelist the requested id (unknown/injected
+  → default Sonnet tier) + return its cap; usage counter is keyed PER MODEL (`ai:usage:{addr}:{model}:{date}`).
+  Tiers mirrored client-side in `config/assistant.ts` (`HOSTED_TIERS`). Env-tunable caps `HOSTED_CAP_HAIKU/
+  SONNET/OPUS` + default tier `HOSTED_AI_DEFAULT_MODEL` (legacy `HOSTED_AI_MODEL` honored as default source);
+  needs `ANTHROPIC_API_KEY` secret (set). Free users keep BYOK.
 - **`/analyze`** public Hyperliquid wallet x-ray (HL public API → Lab AnalyticsView; in nav). **Strategy presets**
   (`config/strategyPresets.ts`) load in PAPER/ASSISTED/AUTONOMOUS (no longer force PAPER). **Agent regime filter**
   `respectRegime` (opt-in; brain `computeRegime` gates trend-fighting entries). Bankr skill updated for both.

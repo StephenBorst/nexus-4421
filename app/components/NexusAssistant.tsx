@@ -15,7 +15,8 @@ import { useLabStorage } from "@/hooks/useLabStorage";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { useSubscription } from "@/hooks/useSubscription";
 import {
-  PROVIDERS, LS_PROVIDER, LS_MODEL, LS_KEY, SYSTEM_PROMPT,
+  PROVIDERS, LS_PROVIDER, LS_MODEL, LS_KEY, LS_HOSTED_MODEL, SYSTEM_PROMPT,
+  HOSTED_TIERS, loadHostedModel,
   buildContextBlock, runChatStream, listModels, getHostedAccess, type ProviderId, type ChatMsg,
 } from "@/config/assistant";
 
@@ -108,6 +109,9 @@ export default function NexusAssistant() {
   const { isPro } = useSubscription(walletAddress);
   const [useHosted, setUseHosted] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("nexus_ai_hosted") === "1");
   const setHosted = (v: boolean) => { setUseHosted(v); try { window.localStorage.setItem("nexus_ai_hosted", v ? "1" : "0"); } catch { /* ignore */ } };
+  // Hosted (PRO) model tier — which model our proxy runs (each has its own daily cap).
+  const [hostedModel, setHostedModel] = useState<string>(() => loadHostedModel());
+  const chooseHostedModel = (m: string) => { setHostedModel(m); try { window.localStorage.setItem(LS_HOSTED_MODEL, m); } catch { /* ignore */ } };
   const { theses } = useLabStorage(walletAddress);
   // ⚠️ Do NOT use usePrivateQuery("/v1/positions") here — it shares the SWR key the
   // SDK's own account/collateral pipeline owns, and a competing config poisons it
@@ -372,7 +376,7 @@ export default function NexusAssistant() {
       const hosted = hostedActive && walletAddress ? await getHostedAccess(walletAddress) : undefined;
       const { toolsUsed } = await runChatStream({
         provider: hosted ? "anthropic" : provider,
-        model: hosted ? "hosted" : model,
+        model: hosted ? hostedModel : model,
         apiKey: hosted ? "" : apiKey.trim(),
         hosted,
         signal: controller.signal,
@@ -485,7 +489,7 @@ export default function NexusAssistant() {
           <span style={{ color: GREEN, textShadow: "0 0 10px rgba(0,255,136,0.5)" }}>//</span>
           <span style={{ color: "#fff" }}> NEXUS AI</span>
         </span>
-        <span style={{ fontFamily: mono, fontSize: 8, color: "#3a6a4a" }}>{PROVIDERS[provider].label.split(" ")[0]} · {model}</span>
+        <span style={{ fontFamily: mono, fontSize: 8, color: "#3a6a4a" }}>{hostedActive ? `Hosted · ${HOSTED_TIERS.find((t) => t.id === hostedModel)?.label ?? hostedModel}` : `${PROVIDERS[provider].label.split(" ")[0]} · ${model}`}</span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
           <button onClick={() => setView(view === "settings" ? "chat" : "settings")} title="Settings"
             style={btn(view === "settings")}>⚙</button>
@@ -501,6 +505,7 @@ export default function NexusAssistant() {
           apiKey={apiKey} saveKey={saveKey}
           availableModels={availableModels}
           isPro={isPro} useHosted={useHosted} setHosted={setHosted}
+          hostedModel={hostedModel} setHostedModel={chooseHostedModel}
           onDone={() => setView("chat")}
         />
       ) : (
@@ -617,13 +622,15 @@ function btn(active: boolean): React.CSSProperties {
 }
 
 function SettingsView({
-  provider, setProvider, model, setModel, apiKey, saveKey, availableModels, isPro, useHosted, setHosted, onDone,
+  provider, setProvider, model, setModel, apiKey, saveKey, availableModels, isPro, useHosted, setHosted,
+  hostedModel, setHostedModel, onDone,
 }: {
   provider: ProviderId; setProvider: (p: ProviderId) => void;
   model: string; setModel: (m: string) => void;
   apiKey: string; saveKey: (k: string) => void;
   availableModels: string[];
   isPro: boolean; useHosted: boolean; setHosted: (v: boolean) => void;
+  hostedModel: string; setHostedModel: (m: string) => void;
   onDone: () => void;
 }) {
   const def = PROVIDERS[provider];
@@ -653,6 +660,32 @@ function SettingsView({
             {useHosted && isPro ? "ON" : "OFF"}
           </button>
         </div>
+
+        {/* Model tier — stronger model = lower daily cap, cheaper = higher cap. */}
+        {useHosted && isPro && (
+          <div style={{ marginTop: 12, borderTop: "1px solid #1a2e1a", paddingTop: 10 }}>
+            <div style={{ fontFamily: mono, fontSize: 8, color: "#5a8a6a", letterSpacing: "0.12em", marginBottom: 6 }}>MODEL TIER · DAILY CAP</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              {HOSTED_TIERS.map((t) => {
+                const on = hostedModel === t.id;
+                return (
+                  <button key={t.id} onClick={() => setHostedModel(t.id)}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, textAlign: "left",
+                      background: on ? "#0a1a0a" : "#0d120d", border: `1px solid ${on ? GREEN : "#1a2e1a"}`,
+                      borderRadius: 4, padding: "7px 10px", cursor: "pointer",
+                    }}>
+                    <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span style={{ fontFamily: mono, fontSize: 10, color: on ? GREEN : "#7aaa8a", fontWeight: "bold" }}>{t.label}</span>
+                      <span style={{ fontFamily: mono, fontSize: 8, color: "#5a8a6a" }}>{t.note}</span>
+                    </span>
+                    <span style={{ fontFamily: mono, fontSize: 10, color: on ? GREEN : "#5a8a6a", fontWeight: "bold", flexShrink: 0 }}>{t.cap}/day</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={{ fontFamily: mono, fontSize: 10, color: "#8aaa9a", lineHeight: 1.6 }}>

@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel } from "./logic.mjs";
 
 // Recover the signer address from an EIP-191 personal_sign signature.
 function recoverEthAddress(message, sigHex) {
@@ -796,21 +796,22 @@ export default {
         if (recoverEthAddress(aiAccessMessage(addr, ts), sig) !== addr) return json({ error: "bad signature" }, request, 401);
         if (!(await walletIsPro(addr, env))) return json({ error: "pro_required", hint: "Hosted NEXUS AI is a PRO benefit — subscribe or hold ARCHITECT $NEXUS." }, request, 402);
 
-        // Per-wallet daily spend cap. Default model is Opus 4.8 ($5/$25 per MTok —
-        // ~5-6x Haiku) for the strongest analysis, so the cap is tighter: 20/day
-        // (~4 chat exchanges of the best model). Typical user ≈ $5/mo (healthy margin
-        // on the $15-20 sub); a daily-maxing abuser is bounded ~$25-30/mo (rare; BYOK
-        // is the unlimited valve). Env-tunable via HOSTED_AI_DAILY_CAP / HOSTED_AI_MODEL.
-        const CAP = parseInt(env.HOSTED_AI_DAILY_CAP || "20", 10);
-        const usageKey = `ai:usage:${addr}:${new Date().toISOString().slice(0, 10)}`;
+        // Per-MODEL daily spend cap. The PRO user picks a model (Haiku/Sonnet/Opus);
+        // each tier has its OWN cap so our spend scales with model cost — stronger
+        // model = lower cap, cheaper model = higher cap. resolveHostedModel whitelists
+        // the requested id (an unknown/injected model falls back to the default
+        // Sonnet tier) and returns its cap; see logic.mjs. The counter is keyed PER
+        // MODEL so the tiers don't share a budget. BYOK remains the unlimited valve.
+        const { model: hostedModel, cap: CAP } = resolveHostedModel(body.model, env);
+        const usageKey = `ai:usage:${addr}:${hostedModel}:${new Date().toISOString().slice(0, 10)}`;
         const used = parseInt((await env.LAB_STORE.get(usageKey)) || "0", 10);
-        if (used >= CAP) return json({ error: "daily_limit", hint: `Hosted AI cap is ${CAP} requests/day (resets 00:00 UTC).` }, request, 429);
+        if (used >= CAP) return json({ error: "daily_limit", model: hostedModel, cap: CAP, hint: `Hosted ${hostedModel} cap is ${CAP}/day (resets 00:00 UTC). Switch to a lighter model in ⚙ for a higher cap, or use your own API key.` }, request, 429);
         await env.LAB_STORE.put(usageKey, String(used + 1), { expirationTtl: 60 * 60 * 48 });
 
-        // Forward to Anthropic — force our model + clamp tokens (cost control).
+        // Forward to Anthropic — use the resolved (whitelisted) model + clamp tokens.
         const upstreamBody = { ...body };
         delete upstreamBody._addr; delete upstreamBody._ts; delete upstreamBody._sig;
-        upstreamBody.model = env.HOSTED_AI_MODEL || "claude-opus-4-8";
+        upstreamBody.model = hostedModel;
         upstreamBody.max_tokens = Math.min(Number(upstreamBody.max_tokens) || 1024, 1024);
 
         // Prompt caching — the system prompt + 12 tool schemas are identical every
