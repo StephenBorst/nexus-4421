@@ -25,18 +25,19 @@ export const PROVIDERS: Record<ProviderId, ProviderDef> = {
     id: "anthropic",
     label: "Anthropic (Claude)",
     endpoint: "https://api.anthropic.com/v1/messages",
-    // Current 4.x defaults shown before a key is entered; the live /v1/models
-    // list (fetched from the user's key) replaces these once available.
-    defaultModel: "claude-sonnet-4-6",
-    models: ["claude-sonnet-4-6", "claude-opus-4-8", "claude-haiku-4-5"],
+    // Placeholders shown before a key is entered; the live /v1/models list
+    // (fetched from the user's key) replaces these once available — so any model
+    // the user's account can access appears regardless of this list.
+    defaultModel: "claude-opus-4-8",
+    models: ["claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
     keyHint: "sk-ant-…",
   },
   openai: {
     id: "openai",
     label: "OpenAI (GPT)",
     endpoint: "https://api.openai.com/v1/chat/completions",
-    defaultModel: "gpt-4o",
-    models: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "o4-mini"],
+    defaultModel: "gpt-5.5",
+    models: ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-4.1", "gpt-4o"],
     keyHint: "sk-…",
   },
 };
