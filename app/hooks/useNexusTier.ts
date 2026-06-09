@@ -133,6 +133,22 @@ export async function fetchNexusTier(
 }
 
 /** Reads $NEXUS total supply and the amount provably burned (held at dead). */
+/** $NEXUS held by any address (e.g. the treasury Safe) as a % of supply. */
+export async function fetchHeldStats(holder: string): Promise<{
+  held: number;
+  totalSupply: number;
+  pctHeld: number;
+}> {
+  const decimals = await getDecimals();
+  const [rawHeld, rawSupply] = await Promise.all([
+    publicClient.readContract({ address: NEXUS_TOKEN_ADDRESS, abi: ERC20_ABI, functionName: "balanceOf", args: [holder as `0x${string}`] }),
+    publicClient.readContract({ address: NEXUS_TOKEN_ADDRESS, abi: ERC20_ABI, functionName: "totalSupply" }),
+  ]);
+  const held = Number(formatUnits(rawHeld as bigint, decimals));
+  const totalSupply = Number(formatUnits(rawSupply as bigint, decimals));
+  return { held, totalSupply, pctHeld: totalSupply > 0 ? (held / totalSupply) * 100 : 0 };
+}
+
 export async function fetchBurnStats(): Promise<{
   burned: number;
   totalSupply: number;

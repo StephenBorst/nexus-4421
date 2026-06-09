@@ -293,6 +293,27 @@ token-value scheme. $NEXUS only adds **consumptive use** (pay-in-$NEXUS discount
 - **⚠️ The Safe unblocks THREE things at once:** buyback flywheel + public treasury banner (`NEXUS_TREASURY_ADDRESS`)
   + PRO revenue (`SUBSCRIPTION_RECEIVER`). Standing up the Safe (app.safe.global, ~10 min) is the highest-leverage move.
 
+## Tokenomics direction — Bankr-informed pivot (2026-06-08) ⭐ CURRENT
+The Safe is **LIVE** (`0x4Fe2…C733`, 1/1 Arbitrum+Base) and the PRO USDC payment rail is **wired**
+(`/sub/verify` + `NexusPro` subscribe flow). After pitching $HYPE-style mechanics to the Bankr team, **Danny B
+(Bankr) reshaped the token strategy — adopt this, it's both more holder-aligned AND legally cooler:**
+- **❌ DROP automated buyback + burn.** Automated buybacks reward short-term traders, not holders; burning at this
+  stage signals "we don't believe it goes higher." Also: an automated/marketed fee→buyback→burn machine is the
+  CLOSEST thing to a Howey investment-contract — exactly the lawyer-gate we wanted to avoid.
+- **✅ DISCRETIONARY "buy the lows" accumulation into the treasury.** The multisig opportunistically buys $NEXUS when
+  cheap and **HOLDS** (conviction, war chest). Just a company accumulating an asset → far more defensible + what
+  aligned holders actually want. Less to build too (no cron worker).
+- **✅ Don't FULLY token-gate features** — keep a strong free tier so user-growth numbers stay real (needed for
+  narrative/partnerships). PRO = additive premium (we only gate the 2 advanced agent strategies; core stays free).
+- **✅ Points → Seasons** (Danny loved it; wants the structure — see `docs/nexus-seasons.md`). The treasury stack
+  (from buying lows) FUNDS retroactive Season drops to top **verifiable** contributors. Quality-weighted via our
+  trustless grading (reward being RIGHT, not loud) = built-in anti-wash-farming. Hold $NEXUS = points multiplier
+  (aligned, not pay-to-win). Retroactive + merit-based + from a treasury = clean.
+- **Narrative pivot:** burn counter → **treasury-accumulation counter** ("treasury holds X $NEXUS" = conviction,
+  not "X burned" = scarcity). Transparency pillar makes the stacking a feature.
+- **Relationship:** Bankr connecting borst to their devs (facu & edit) + dev-console access → path to deeper
+  integration + a Farcaster mini-app distribution play.
+
 ## Testing (money-path + trust-path)
 - Pure logic is extracted into `logic.mjs` next to each worker's `index.js` (which imports it, so
   tests cover the REAL deployed code, not a copy). Tests = zero-dep `node:test` in `logic.test.mjs`.
