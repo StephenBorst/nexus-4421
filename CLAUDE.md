@@ -314,6 +314,32 @@ The Safe is **LIVE** (`0x4Fe2…C733`, 1/1 Arbitrum+Base) and the PRO USDC payme
 - **Relationship:** Bankr connecting borst to their devs (facu & edit) + dev-console access → path to deeper
   integration + a Farcaster mini-app distribution play.
 
+## Farcaster Mini App (distribution play — 2026-06-08) ⭐ CURRENT
+The cold-start/distribution weapon: a slim Nexus surface native to Warpcast, where Bankr's users are.
+- **LIVE:** `/mini` route (`app/pages/mini/index.tsx`) — STANDALONE, OUTSIDE `<App>`/OrderlyProvider (frames must
+  stay light). Manifest at `public/.well-known/farcaster.json` is **SIGNED** (accountAssociation, FID 389456,
+  domain trade.nexustradinglabs.com verified) → Warpcast recognizes it as an official Mini App. Uses
+  `@farcaster/miniapp-sdk` v0.3: `isInMiniApp`, `context` (identity, free), `actions.ready`, `wallet.getEthereum
+  Provider` (connect CONFIRMED working in Warpcast preview).
+- **v1 (zero-auth, shipped):** identity + LIVE CALLS feed (read-only `/feed`) + Buy $NEXUS (`actions.swapToken`
+  → `actions.viewToken` fallback, 100% native, no Uniswap redirect) + share-to-cast (`actions.composeCast` —
+  the viral loop: each thesis embeds `/feed/thesis/:wallet/:id`).
+- **⚠️ Native swap can't route $NEXUS (same v4-hook gap):** Warpcast's swap uses an aggregator; aggregators
+  don't route the v4 NEXUS pool (see swap section). So the native sheet may show "no route" until liquidity
+  deepens / aggregators index v4. UX is native now; actual fill depends on routing. Real fix = depth.
+- **⚠️ Frame wallet is FRESH/separate** from the user's main wallet (no Orderly acct, no funds, no $NEXUS). Can
+  read verified wallets from `context.user.verifications`. Shapes the build order (zero-auth first).
+- **TRADING PHASE — scoped, shovel-ready, NOT built (needs live-frame test + funded wallet → don't blind-ship
+  real-money code):** reuse the existing **`POST /trade {walletSig, walletAddress, ...order}`** in lab-api
+  (auth = `sign_message('nexus-trading-key-v1')`; resolves Orderly acct from `user:{addr}` registration;
+  places via Orderly REST `/v1/order`). Frame wallet signs → calls /trade. Lightweight, no heavy SDK.
+  THE FRICTION = onboarding a fresh wallet (register Orderly acct + deposit USDC on Arbitrum) — study how Volt
+  does in-frame deposits. Spike first on an ALREADY-registered+funded wallet (skip onboarding) to prove
+  sign→key→order in-frame, then build onboarding.
+- **⚠️ This repo is YARN 4** — use `yarn add`, NEVER `npm install` (npm writes a conflicting root
+  `package-lock.json` + desyncs `yarn.lock` → CI `yarn install` fails → deploy skipped). Bit us once on the
+  miniapp-sdk add.
+
 ## Testing (money-path + trust-path)
 - Pure logic is extracted into `logic.mjs` next to each worker's `index.js` (which imports it, so
   tests cover the REAL deployed code, not a copy). Tests = zero-dep `node:test` in `logic.test.mjs`.
