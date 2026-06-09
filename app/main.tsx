@@ -62,6 +62,9 @@ const IntelLayout = lazy(() => import('./pages/intel/Layout'));
 const MessagesPage   = lazy(() => import('./pages/messages'));
 const MessagesLayout = lazy(() => import('./pages/messages/Layout'));
 
+// Farcaster Mini App — standalone, lightweight (no app chrome / OrderlyProvider)
+const MiniApp = lazy(() => import('./pages/mini'));
+
 async function loadRuntimeConfig() {
   return new Promise<void>((resolve) => {
     const script = document.createElement('script');
@@ -225,6 +228,12 @@ const router = createBrowserRouter([
         ],
       },
     ],
+  },
+  // Farcaster Mini App route — outside <App /> so it loads light, no Orderly chrome.
+  {
+    path: '/mini',
+    element: <React.Suspense fallback={null}><MiniApp /></React.Suspense>,
+    errorElement: <ErrorBoundary />,
   },
 ], { basename: basePath });
 

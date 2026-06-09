@@ -18,6 +18,7 @@
     "typecheck": "tsc"
   },
   "dependencies": {
+    "@farcaster/miniapp-sdk": "^0.3.0",
     "@orderly.network/affiliate": "^3.1.0",
     "@orderly.network/i18n": "^3.1.0",
     "@orderly.network/markets": "^3.1.0",
