@@ -73,3 +73,33 @@ export function nexusMinUnits(priceUsd, discountUsd, tolerance, decimals = 18) {
   if (!(wholeTokens > 0)) return null;
   return BigInt(wholeTokens) * (10n ** BigInt(decimals));
 }
+
+// ── Hosted NEXUS AI model tiers ─────────────────────────────────────────────
+// PRO users pick which model the hosted proxy runs; each model carries its OWN
+// daily cap so our LLM spend scales with model cost. Stronger model → lower cap;
+// cheaper model → higher cap (the user trades model strength for volume). Rates
+// per MTok (in/out): Haiku $1/$5 · Sonnet $3/$15 · Opus $5/$25. Default is Sonnet
+// (the everyday tier) — Opus is the scarce "big gun". Caps are env-overridable
+// (HOSTED_CAP_HAIKU/SONNET/OPUS) for tuning without a code change, and the default
+// tier via HOSTED_AI_DEFAULT_MODEL (legacy HOSTED_AI_MODEL still honored as the
+// default source). Mirrored on the client in app/config/assistant.ts (HOSTED_TIERS).
+export const HOSTED_DEFAULT_MODEL = "claude-sonnet-4-6";
+
+export function hostedCaps(env = {}) {
+  return {
+    "claude-haiku-4-5": parseInt(env.HOSTED_CAP_HAIKU || "100", 10),
+    "claude-sonnet-4-6": parseInt(env.HOSTED_CAP_SONNET || "40", 10),
+    "claude-opus-4-8": parseInt(env.HOSTED_CAP_OPUS || "20", 10),
+  };
+}
+
+// Resolve a client-requested hosted model → an allowed model + its daily cap.
+// Whitelist-gated: an unknown / stale / injected id falls back to the default
+// tier, so a client can never force an off-list (or arbitrarily expensive) model.
+export function resolveHostedModel(requested, env = {}) {
+  const caps = hostedCaps(env);
+  const wanted = env.HOSTED_AI_DEFAULT_MODEL || env.HOSTED_AI_MODEL || HOSTED_DEFAULT_MODEL;
+  const fallback = caps[wanted] != null ? wanted : HOSTED_DEFAULT_MODEL;
+  const model = caps[requested] != null ? requested : fallback;
+  return { model, cap: caps[model] };
+}

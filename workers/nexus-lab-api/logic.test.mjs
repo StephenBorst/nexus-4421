@@ -134,3 +134,41 @@ test("nexusMinUnits: higher price → fewer tokens required", () => {
   const hi = nexusMinUnits(0.000001, 15, 0.12);
   assert.ok(hi < lo);
 });
+
+// ── resolveHostedModel (per-model hosted AI caps) ────────────
+import { resolveHostedModel, HOSTED_DEFAULT_MODEL } from "./logic.mjs";
+
+test("resolveHostedModel: default (no request) → Sonnet @ 40/day", () => {
+  const r = resolveHostedModel(undefined, {});
+  assert.equal(r.model, "claude-sonnet-4-6");
+  assert.equal(r.model, HOSTED_DEFAULT_MODEL);
+  assert.equal(r.cap, 40);
+});
+
+test("resolveHostedModel: each whitelisted tier maps to its own cap", () => {
+  assert.deepEqual(resolveHostedModel("claude-haiku-4-5", {}), { model: "claude-haiku-4-5", cap: 100 });
+  assert.deepEqual(resolveHostedModel("claude-sonnet-4-6", {}), { model: "claude-sonnet-4-6", cap: 40 });
+  assert.deepEqual(resolveHostedModel("claude-opus-4-8", {}), { model: "claude-opus-4-8", cap: 20 });
+});
+
+test("resolveHostedModel: unknown/injected id falls back to default tier", () => {
+  for (const bad of ["claude-opus-4-7", "gpt-5.5", "claude-3-opus-20240229", "", "../etc"]) {
+    const r = resolveHostedModel(bad, {});
+    assert.equal(r.model, "claude-sonnet-4-6", `expected fallback for ${JSON.stringify(bad)}`);
+    assert.equal(r.cap, 40);
+  }
+});
+
+test("resolveHostedModel: env overrides caps + default tier", () => {
+  const env = { HOSTED_CAP_OPUS: "5", HOSTED_CAP_HAIKU: "250", HOSTED_AI_DEFAULT_MODEL: "claude-haiku-4-5" };
+  assert.equal(resolveHostedModel("claude-opus-4-8", env).cap, 5);
+  assert.equal(resolveHostedModel("claude-haiku-4-5", env).cap, 250);
+  // unknown → env default tier (Haiku), with its overridden cap
+  assert.deepEqual(resolveHostedModel("nope", env), { model: "claude-haiku-4-5", cap: 250 });
+});
+
+test("resolveHostedModel: legacy HOSTED_AI_MODEL honored as default source", () => {
+  const r = resolveHostedModel("nope", { HOSTED_AI_MODEL: "claude-opus-4-8" });
+  assert.equal(r.model, "claude-opus-4-8");
+  assert.equal(r.cap, 20);
+});

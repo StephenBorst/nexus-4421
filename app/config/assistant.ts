@@ -46,6 +46,28 @@ export const PROVIDERS: Record<ProviderId, ProviderDef> = {
 export const LS_PROVIDER = "nexus_ai_provider";
 export const LS_MODEL = (p: ProviderId) => `nexus_ai_model_${p}`; // per-provider model
 export const LS_KEY = (p: ProviderId) => `nexus_ai_key_${p}`;     // per-provider key
+export const LS_HOSTED_MODEL = "nexus_ai_hosted_model";           // PRO hosted-tier choice
+
+// ── Hosted (PRO) model tiers ────────────────────────────────────────────────
+// PRO users pick which model our proxy runs; each tier has its own daily cap so
+// our LLM spend scales with model cost — stronger model = lower cap, cheaper
+// model = higher cap. ⚠️ MUST mirror the worker's hostedCaps()/resolveHostedModel
+// in workers/nexus-lab-api/logic.mjs (ids + cap numbers) or the UI will advertise
+// a cap the server doesn't enforce. Sonnet is the default everyday tier.
+export interface HostedTier { id: string; label: string; cap: number; note: string; }
+export const HOSTED_TIERS: HostedTier[] = [
+  { id: "claude-haiku-4-5",  label: "Haiku 4.5",  cap: 100, note: "fastest · highest cap" },
+  { id: "claude-sonnet-4-6", label: "Sonnet 4.6", cap: 40,  note: "balanced · default" },
+  { id: "claude-opus-4-8",   label: "Opus 4.8",   cap: 20,  note: "strongest · lowest cap" },
+];
+export const HOSTED_DEFAULT_MODEL = "claude-sonnet-4-6";
+
+// Load the stored hosted tier, validated against the current tier list (a stale
+// id — e.g. a previously-default Opus — snaps back to the default).
+export function loadHostedModel(): string {
+  const stored = typeof window !== "undefined" ? window.localStorage.getItem(LS_HOSTED_MODEL) : null;
+  return HOSTED_TIERS.some((t) => t.id === stored) ? (stored as string) : HOSTED_DEFAULT_MODEL;
+}
 
 import { anthropicTools, openaiTools, TOOL_BY_NAME, type ToolCtx } from "@/config/assistantTools";
 import { createWalletClient, custom } from "viem";
