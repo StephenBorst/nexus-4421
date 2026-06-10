@@ -39,6 +39,12 @@ const STATUS_COLOR: Record<string, string> = {
 };
 const tk = (s: string) => s.replace("PERP_", "").replace("_USDC", "");
 const shortAddr = (w: string) => `${w.slice(0, 6)}…${w.slice(-4)}`;
+const toMsgHex = (s: string) => ("0x" + Array.from(new TextEncoder().encode(s)).map((b) => b.toString(16).padStart(2, "0")).join("")) as `0x${string}`;
+
+// Orderly AddOrderlyKey registration constants (mirror lab-api).
+const BROKER = "nexus_trading";
+const CHAIN = 42161; // Arbitrum One
+const VC = "0x6F7a338F2aA472838dEFD3283eB360d4Dff5D203"; // Orderly mainnet verifyingContract
 
 export default function MiniApp() {
   const [booted, setBooted] = useState(false);
@@ -56,6 +62,7 @@ export default function MiniApp() {
   const [tradeBusy, setTradeBusy] = useState(false);
   const [confirmSide, setConfirmSide] = useState<null | "LONG" | "SHORT">(null);
   const [tradeMsg, setTradeMsg] = useState<TradeMsg>(null);
+  const [enabling, setEnabling] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -113,9 +120,7 @@ export default function MiniApp() {
       const addr = accts?.[0];
       if (!addr) throw new Error("connect a wallet");
       // Deterministic EIP-191 sig → server derives the Orderly key (same as registration).
-      // Hex-encode the message (standard personal_sign; wallet decodes to the same UTF-8 bytes).
-      const msgHex = ("0x" + Array.from(new TextEncoder().encode("nexus-trading-key-v1")).map((b) => b.toString(16).padStart(2, "0")).join("")) as `0x${string}`;
-      const walletSig = (await provider.request({ method: "personal_sign", params: [msgHex, addr as `0x${string}`] })) as string;
+      const walletSig = (await provider.request({ method: "personal_sign", params: [toMsgHex("nexus-trading-key-v1"), addr as `0x${string}`] })) as string;
       const r = await fetch(`${API}/trade`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol: sym, side: side === "LONG" ? "BUY" : "SELL", notional, leverage: lev, walletSig, walletAddress: addr }),
@@ -128,6 +133,42 @@ export default function MiniApp() {
       setTradeMsg({ ok: false, text: (e as Error)?.message || "error" });
     } finally {
       setTradeBusy(false);
+    }
+  }
+
+  // ── Enable trading: register an Orderly order-key for this wallet (NO funds move).
+  // sign → /derive-key → EIP-712 AddOrderlyKey → /proxy/register-key (writes user:{addr}).
+  async function enableTrading() {
+    if (enabling) return;
+    setEnabling(true); setTradeMsg({ ok: true, text: "enabling — sign twice…" });
+    try {
+      const provider = await sdk.wallet.getEthereumProvider();
+      if (!provider) throw new Error("no wallet");
+      const accts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+      const addr = accts?.[0];
+      if (!addr) throw new Error("connect a wallet");
+      const walletSig = (await provider.request({ method: "personal_sign", params: [toMsgHex("nexus-trading-key-v1"), addr as `0x${string}`] })) as string;
+      const dk = await fetch(`${API}/derive-key`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ walletSig }) }).then((r) => r.json());
+      if (!dk.orderlyKey) throw new Error(dk.error || "derive failed");
+      const ts = Date.now(), exp = ts + 365 * 24 * 3600 * 1000;
+      const message = { brokerId: BROKER, chainId: CHAIN, orderlyKey: dk.orderlyKey, scope: "read,trading", timestamp: ts, expiration: exp };
+      const typedData = {
+        domain: { name: "Orderly", version: "1", chainId: CHAIN, verifyingContract: VC },
+        types: {
+          EIP712Domain: [{ name: "name", type: "string" }, { name: "version", type: "string" }, { name: "chainId", type: "uint256" }, { name: "verifyingContract", type: "address" }],
+          AddOrderlyKey: [{ name: "brokerId", type: "string" }, { name: "chainId", type: "uint256" }, { name: "orderlyKey", type: "string" }, { name: "scope", type: "string" }, { name: "timestamp", type: "uint64" }, { name: "expiration", type: "uint64" }],
+        },
+        primaryType: "AddOrderlyKey",
+        message,
+      };
+      const signature = (await provider.request({ method: "eth_signTypedData_v4", params: [addr as `0x${string}`, JSON.stringify(typedData)] })) as string;
+      const reg = await fetch(`${API}/proxy/register-key`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, signature, userAddress: addr, orderlyKey: dk.orderlyKey }) }).then((r) => r.json());
+      if (reg.success || reg.data || reg.accountId) setTradeMsg({ ok: true, text: "✓ Trading enabled — place your trade now." });
+      else setTradeMsg({ ok: false, text: reg.message || reg.error || "couldn't enable — this wallet may need an Orderly account + USDC deposit first" });
+    } catch (e) {
+      setTradeMsg({ ok: false, text: (e as Error)?.message || "enable error" });
+    } finally {
+      setEnabling(false);
     }
   }
 
@@ -197,12 +238,12 @@ export default function MiniApp() {
             <button onClick={() => placeTrade("SHORT")} disabled={tradeBusy || notional <= 0} style={{ background: red, color: "#fff", border: `1px solid ${red}`, borderRadius: 4, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: "pointer", letterSpacing: "0.06em", opacity: tradeBusy && confirmSide !== "SHORT" ? 0.4 : 1 }}>{tradeBusy ? "…" : confirmSide === "SHORT" ? "TAP TO CONFIRM ✓" : "↓ SHORT"}</button>
           </div>
           {tradeMsg && (
-            <div style={{ fontSize: 10, color: tradeMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>
-              {tradeMsg.text}
-              {tradeMsg.cta && <> <a href={APP} style={{ color: green, textDecoration: "none" }}>enable on the full terminal ↗</a></>}
-            </div>
+            <div style={{ fontSize: 10, color: tradeMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{tradeMsg.text}</div>
           )}
-          <div style={{ fontSize: 8, color: "#2a4a3a" }}>real market order on Orderly · signs once to authorize</div>
+          {tradeMsg?.cta && (
+            <button onClick={enableTrading} disabled={enabling} style={{ background: "#0a1a0a", color: green, border: `1px solid ${green}`, borderRadius: 4, padding: "10px 0", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: enabling ? "wait" : "pointer", letterSpacing: "0.05em", opacity: enabling ? 0.6 : 1 }}>{enabling ? "ENABLING…" : "◆ ENABLE TRADING (1-time)"}</button>
+          )}
+          <div style={{ fontSize: 8, color: "#2a4a3a" }}>real market order on Orderly · signs to authorize · no key custody</div>
         </div>
       )}
 
