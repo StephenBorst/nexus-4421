@@ -63,6 +63,9 @@ export default function MiniApp() {
   const [confirmSide, setConfirmSide] = useState<null | "LONG" | "SHORT">(null);
   const [tradeMsg, setTradeMsg] = useState<TradeMsg>(null);
   const [enabling, setEnabling] = useState(false);
+  const [depositAmt, setDepositAmt] = useState(20);
+  const [depositing, setDepositing] = useState(false);
+  const [depositMsg, setDepositMsg] = useState<TradeMsg>(null);
 
   useEffect(() => {
     (async () => {
@@ -199,6 +202,50 @@ export default function MiniApp() {
     }
   }
 
+  // ── Fund: deposit USDC into the Orderly account (real on-chain txs on Arbitrum).
+  // /deposit/prepare → switch to Arbitrum → approve USDC → (wait) → deposit.
+  // Requires the wallet to be enabled (account exists) + hold USDC + a little ETH (gas) on Arbitrum.
+  async function deposit() {
+    if (depositing || depositAmt <= 0) return;
+    setDepositing(true); setDepositMsg({ ok: true, text: "preparing deposit…" });
+    try {
+      const provider = await sdk.wallet.getEthereumProvider();
+      if (!provider) throw new Error("no wallet");
+      const accts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+      const addr = accts?.[0];
+      if (!addr) throw new Error("connect a wallet");
+      try { await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0xa4b1" }] }); } catch { /* may already be on Arbitrum */ }
+
+      const prep = await fetch(`${API}/deposit/prepare`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet: addr, amount: depositAmt }) }).then((r) => r.json());
+      if (prep.error === "no_orderly_account") { setDepositMsg({ ok: false, text: "enable trading first (creates your account)." }); return; }
+      if (!prep.steps?.length) throw new Error(prep.hint || prep.error || "couldn't prepare deposit");
+
+      setDepositMsg({ ok: true, text: "approve USDC in your wallet…" });
+      const tx = (s: { to: string; data: string; value: string }) => ({ from: addr as `0x${string}`, to: s.to as `0x${string}`, data: s.data as `0x${string}`, value: s.value as `0x${string}` });
+      const approveHash = (await provider.request({ method: "eth_sendTransaction", params: [tx(prep.steps[0])] })) as string;
+      await waitForReceipt(provider, approveHash);
+
+      setDepositMsg({ ok: true, text: "confirm the deposit…" });
+      await provider.request({ method: "eth_sendTransaction", params: [tx(prep.steps[1])] });
+      setDepositMsg({ ok: true, text: `✓ Depositing $${depositAmt} — lands in ~30s, then you can trade.` });
+    } catch (e) {
+      const m = (e as Error)?.message || "deposit error";
+      setDepositMsg({ ok: false, text: /insufficient|exceeds balance/i.test(m) ? "Not enough USDC (+ a little ETH for gas) on Arbitrum in this wallet — fund it first." : m });
+    } finally {
+      setDepositing(false);
+    }
+  }
+
+  async function waitForReceipt(provider: { request: (a: { method: string; params?: unknown[] }) => Promise<unknown> }, hash: string) {
+    for (let i = 0; i < 40; i++) {
+      try {
+        const rcpt = await provider.request({ method: "eth_getTransactionReceipt", params: [hash] });
+        if (rcpt) return;
+      } catch { /* keep polling */ }
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
+
   const shell: React.CSSProperties = { background: bg, color: "#e5e7eb", minHeight: "100dvh", fontFamily: mono, padding: 14, display: "flex", flexDirection: "column", gap: 11 };
   const card: React.CSSProperties = { background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 6, padding: 12 };
   const liveCount = feed?.filter((t) => t.status === "ACTIVE").length ?? 0;
@@ -270,7 +317,18 @@ export default function MiniApp() {
           {tradeMsg?.cta && (
             <button onClick={enableTrading} disabled={enabling} style={{ background: "#0a1a0a", color: green, border: `1px solid ${green}`, borderRadius: 4, padding: "10px 0", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: enabling ? "wait" : "pointer", letterSpacing: "0.05em", opacity: enabling ? 0.6 : 1 }}>{enabling ? "ENABLING…" : "◆ ENABLE TRADING (1-time)"}</button>
           )}
-          <div style={{ fontSize: 8, color: "#2a4a3a" }}>real market order on Orderly · signs to authorize · no key custody</div>
+
+          {/* Fund / deposit */}
+          <div style={{ borderTop: "1px solid #1a2e1a", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ fontSize: 8, color: "#3a6a4a", letterSpacing: "0.1em" }}>💰 FUND ACCOUNT (USDC · Arbitrum)</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input type="number" inputMode="decimal" min={1} value={depositAmt} onChange={(e) => setDepositAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e5e7eb", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
+              <button onClick={deposit} disabled={depositing || depositAmt <= 0} style={{ flexShrink: 0, background: "#0a1a2a", color: "#4a9fff", border: "1px solid #1a3a5a", borderRadius: 4, padding: "8px 16px", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: depositing ? "wait" : "pointer", letterSpacing: "0.05em", opacity: depositing ? 0.6 : 1 }}>{depositing ? "…" : "DEPOSIT"}</button>
+            </div>
+            {depositMsg && <div style={{ fontSize: 10, color: depositMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{depositMsg.text}</div>}
+          </div>
+
+          <div style={{ fontSize: 8, color: "#2a4a3a" }}>real orders on Orderly · signs to authorize · non-custodial</div>
         </div>
       )}
 
