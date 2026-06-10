@@ -145,6 +145,14 @@ Bankr/Farcaster users can deploy/control the autonomous agent by chat. Two addit
   owner can produce it via Bankr) — NEVER address-only (would let anyone arm someone else's agent).
 - Status/fund/kill reuse existing routes (`GET /agent/:addr`, `/deposit/prepare`, `DELETE`, `/kill`). Capital
   guardrail (avoid -1101): suggest `capitalPerTrade ≈ floor(freeCollateral*0.6)`.
+- **✅ Bankr deposit flow LIVE-VERIFIED (2026-06-10):** ran a real end-to-end deposit through
+  `/proxy/bankr-deposit` on a funded Bankr wallet → both Arbitrum txs confirmed `status:0x1` (approve
+  `0xbcea3e25…721f18bc` to USDC; deposit `0x81033f70…d25eed1a2` to Orderly Vault `0x816f72…67e9`). The
+  skill deposits ONLY to the **trading balance** (perp collateral, withdraw anytime, no lockup) — it
+  CANNOT use **OmniVault** (`0x70fe7d65…`, Orderly's managed-fund product, 48h redemption window).
+  ⚠️ Orderly Dev-Rel (Wuzhong) confirmed external brokers can't `allowBroker` into OmniVault "at this
+  stage" — so the earlier OmniVault listing ask was a phantom requirement; the standard broker vault
+  was always the right path and works out of the box. Don't re-chase OmniVault.
 
 ## Agent signal modes + config control surface (`brain/logic.mjs` `deriveSignal`)
 - **`signalMode`** (user-picked): `CONFLUENCE` (default, conf 80 — funding extreme AND OI-divergence must agree),
