@@ -1,101 +1,70 @@
-# Orderly Broker UI Template
+# Nexus Trading Labs
 
-This template provides a quick way to set up a customized trading UI for Orderly Network brokers, built with Remix and deployable on Vercel.
+**The trading terminal that makes you a better trader.**
 
-🔗 [Live Demo](https://broker-template-seven.vercel.app/)
+A non-custodial perpetuals trading terminal built on [Orderly Network](https://orderly.network), customized far beyond a stock DEX into a full **plan → automate → prove** workflow. The order book is the commodity; the edge on top is the product.
 
-## Quick Start
+🔗 **Live:** [trade.nexustradinglabs.com](https://trade.nexustradinglabs.com) · [landing](https://nexustradinglabs.com) · [𝕏 @nexustradinglab](https://x.com/nexustradinglab)
 
-1. **Fork the Repository**
-   
-   Fork this repository to your GitHub account to create your broker's UI.
+---
 
-2. **Clone Your Fork**
+## What it is
 
-```sh
-git clone https://github.com/YOUR_USERNAME/broker-template.git
-cd broker-template
+Most apps just let you trade. Nexus turns every position into a process:
+
+- **🧪 The Lab** — the flagship. Market intel, an on-chain thesis engine, an autonomous agent, copy trades, an analytics + trade journal, and a holders room, in one terminal.
+- **◎ Thesis Engine** — size every trade like a desk (position sizing, R:R, funding cost, live P&L) and publish it as a timestamped, on-chain call.
+- **⬡ Autonomous Agent** — a funding-edge trading bot that runs 24/7 within hard guardrails. Risk-free **PAPER** mode → **ASSISTED** signals → **AUTONOMOUS** execution. Order-only keys that **cannot withdraw**, daily-loss cap, max-trades/day, one-tap kill switch, keys encrypted at rest.
+- **◆ // NEXUS AI** — a copilot wired into the live terminal (market regime, your positions, your track record, the leaderboards). Free with your own key (client-side, never touches our servers) or hosted for PRO with selectable model tiers.
+- **⛓ Trustless track records** — human "calls" are graded against **public price** (first-touch TP vs SL), agent trades against settled exchange orders. The full ledger hashes to a root that's **anchored on-chain hourly** and recomputable by anyone. Don't trust the leaderboard — verify it.
+- **✉ Social** — a live feed of real on-chain calls, one-click copy trades, and encrypted wallet-to-wallet DMs (XMTP).
+- **🏦 Transparent treasury** — a public multisig you can watch on-chain; fees accumulate into a held $NEXUS war chest that funds retroactive, merit-graded Seasons.
+
+**Nexus PRO** is a plain software subscription (USDC, or $NEXUS at a discount, or unlocked by holding) — no yield, no revenue share. **$NEXUS** is a community token: cosmetic perks and access only. Nothing in the app is financial advice.
+
+---
+
+## Architecture
+
+```
+React + Vite + TypeScript (Cloudflare Pages)
+        │  Orderly SDK · wagmi · XMTP
+        ▼
+Cloudflare Workers
+  ├─ nexus-lab-api      lab storage, agent control, payments, trustless ledger
+  ├─ nexus-agent-brain  funding + OI confluence signals (cron)
+  ├─ nexus-agent-exec   non-custodial position execution + monitoring (cron)
+  ├─ nexus-lab-alerts   alerts
+  └─ nexus-ledger-anchor hourly Merkle-root anchor + ops monitoring
+        │
+        ▼
+NexusLedgerAnchor.sol (Arbitrum) — append-only on-chain ledger anchor
 ```
 
-3. **Install Dependencies**
+- **Frontend:** React + react-router, TypeScript, [Orderly SDK](https://github.com/OrderlyNetwork/js-sdk), wagmi, `@xmtp/browser-sdk`. Deployed to Cloudflare Pages via GitHub Actions (wrangler direct-upload).
+- **Backend:** five Cloudflare Workers (KV-backed), pure money/trust logic extracted into tested `logic.mjs` modules (`node:test`).
+- **On-chain:** a Solidity ledger-anchor contract on Arbitrum; the agent signs Orderly orders with ed25519 order-only keys.
 
-```sh
-yarn install
-```
+~27K lines across 128 source files.
 
-## Configuration Steps
-
-### 1. Broker Configuration
-
-Edit the `.env` file to set up your broker details:
-
-```env
-# Broker settings
-VITE_ORDERLY_BROKER_ID=your_broker_id
-VITE_ORDERLY_BROKER_NAME=Your Broker Name
-VITE_ORDERLY_NETWORK_ID=mainnet  # or testnet for testing
-
-# Meta tags
-VITE_APP_NAME=Your App Name
-VITE_APP_DESCRIPTION=Your app description for SEO
-
-# Navigation menu configuration (optional)
-VITE_ENABLED_MENUS=Trading,Portfolio,Markets,Leaderboard
-VITE_CUSTOM_MENUS=Documentation,https://docs.yoursite.com;Blog,https://blog.yoursite.com;Support,https://support.yoursite.com
-```
-
-### 2. Theme Customization
-
-1. Visit the [Orderly Storybook Trading Page](https://storybook.orderly.network/?path=/story/package-trading-tradingpage--page)
-2. Customize your preferred theme using the controls
-3. Export the generated CSS
-4. Replace the contents of `app/styles/theme.css` with your exported CSS
-
-### 3. UI Configuration
-
-Edit `app/utils/config.tsx` to customize your UI:
-
-- **Footer Links**: Update `footerProps` with your social media links
-- **Logos**: Replace the main and secondary logos in the `appIcons` section
-- **PnL Sharing**: Customize the PnL poster backgrounds and colors in `sharePnLConfig`
-
-Required assets:
-- Place your logos in the `public` directory:
-  - Main logo: `public/orderly-logo.svg`
-  - Secondary logo: `public/orderly-logo-secondary.svg`
-  - Favicon: `public/favicon.webp`
-- PnL sharing backgrounds: `public/pnl/poster_bg_[1-4].png`
+---
 
 ## Development
 
-Run the development server:
-
 ```sh
-yarn dev
+yarn install      # ⚠️ Yarn 4 — never npm install
+yarn dev          # frontend dev server
+node --test workers/<worker>/logic.test.mjs   # money/trust-path tests
 ```
 
-## Deployment
+Workers deploy with `npx wrangler deploy` in each worker directory.
 
-1. Build the application:
+---
 
-```sh
-yarn build
-```
+## Stack
 
-2. Deploy to Vercel:
-   - Create an account on [Vercel](https://vercel.com) if you haven't already
-   - Install Vercel CLI: `yarn global add vercel`
-   - Run `vercel` in your project directory and follow the prompts
-   - For subsequent deployments, use `vercel --prod` to deploy to production
+`TypeScript` · `React` · `Vite` · `Orderly Network SDK` · `wagmi` / `viem` · `XMTP` · `Cloudflare Workers + KV + Pages` · `Solidity` (Arbitrum) · `Supabase`
 
-For custom domain setup:
-   - Go to your project settings in Vercel dashboard
-   - Navigate to the "Domains" section
-   - Add and configure your custom domain
+---
 
-## Additional Resources
-
-- [Orderly JS SDK Documentation](https://github.com/OrderlyNetwork/js-sdk)
-- [Orderly Network Documentation](https://orderly.network/docs/sdks)
-- [Storybook Theme Editor](https://storybook.orderly.network/?path=/story/package-trading-tradingpage--page)
-
+Built on [Orderly Network](https://orderly.network). © Nexus Trading Labs LLC.
