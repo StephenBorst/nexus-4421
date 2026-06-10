@@ -39,6 +39,7 @@ export default function MiniApp() {
   const [inFrame, setInFrame] = useState<boolean | null>(null);
   const [user, setUser] = useState<FUser | null>(null);
   const [feed, setFeed] = useState<Thesis[] | null>(null);
+  const [buying, setBuying] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -62,14 +63,17 @@ export default function MiniApp() {
   }, []);
 
   async function buyNexus() {
-    // Stay 100% native to Warpcast: try the in-app swap sheet, else the native
-    // token page (where the user can buy/swap in-wallet). No external redirect.
+    // Lead with the native $NEXUS token page (viewToken) — it ALWAYS opens (the
+    // Buy/Swap controls live there). swapToken is flaky for $NEXUS because the v4
+    // pool isn't aggregator-routable, so it's only a fallback. Guard re-entrancy.
+    if (buying) return;
+    setBuying(true);
     try {
-      const res = await sdk.actions.swapToken({ sellToken: "eip155:8453/native", buyToken: NEXUS_CAIP19 });
-      if (res?.success || res?.reason === "rejected_by_user") return; // done / user cancelled
-      await sdk.actions.viewToken({ token: NEXUS_CAIP19 });            // couldn't swap → native token page
+      await sdk.actions.viewToken({ token: NEXUS_CAIP19 });
     } catch {
-      try { await sdk.actions.viewToken({ token: NEXUS_CAIP19 }); } catch { /* ignore */ }
+      try { await sdk.actions.swapToken({ buyToken: NEXUS_CAIP19 }); } catch { /* ignore */ }
+    } finally {
+      setBuying(false);
     }
   }
 
@@ -123,7 +127,7 @@ export default function MiniApp() {
 
       {/* Actions */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <button onClick={buyNexus} style={{ background: green, color: "#04130c", border: "none", borderRadius: 5, padding: "11px 0", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: "pointer", letterSpacing: "0.04em" }}>🪙 BUY $NEXUS</button>
+        <button onClick={buyNexus} disabled={buying} style={{ background: green, color: "#04130c", border: "none", borderRadius: 5, padding: "11px 0", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: buying ? "wait" : "pointer", letterSpacing: "0.04em", opacity: buying ? 0.6 : 1 }}>{buying ? "OPENING…" : "🪙 BUY $NEXUS"}</button>
         <button onClick={shareApp} style={{ background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 5, padding: "11px 0", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: "pointer", letterSpacing: "0.04em" }}>↗ SHARE NEXUS</button>
       </div>
 
