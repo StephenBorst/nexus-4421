@@ -2601,6 +2601,32 @@ export default {
       }
     }
 
+    // ── /proxy/registration-nonce — GET Orderly registration nonce (CORS proxy) ──
+    if (parts[0] === "proxy" && parts[1] === "registration-nonce" && request.method === "GET") {
+      try {
+        const r = await fetch("https://api-evm.orderly.org/v1/registration_nonce");
+        const d = await r.json();
+        return new Response(JSON.stringify(d), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+      }
+    }
+
+    // ── /proxy/register-account — create an Orderly account (browser-signed EIP-712 Registration) ──
+    if (parts[0] === "proxy" && parts[1] === "register-account" && request.method === "POST") {
+      let rb;
+      try { rb = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      try {
+        const r = await fetch("https://api-evm.orderly.org/v1/register_account", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rb),
+        });
+        const d = await r.json();
+        return new Response(JSON.stringify(d), { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+      }
+    }
+
     // ── /proxy/register-key — server-side proxy to Orderly (multi-user) ──────────
     if (parts[0] === "proxy" && parts[1] === "register-key" && request.method === "POST") {
       let body;

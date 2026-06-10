@@ -140,7 +140,7 @@ export default function MiniApp() {
   // sign → /derive-key → EIP-712 AddOrderlyKey → /proxy/register-key (writes user:{addr}).
   async function enableTrading() {
     if (enabling) return;
-    setEnabling(true); setTradeMsg({ ok: true, text: "enabling — sign twice…" });
+    setEnabling(true); setTradeMsg({ ok: true, text: "enabling — approve the signature prompts…" });
     try {
       const provider = await sdk.wallet.getEthereumProvider();
       if (!provider) throw new Error("no wallet");
@@ -148,6 +148,33 @@ export default function MiniApp() {
       const addr = accts?.[0];
       if (!addr) throw new Error("connect a wallet");
       const walletSig = (await provider.request({ method: "personal_sign", params: [toMsgHex("nexus-trading-key-v1"), addr as `0x${string}`] })) as string;
+
+      // 0) Ensure the wallet has an Orderly account (else key registration → "Account not found").
+      let accountId: string | undefined;
+      try {
+        const acct = await fetch(`https://api-evm.orderly.org/v1/get_account?address=${addr.toLowerCase()}&broker_id=${BROKER}`).then((r) => r.json());
+        accountId = acct?.data?.account_id;
+      } catch { /* fall through to register */ }
+      if (!accountId) {
+        const nonceData = await fetch(`${API}/proxy/registration-nonce`).then((r) => r.json());
+        const registrationNonce = nonceData?.data?.registration_nonce;
+        if (!registrationNonce) throw new Error("couldn't get registration nonce");
+        const regMsg = { brokerId: BROKER, chainId: CHAIN, timestamp: Date.now(), registrationNonce: String(registrationNonce) };
+        const regTyped = {
+          domain: { name: "Orderly", version: "1", chainId: CHAIN, verifyingContract: VC },
+          types: {
+            EIP712Domain: [{ name: "name", type: "string" }, { name: "version", type: "string" }, { name: "chainId", type: "uint256" }, { name: "verifyingContract", type: "address" }],
+            Registration: [{ name: "brokerId", type: "string" }, { name: "chainId", type: "uint256" }, { name: "timestamp", type: "uint64" }, { name: "registrationNonce", type: "uint256" }],
+          },
+          primaryType: "Registration",
+          message: regMsg,
+        };
+        const regSig = (await provider.request({ method: "eth_signTypedData_v4", params: [addr as `0x${string}`, JSON.stringify(regTyped)] })) as string;
+        const acctRes = await fetch(`${API}/proxy/register-account`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: regMsg, signature: regSig, userAddress: addr }) }).then((r) => r.json());
+        accountId = acctRes?.data?.account_id;
+        if (!accountId) throw new Error(acctRes?.message || acctRes?.error || "account registration failed");
+      }
+
       const dk = await fetch(`${API}/derive-key`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ walletSig }) }).then((r) => r.json());
       if (!dk.orderlyKey) throw new Error(dk.error || "derive failed");
       const ts = Date.now(), exp = ts + 365 * 24 * 3600 * 1000;
