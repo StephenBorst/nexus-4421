@@ -180,10 +180,15 @@ Bankr/Farcaster users can deploy/control the autonomous agent by chat. Two addit
 ## Leaderboard integrity (cypherpunk hardening — tiers 1-3)
 The public agents leaderboard ranks on a risk-adjusted score from live `agent_trades`
 (Supabase). Trust hardening, all on `main`:
-- **Tier 1 — write-path:** exec logs with `SUPABASE_SERVICE_KEY` (falls back to anon until set).
-  ⚠️ TODO (user/dashboard): set `SUPABASE_SERVICE_KEY` secret on nexus-agent-exec + add RLS policy
-  blocking anon INSERT on `agent_trades` (anon stays SELECT-only for reads). Then the public read key
-  can't forge rows.
+- **Tier 1 — write-path (✅ DONE + VERIFIED 2026-06-09):** exec logs with `SUPABASE_SERVICE_KEY`
+  (secret SET on nexus-agent-exec; falls back to anon only if unset). RLS is ENABLED on `agent_trades`
+  with a single `SELECT`-only policy for `anon`/`authenticated` — a pre-existing `allow all` (FOR ALL TO
+  public) policy was the real hole and has been DROPPED. Verified with the public anon key: SELECT→200,
+  INSERT→401 (`42501` RLS violation), DELETE→0 rows (count unchanged 68→68). `service_role` bypasses RLS,
+  so exec writes are unaffected. ⚠️ Since anon writes are now blocked, `service_role` is the ONLY writer —
+  if agent trades stop appearing in History/leaderboard, the `SUPABASE_SERVICE_KEY` secret is wrong; re-set
+  it (canary: `supabase log failed` in exec logs). ⚠️ Lesson: in Supabase, `CREATE POLICY` does NOT enable
+  RLS, and policies are OR'd — a leftover `allow all` silently negates restrictive ones. Verify, don't assume.
 - **Tier 2 — exchange-auditable:** every closed trade now records Orderly `entry_order_id` +
   `close_order_id` so records are independently verifiable against the exchange. Insert is resilient
   (retries core row if order_id columns aren't migrated). ⚠️ TODO (dashboard): `ALTER TABLE agent_trades
