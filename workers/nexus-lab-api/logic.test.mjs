@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-lab-api/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { gradeCall } from "./logic.mjs";
+import { gradeCall, resolveAiUpstream, bankrGatewayModel } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
 const series = (t0, bars) => ({
@@ -171,4 +171,40 @@ test("resolveHostedModel: legacy HOSTED_AI_MODEL honored as default source", () 
   const r = resolveHostedModel("nope", { HOSTED_AI_MODEL: "claude-opus-4-8" });
   assert.equal(r.model, "claude-opus-4-8");
   assert.equal(r.cap, 20);
+});
+
+// ── Hosted-AI upstream selection (Anthropic direct vs Bankr LLM Gateway) ──────
+test("upstream defaults to Anthropic direct when only ANTHROPIC_API_KEY set", () => {
+  const u = resolveAiUpstream("claude-sonnet-4-6", { ANTHROPIC_API_KEY: "sk-x" });
+  assert.equal(u.provider, "anthropic");
+  assert.equal(u.url, "https://api.anthropic.com/v1/messages");
+  assert.equal(u.model, "claude-sonnet-4-6"); // unchanged hyphen id
+  assert.equal(u.apiKey, "sk-x");
+});
+
+test("upstream routes to Bankr gateway when AI_GATEWAY=bankr + key, mapping the model id", () => {
+  const u = resolveAiUpstream("claude-opus-4-8", { AI_GATEWAY: "bankr", BANKR_LLM_KEY: "bk-x", ANTHROPIC_API_KEY: "sk-x" });
+  assert.equal(u.provider, "bankr");
+  assert.equal(u.url, "https://llm.bankr.bot/v1/messages");
+  assert.equal(u.model, "claude-opus-4.8"); // dot-notation for the gateway
+  assert.equal(u.apiKey, "bk-x");
+});
+
+test("gateway flag without BANKR_LLM_KEY falls back to Anthropic", () => {
+  const u = resolveAiUpstream("claude-sonnet-4-6", { AI_GATEWAY: "bankr", ANTHROPIC_API_KEY: "sk-x" });
+  assert.equal(u.provider, "anthropic");
+});
+
+test("no provider configured → null (caller returns 503)", () => {
+  assert.equal(resolveAiUpstream("claude-sonnet-4-6", {}), null);
+  // gateway flag but neither key
+  assert.equal(resolveAiUpstream("claude-sonnet-4-6", { AI_GATEWAY: "bankr" }), null);
+});
+
+test("bankrGatewayModel maps tiers, is env-overridable, passes unknown ids through", () => {
+  assert.equal(bankrGatewayModel("claude-haiku-4-5"), "claude-haiku-4.5");
+  assert.equal(bankrGatewayModel("claude-sonnet-4-6"), "claude-sonnet-4.6");
+  assert.equal(bankrGatewayModel("claude-opus-4-8"), "claude-opus-4.8");
+  assert.equal(bankrGatewayModel("claude-opus-4-8", { BANKR_MODEL_OPUS: "claude-opus-4.8-vertex" }), "claude-opus-4.8-vertex");
+  assert.equal(bankrGatewayModel("something-else"), "something-else");
 });

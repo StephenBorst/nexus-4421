@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream } from "./logic.mjs";
 
 // Recover the signer address from an EIP-191 personal_sign signature.
 function recoverEthAddress(message, sigHex) {
@@ -783,7 +783,6 @@ export default {
     // The client keeps orchestrating its tool loop — this is a thin authed forwarder.
     if (parts[0] === "ai" && parts[1] === "chat" && request.method === "POST") {
       try {
-        if (!env.ANTHROPIC_API_KEY) return json({ error: "hosted inference not configured", hint: "set ANTHROPIC_API_KEY on nexus-lab-api" }, request, 503);
         const body = await request.json().catch(() => null);
         if (!body) return json({ error: "bad request" }, request, 400);
 
@@ -803,6 +802,12 @@ export default {
         // Sonnet tier) and returns its cap; see logic.mjs. The counter is keyed PER
         // MODEL so the tiers don't share a budget. BYOK remains the unlimited valve.
         const { model: hostedModel, cap: CAP } = resolveHostedModel(body.model, env);
+
+        // Pick upstream: direct Anthropic (default) or the Bankr LLM Gateway when
+        // AI_GATEWAY=bankr + BANKR_LLM_KEY are set. 503 only if neither is configured.
+        const upstreamCfg = resolveAiUpstream(hostedModel, env);
+        if (!upstreamCfg) return json({ error: "hosted inference not configured", hint: "set ANTHROPIC_API_KEY (or AI_GATEWAY=bankr + BANKR_LLM_KEY) on nexus-lab-api" }, request, 503);
+
         const usageKey = `ai:usage:${addr}:${hostedModel}:${new Date().toISOString().slice(0, 10)}`;
         const used = parseInt((await env.LAB_STORE.get(usageKey)) || "0", 10);
         if (used >= CAP) return json({ error: "daily_limit", model: hostedModel, cap: CAP, hint: `Hosted ${hostedModel} cap is ${CAP}/day (resets 00:00 UTC). Switch to a lighter model in ⚙ for a higher cap, or use your own API key.` }, request, 429);
@@ -811,7 +816,7 @@ export default {
         // Forward to Anthropic — use the resolved (whitelisted) model + clamp tokens.
         const upstreamBody = { ...body };
         delete upstreamBody._addr; delete upstreamBody._ts; delete upstreamBody._sig;
-        upstreamBody.model = hostedModel;
+        upstreamBody.model = upstreamCfg.model; // provider-correct id (gateway uses dot-notation)
         upstreamBody.max_tokens = Math.min(Number(upstreamBody.max_tokens) || 1024, 1024);
 
         // Prompt caching — the system prompt + 12 tool schemas are identical every
@@ -830,9 +835,9 @@ export default {
           if (lastSys && typeof lastSys === "object") lastSys.cache_control = { type: "ephemeral" };
         }
 
-        const upstream = await fetch("https://api.anthropic.com/v1/messages", {
+        const upstream = await fetch(upstreamCfg.url, {
           method: "POST",
-          headers: { "content-type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+          headers: { "content-type": "application/json", "x-api-key": upstreamCfg.apiKey, "anthropic-version": "2023-06-01" },
           body: JSON.stringify(upstreamBody),
         });
 

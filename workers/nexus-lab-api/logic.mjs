@@ -103,3 +103,49 @@ export function resolveHostedModel(requested, env = {}) {
   const model = caps[requested] != null ? requested : fallback;
   return { model, cap: caps[model] };
 }
+
+// ── Hosted-AI upstream selection (direct Anthropic vs Bankr LLM Gateway) ──────
+// Default = Anthropic direct (our ANTHROPIC_API_KEY). When AI_GATEWAY="bankr" and
+// BANKR_LLM_KEY is set, route /ai/chat through the Bankr LLM Gateway instead — it's
+// Anthropic-compatible (/v1/messages, auth via X-API-Key bk_…), so the request body
+// (incl. cache_control) carries over. One env flip A/Bs the gateway against direct
+// and falls back instantly. Per-model daily caps stay keyed on the Anthropic-style
+// id (resolveHostedModel), so spend accounting is provider-independent.
+export const BANKR_GATEWAY_URL = "https://llm.bankr.bot/v1/messages";
+
+// The gateway names models in dot-notation (claude-opus-4.8) vs Anthropic's hyphen
+// ids (claude-opus-4-8). Map each tier; every leg is env-overridable so the exact
+// gateway id can be corrected from GET https://llm.bankr.bot/v1/models without a
+// code change. Unknown ids pass through untouched.
+export function bankrGatewayModel(anthropicId, env = {}) {
+  const map = {
+    "claude-haiku-4-5":  env.BANKR_MODEL_HAIKU  || "claude-haiku-4.5",
+    "claude-sonnet-4-6": env.BANKR_MODEL_SONNET || "claude-sonnet-4.6",
+    "claude-opus-4-8":   env.BANKR_MODEL_OPUS   || "claude-opus-4.8",
+  };
+  return map[anthropicId] || anthropicId;
+}
+
+// Decide where /ai/chat forwards. `hostedModel` is the Anthropic-style id from
+// resolveHostedModel. Returns null if the selected provider isn't configured
+// (caller → 503). Header is "x-api-key" for both providers (HTTP headers are
+// case-insensitive, so it satisfies Bankr's X-API-Key and Anthropic's x-api-key).
+export function resolveAiUpstream(hostedModel, env = {}) {
+  if (env.AI_GATEWAY === "bankr" && env.BANKR_LLM_KEY) {
+    return {
+      provider: "bankr",
+      url: BANKR_GATEWAY_URL,
+      apiKey: env.BANKR_LLM_KEY,
+      model: bankrGatewayModel(hostedModel, env),
+    };
+  }
+  if (env.ANTHROPIC_API_KEY) {
+    return {
+      provider: "anthropic",
+      url: "https://api.anthropic.com/v1/messages",
+      apiKey: env.ANTHROPIC_API_KEY,
+      model: hostedModel,
+    };
+  }
+  return null;
+}
