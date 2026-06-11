@@ -66,6 +66,15 @@ export default function MiniApp() {
   const [depositAmt, setDepositAmt] = useState(20);
   const [depositing, setDepositing] = useState(false);
   const [depositMsg, setDepositMsg] = useState<TradeMsg>(null);
+  const [connectedAddr, setConnectedAddr] = useState<string | null>(null);
+
+  async function connectWallet() {
+    try {
+      const provider = await sdk.wallet.getEthereumProvider();
+      const accts = (await provider?.request({ method: "eth_requestAccounts" })) as string[];
+      setConnectedAddr(accts?.[0] ?? null);
+    } catch { /* ignore */ }
+  }
 
   useEffect(() => {
     (async () => {
@@ -150,6 +159,7 @@ export default function MiniApp() {
       const accts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
       const addr = accts?.[0];
       if (!addr) throw new Error("connect a wallet");
+      setConnectedAddr(addr);
       const walletSig = (await provider.request({ method: "personal_sign", params: [toMsgHex("nexus-trading-key-v1"), addr as `0x${string}`] })) as string;
 
       // 0) Ensure the wallet has an Orderly account (else key registration → "Account not found").
@@ -173,7 +183,7 @@ export default function MiniApp() {
           message: regMsg,
         };
         const regSig = (await provider.request({ method: "eth_signTypedData_v4", params: [addr as `0x${string}`, JSON.stringify(regTyped)] })) as string;
-        const acctRes = await fetch(`${API}/proxy/register-account`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: regMsg, signature: regSig, userAddress: addr }) }).then((r) => r.json());
+        const acctRes = await fetch(`${API}/proxy/register-account`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: regMsg, signature: regSig, userAddress: addr.toLowerCase() }) }).then((r) => r.json());
         accountId = acctRes?.data?.account_id;
         if (!accountId) throw new Error(acctRes?.message || acctRes?.error || "account registration failed");
       }
@@ -192,7 +202,7 @@ export default function MiniApp() {
         message,
       };
       const signature = (await provider.request({ method: "eth_signTypedData_v4", params: [addr as `0x${string}`, JSON.stringify(typedData)] })) as string;
-      const reg = await fetch(`${API}/proxy/register-key`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, signature, userAddress: addr, orderlyKey: dk.orderlyKey }) }).then((r) => r.json());
+      const reg = await fetch(`${API}/proxy/register-key`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, signature, userAddress: addr.toLowerCase(), orderlyKey: dk.orderlyKey }) }).then((r) => r.json());
       if (reg.success || reg.data || reg.accountId) setTradeMsg({ ok: true, text: "✓ Trading enabled — place your trade now." });
       else setTradeMsg({ ok: false, text: reg.message || reg.error || "couldn't enable — this wallet may need an Orderly account + USDC deposit first" });
     } catch (e) {
@@ -288,6 +298,15 @@ export default function MiniApp() {
 
       {tradeOpen && (
         <div style={{ ...card, display: "flex", flexDirection: "column", gap: 10 }}>
+          {/* Step 1+2 — connect → enable (one-time) */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            {connectedAddr
+              ? <span style={{ fontSize: 10, color: green }}>● {shortAddr(connectedAddr)}</span>
+              : <button onClick={connectWallet} style={{ background: "#0a1a0a", color: green, border: `1px solid ${green}`, borderRadius: 4, padding: "7px 14px", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: "pointer", letterSpacing: "0.05em" }}>CONNECT WALLET</button>}
+            <button onClick={enableTrading} disabled={enabling} style={{ marginLeft: "auto", background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 4, padding: "7px 12px", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: enabling ? "wait" : "pointer", letterSpacing: "0.05em", opacity: enabling ? 0.6 : 1 }}>{enabling ? "ENABLING…" : "◆ ENABLE TRADING"}</button>
+          </div>
+          <div style={{ fontSize: 8, color: "#2a4a3a", marginTop: -4 }}>1. connect · 2. enable (one-time) · 3. fund · 4. trade</div>
+
           {/* Market */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
             {MARKETS.map((m) => (
@@ -312,10 +331,9 @@ export default function MiniApp() {
             <button onClick={() => placeTrade("SHORT")} disabled={tradeBusy || notional <= 0} style={{ background: red, color: "#fff", border: `1px solid ${red}`, borderRadius: 4, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: "pointer", letterSpacing: "0.06em", opacity: tradeBusy && confirmSide !== "SHORT" ? 0.4 : 1 }}>{tradeBusy ? "…" : confirmSide === "SHORT" ? "TAP TO CONFIRM ✓" : "↓ SHORT"}</button>
           </div>
           {tradeMsg && (
-            <div style={{ fontSize: 10, color: tradeMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{tradeMsg.text}</div>
-          )}
-          {tradeMsg?.cta && (
-            <button onClick={enableTrading} disabled={enabling} style={{ background: "#0a1a0a", color: green, border: `1px solid ${green}`, borderRadius: 4, padding: "10px 0", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: enabling ? "wait" : "pointer", letterSpacing: "0.05em", opacity: enabling ? 0.6 : 1 }}>{enabling ? "ENABLING…" : "◆ ENABLE TRADING (1-time)"}</button>
+            <div style={{ fontSize: 10, color: tradeMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>
+              {tradeMsg.text}{tradeMsg.cta ? " — use ◆ ENABLE TRADING above (1-time)." : ""}
+            </div>
           )}
 
           {/* Fund / deposit */}
