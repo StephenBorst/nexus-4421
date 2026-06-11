@@ -68,6 +68,19 @@ export default function MiniApp() {
   const [depositMsg, setDepositMsg] = useState<TradeMsg>(null);
   const [connectedAddr, setConnectedAddr] = useState<string | null>(null);
 
+  // A smart-contract wallet (code at the address) can't be registered with Orderly
+  // via ECDSA ecrecover → "address and signature do not match". Detect on Base+Arbitrum.
+  async function isSmartWallet(addr: string): Promise<boolean> {
+    const rpcs = ["https://mainnet.base.org", "https://arb1.arbitrum.io/rpc"];
+    for (const rpc of rpcs) {
+      try {
+        const r = await fetch(rpc, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getCode", params: [addr, "latest"] }) }).then((x) => x.json());
+        if (r?.result && r.result !== "0x" && r.result.length > 2) return true;
+      } catch { /* try next */ }
+    }
+    return false;
+  }
+
   async function connectWallet() {
     try {
       const provider = await sdk.wallet.getEthereumProvider();
@@ -160,6 +173,10 @@ export default function MiniApp() {
       const addr = accts?.[0];
       if (!addr) throw new Error("connect a wallet");
       setConnectedAddr(addr);
+      if (await isSmartWallet(addr)) {
+        setTradeMsg({ ok: false, text: "This is a smart-contract wallet, which Orderly can't register yet. Connect an external EOA wallet (Warpcast → wallet settings → connect) and retry." });
+        return;
+      }
       const walletSig = (await provider.request({ method: "personal_sign", params: [toMsgHex("nexus-trading-key-v1"), addr as `0x${string}`] })) as string;
 
       // 0) Ensure the wallet has an Orderly account (else key registration → "Account not found").
