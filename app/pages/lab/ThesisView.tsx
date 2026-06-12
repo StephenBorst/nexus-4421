@@ -52,7 +52,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
 }) {
   const [actualInput, setActualInput] = useState(t.actualPnl !== null ? String(t.actualPnl) : "");
   const [inputVisible, setInputVisible] = useState(false);
-  const cfg = STATUS_CONFIG[t.status];
+  const cfg = STATUS_CONFIG[t.status] ?? STATUS_CONFIG.ACTIVE;
   const isClosed = CLOSED_STATUSES.includes(t.status);
 
   const handleStatusClick = (s: ThesisStatus) => {

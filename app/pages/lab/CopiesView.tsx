@@ -37,7 +37,7 @@ export function CopiesView() {
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {copiedTheses.map((t) => {
             const ticker = t.symbol.replace("PERP_", "").replace("_USDC", "");
-            const cfg = STATUS_CONFIG[t.status];
+            const cfg = STATUS_CONFIG[t.status] ?? STATUS_CONFIG.ACTIVE;
             const shortWallet = t.copiedFromWallet
               ? `${t.copiedFromWallet.slice(0, 6)}...${t.copiedFromWallet.slice(-4)}`
               : null;
