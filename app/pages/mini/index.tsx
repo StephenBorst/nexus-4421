@@ -411,13 +411,20 @@ export default function MiniApp() {
             </div>
             {positions && positions.length === 0 && <div style={{ fontSize: 10, color: "#3a6a4a" }}>no open positions.</div>}
             {positions && positions.map((p) => {
-              const long = Number(p.position_qty) > 0;
-              const pnl = Number(p.unrealized_pnl);
+              const qty = Number(p.position_qty);
+              const long = qty > 0;
+              const entry = Number(p.average_open_price);
+              const mark = Number(p.mark_price);
+              // Orderly /v1/positions has no flat unrealized_pnl field — compute it
+              // (signed qty handles long/short). NaN-safe so a missing mark shows "—".
+              const pnl = mark && entry ? (mark - entry) * qty : Number(p.unrealized_pnl);
+              const hasPnl = Number.isFinite(pnl);
               return (
                 <div key={p.symbol} style={{ display: "flex", alignItems: "center", gap: 8, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, padding: "7px 9px" }}>
                   <span style={{ fontSize: 12, fontWeight: "bold", color: "#fff", flexShrink: 0 }}>{tk(p.symbol)}</span>
-                  <span style={{ fontSize: 9, color: long ? green : red, flexShrink: 0 }}>{long ? "↑ LONG" : "↓ SHORT"} {Math.abs(Number(p.position_qty))}</span>
-                  <span style={{ fontSize: 9, color: pnl >= 0 ? green : red, marginLeft: "auto", flexShrink: 0 }}>{pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}</span>
+                  <span style={{ fontSize: 9, color: long ? green : red, flexShrink: 0 }}>{long ? "↑ LONG" : "↓ SHORT"} {Math.abs(qty)}</span>
+                  {mark > 0 && <span style={{ fontSize: 8, color: "#5a8a6a", flexShrink: 0 }}>@ {entry.toFixed(entry < 10 ? 4 : 2)}→{mark.toFixed(mark < 10 ? 4 : 2)}</span>}
+                  <span style={{ fontSize: 9, color: !hasPnl ? "#5a8a6a" : pnl >= 0 ? green : red, marginLeft: "auto", flexShrink: 0 }}>{hasPnl ? `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : "—"}</span>
                   <button onClick={() => closePosition(p.symbol)} disabled={closingSym === p.symbol} style={{ flexShrink: 0, background: "#1a0a0a", color: red, border: `1px solid ${red}55`, borderRadius: 4, padding: "5px 10px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: closingSym === p.symbol ? "wait" : "pointer", letterSpacing: "0.05em", opacity: closingSym === p.symbol ? 0.6 : 1 }}>{closingSym === p.symbol ? "…" : "CLOSE"}</button>
                 </div>
               );
