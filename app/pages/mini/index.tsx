@@ -33,6 +33,8 @@ type Thesis = {
   status: string; wallet: string; displayName: string | null; agent?: boolean;
 };
 type TradeMsg = { ok: boolean; text: string; cta?: boolean } | null;
+type PosRow = { symbol: string; position_qty: number; average_open_price: number; mark_price: number; unrealized_pnl: number };
+type Acct = { free: number; total: number };
 
 const STATUS_COLOR: Record<string, string> = {
   ACTIVE: "#4a9fff", HIT_TP: "#00ff88", STOPPED_OUT: "#ff4444", INVALIDATED: "#fbbf24", CLOSED: "#8aaa9a",
@@ -71,6 +73,13 @@ export default function MiniApp() {
   const [depositing, setDepositing] = useState(false);
   const [depositMsg, setDepositMsg] = useState<TradeMsg>(null);
   const [connectedAddr, setConnectedAddr] = useState<string | null>(null);
+  // Session sig (deterministic personal_sign of the key message) cached so reads
+  // don't re-prompt; reused for /positions + /close-position.
+  const [sessionSig, setSessionSig] = useState<{ addr: string; sig: string } | null>(null);
+  const [acct, setAcct] = useState<Acct | null>(null);
+  const [positions, setPositions] = useState<PosRow[] | null>(null);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [closingSym, setClosingSym] = useState<string | null>(null);
 
   // A smart-contract wallet (code at the address) can't be registered with Orderly
   // via ECDSA ecrecover → "address and signature do not match". Detect on Base+Arbitrum.
@@ -133,6 +142,63 @@ export default function MiniApp() {
     try { await sdk.actions.composeCast({ text: `${tk(t.symbol)} ${t.direction} — ${t.displayName || shortAddr(t.wallet)}'s call on Nexus. graded on-chain, not vibes 🟢`, embeds: [`${APP}/feed/thesis/${t.wallet}/${t.id}`] }); } catch { /* ignore */ }
   }
 
+  // Deterministic EIP-191 sig → server derives the Orderly key. Cached per session
+  // so balance/position reads + closes don't re-prompt a signature each time.
+  async function ensureSig(): Promise<{ addr: string; sig: string }> {
+    if (sessionSig) return sessionSig;
+    const provider = await sdk.wallet.getEthereumProvider();
+    if (!provider) throw new Error("no wallet");
+    const accts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+    const addr = accts?.[0];
+    if (!addr) throw new Error("connect a wallet");
+    const sig = (await provider.request({ method: "personal_sign", params: [toMsgHex("nexus-trading-key-v1"), addr as `0x${string}`] })) as string;
+    const s = { addr, sig };
+    setSessionSig(s); setConnectedAddr(addr);
+    return s;
+  }
+
+  // ── Read account state: free collateral + open positions (one /positions call). ──
+  async function refreshStatus(over?: { addr: string; sig: string }) {
+    if (statusBusy) return;
+    setStatusBusy(true);
+    try {
+      const s = over || await ensureSig();
+      const r = await fetch(`${API}/positions`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walletAddress: s.addr, walletSig: s.sig }),
+      });
+      const d = await r.json();
+      if (d?.error === "wallet_not_registered") { setTradeMsg({ ok: false, text: "This wallet isn't enabled for trading yet.", cta: true }); return; }
+      const data = d?.data ?? {};
+      setAcct({ free: Number(data.free_collateral ?? 0), total: Number(data.total_collateral_value ?? 0) });
+      const rows = (Array.isArray(data.rows) ? data.rows : []).filter((p: PosRow) => Math.abs(Number(p.position_qty)) > 0);
+      setPositions(rows);
+    } catch (e) {
+      setTradeMsg({ ok: false, text: (e as Error)?.message || "couldn't load account" });
+    } finally {
+      setStatusBusy(false);
+    }
+  }
+
+  async function closePosition(symbol: string) {
+    if (closingSym) return;
+    setClosingSym(symbol); setTradeMsg(null);
+    try {
+      const s = await ensureSig();
+      const r = await fetch(`${API}/close-position`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol, walletSig: s.sig, walletAddress: s.addr }),
+      });
+      const d = await r.json();
+      if (r.ok && !d.error) { setTradeMsg({ ok: true, text: `✓ closed ${tk(symbol)}` }); await refreshStatus(s); }
+      else setTradeMsg({ ok: false, text: d.message || d.error || "close failed" });
+    } catch (e) {
+      setTradeMsg({ ok: false, text: (e as Error)?.message || "error" });
+    } finally {
+      setClosingSym(null);
+    }
+  }
+
   // ── In-frame trade: sign → POST /trade ──
   async function placeTrade(side: "LONG" | "SHORT") {
     if (tradeBusy) return;
@@ -143,19 +209,13 @@ export default function MiniApp() {
     }
     setConfirmSide(null); setTradeBusy(true); setTradeMsg(null);
     try {
-      const provider = await sdk.wallet.getEthereumProvider();
-      if (!provider) throw new Error("no wallet");
-      const accts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
-      const addr = accts?.[0];
-      if (!addr) throw new Error("connect a wallet");
-      // Deterministic EIP-191 sig → server derives the Orderly key (same as registration).
-      const walletSig = (await provider.request({ method: "personal_sign", params: [toMsgHex("nexus-trading-key-v1"), addr as `0x${string}`] })) as string;
+      const s = await ensureSig();
       const r = await fetch(`${API}/trade`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbol: sym, side: side === "LONG" ? "BUY" : "SELL", notional, leverage: lev, walletSig, walletAddress: addr }),
+        body: JSON.stringify({ symbol: sym, side: side === "LONG" ? "BUY" : "SELL", notional, leverage: lev, walletSig: s.sig, walletAddress: s.addr }),
       });
       const d = await r.json();
-      if (r.ok && !d.error) setTradeMsg({ ok: true, text: `✓ ${side} ${sym} placed — $${notional} @ ${lev}x` });
+      if (r.ok && !d.error) { setTradeMsg({ ok: true, text: `✓ ${side} ${sym} placed — $${notional} @ ${lev}x` }); await refreshStatus(s); }
       else if (d.error === "wallet_not_registered") setTradeMsg({ ok: false, text: "This wallet isn't enabled for trading yet.", cta: true });
       else setTradeMsg({ ok: false, text: d.message || d.error || "trade failed" });
     } catch (e) {
@@ -182,6 +242,7 @@ export default function MiniApp() {
         return;
       }
       const walletSig = (await provider.request({ method: "personal_sign", params: [toMsgHex("nexus-trading-key-v1"), addr as `0x${string}`] })) as string;
+      setSessionSig({ addr, sig: walletSig }); // cache for balance/position reads
 
       // 0) Ensure the wallet has an Orderly account (else key registration → "Account not found").
       let accountId: string | undefined;
@@ -224,7 +285,7 @@ export default function MiniApp() {
       };
       const signature = (await provider.request({ method: "eth_signTypedData_v4", params: [addr as `0x${string}`, JSON.stringify(typedData)] })) as string;
       const reg = await fetch(`${API}/proxy/register-key`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, signature, userAddress: addr.toLowerCase(), orderlyKey: dk.orderlyKey }) }).then((r) => r.json());
-      if (reg.success || reg.data || reg.accountId) setTradeMsg({ ok: true, text: "✓ Trading enabled — place your trade now." });
+      if (reg.success || reg.data || reg.accountId) { setTradeMsg({ ok: true, text: "✓ Trading enabled — place your trade now." }); refreshStatus({ addr, sig: walletSig }); }
       else setTradeMsg({ ok: false, text: reg.message || reg.error || "couldn't enable — this wallet may need an Orderly account + USDC deposit first" });
     } catch (e) {
       setTradeMsg({ ok: false, text: (e as Error)?.message || "enable error" });
@@ -314,7 +375,7 @@ export default function MiniApp() {
 
       {/* TRADE (hero) */}
       <button onClick={() => { setTradeOpen((o) => !o); setTradeMsg(null); }} style={{ background: tradeOpen ? "#0a1a0a" : green, color: tradeOpen ? green : "#04130c", border: `1px solid ${green}`, borderRadius: 5, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: "pointer", letterSpacing: "0.06em" }}>
-        ⚡ {tradeOpen ? "CLOSE TRADE" : "TRADE PERPS"}
+        ⚡ {tradeOpen ? "✕ HIDE PANEL" : "TRADE PERPS"}
       </button>
 
       {tradeOpen && (
@@ -327,6 +388,28 @@ export default function MiniApp() {
             <button onClick={enableTrading} disabled={enabling} style={{ marginLeft: "auto", background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 4, padding: "7px 12px", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: enabling ? "wait" : "pointer", letterSpacing: "0.05em", opacity: enabling ? 0.6 : 1 }}>{enabling ? "ENABLING…" : "◆ ENABLE TRADING"}</button>
           </div>
           <div style={{ fontSize: 8, color: "#2a4a3a", marginTop: -4 }}>1. connect · 2. enable (one-time) · 3. fund · 4. trade</div>
+
+          {/* Account status + open positions (read-back) */}
+          <div style={{ borderTop: "1px solid #1a2e1a", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 8, color: "#3a6a4a", letterSpacing: "0.1em" }}>📊 ACCOUNT</span>
+              {acct && <span style={{ fontSize: 10, color: "#5a8a6a" }}>free <b style={{ color: "#fff" }}>${acct.free.toFixed(2)}</b> · value <b style={{ color: "#fff" }}>${acct.total.toFixed(2)}</b></span>}
+              <button onClick={() => refreshStatus()} disabled={statusBusy} style={{ marginLeft: "auto", background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 4, padding: "5px 11px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: statusBusy ? "wait" : "pointer", letterSpacing: "0.05em", opacity: statusBusy ? 0.6 : 1 }}>{statusBusy ? "…" : acct ? "↻ REFRESH" : "↻ LOAD"}</button>
+            </div>
+            {positions && positions.length === 0 && <div style={{ fontSize: 10, color: "#3a6a4a" }}>no open positions.</div>}
+            {positions && positions.map((p) => {
+              const long = Number(p.position_qty) > 0;
+              const pnl = Number(p.unrealized_pnl);
+              return (
+                <div key={p.symbol} style={{ display: "flex", alignItems: "center", gap: 8, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, padding: "7px 9px" }}>
+                  <span style={{ fontSize: 12, fontWeight: "bold", color: "#fff", flexShrink: 0 }}>{tk(p.symbol)}</span>
+                  <span style={{ fontSize: 9, color: long ? green : red, flexShrink: 0 }}>{long ? "↑ LONG" : "↓ SHORT"} {Math.abs(Number(p.position_qty))}</span>
+                  <span style={{ fontSize: 9, color: pnl >= 0 ? green : red, marginLeft: "auto", flexShrink: 0 }}>{pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}</span>
+                  <button onClick={() => closePosition(p.symbol)} disabled={closingSym === p.symbol} style={{ flexShrink: 0, background: "#1a0a0a", color: red, border: `1px solid ${red}55`, borderRadius: 4, padding: "5px 10px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: closingSym === p.symbol ? "wait" : "pointer", letterSpacing: "0.05em", opacity: closingSym === p.symbol ? 0.6 : 1 }}>{closingSym === p.symbol ? "…" : "CLOSE"}</button>
+                </div>
+              );
+            })}
+          </div>
 
           {/* Market */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
