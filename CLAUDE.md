@@ -342,13 +342,25 @@ The cold-start/distribution weapon: a slim Nexus surface native to Warpcast, whe
   deepens / aggregators index v4. UX is native now; actual fill depends on routing. Real fix = depth.
 - **⚠️ Frame wallet is FRESH/separate** from the user's main wallet (no Orderly acct, no funds, no $NEXUS). Can
   read verified wallets from `context.user.verifications`. Shapes the build order (zero-auth first).
-- **TRADING PHASE — scoped, shovel-ready, NOT built (needs live-frame test + funded wallet → don't blind-ship
-  real-money code):** reuse the existing **`POST /trade {walletSig, walletAddress, ...order}`** in lab-api
-  (auth = `sign_message('nexus-trading-key-v1')`; resolves Orderly acct from `user:{addr}` registration;
-  places via Orderly REST `/v1/order`). Frame wallet signs → calls /trade. Lightweight, no heavy SDK.
-  THE FRICTION = onboarding a fresh wallet (register Orderly acct + deposit USDC on Arbitrum) — study how Volt
-  does in-frame deposits. Spike first on an ALREADY-registered+funded wallet (skip onboarding) to prove
-  sign→key→order in-frame, then build onboarding.
+- **✅ TRADING PHASE — BUILT + LIVE-VERIFIED in-frame (2026-06-11; full real-money loop works).** Flow:
+  connect → ENABLE (registers Orderly acct + order-key, no funds move) → DEPOSIT (real Arbitrum USDC txs) →
+  TRADE (`POST /trade {symbol, side, notional, leverage, walletSig, walletAddress}`, auth =
+  `sign_message('nexus-trading-key-v1')`, places MARKET via Orderly `/v1/order`). The frame wallet signs once;
+  `ensureSig()` caches the sig per session so reads don't re-prompt. **Account read-back** (`POST /positions`
+  → free_collateral + total_collateral_value + rows; `POST /balance` = `/v1/client/holding`) renders collateral
+  + open positions with live uPnL + a real per-position **CLOSE** (`POST /close-position {symbol, walletSig,
+  walletAddress}`). Verified live: $10 BTC short filled, position shown, closed; HYPE closed.
+- **⚠️ /trade money-path gotchas (all bit us, all fixed — don't regress):** (1) **min_notional + base_tick
+  live on `/v1/public/info/{symbol}`, NOT `/v1/public/futures/`** (futures returns null for both → silently
+  defaulted minNotional to 1 → sub-min orders slipped through). (2) **/trade MUST check `orderResult.success`** —
+  Orderly returns `{success:false, code, message}` on reject; the old code wrapped it as `ok:true` → trades
+  "placed" with no position. (3) **Floor-snapping qty to base_tick can dip the VALUE under min_notional** (e.g.
+  $10 HYPE → 0.17 → $9.95 → "order value should be ≥ 10"); ceil up one step to clear it. (4) **Orderly position
+  rows have NO flat `unrealized_pnl` field** — compute uPnL = `(mark - entry) * signed_qty` (NaN-safe). HYPE/most
+  perps min_notional = $10, so with a small balance use leverage so margin fits (e.g. $10 @ 2x = $5 margin).
+- **⚠️ Frame wallet ≠ Bankr/main wallet:** the mini frame wallet is its OWN Orderly account, separate from the
+  Bankr wallet used by the skill `/proxy/bankr-deposit`. Funds/positions deposited via one are invisible to the
+  other — a common "where are my funds?" confusion. Each account is keyed by its own address.
 - **⚠️ This repo is YARN 4** — use `yarn add`, NEVER `npm install` (npm writes a conflicting root
   `package-lock.json` + desyncs `yarn.lock` → CI `yarn install` fails → deploy skipped). Bit us once on the
   miniapp-sdk add.
