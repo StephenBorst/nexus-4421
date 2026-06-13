@@ -80,6 +80,7 @@ export default function MiniApp() {
   const [positions, setPositions] = useState<PosRow[] | null>(null);
   const [statusBusy, setStatusBusy] = useState(false);
   const [closingSym, setClosingSym] = useState<string | null>(null);
+  const [minNotional, setMinNotional] = useState<number | null>(null);
 
   // A smart-contract wallet (code at the address) can't be registered with Orderly
   // via ECDSA ecrecover → "address and signature do not match". Detect on Base+Arbitrum.
@@ -126,6 +127,17 @@ export default function MiniApp() {
       .then((d: { feed?: Thesis[] }) => setFeed((d.feed ?? []).slice(0, 12)))
       .catch(() => setFeed([]));
   }, []);
+
+  // Per-market minimum order size (notional) — so we can warn BEFORE a signature
+  // instead of after the exchange rejects. Lives on Orderly's public /info.
+  useEffect(() => {
+    let cancelled = false;
+    setMinNotional(null);
+    fetch(`https://api-evm.orderly.org/v1/public/info/PERP_${sym}_USDC`).then((r) => r.json())
+      .then((d) => { if (!cancelled) setMinNotional(Number(d?.data?.min_notional) || null); })
+      .catch(() => { /* leave null — backend still guards */ });
+    return () => { cancelled = true; };
+  }, [sym]);
 
   async function buyNexus() {
     if (buying) return;
@@ -342,6 +354,7 @@ export default function MiniApp() {
   const card: React.CSSProperties = { background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 6, padding: 12 };
   const liveCount = feed?.filter((t) => t.status === "ACTIVE").length ?? 0;
   const margin = notional / (lev || 1);
+  const belowMin = minNotional != null && notional < minNotional;
 
   return (
     <div style={shell}>
@@ -428,11 +441,12 @@ export default function MiniApp() {
               <input type="range" min={1} max={20} step={1} value={lev} onChange={(e) => setLev(parseInt(e.target.value, 10))} style={{ width: "100%", marginTop: 12 }} />
             </div>
           </div>
-          <div style={{ fontSize: 9, color: "#5a8a6a" }}>notional <b style={{ color: "#fff" }}>${notional.toFixed(0)}</b> · margin <b style={{ color: "#fff" }}>${margin.toFixed(2)}</b></div>
+          <div style={{ fontSize: 9, color: "#5a8a6a" }}>notional <b style={{ color: "#fff" }}>${notional.toFixed(0)}</b> · margin <b style={{ color: "#fff" }}>${margin.toFixed(2)}</b>{minNotional ? <> · min <b style={{ color: "#fff" }}>${minNotional}</b></> : null}</div>
+          {belowMin && <div style={{ fontSize: 9, color: "#fbbf24", lineHeight: 1.5 }}>↑ {sym} needs ≥ ${minNotional} notional. Raise SIZE to ${minNotional} (bump leverage if the margin doesn&apos;t fit your balance).</div>}
           {/* Long / Short */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <button onClick={() => placeTrade("LONG")} disabled={tradeBusy || notional <= 0} style={{ background: green, color: "#04130c", border: `1px solid ${green}`, borderRadius: 4, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: "pointer", letterSpacing: "0.06em", opacity: tradeBusy && confirmSide !== "LONG" ? 0.4 : 1 }}>{tradeBusy ? "…" : confirmSide === "LONG" ? "TAP TO CONFIRM ✓" : "↑ LONG"}</button>
-            <button onClick={() => placeTrade("SHORT")} disabled={tradeBusy || notional <= 0} style={{ background: red, color: "#fff", border: `1px solid ${red}`, borderRadius: 4, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: "pointer", letterSpacing: "0.06em", opacity: tradeBusy && confirmSide !== "SHORT" ? 0.4 : 1 }}>{tradeBusy ? "…" : confirmSide === "SHORT" ? "TAP TO CONFIRM ✓" : "↓ SHORT"}</button>
+            <button onClick={() => placeTrade("LONG")} disabled={tradeBusy || notional <= 0 || belowMin} style={{ background: green, color: "#04130c", border: `1px solid ${green}`, borderRadius: 4, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: belowMin ? "not-allowed" : "pointer", letterSpacing: "0.06em", opacity: belowMin ? 0.4 : tradeBusy && confirmSide !== "LONG" ? 0.4 : 1 }}>{tradeBusy ? "…" : confirmSide === "LONG" ? "TAP TO CONFIRM ✓" : "↑ LONG"}</button>
+            <button onClick={() => placeTrade("SHORT")} disabled={tradeBusy || notional <= 0 || belowMin} style={{ background: red, color: "#fff", border: `1px solid ${red}`, borderRadius: 4, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: belowMin ? "not-allowed" : "pointer", letterSpacing: "0.06em", opacity: belowMin ? 0.4 : tradeBusy && confirmSide !== "SHORT" ? 0.4 : 1 }}>{tradeBusy ? "…" : confirmSide === "SHORT" ? "TAP TO CONFIRM ✓" : "↓ SHORT"}</button>
           </div>
           {tradeMsg && (
             <div style={{ fontSize: 10, color: tradeMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>
