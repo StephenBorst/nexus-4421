@@ -1175,10 +1175,21 @@ export default {
         const baseMin       = symInfo.base_min ?? 0;
         const minNotional   = symInfo.min_notional ?? futuresInfo.min_notional ?? 10;
         const validNotional = notional;
-        const quantity      = Math.floor((validNotional / markPrice) * Math.round(1 / qtyStep)) / Math.round(1 / qtyStep);
+        // Snap to the step with toFixed (avoids float artifacts like 0.17000000003
+        // → Orderly -1104). decimals = -log10(step), e.g. 0.01 → 2dp.
+        const decimals = Math.max(0, Math.round(-Math.log10(qtyStep)));
+        const snap = (q) => parseFloat((Math.floor(q / qtyStep) * qtyStep).toFixed(decimals));
+        let quantity = snap(validNotional / markPrice);
+        // ⚠️ Floor-snapping a min-sized order can dip its VALUE just under min_notional
+        // (e.g. $10 HYPE → 0.17 → $9.95) → Orderly "order value should be ≥ 10". Bump
+        // up one step to clear the exchange minimum. Skip for reduce-only.
+        if (!isReduceOnly && quantity * markPrice < minNotional) {
+          quantity = parseFloat((Math.ceil((minNotional / markPrice) / qtyStep) * qtyStep).toFixed(decimals));
+        }
+        if (!isReduceOnly && baseMin && quantity < baseMin) quantity = baseMin;
 
         // ── Minimum notional / size guard (skip for reduce-only — qty comes from position) ──
-        if (!isReduceOnly && (validNotional < minNotional || quantity <= 0 || quantity < baseMin)) {
+        if (!isReduceOnly && (validNotional < minNotional || quantity <= 0)) {
           return json({
             error: "below_min_notional",
             notional: validNotional,
@@ -1194,12 +1205,15 @@ export default {
         }
 
         // ── Margin check (skip for reduce-only — closing never requires margin) ──
+        // Use the ACTUAL order value (qty may have been bumped to clear min_notional),
+        // not the requested notional, so the margin estimate is honest.
         const lev = Math.max(1, Number(leverage) || 1);
+        const actualNotional = quantity * markPrice;
         if (!isReduceOnly) {
           const holdingRows    = authCheck?.data?.holding ?? [];
           const usdcHolding    = holdingRows.find(h => h.token === "USDC");
           const freeCollateral = Number(usdcHolding?.holding ?? usdcHolding?.available ?? 0);
-          const requiredMargin = validNotional / lev;
+          const requiredMargin = actualNotional / lev;
           if (freeCollateral > 0 && requiredMargin > freeCollateral * 0.95) {
             return json({
               error: "insufficient_margin",
@@ -1257,7 +1271,7 @@ export default {
 
         return json({
           ok: true, symbol, side: side.toUpperCase(), markPrice, qtyStep, minNotional,
-          validNotional, quantity, notional, leverage: lev, leverageResult, order: orderResult,
+          validNotional, actualNotional: Number(actualNotional.toFixed(2)), quantity, notional, leverage: lev, leverageResult, order: orderResult,
           slTp: slTpResult,
           mode: walletSig ? "multi-user" : "single-user",
         }, request);
