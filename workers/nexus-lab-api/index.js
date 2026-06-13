@@ -1166,17 +1166,24 @@ export default {
         const markPrice   = futuresInfo.mark_price;
         if (!markPrice) return json({ error: "failed to fetch mark price", symbol, hint: "Symbol may not be listed on Orderly Network. Try PERP_BTC_USDC, PERP_ETH_USDC, PERP_SOL_USDC, PERP_ARB_USDC, PERP_HYPE_USDC.", raw: priceData }, request, 502);
 
-        const qtyStep       = futuresInfo.base_tick ?? futuresInfo.qty_step ?? futuresInfo.base_min ?? 0.01;
-        const minNotional   = futuresInfo.min_notional ?? futuresInfo.notional_step ?? 1;
-        const validNotional = minNotional > 1 ? Math.floor(notional / minNotional) * minNotional : notional;
+        // ⚠️ Step size + min_notional live on /v1/public/info — NOT /v1/public/futures,
+        // which returns null for them. Reading them off /futures silently defaulted
+        // minNotional→1, so sub-minimum orders slipped past the guard and were then
+        // rejected by the exchange (and that rejection used to be reported as success).
+        const symInfo       = (await (await fetch(ORDERLY_BASE + "/v1/public/info/" + symbol)).json())?.data || {};
+        const qtyStep       = symInfo.base_tick ?? futuresInfo.base_tick ?? futuresInfo.qty_step ?? 0.01;
+        const baseMin       = symInfo.base_min ?? 0;
+        const minNotional   = symInfo.min_notional ?? futuresInfo.min_notional ?? 10;
+        const validNotional = notional;
         const quantity      = Math.floor((validNotional / markPrice) * Math.round(1 / qtyStep)) / Math.round(1 / qtyStep);
 
-        // ── Minimum notional guard (skip for reduce-only — qty comes from position) ──
-        if (!isReduceOnly && (validNotional < minNotional || quantity <= 0)) {
+        // ── Minimum notional / size guard (skip for reduce-only — qty comes from position) ──
+        if (!isReduceOnly && (validNotional < minNotional || quantity <= 0 || quantity < baseMin)) {
           return json({
             error: "below_min_notional",
             notional: validNotional,
             minNotional,
+            message: `Minimum order size for ${symbol.replace("PERP_", "").replace("_USDC", "")} is $${minNotional} notional. You tried $${validNotional}. Increase size (or leverage so the margin still fits).`,
             hint: `Minimum order size for ${symbol} is $${minNotional}. Requested: $${validNotional}.`,
           }, request, 400);
         }
@@ -1209,6 +1216,20 @@ export default {
           ...(isReduceOnly && { reduce_only: true }),
         };
         const orderResult = await orderlyRequest("POST", "/v1/order", orderBody);
+
+        // ⚠️ Don't report a rejected order as success. Orderly returns
+        // { success:false, code, message } on reject (min-notional, step size,
+        // margin, etc.); surfacing it as ok:true (the old behavior) made trades
+        // "place" with no resulting position. Fail loudly with the real reason.
+        if (!orderResult || orderResult.success === false) {
+          return json({
+            error: "order_rejected",
+            code: orderResult?.code,
+            message: orderResult?.message || "Orderly rejected the order — check size, min notional, step size, or margin.",
+            detail: orderResult,
+            quantity, validNotional, minNotional,
+          }, request, 400);
+        }
 
         // ── SL/TP via POSITIONAL_TP_SL algo order (optional) ───────────────────
         // Orderly requires child_orders array with CLOSE_POSITION type — NOT flat tp/sl fields.
