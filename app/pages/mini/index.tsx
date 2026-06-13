@@ -44,7 +44,11 @@ const toMsgHex = (s: string) => ("0x" + Array.from(new TextEncoder().encode(s)).
 // Orderly AddOrderlyKey registration constants (mirror lab-api).
 const BROKER = "nexus_trading";
 const CHAIN = 42161; // Arbitrum One
-const VC = "0x6F7a338F2aA472838dEFD3283eB360d4Dff5D203"; // Orderly mainnet verifyingContract
+// Orderly's OFF-CHAIN EIP-712 domain verifyingContract (the canonical all-C sentinel).
+// Orderly reconstructs the registration/AddOrderlyKey hash with THIS address and ecrecovers
+// the signer; signing with any other value → recovered addr ≠ userAddress → Orderly's
+// "address and signature do not match". Must match the web ENABLE flow + Orderly docs.
+const VC = "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC";
 
 export default function MiniApp() {
   const [booted, setBooted] = useState(false);
