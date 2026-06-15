@@ -81,6 +81,9 @@ export default function MiniApp() {
   const [statusBusy, setStatusBusy] = useState(false);
   const [closingSym, setClosingSym] = useState<string | null>(null);
   const [minNotional, setMinNotional] = useState<number | null>(null);
+  const [withdrawAmt, setWithdrawAmt] = useState(20);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawMsg, setWithdrawMsg] = useState<TradeMsg>(null);
 
   // A smart-contract wallet (code at the address) can't be registered with Orderly
   // via ECDSA ecrecover → "address and signature do not match". Detect on Base+Arbitrum.
@@ -340,6 +343,50 @@ export default function MiniApp() {
     }
   }
 
+  // ── Withdraw: pull USDC collateral back to the frame wallet (Arbitrum). ──
+  // prepare (server builds the Withdraw EIP-712) → frame signs it → submit (server relays
+  // to Orderly with our derived key). On code 78 (unsettled PnL), retry once with settle:true.
+  async function withdraw() {
+    if (withdrawing || withdrawAmt <= 0) return;
+    setWithdrawing(true); setWithdrawMsg({ ok: true, text: "preparing withdrawal…" });
+    try {
+      const provider = await sdk.wallet.getEthereumProvider();
+      if (!provider) throw new Error("no wallet");
+      const s = await ensureSig();
+
+      const submitOnce = async (settle: boolean) => {
+        const prep = await fetch(`${API}/withdraw/prepare`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ walletSig: s.sig, walletAddress: s.addr, amount: withdrawAmt, settle }),
+        }).then((r) => r.json());
+        if (prep.error === "wallet_not_registered") { setWithdrawMsg({ ok: false, text: "Enable trading first." }); return null; }
+        if (prep.error === "insufficient_free_collateral") { setWithdrawMsg({ ok: false, text: `Free collateral too low ($${Number(prep.freeCollateral ?? 0).toFixed(2)}) — close positions first.` }); return null; }
+        if (!prep.typedData) throw new Error(prep.hint || prep.error || "couldn't prepare withdrawal");
+        setWithdrawMsg({ ok: true, text: "approve the withdrawal in your wallet…" });
+        const signature = (await provider.request({ method: "eth_signTypedData_v4", params: [s.addr as `0x${string}`, JSON.stringify(prep.typedData)] })) as string;
+        const res = await fetch(`${API}/withdraw/submit`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ walletSig: s.sig, walletAddress: s.addr, message: prep.message, signature }),
+        }).then((r) => r.json());
+        return { res, sentAmount: prep.amount as number };
+      };
+
+      let out = await submitOnce(false);
+      if (out && out.res?.needsSettle) { setWithdrawMsg({ ok: true, text: "settling PnL — re-sign when prompted…" }); out = await submitOnce(true); }
+      if (!out) return;
+      if (out.res?.ok) {
+        setWithdrawMsg({ ok: true, text: `✓ Withdrawing $${out.sentAmount.toFixed(2)} USDC to your wallet — lands in ~1–3 min.` });
+        await refreshStatus(s);
+      } else {
+        setWithdrawMsg({ ok: false, text: out.res?.raw?.message || out.res?.hint || out.res?.error || "withdrawal failed" });
+      }
+    } catch (e) {
+      setWithdrawMsg({ ok: false, text: (e as Error)?.message || "withdraw error" });
+    } finally {
+      setWithdrawing(false);
+    }
+  }
+
   async function waitForReceipt(provider: { request: (a: { method: string; params?: unknown[] }) => Promise<unknown> }, hash: string) {
     for (let i = 0; i < 40; i++) {
       try {
@@ -469,6 +516,19 @@ export default function MiniApp() {
               <button onClick={deposit} disabled={depositing || depositAmt <= 0} style={{ flexShrink: 0, background: "#0a1a2a", color: "#4a9fff", border: "1px solid #1a3a5a", borderRadius: 4, padding: "8px 16px", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: depositing ? "wait" : "pointer", letterSpacing: "0.05em", opacity: depositing ? 0.6 : 1 }}>{depositing ? "…" : "DEPOSIT"}</button>
             </div>
             {depositMsg && <div style={{ fontSize: 10, color: depositMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{depositMsg.text}</div>}
+          </div>
+
+          {/* Withdraw */}
+          <div style={{ borderTop: "1px solid #1a2e1a", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 8, color: "#3a6a4a", letterSpacing: "0.1em" }}>🏧 WITHDRAW (USDC · to your wallet)</span>
+              {acct && <button onClick={() => setWithdrawAmt(Math.max(0, Math.floor(acct.free * 100) / 100))} style={{ marginLeft: "auto", background: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#5a8a6a", fontFamily: mono, fontSize: 9, padding: "2px 7px", cursor: "pointer" }}>MAX ${acct.free.toFixed(2)}</button>}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input type="number" inputMode="decimal" min={1} value={withdrawAmt} onChange={(e) => setWithdrawAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e5e7eb", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
+              <button onClick={withdraw} disabled={withdrawing || withdrawAmt <= 0} style={{ flexShrink: 0, background: "#1a140a", color: "#fbbf24", border: "1px solid #4a3a1a", borderRadius: 4, padding: "8px 16px", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: withdrawing ? "wait" : "pointer", letterSpacing: "0.05em", opacity: withdrawing ? 0.6 : 1 }}>{withdrawing ? "…" : "WITHDRAW"}</button>
+            </div>
+            {withdrawMsg && <div style={{ fontSize: 10, color: withdrawMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{withdrawMsg.text}</div>}
           </div>
 
           <div style={{ fontSize: 8, color: "#2a4a3a" }}>real orders on Orderly · signs to authorize · non-custodial</div>

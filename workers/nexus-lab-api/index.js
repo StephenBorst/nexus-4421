@@ -2466,6 +2466,106 @@ export default {
       }
     }
 
+    // ── /withdraw/prepare + /withdraw/submit — miniapp withdrawal (frame wallet signs) ──
+    // Same Orderly flow as /proxy/bankr-withdraw, but the frame EOA signs the Withdraw
+    // EIP-712 CLIENT-SIDE (we never hold its key). prepare → returns typedData to sign;
+    // submit → relays {message,signature} to Orderly. settle:true settles PnL first
+    // (code-78 fix) and recomputes a safe amount from free_collateral.
+    if (parts[0] === "withdraw" && (parts[1] === "prepare" || parts[1] === "submit") && request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const { walletSig, walletAddress } = body;
+      if (!walletSig || !walletAddress) return json({ error: "walletSig and walletAddress required" }, request, 400);
+      try {
+        const walletNorm = walletAddress.toLowerCase().trim();
+        const ORDERLY_BASE_W = "https://api-evm.orderly.org";
+        const BROKER_W = "nexus_trading";
+        const CHAIN_W  = 42161;
+        const VC_W     = "0x6F7a338F2aA472838dEFD3283eB360d4Dff5D203"; // Orderly mainnet verifyingContract (Withdraw)
+        const HDR_W    = new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20]);
+
+        // Derive the ed25519 trading key from the frame wallet's personal_sig (Orderly REST auth).
+        const sHex = walletSig.startsWith("0x") ? walletSig.slice(2) : walletSig;
+        const seed = new Uint8Array(await crypto.subtle.digest("SHA-256",
+          new Uint8Array(sHex.match(/.{2}/g).map(b => parseInt(b, 16)))));
+        const pk8  = new Uint8Array(48); pk8.set(HDR_W, 0); pk8.set(seed, 16);
+        const sk   = await crypto.subtle.importKey("pkcs8", pk8, { name: "Ed25519" }, false, ["sign"]);
+
+        const userRaw = await env.LAB_STORE.get("user:" + walletNorm);
+        if (!userRaw) return json({ error: "wallet_not_registered" }, request, 401);
+        const urec = JSON.parse(userRaw);
+        const oReq = async (method, path, data) => {
+          const bs  = data ? JSON.stringify(data) : undefined;
+          const ts  = Date.now();
+          const m   = new TextEncoder().encode(ts + method.toUpperCase() + path + (bs || ""));
+          const sb  = new Uint8Array(await crypto.subtle.sign("Ed25519", sk, m));
+          const b64 = btoa(String.fromCharCode(...sb)).replace(/[+]/g,"-").replace(/[/]/g,"_").replace(/=+$/,"");
+          const hdrs = { "Content-Type": "application/json", "orderly-timestamp": String(ts),
+            "orderly-account-id": urec.accountId, "orderly-key": urec.orderlyKey, "orderly-signature": b64 };
+          const res = await fetch(ORDERLY_BASE_W + path, { method, headers: hdrs, body: bs });
+          return res.json();
+        };
+        const buildTyped = (message) => ({
+          types: {
+            EIP712Domain: [
+              { name: "name", type: "string" }, { name: "version", type: "string" },
+              { name: "chainId", type: "uint256" }, { name: "verifyingContract", type: "address" },
+            ],
+            Withdraw: [
+              { name: "brokerId", type: "string" }, { name: "chainId", type: "uint256" },
+              { name: "receiver", type: "address" }, { name: "token", type: "string" },
+              { name: "amount", type: "uint256" }, { name: "withdrawNonce", type: "uint64" },
+              { name: "timestamp", type: "uint64" },
+            ],
+          },
+          primaryType: "Withdraw",
+          domain: { name: "Orderly", version: "1", chainId: CHAIN_W, verifyingContract: VC_W },
+          message,
+        });
+
+        if (parts[1] === "prepare") {
+          const { amount, settle } = body;
+          if (!amount || Number(amount) <= 0) return json({ error: "amount (USDC) required" }, request, 400);
+          let effAmount = Number(amount);
+          if (settle) {
+            await oReq("POST", "/v1/settle_pnl", {});
+            await new Promise(r => setTimeout(r, 4000));
+            const holdingRes = await oReq("GET", "/v1/client/holding", null);
+            const usdcRow = (holdingRes?.data?.holding ?? []).find(h => h.token === "USDC");
+            const freeCol = Number(usdcRow?.holding ?? usdcRow?.available ?? 0);
+            effAmount = Math.min(Number(amount), Math.max(0, freeCol - 0.5));
+            if (effAmount <= 0) return json({ ok: false, error: "insufficient_free_collateral", freeCollateral: freeCol,
+              hint: "Free collateral too low to withdraw after settlement. Close positions or wait for the daily settlement cycle." }, request, 400);
+          }
+          const nonceData = await oReq("GET", "/v1/withdraw_nonce", null);
+          const withdrawNonce = nonceData?.data?.withdraw_nonce;
+          if (withdrawNonce == null) return json({ error: "failed to get withdraw nonce", detail: nonceData }, request, 502);
+          const message = { brokerId: BROKER_W, chainId: CHAIN_W, receiver: walletNorm, token: "USDC",
+            amount: Math.round(effAmount * 1e6), withdrawNonce: Number(withdrawNonce), timestamp: Date.now() };
+          return json({ typedData: buildTyped(message), message, amount: effAmount, verifyingContract: VC_W }, request);
+        }
+
+        // submit
+        const { message, signature } = body;
+        if (!message || !signature) return json({ error: "message and signature required" }, request, 400);
+        // Guard: the signed receiver must be the caller's own wallet (no redirecting funds).
+        if (String(message.receiver).toLowerCase() !== walletNorm) {
+          return json({ error: "receiver_mismatch", hint: "Withdrawal receiver must equal your wallet address." }, request, 400);
+        }
+        const withdrawRes = await oReq("POST", "/v1/withdraw_request", {
+          message, signature, userAddress: walletNorm, verifyingContract: VC_W,
+        });
+        const code78 = withdrawRes?.code === 78 || String(withdrawRes?.message ?? "").includes("occupied");
+        if (code78) {
+          return json({ ok: false, code: 78, needsSettle: true,
+            hint: "Unsettled PnL is occupying margin. Re-run /withdraw/prepare with settle:true, re-sign, and resubmit." }, request);
+        }
+        return json({ ok: withdrawRes?.success ?? false, raw: withdrawRes }, request);
+      } catch (e) {
+        return json({ error: "withdraw internal error", detail: String(e) }, request, 500);
+      }
+    }
+
     // ── /proxy/bankr-register — fully server-side onboarding via Bankr Wallet API ──
     // Flow: check account → deposit if new → personal_sign → derive ed25519 → EIP-712 → register → KV
     // depositAmount defaults to 5 USDC. key is used transiently, never stored.
