@@ -7,9 +7,9 @@
   "frame": {
     "version": "1",
     "name": "Nexus Trading Labs",
-    "iconUrl": "https://trade.nexustradinglabs.com/favicon.webp",
+    "iconUrl": "https://trade.nexustradinglabs.com/icon-512.png",
     "homeUrl": "https://trade.nexustradinglabs.com/mini",
-    "splashImageUrl": "https://trade.nexustradinglabs.com/favicon.webp",
+    "splashImageUrl": "https://trade.nexustradinglabs.com/icon-512.png",
     "splashBackgroundColor": "#0a0e0a",
     "subtitle": "The terminal that makes you better",
     "description": "One-tap perps, autonomous trading agents, and on-chain-verifiable track records.",
