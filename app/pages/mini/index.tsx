@@ -109,6 +109,7 @@ export default function MiniApp() {
   const [feed, setFeed] = useState<Thesis[] | null>(null);
   const [buying, setBuying] = useState(false);
   const [added, setAdded] = useState(false);
+  const [addErr, setAddErr] = useState<string | null>(null);
 
   // Trade sheet
   const [tradeOpen, setTradeOpen] = useState(false);
@@ -276,7 +277,14 @@ export default function MiniApp() {
     catch { try { await sdk.actions.swapToken({ buyToken: NEXUS_CAIP19 }); } catch { /* ignore */ } }
     finally { setBuying(false); }
   }
-  async function saveApp() { try { await sdk.actions.addMiniApp(); setAdded(true); } catch { /* ignore */ } }
+  async function saveApp() {
+    setAddErr(null);
+    try { await sdk.actions.addMiniApp(); setAdded(true); }
+    catch (e) {
+      const msg = (e as { message?: string; name?: string })?.message || (e as { name?: string })?.name || String(e);
+      setAddErr(msg); // surface the real reason so we can diagnose (e.g. manifest not indexed)
+    }
+  }
   async function shareApp() {
     try { await sdk.actions.composeCast({ text: "trading on Nexus 🟢 verifiable track records, autonomous agents & one-tap perps — the terminal that makes you better.", embeds: [`${APP}/mini`] }); } catch { /* ignore */ }
   }
@@ -557,6 +565,7 @@ export default function MiniApp() {
           <button onClick={saveApp} style={{ marginLeft: "auto", background: added ? "#0a2a0a" : "none", border: `1px solid ${added ? "#1a4a2a" : "#1a2e1a"}`, borderRadius: 3, color: added ? green : "#5a8a6a", fontFamily: mono, fontSize: 9, padding: "3px 9px", cursor: "pointer", letterSpacing: "0.06em" }}>{added ? "★ SAVED" : "★ SAVE"}</button>
         </div>
         <div style={{ fontSize: 9, color: "#3a6a4a", marginTop: 4, letterSpacing: "0.05em" }}>the terminal that makes you a better trader</div>
+        {addErr && <div style={{ fontSize: 9, color: "#fbbf24", marginTop: 6, lineHeight: 1.5, wordBreak: "break-word" }}>add failed: {addErr}</div>}
       </div>
 
       {!booted && <div style={{ ...card, color: "#3a6a4a", fontSize: 12 }}>loading…</div>}
