@@ -32,6 +32,16 @@ is everything built on top:
   Tiers mirrored client-side in `config/assistant.ts` (`HOSTED_TIERS`). Env-tunable caps `HOSTED_CAP_HAIKU/
   SONNET/OPUS` + default tier `HOSTED_AI_DEFAULT_MODEL` (legacy `HOSTED_AI_MODEL` honored as default source);
   needs `ANTHROPIC_API_KEY` secret (set). Free users keep BYOK.
+- **⚠️ Hosted-AI SPEND PATH = Bankr LLM Gateway (LIVE 2026-06-14), not direct Anthropic.** `/ai/chat` upstream is
+  pluggable via `resolveAiUpstream`/`bankrGatewayModel` in `logic.mjs`: with worker var `AI_GATEWAY=bankr` (set in
+  wrangler.toml `[vars]`) + secret `BANKR_LLM_KEY` (set), it proxies to `https://llm.bankr.bot/v1/messages`
+  (Anthropic-compatible, header `x-api-key`) instead of Anthropic — funded by Bankr's **$100k inference grant**
+  ($1112 credited; "$100k Inference Program"). Gateway uses dot-notation ids (`claude-opus-4.8`/`-sonnet-4.6`/
+  `-haiku-4.5`, verified via `GET /v1/models`, caching supported) vs our hyphen ids — `bankrGatewayModel` maps
+  each tier (env-overridable `BANKR_MODEL_HAIKU/SONNET/OPUS`). Per-model daily caps + cache_control breakpoints
+  still apply. Falls back to direct Anthropic if `BANKR_LLM_KEY` is absent. Manage credits/usage at bankr.bot/llm
+  (Bankr wallet `0xd9f7…b449`). Revert = remove the `AI_GATEWAY` var. Verified live: credit balance ticked down on
+  a real PRO call.
 - **`/analyze`** public Hyperliquid wallet x-ray (HL public API → Lab AnalyticsView; in nav). **Strategy presets**
   (`config/strategyPresets.ts`) load in PAPER/ASSISTED/AUTONOMOUS (no longer force PAPER). **Agent regime filter**
   `respectRegime` (opt-in; brain `computeRegime` gates trend-fighting entries). Bankr skill updated for both.
