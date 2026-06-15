@@ -132,6 +132,9 @@ export default function MiniApp() {
   const [statusBusy, setStatusBusy] = useState(false);
   const [closingSym, setClosingSym] = useState<string | null>(null);
   const [minNotional, setMinNotional] = useState<number | null>(null);
+  // Opt-in: broadcast my open positions to the public LIVE NOW feed (ephemeral,
+  // server keeps a ~6-min snapshot only). Identity = my Farcaster name/pfp.
+  const [broadcast, setBroadcast] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("nexus_broadcast") === "1");
   const [withdrawAmt, setWithdrawAmt] = useState(20);
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawMsg, setWithdrawMsg] = useState<TradeMsg>(null);
@@ -338,11 +341,37 @@ export default function MiniApp() {
       setAcct({ free: Number(data.free_collateral ?? 0), total: Number(data.total_collateral_value ?? 0) });
       const rows = (Array.isArray(data.rows) ? data.rows : []).filter((p: PosRow) => Math.abs(Number(p.position_qty)) > 0);
       setPositions(rows);
+      if (broadcast) publishLive(rows, s); // keep the LIVE NOW snapshot fresh
     } catch (e) {
       setTradeMsg({ ok: false, text: (e as Error)?.message || "couldn't load account" });
     } finally {
       setStatusBusy(false);
     }
+  }
+
+  // Publish (or clear) my open positions to the public LIVE NOW feed. Fail-soft.
+  async function publishLive(rows: PosRow[], s: { addr: string; sig: string }) {
+    try {
+      await fetch(`${API}/live/publish`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          walletAddress: s.addr, walletSig: s.sig,
+          positions: rows.map((p) => ({ symbol: p.symbol, direction: Number(p.position_qty) > 0 ? "LONG" : "SHORT", entry_price: p.average_open_price, qty: Math.abs(Number(p.position_qty)) })),
+          displayName: user?.displayName || user?.username || null,
+          pfpUrl: user?.pfpUrl || null,
+        }),
+      });
+    } catch { /* fail-soft */ }
+  }
+
+  async function toggleBroadcast() {
+    const next = !broadcast;
+    setBroadcast(next);
+    try { window.localStorage.setItem("nexus_broadcast", next ? "1" : "0"); } catch { /* ignore */ }
+    const s = sessionSig || await ensureSig().catch(() => null);
+    if (!s) return;
+    if (next) publishLive(positions ?? [], s);                  // start broadcasting
+    else await publishLive([], s);                              // opt-out → clears the snapshot
   }
 
   async function closePosition(symbol: string) {
@@ -609,6 +638,10 @@ export default function MiniApp() {
               {acct && <span style={{ fontSize: 10, color: "#5a8a6a" }}>free <b style={{ color: "#fff" }}>${acct.free.toFixed(2)}</b> · value <b style={{ color: "#fff" }}>${acct.total.toFixed(2)}</b></span>}
               <button onClick={() => refreshStatus()} disabled={statusBusy} style={{ marginLeft: "auto", background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 4, padding: "5px 11px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: statusBusy ? "wait" : "pointer", letterSpacing: "0.05em", opacity: statusBusy ? 0.6 : 1 }}>{statusBusy ? "…" : acct ? "↻ REFRESH" : "↻ LOAD"}</button>
             </div>
+            <button onClick={toggleBroadcast} style={{ display: "flex", alignItems: "center", gap: 6, background: broadcast ? "#0a2a0a" : "#0a0e0a", border: `1px solid ${broadcast ? "#1a4a2a" : "#1e2d1e"}`, borderRadius: 4, padding: "6px 9px", fontFamily: mono, fontSize: 9, cursor: "pointer", color: broadcast ? green : "#5a8a6a", textAlign: "left" }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: broadcast ? green : "#2a4a3a", boxShadow: broadcast ? `0 0 6px ${green}` : "none", flexShrink: 0 }} />
+              📡 {broadcast ? "BROADCASTING to LIVE NOW — your open positions are public" : "Broadcast my positions to the public LIVE NOW feed"}
+            </button>
             {positions && positions.length === 0 && <div style={{ fontSize: 10, color: "#3a6a4a" }}>no open positions.</div>}
             {positions && positions.map((p) => {
               const qty = Number(p.position_qty);

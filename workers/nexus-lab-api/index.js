@@ -3174,37 +3174,87 @@ document.getElementById("btn").addEventListener("click",go);
     // Ranks by a risk-adjusted score (win rate + capped profit factor, shrunk by
     // sample size) so it reflects STRATEGY quality, not deposit size or a lucky
     // small sample. Live trades only (paper never reaches Supabase).
-    // ── /agents/live — currently-OPEN autonomous agent positions (live feed) ──
-    // Powers the "LIVE NOW" surface (Legend-style live positions, but verifiable):
-    // real (non-paper) positions agents hold RIGHT NOW, with live uPnL from public
-    // mark price. Pure read of existing KV (agent:users + agent:state) — no keys, no
-    // privacy surface (autonomous agents trade publicly by design). Cold-start fix.
+    // ── POST /live/publish — a human OPTS IN to broadcast their OPEN positions ──
+    // We can't read a user's positions server-side (their Orderly key is private),
+    // so the client publishes a snapshot. EPHEMERAL by design: stored with a ~6-min
+    // TTL, so it self-expires the moment they stop refreshing — we retain nothing.
+    // Auth = ecrecover of sign_message('nexus-trading-key-v1') === wallet. uPnL is
+    // recomputed from PUBLIC mark price in /agents/live (we never trust client PnL).
+    // Identity (name/pfp) is the user's own already-public profile data. Empty
+    // positions → opt-out (delete the key).
+    if (parts[0] === "live" && parts[1] === "publish" && request.method === "POST") {
+      let body; try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const { walletAddress, walletSig, positions, displayName, pfpUrl } = body || {};
+      if (!walletAddress || !walletSig) return json({ error: "walletAddress + walletSig required" }, request, 401);
+      const addr = String(walletAddress).toLowerCase();
+      if (recoverEthAddress("nexus-trading-key-v1", walletSig) !== addr) return json({ error: "bad signature" }, request, 401);
+      const KV = env.NEXUS_AGENT || env.LAB_STORE;
+      const clean = (Array.isArray(positions) ? positions : [])
+        .filter((p) => p && p.symbol && Number(p.entry_price) > 0 && Number(p.qty) > 0 && (p.direction === "LONG" || p.direction === "SHORT"))
+        .slice(0, 20)
+        .map((p) => ({ symbol: String(p.symbol), direction: p.direction, entry_price: Number(p.entry_price), qty: Math.abs(Number(p.qty)), opened_at: Number(p.opened_at) || null }));
+      if (!clean.length) { await KV.delete(`live:human:${addr}`); return json({ ok: true, cleared: true }, request); }
+      await KV.put(`live:human:${addr}`, JSON.stringify({
+        positions: clean,
+        displayName: displayName ? String(displayName).slice(0, 40) : null,
+        pfpUrl: pfpUrl ? String(pfpUrl).slice(0, 300) : null,
+      }), { expirationTtl: 360 }); // self-expiring — nothing retained
+      return json({ ok: true, count: clean.length }, request);
+    }
+
+    // ── /agents/live — LIVE NOW feed: currently-OPEN positions (agents + opted-in ──
+    // humans), with uPnL recomputed from PUBLIC mark price. Agents come from
+    // agent:state (real, non-paper); humans from their ephemeral live:human snapshot.
+    // Pure public read. Verifiable — the PnL is derived from public price, not claimed.
     if (parts[0] === "agents" && parts[1] === "live") {
       if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
       const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+
+      // Agents: open, non-paper current_position per agent:users.
       const usersRaw = await AGENT_KV.get("agent:users");
       const users = usersRaw ? JSON.parse(usersRaw) : [];
-      const states = await Promise.all(users.map(async (w) => {
+      const agentStates = await Promise.all(users.map(async (w) => {
         const s = await AGENT_KV.get(`agent:state:${w}`);
         return { w, p: s ? (JSON.parse(s).current_position || null) : null };
       }));
-      const open = states.filter(({ p }) => p && !p.paper && p.symbol && p.entry_price && p.qty);
-      // One public mark-price fetch per unique symbol.
+      const rows = [];
+      for (const { w, p } of agentStates) {
+        if (p && !p.paper && p.symbol && p.entry_price && p.qty) {
+          rows.push({ wallet: w, agent: true, displayName: null, pfpUrl: null, symbol: p.symbol, direction: p.direction, entry_price: Number(p.entry_price), qty: Number(p.qty), opened_at: p.opened_at || null });
+        }
+      }
+
+      // Humans: ephemeral opted-in snapshots (live:human:*), still within TTL.
+      try {
+        const list = await AGENT_KV.list({ prefix: "live:human:", limit: 1000 });
+        const snaps = await Promise.all(list.keys.map(async (k) => {
+          const raw = await AGENT_KV.get(k.name);
+          return raw ? { wallet: k.name.slice("live:human:".length), ...JSON.parse(raw) } : null;
+        }));
+        for (const sn of snaps) {
+          if (!sn) continue;
+          for (const p of sn.positions || []) {
+            rows.push({ wallet: sn.wallet, agent: false, displayName: sn.displayName || null, pfpUrl: sn.pfpUrl || null, symbol: p.symbol, direction: p.direction, entry_price: Number(p.entry_price), qty: Number(p.qty), opened_at: p.opened_at || null });
+          }
+        }
+      } catch (e) { console.error("[live] human snapshot list error:", e); }
+
+      // One public mark-price fetch per unique symbol → recompute uPnL.
       const markBy = {};
-      await Promise.all([...new Set(open.map(({ p }) => p.symbol))].map(async (sym) => {
+      await Promise.all([...new Set(rows.map((r) => r.symbol))].map(async (sym) => {
         try { markBy[sym] = Number((await (await fetch(`https://api-evm.orderly.org/v1/public/futures/${sym}`)).json())?.data?.mark_price) || null; }
         catch { markBy[sym] = null; }
       }));
-      const positions = open.map(({ w, p }) => {
-        const mark = markBy[p.symbol], entry = Number(p.entry_price), qty = Number(p.qty);
-        const long = p.direction === "LONG";
-        const move = mark ? (long ? mark - entry : entry - mark) : null;
+      const positions = rows.map((r) => {
+        const mark = markBy[r.symbol], entry = r.entry_price, qty = r.qty;
+        const move = mark ? (r.direction === "LONG" ? mark - entry : entry - mark) : null;
         return {
-          wallet: w, symbol: p.symbol, direction: p.direction, agent: true,
-          entry_price: entry, mark_price: mark, qty, notional: Number((entry * qty).toFixed(2)),
+          wallet: r.wallet, agent: r.agent, displayName: r.displayName, pfpUrl: r.pfpUrl,
+          symbol: r.symbol, direction: r.direction, entry_price: entry, mark_price: mark, qty,
+          notional: Number((entry * qty).toFixed(2)),
           unrealized_pnl: move != null ? Number((move * qty).toFixed(2)) : null,
           unrealized_pnl_pct: move != null ? Number(((move / entry) * 100).toFixed(2)) : null,
-          opened_at: p.opened_at || null,
+          opened_at: r.opened_at,
         };
       }).sort((a, b) => (b.opened_at || 0) - (a.opened_at || 0));
       return json({ count: positions.length, positions }, request);

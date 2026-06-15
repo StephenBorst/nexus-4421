@@ -12,6 +12,9 @@ const red = "#ff4444";
 
 type LivePos = {
   wallet: string;
+  agent: boolean;
+  displayName: string | null;
+  pfpUrl: string | null;
   symbol: string;
   direction: "LONG" | "SHORT";
   entry_price: number;
@@ -57,7 +60,7 @@ export default function LiveNow() {
           ◆ LIVE NOW
         </span>
         <span style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>
-          {positions.length} agent position{positions.length !== 1 ? "s" : ""} open · real, graded on-chain
+          {positions.length} position{positions.length !== 1 ? "s" : ""} open · live PnL from public price
         </span>
         <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: green, boxShadow: `0 0 6px ${green}` }} />
@@ -83,14 +86,16 @@ export default function LiveNow() {
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: 13, fontWeight: "bold", color: "#fff" }}>{tk(p.symbol)}</span>
                 <span style={{ fontSize: 9, color: long ? green : red }}>{long ? "↑ LONG" : "↓ SHORT"}</span>
-                <span style={{ marginLeft: "auto", fontSize: 8, color: "#4a9fff", border: "1px solid #1a3a5a", borderRadius: 3, padding: "0 4px" }}>🤖</span>
+                <span style={{ marginLeft: "auto", fontSize: 8, color: p.agent ? "#4a9fff" : "#00ff88", border: `1px solid ${p.agent ? "#1a3a5a" : "#1a4a2a"}`, borderRadius: 3, padding: "0 4px" }}>{p.agent ? "🤖" : "👤"}</span>
               </div>
               <div style={{ fontSize: 15, fontWeight: "bold", color: pnlColor, marginTop: 5 }}>
                 {pct == null ? "—" : `${up ? "+" : ""}${pct.toFixed(2)}%`}
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
-                <span style={{ fontSize: 8, color: "#3a5a4a" }}>{shortAddr(p.wallet)}</span>
-                <span style={{ fontSize: 8, color: "#3a5a4a" }}>{ago(p.opened_at)} ago</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 3, gap: 4 }}>
+                <span style={{ fontSize: 8, color: "#3a5a4a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {p.agent ? "Nexus Agent" : (p.displayName || shortAddr(p.wallet))}
+                </span>
+                <span style={{ fontSize: 8, color: "#3a5a4a", flexShrink: 0 }}>{ago(p.opened_at)} ago</span>
               </div>
             </div>
           );
