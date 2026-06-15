@@ -13,7 +13,7 @@
 
 import * as ed from "@noble/ed25519";
 import bs58 from "bs58";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus, volScaledLevels } from "./logic.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const COOLDOWN_MS = 15 * 60 * 1000; // 15 min between trades
@@ -23,7 +23,12 @@ const COOLDOWN_MS = 15 * 60 * 1000; // 15 min between trades
 // heartbeat instead of looking abandoned (cold-start fix). Records are written
 // per-user to agent:feed:{address} (single-writer: only this user's processUser
 // touches its own key, so no cross-user race). lab-api's /feed merges them.
-const PUBLISH_AGENT_FEED = true;
+// ⚠️ OFF while the strategy's edge is being re-validated (net-negative right now).
+// Broadcasting a losing beta to the public feed actively undermines the "makes you
+// a better trader" brand. The agent's OWNER still sees full truth on their dash;
+// this only stops PUBLIC marketing of unproven trades. Re-enable (true) once the
+// agent is net-positive in PAPER — ideally gate it to net-positive agents then.
+const PUBLISH_AGENT_FEED = false;
 // Keep simulated PAPER trades OUT of the public feed — the feed is the "these are
 // real calls" surface and mixing sims (even labeled) dilutes the trust moat.
 const PUBLISH_PAPER_TO_FEED = false;
@@ -373,6 +378,18 @@ async function enterPosition(address, state, config, signal, env, cache) {
     orderId = order.data?.order_id;
   }
 
+  // Effective TP/SL — fixed config %, or volatility-scaled to recent ATR (opt-in
+  // config.volScaledStops). Resolved per-entry + stored on the position so the
+  // monitor exits on THESE levels, not the flat config %. Computed for paper too,
+  // so PAPER validates the exact behavior before anyone goes live with it.
+  let effTp = config.tpPercent, effSl = config.slPercent;
+  if (config.volScaledStops) {
+    const atrPct = await fetchAtrPct(symbol, env);
+    const lv = volScaledLevels(atrPct, config);
+    effTp = lv.tpPercent; effSl = lv.slPercent;
+    console.log(`[exec] ${address.slice(0, 10)} volScaledStops atr%=${atrPct == null ? "n/a" : atrPct.toFixed(2)} → tp=${effTp} sl=${effSl}`);
+  }
+
   // Update state
   state.current_position = {
     symbol,
@@ -384,6 +401,8 @@ async function enterPosition(address, state, config, signal, env, cache) {
     opened_at: Date.now(),
     order_id: orderId,
     paper,
+    tpPercent: effTp,
+    slPercent: effSl,
   };
   state.last_trade_time = Date.now();
   state.trades_today = (state.trades_today || 0) + 1;
@@ -402,6 +421,27 @@ async function enterPosition(address, state, config, signal, env, cache) {
   await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
 
   console.log(`[exec] ${address.slice(0, 10)} ${paper ? "PAPER " : ""}ENTER ${signal.direction} ${symbol} @ ${markPrice} qty=${qty}`);
+}
+
+// ATR as a % of price from recent 1h candles (public /tv/history). Used to scale
+// the agent's stop to each symbol's real volatility (opt-in volScaledStops).
+async function fetchAtrPct(symbol, env, periods = 14) {
+  try {
+    const now = Math.floor(Date.now() / 1000);
+    const from = now - (periods + 5) * 3600;
+    const r = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${symbol}&resolution=60&from=${from}&to=${now}`);
+    const d = await r.json();
+    if (!d || d.s !== "ok" || !Array.isArray(d.t) || d.t.length < 3) return null;
+    const { h: H, l: L, c: C, t } = d;
+    const n = t.length;
+    let trSum = 0, cnt = 0;
+    for (let i = Math.max(1, n - periods); i < n; i++) {
+      const tr = Math.max(H[i] - L[i], Math.abs(H[i] - C[i - 1]), Math.abs(L[i] - C[i - 1]));
+      if (Number.isFinite(tr)) { trSum += tr; cnt++; }
+    }
+    const lastClose = C[n - 1];
+    return cnt && lastClose > 0 ? (trSum / cnt / lastClose) * 100 : null;
+  } catch { return null; }
 }
 
 async function monitorPosition(address, state, config, env, cache) {
@@ -445,8 +485,14 @@ async function monitorPosition(address, state, config, env, cache) {
   pos.current_price = currentPrice;
   pos.pnl_percent = pnlPct;
 
-  // Exit decision: TP → SL → timeout (tested in logic.mjs)
-  const reason = exitReason(pnlPct, Date.now() - pos.opened_at, config);
+  // Exit decision: TP → SL → timeout (tested in logic.mjs). Prefer the per-position
+  // levels resolved at entry (vol-scaled) over the flat config, falling back to
+  // config for positions opened before this field existed.
+  const reason = exitReason(pnlPct, Date.now() - pos.opened_at, {
+    tpPercent: pos.tpPercent ?? config.tpPercent,
+    slPercent: pos.slPercent ?? config.slPercent,
+    maxHoldHours: config.maxHoldHours,
+  });
   if (reason) {
     await closePosition(address, state, env, reason, cache);
     return;

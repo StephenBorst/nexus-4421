@@ -697,6 +697,27 @@ export function AgentView() {
           </div>
 
           <div style={agentCardStyle}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <div>
+                <div style={agentLabelStyle}>// VOLATILITY-SCALED STOPS</div>
+                <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 6, color: "#3a6a4a", letterSpacing: 0 }}>
+                  Sizes TP/SL to each symbol&apos;s recent ATR instead of a flat % — so a high-vol coin (SOL) isn&apos;t
+                  noise-stopped and a calm one isn&apos;t over-given. Keeps your R:R ratio. Test in PAPER first.
+                </div>
+              </div>
+              <button onClick={() => setConfig({ ...config, volScaledStops: !config.volScaledStops })}
+                style={{
+                  flexShrink: 0, cursor: "pointer", fontFamily: "monospace", fontSize: 11, borderRadius: 4, padding: "6px 16px",
+                  background: config.volScaledStops ? "#00ff8815" : "#0a0e0a",
+                  border: `1px solid ${config.volScaledStops ? "#00ff88" : "#1e2d1e"}`,
+                  color: config.volScaledStops ? "#00ff88" : "#4a7a5a",
+                }}>
+                {config.volScaledStops ? "ON" : "OFF"}
+              </button>
+            </div>
+          </div>
+
+          <div style={agentCardStyle}>
             <div style={agentLabelStyle}>// WATCHLIST — SELECT SYMBOLS</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
               {AVAILABLE_SYMBOLS.map((sym) => {

@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-agent-exec/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus, volScaledLevels } from "./logic.mjs";
 
 // ─── snapQty ───────────────────────────────────────────────
 test("snapQty: snaps cleanly to base_tick (no float artifacts)", () => {
@@ -124,4 +124,27 @@ test("agentCloseStatus: maps exit reason → feed status", () => {
   assert.equal(agentCloseStatus("SL"), "STOPPED_OUT");
   assert.equal(agentCloseStatus("TIMEOUT"), "CLOSED");
   assert.equal(agentCloseStatus("KILLED"), "CLOSED");
+});
+
+// ── volScaledLevels (ATR-scaled stops) ──────────────────────────────────────
+test("volScaledLevels: invalid/zero ATR → falls back to fixed config", () => {
+  const cfg = { tpPercent: 1.5, slPercent: 0.75 };
+  assert.deepEqual(volScaledLevels(null, cfg), { slPercent: 0.75, tpPercent: 1.5 });
+  assert.deepEqual(volScaledLevels(0, cfg), { slPercent: 0.75, tpPercent: 1.5 });
+});
+test("volScaledLevels: scales SL to ATR and preserves R:R", () => {
+  const cfg = { tpPercent: 1.5, slPercent: 0.75 }; // RR = 2
+  const lv = volScaledLevels(1.2, cfg); // 1.2% ATR, slMult 1 → SL 1.2, TP 2.4
+  assert.equal(lv.slPercent, 1.2);
+  assert.equal(lv.tpPercent, 2.4);
+  assert.equal(lv.tpPercent / lv.slPercent, 2); // RR preserved
+});
+test("volScaledLevels: clamps SL to [0.3, 3.0]", () => {
+  const cfg = { tpPercent: 1.5, slPercent: 0.75 };
+  assert.equal(volScaledLevels(0.05, cfg).slPercent, 0.3);  // tiny ATR floored
+  assert.equal(volScaledLevels(9, cfg).slPercent, 3.0);     // huge ATR capped
+});
+test("volScaledLevels: slAtrMult widens the stop", () => {
+  const cfg = { tpPercent: 1.5, slPercent: 0.75, slAtrMult: 1.5 };
+  assert.equal(volScaledLevels(1.0, cfg).slPercent, 1.5); // 1.0 ATR × 1.5
 });

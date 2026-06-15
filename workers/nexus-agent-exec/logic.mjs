@@ -97,3 +97,26 @@ export function agentCloseStatus(reason) {
   if (reason === "SL") return "STOPPED_OUT";
   return "CLOSED";
 }
+
+/**
+ * Volatility-scaled TP/SL (opt-in via config.volScaledStops). FIXED-% stops are
+ * the core leak: 0.75% noise-stops a high-vol symbol (SOL) but over-gives on a
+ * calm one — so the same setting is wrong for every symbol. Scaling the stop to
+ * each symbol's recent ATR makes risk proportional to how much it actually moves,
+ * while PRESERVING the configured reward:risk ratio. atrPct = ATR as a % of price.
+ * Falls back to the fixed config when atrPct is missing/invalid. Clamped to sane
+ * bounds so a vol spike can't set an absurd stop.
+ */
+export function volScaledLevels(atrPct, config) {
+  const baseSl = Number(config?.slPercent) || 0.75;
+  const baseTp = Number(config?.tpPercent) || 1.5;
+  const rr = baseSl > 0 ? baseTp / baseSl : 2;
+  if (!Number.isFinite(atrPct) || atrPct <= 0) return { slPercent: baseSl, tpPercent: baseTp };
+  const slMult = Number(config?.slAtrMult) > 0 ? Number(config.slAtrMult) : 1.0; // stop = slMult × ATR
+  const MIN_SL = 0.3, MAX_SL = 3.0;
+  const slPercent = Math.min(MAX_SL, Math.max(MIN_SL, atrPct * slMult));
+  return {
+    slPercent: Math.round(slPercent * 100) / 100,
+    tpPercent: Math.round(slPercent * rr * 100) / 100,
+  };
+}
