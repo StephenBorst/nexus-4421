@@ -151,6 +151,47 @@ async function agentSecretFromWalletSig(walletSig) {
   return bs58Encode(seedBytes);
 }
 
+// Grade every PUBLIC thesis call against public price (first-touch TP-vs-SL via
+// gradeCall in logic.mjs) and aggregate per wallet → { wallet: {calls,wins,rSum} }.
+// Shared by the human-caller leaderboard AND Desk scoring so the two never drift.
+// PENDING/INVALID are excluded from the record (same rule as the board).
+async function computeCallerStats(env, maxHorizonS = 30 * 86400) {
+  const listed = await env.LAB_STORE.list({ prefix: "lab:" });
+  const calls = [];
+  for (const key of listed.keys) {
+    const raw = await env.LAB_STORE.get(key.name);
+    if (!raw) continue;
+    let data; try { data = JSON.parse(raw); } catch { continue; }
+    const wallet = key.name.replace("lab:", "");
+    for (const t of (data.theses || [])) {
+      if (t.isPublic && t.symbol && t.createdAt) calls.push({ wallet, t });
+    }
+  }
+  const now = Math.floor(Date.now() / 1000);
+  const symFrom = {};
+  for (const { t } of calls) {
+    const start = Math.floor((t.createdAt || Date.now()) / 1000);
+    symFrom[t.symbol] = Math.min(symFrom[t.symbol] ?? start, start);
+  }
+  const history = {};
+  await Promise.all(Object.entries(symFrom).map(async ([sym, fromS]) => {
+    try {
+      const from = Math.max(fromS - 3600, now - maxHorizonS);
+      const r = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${sym}&resolution=60&from=${from}&to=${now}`);
+      const d = await r.json();
+      if (d && d.s === "ok" && Array.isArray(d.t)) history[sym] = { t: d.t, h: d.h, l: d.l };
+    } catch (e) { console.error("[caller-stats] history fetch", sym, e.message); }
+  }));
+  const byWallet = {};
+  for (const { wallet, t } of calls) {
+    const g = gradeCall(t, history[t.symbol]);
+    if (g.outcome === "PENDING" || g.outcome === "INVALID") continue;
+    const a = byWallet[wallet] || (byWallet[wallet] = { calls: 0, wins: 0, rSum: 0 });
+    a.calls += 1; if (g.outcome === "WIN") a.wins += 1; a.rSum += g.r;
+  }
+  return byWallet;
+}
+
 // ── Nexus PRO gate (server-side, source of truth) ─────────────────────────────
 // PRO agent strategies (MOMENTUM, MEAN_REVERSION) require Nexus PRO. PRO resolves
 // two ways: (1) an active paid subscription record (sub:{addr} — paid rail, when
@@ -3260,6 +3301,99 @@ document.getElementById("btn").addEventListener("click",go);
       return json({ count: positions.length, positions }, request);
     }
 
+    // ── /desks — team layer ("clans") ranked by aggregate TRUSTLESS call score ──
+    // A Desk groups wallets; its rank = the COMBINED graded-call record of its
+    // members (same public-price grading as the caller leaderboard, via the shared
+    // computeCallerStats). One desk per wallet. Mutations require walletSig
+    // ownership. Identity = members' already-public wallets/profiles — no new PII.
+    if (parts[0] === "desks") {
+      const KV = env.LAB_STORE;
+      const ownsWallet = (sig, addr) => typeof sig === "string" && recoverEthAddress("nexus-trading-key-v1", sig) === addr;
+      const slugify = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
+
+      // POST /desks — create (creator = first member)
+      if (request.method === "POST" && !parts[1]) {
+        let body; try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        const { name, walletAddress, walletSig } = body || {};
+        const addr = String(walletAddress || "").toLowerCase();
+        if (!name || !addr || !ownsWallet(walletSig, addr)) return json({ error: "name + walletAddress + valid walletSig required" }, request, 401);
+        const existing = await KV.get(`desk:mem:${addr}`);
+        if (existing) return json({ error: "already_in_desk", deskId: existing, hint: "Leave your current desk first." }, request, 409);
+        const base = slugify(name) || `desk-${Date.now().toString(36)}`;
+        let id = base, n = 1;
+        while (await KV.get(`desk:rec:${id}`)) id = `${base}-${++n}`;
+        const desk = { id, name: String(name).slice(0, 40), owner: addr, members: [addr], createdAt: Date.now() };
+        await KV.put(`desk:rec:${id}`, JSON.stringify(desk));
+        await KV.put(`desk:mem:${addr}`, id);
+        return json({ ok: true, desk }, request);
+      }
+
+      // POST /desks/:id/join | /leave
+      if (request.method === "POST" && parts[1] && (parts[2] === "join" || parts[2] === "leave")) {
+        const id = parts[1];
+        let body; try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        const addr = String(body?.walletAddress || "").toLowerCase();
+        if (!addr || !ownsWallet(body?.walletSig, addr)) return json({ error: "walletAddress + valid walletSig required" }, request, 401);
+        const raw = await KV.get(`desk:rec:${id}`);
+        if (!raw) return json({ error: "desk_not_found" }, request, 404);
+        const desk = JSON.parse(raw);
+        if (parts[2] === "join") {
+          const existing = await KV.get(`desk:mem:${addr}`);
+          if (existing) return json({ error: "already_in_desk", deskId: existing }, request, 409);
+          if (!desk.members.includes(addr)) desk.members.push(addr);
+          await KV.put(`desk:rec:${id}`, JSON.stringify(desk));
+          await KV.put(`desk:mem:${addr}`, id);
+          return json({ ok: true, desk }, request);
+        }
+        // leave — disband if empty; transfer ownership if the owner leaves
+        desk.members = desk.members.filter((m) => m !== addr);
+        await KV.delete(`desk:mem:${addr}`);
+        if (desk.members.length === 0) { await KV.delete(`desk:rec:${id}`); return json({ ok: true, disbanded: true }, request); }
+        if (desk.owner === addr) desk.owner = desk.members[0];
+        await KV.put(`desk:rec:${id}`, JSON.stringify(desk));
+        return json({ ok: true, desk }, request);
+      }
+
+      // GET /desks/:id — detail (members + per-member graded stats)
+      if (request.method === "GET" && parts[1]) {
+        const raw = await KV.get(`desk:rec:${parts[1]}`);
+        if (!raw) return json({ error: "desk_not_found" }, request, 404);
+        const d = JSON.parse(raw);
+        const stats = await computeCallerStats(env);
+        const memberStats = await Promise.all(d.members.map(async (m) => {
+          const a = stats[m] || { calls: 0, wins: 0, rSum: 0 };
+          const profileRaw = await KV.get(`profile:${m}`);
+          const p = profileRaw ? JSON.parse(profileRaw) : {};
+          return { wallet: m, displayName: p.displayName || null, pfp: p.pfp || null, calls: a.calls, hitRate: a.calls ? Math.round((a.wins / a.calls) * 1000) / 10 : 0, totalR: Math.round(a.rSum * 100) / 100 };
+        }));
+        return json({ desk: { ...d, memberStats } }, request);
+      }
+
+      // GET /desks — ranked desk leaderboard
+      if (request.method === "GET" && !parts[1]) {
+        const MIN_CALLS = 5, FULL_CONF = 30;
+        const stats = await computeCallerStats(env);
+        const listed = await KV.list({ prefix: "desk:rec:" });
+        const desks = [];
+        for (const k of listed.keys) {
+          const raw = await KV.get(k.name);
+          if (!raw) continue;
+          const d = JSON.parse(raw);
+          let calls = 0, wins = 0, rSum = 0;
+          for (const m of d.members) { const a = stats[m]; if (a) { calls += a.calls; wins += a.wins; rSum += a.rSum; } }
+          const hitRate = calls ? wins / calls : 0, avgR = calls ? rSum / calls : 0;
+          const rScore = Math.max(0, Math.min(avgR, 3)) / 3, conf = Math.min(1, calls / FULL_CONF);
+          const score = calls >= MIN_CALLS && avgR > 0 ? Math.round((0.5 * hitRate + 0.5 * rScore) * conf * 1000) / 10 : 0;
+          desks.push({ id: d.id, name: d.name, members: d.members.length, owner: d.owner, calls, hitRate: Math.round(hitRate * 1000) / 10, avgR: Math.round(avgR * 100) / 100, totalR: Math.round(rSum * 100) / 100, score });
+        }
+        desks.sort((a, b) => b.score - a.score || b.totalR - a.totalR || b.members - a.members);
+        desks.forEach((d, i) => { d.rank = i + 1; });
+        return json({ desks }, request);
+      }
+
+      return json({ error: "not found" }, request, 404);
+    }
+
     if (parts[0] === "agents" && parts[1] === "leaderboard") {
       if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
       const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
@@ -3432,45 +3566,8 @@ document.getElementById("btn").addEventListener("click",go);
 
       const MIN_CALLS = 5, FULL_CONF = 20, TOP_N = 25, MAX_HORIZON_S = 30 * 86400;
 
-      // First-touch grade against 1h candles (tested in logic.mjs).
-      // Gather all public theses across wallets.
-      const listed = await env.LAB_STORE.list({ prefix: "lab:" });
-      const calls = [];
-      for (const key of listed.keys) {
-        const raw = await env.LAB_STORE.get(key.name);
-        if (!raw) continue;
-        const data = JSON.parse(raw);
-        const wallet = key.name.replace("lab:", "");
-        for (const t of (data.theses || [])) {
-          if (t.isPublic && t.symbol && t.createdAt) calls.push({ wallet, t });
-        }
-      }
-
-      // One public-history pull per symbol (covers all that symbol's calls).
-      const now = Math.floor(Date.now() / 1000);
-      const symFrom = {};
-      for (const { t } of calls) {
-        const start = Math.floor((t.createdAt || Date.now()) / 1000);
-        symFrom[t.symbol] = Math.min(symFrom[t.symbol] ?? start, start);
-      }
-      const history = {};
-      await Promise.all(Object.entries(symFrom).map(async ([sym, fromS]) => {
-        try {
-          const from = Math.max(fromS - 3600, now - MAX_HORIZON_S);
-          const r = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${sym}&resolution=60&from=${from}&to=${now}`);
-          const d = await r.json();
-          if (d && d.s === "ok" && Array.isArray(d.t)) history[sym] = { t: d.t, h: d.h, l: d.l };
-        } catch (e) { console.error("[theses-lb] history fetch", sym, e.message); }
-      }));
-
-      // Grade + aggregate per wallet (PENDING/INVALID excluded from the record).
-      const byWallet = {};
-      for (const { wallet, t } of calls) {
-        const g = gradeCall(t, history[t.symbol]);
-        if (g.outcome === "PENDING" || g.outcome === "INVALID") continue;
-        const a = byWallet[wallet] || (byWallet[wallet] = { calls: 0, wins: 0, rSum: 0 });
-        a.calls += 1; if (g.outcome === "WIN") a.wins += 1; a.rSum += g.r;
-      }
+      // First-touch grade per wallet (shared helper — same source as Desk scoring).
+      const byWallet = await computeCallerStats(env, MAX_HORIZON_S);
 
       const eligible = [];
       for (const [wallet, a] of Object.entries(byWallet)) {

@@ -19,6 +19,7 @@ import type { ThesisTrade } from "@/pages/lab/types";
 import CommentsPanel from "@/components/CommentsPanel";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import LiveNow from "./LiveNow";
+import Desks from "./Desks";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 
@@ -1545,6 +1546,7 @@ export default function FeedPage() {
             {!loading && !error && (
               <LeaderboardView feed={feed} walletAddress={walletAddress} onCopy={setCopyTarget} />
             )}
+            {!loading && !error && <Desks walletAddress={walletAddress} />}
           </>
         )}
 
