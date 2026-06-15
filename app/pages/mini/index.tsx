@@ -115,6 +115,8 @@ export default function MiniApp() {
   const [withdrawMsg, setWithdrawMsg] = useState<TradeMsg>(null);
   const [mkt, setMkt] = useState<Mkt | null>(null);
   const [candles, setCandles] = useState<number[] | null>(null);
+  const [fundsOpen, setFundsOpen] = useState(false);
+  const [prefillSide, setPrefillSide] = useState<"LONG" | "SHORT" | null>(null);
 
   // A smart-contract wallet (code at the address) can't be registered with Orderly
   // via ECDSA ecrecover → "address and signature do not match". Detect on Base+Arbitrum.
@@ -206,6 +208,17 @@ export default function MiniApp() {
     const iv = setInterval(loadStats, 25000);
     return () => { cancelled = true; clearInterval(iv); };
   }, [sym]);
+
+  // Copy-trade loop: tap a feed call → open the trade panel pre-set to that asset +
+  // direction. The matching LONG/SHORT button is highlighted; user sets size & confirms.
+  function tradeThis(t: Thesis) {
+    setSym(tk(t.symbol));
+    setTradeOpen(true);
+    setPrefillSide(t.direction);
+    setTradeMsg({ ok: true, text: `${tk(t.symbol)} ${t.direction} staged — set size, then tap ${t.direction}.` });
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(() => setPrefillSide((s) => (s === t.direction ? null : s)), 6000);
+  }
 
   async function buyNexus() {
     if (buying) return;
@@ -575,14 +588,19 @@ export default function MiniApp() {
             <div>
               <div style={{ fontSize: 8, color: "#3a6a4a", letterSpacing: "0.1em" }}>LEVERAGE — {lev}x</div>
               <input type="range" min={1} max={20} step={1} value={lev} onChange={(e) => setLev(parseInt(e.target.value, 10))} style={{ width: "100%", marginTop: 12 }} />
+              <div style={{ display: "flex", gap: 5, marginTop: 6 }}>
+                {[2, 5, 10, 20].map((p) => (
+                  <button key={p} onClick={() => setLev(p)} style={{ flex: 1, background: lev === p ? "#00ff8815" : "#0a0e0a", border: `1px solid ${lev === p ? "#00ff8860" : "#1e2d1e"}`, borderRadius: 3, padding: "4px 0", cursor: "pointer", color: lev === p ? green : "#4a7a5a", fontFamily: mono, fontSize: 10, fontWeight: "bold" }}>{p}x</button>
+                ))}
+              </div>
             </div>
           </div>
           <div style={{ fontSize: 9, color: "#5a8a6a" }}>notional <b style={{ color: "#fff" }}>${notional.toFixed(0)}</b> · margin <b style={{ color: "#fff" }}>${margin.toFixed(2)}</b>{minNotional ? <> · min <b style={{ color: "#fff" }}>${minNotional}</b></> : null}</div>
           {belowMin && <div style={{ fontSize: 9, color: "#fbbf24", lineHeight: 1.5 }}>↑ {sym} needs ≥ ${minNotional} notional. Raise SIZE to ${minNotional} (bump leverage if the margin doesn&apos;t fit your balance).</div>}
           {/* Long / Short */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <button onClick={() => placeTrade("LONG")} disabled={tradeBusy || notional <= 0 || belowMin} style={{ background: green, color: "#04130c", border: `1px solid ${green}`, borderRadius: 4, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: belowMin ? "not-allowed" : "pointer", letterSpacing: "0.06em", opacity: belowMin ? 0.4 : tradeBusy && confirmSide !== "LONG" ? 0.4 : 1 }}>{tradeBusy ? "…" : confirmSide === "LONG" ? "TAP TO CONFIRM ✓" : "↑ LONG"}</button>
-            <button onClick={() => placeTrade("SHORT")} disabled={tradeBusy || notional <= 0 || belowMin} style={{ background: red, color: "#fff", border: `1px solid ${red}`, borderRadius: 4, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: belowMin ? "not-allowed" : "pointer", letterSpacing: "0.06em", opacity: belowMin ? 0.4 : tradeBusy && confirmSide !== "SHORT" ? 0.4 : 1 }}>{tradeBusy ? "…" : confirmSide === "SHORT" ? "TAP TO CONFIRM ✓" : "↓ SHORT"}</button>
+            <button onClick={() => placeTrade("LONG")} disabled={tradeBusy || notional <= 0 || belowMin} style={{ background: green, color: "#04130c", border: `1px solid ${green}`, borderRadius: 4, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: belowMin ? "not-allowed" : "pointer", letterSpacing: "0.06em", opacity: belowMin ? 0.4 : tradeBusy && confirmSide !== "LONG" ? 0.4 : 1, boxShadow: prefillSide === "LONG" ? `0 0 0 2px ${green}` : "none" }}>{tradeBusy ? "…" : confirmSide === "LONG" ? "TAP TO CONFIRM ✓" : "↑ LONG"}</button>
+            <button onClick={() => placeTrade("SHORT")} disabled={tradeBusy || notional <= 0 || belowMin} style={{ background: red, color: "#fff", border: `1px solid ${red}`, borderRadius: 4, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: belowMin ? "not-allowed" : "pointer", letterSpacing: "0.06em", opacity: belowMin ? 0.4 : tradeBusy && confirmSide !== "SHORT" ? 0.4 : 1, boxShadow: prefillSide === "SHORT" ? `0 0 0 2px ${red}` : "none" }}>{tradeBusy ? "…" : confirmSide === "SHORT" ? "TAP TO CONFIRM ✓" : "↓ SHORT"}</button>
           </div>
           {tradeMsg && (
             <div style={{ fontSize: 10, color: tradeMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>
@@ -590,8 +608,16 @@ export default function MiniApp() {
             </div>
           )}
 
+          {/* Manage funds (progressive disclosure — keeps the default view chart + trade) */}
+          <button onClick={() => setFundsOpen((o) => !o)} style={{ borderTop: "1px solid #1a2e1a", paddingTop: 10, background: "none", border: "none", borderRadius: 0, color: "#5a8a6a", fontFamily: mono, fontSize: 9, fontWeight: "bold", letterSpacing: "0.1em", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 6 }}>
+            <span>⚙ MANAGE FUNDS</span>
+            {acct && <span style={{ color: "#3a6a4a", fontWeight: "normal" }}>· free ${acct.free.toFixed(2)}</span>}
+            <span style={{ marginLeft: "auto", color: "#3a6a4a" }}>{fundsOpen ? "▲" : "▼ deposit · withdraw"}</span>
+          </button>
+
+          {fundsOpen && (<>
           {/* Fund / deposit */}
-          <div style={{ borderTop: "1px solid #1a2e1a", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ fontSize: 8, color: "#3a6a4a", letterSpacing: "0.1em" }}>💰 FUND ACCOUNT (USDC · Arbitrum)</div>
             <div style={{ display: "flex", gap: 8 }}>
               <input type="number" inputMode="decimal" min={1} value={depositAmt} onChange={(e) => setDepositAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e5e7eb", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
@@ -612,6 +638,7 @@ export default function MiniApp() {
             </div>
             {withdrawMsg && <div style={{ fontSize: 10, color: withdrawMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{withdrawMsg.text}</div>}
           </div>
+          </>)}
 
           <div style={{ fontSize: 8, color: "#2a4a3a" }}>real orders on Orderly · signs to authorize · non-custodial</div>
         </div>
@@ -644,6 +671,7 @@ export default function MiniApp() {
               <span style={{ fontSize: 15, fontWeight: "bold", color: "#fff" }}>{tk(t.symbol)}</span>
               <span style={{ fontSize: 10, color: t.direction === "LONG" ? green : red }}>{t.direction === "LONG" ? "↑" : "↓"} {t.direction}</span>
               <span style={{ fontSize: 10, color: t.riskReward >= 2 ? green : "#fbbf24" }}>R:R 1:{t.riskReward?.toFixed?.(2) ?? "—"}</span>
+              <button onClick={() => tradeThis(t)} title="Trade this call" style={{ marginLeft: "auto", flexShrink: 0, background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 3, fontFamily: mono, fontSize: 9, fontWeight: "bold", padding: "3px 9px", cursor: "pointer", letterSpacing: "0.05em" }}>⚡ TRADE</button>
             </div>
           </div>
         );
