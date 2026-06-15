@@ -18,6 +18,7 @@ import { NexusMarket } from "@/components/NexusMarket";
 import type { ThesisTrade } from "@/pages/lab/types";
 import CommentsPanel from "@/components/CommentsPanel";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
+import LiveNow from "./LiveNow";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 
@@ -1490,6 +1491,9 @@ export default function FeedPage() {
       </div>
 
       <div style={{ padding: 16, maxWidth: 860, margin: "0 auto" }}>
+
+        {/* ◆ LIVE NOW — open autonomous agent positions (live, verifiable) */}
+        {view === "feed" && <LiveNow />}
 
         {/* ── FOLLOWING VIEW ── */}
         {view === "following" && (

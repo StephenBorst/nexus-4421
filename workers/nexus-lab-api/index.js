@@ -3174,6 +3174,42 @@ document.getElementById("btn").addEventListener("click",go);
     // Ranks by a risk-adjusted score (win rate + capped profit factor, shrunk by
     // sample size) so it reflects STRATEGY quality, not deposit size or a lucky
     // small sample. Live trades only (paper never reaches Supabase).
+    // ── /agents/live — currently-OPEN autonomous agent positions (live feed) ──
+    // Powers the "LIVE NOW" surface (Legend-style live positions, but verifiable):
+    // real (non-paper) positions agents hold RIGHT NOW, with live uPnL from public
+    // mark price. Pure read of existing KV (agent:users + agent:state) — no keys, no
+    // privacy surface (autonomous agents trade publicly by design). Cold-start fix.
+    if (parts[0] === "agents" && parts[1] === "live") {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+      const usersRaw = await AGENT_KV.get("agent:users");
+      const users = usersRaw ? JSON.parse(usersRaw) : [];
+      const states = await Promise.all(users.map(async (w) => {
+        const s = await AGENT_KV.get(`agent:state:${w}`);
+        return { w, p: s ? (JSON.parse(s).current_position || null) : null };
+      }));
+      const open = states.filter(({ p }) => p && !p.paper && p.symbol && p.entry_price && p.qty);
+      // One public mark-price fetch per unique symbol.
+      const markBy = {};
+      await Promise.all([...new Set(open.map(({ p }) => p.symbol))].map(async (sym) => {
+        try { markBy[sym] = Number((await (await fetch(`https://api-evm.orderly.org/v1/public/futures/${sym}`)).json())?.data?.mark_price) || null; }
+        catch { markBy[sym] = null; }
+      }));
+      const positions = open.map(({ w, p }) => {
+        const mark = markBy[p.symbol], entry = Number(p.entry_price), qty = Number(p.qty);
+        const long = p.direction === "LONG";
+        const move = mark ? (long ? mark - entry : entry - mark) : null;
+        return {
+          wallet: w, symbol: p.symbol, direction: p.direction, agent: true,
+          entry_price: entry, mark_price: mark, qty, notional: Number((entry * qty).toFixed(2)),
+          unrealized_pnl: move != null ? Number((move * qty).toFixed(2)) : null,
+          unrealized_pnl_pct: move != null ? Number(((move / entry) * 100).toFixed(2)) : null,
+          opened_at: p.opened_at || null,
+        };
+      }).sort((a, b) => (b.opened_at || 0) - (a.opened_at || 0));
+      return json({ count: positions.length, positions }, request);
+    }
+
     if (parts[0] === "agents" && parts[1] === "leaderboard") {
       if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
       const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
