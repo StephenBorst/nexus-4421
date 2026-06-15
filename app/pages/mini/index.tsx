@@ -283,6 +283,21 @@ export default function MiniApp() {
   async function shareThesis(t: Thesis) {
     try { await sdk.actions.composeCast({ text: `${tk(t.symbol)} ${t.direction} — ${t.displayName || shortAddr(t.wallet)}'s call on Nexus. graded on-chain, not vibes 🟢`, embeds: [`${APP}/feed/thesis/${t.wallet}/${t.id}`] }); } catch { /* ignore */ }
   }
+  // Share an open position to a cast — the PnL flex viral loop. Each cast embeds /mini
+  // so readers can one-tap into the same trade panel.
+  async function sharePosition(p: PosRow) {
+    const qty = Number(p.position_qty);
+    const entry = Number(p.average_open_price);
+    const mark = Number(p.mark_price);
+    const long = qty > 0;
+    const pnl = mark && entry ? (mark - entry) * qty : Number(p.unrealized_pnl);
+    const pct = entry > 0 && mark ? ((mark - entry) / entry) * 100 * (long ? 1 : -1) : 0;
+    const win = Number.isFinite(pnl) && pnl >= 0;
+    const move = `entry $${fmtPrice(entry)} → $${fmtPrice(mark)}`;
+    const pnlTxt = Number.isFinite(pnl) ? `${win ? "+" : ""}$${pnl.toFixed(2)} (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%)` : "";
+    const text = `${win ? "🟢" : "🔴"} ${tk(p.symbol)} ${long ? "LONG" : "SHORT"} ${pnlTxt} on Nexus\n\n${move}\n\nperps in-frame — verify, don't trust 👇`;
+    try { await sdk.actions.composeCast({ text, embeds: [`${APP}/mini`] }); } catch { /* ignore */ }
+  }
 
   // Deterministic EIP-191 sig → server derives the Orderly key. Cached per session
   // so balance/position reads + closes don't re-prompt a signature each time.
@@ -601,6 +616,7 @@ export default function MiniApp() {
                   <span style={{ fontSize: 9, color: long ? green : red, flexShrink: 0 }}>{long ? "↑ LONG" : "↓ SHORT"} {Math.abs(qty)}</span>
                   {mark > 0 && <span style={{ fontSize: 8, color: "#5a8a6a", flexShrink: 0 }}>@ {entry.toFixed(entry < 10 ? 4 : 2)}→{mark.toFixed(mark < 10 ? 4 : 2)}</span>}
                   <span style={{ fontSize: 9, color: !hasPnl ? "#5a8a6a" : pnl >= 0 ? green : red, marginLeft: "auto", flexShrink: 0 }}>{hasPnl ? `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : "—"}</span>
+                  <button onClick={() => sharePosition(p)} title="Share to cast" style={{ flexShrink: 0, background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 4, padding: "5px 9px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: "pointer" }}>↗</button>
                   <button onClick={() => closePosition(p.symbol)} disabled={closingSym === p.symbol} style={{ flexShrink: 0, background: "#1a0a0a", color: red, border: `1px solid ${red}55`, borderRadius: 4, padding: "5px 10px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: closingSym === p.symbol ? "wait" : "pointer", letterSpacing: "0.05em", opacity: closingSym === p.symbol ? 0.6 : 1 }}>{closingSym === p.symbol ? "…" : "CLOSE"}</button>
                 </div>
               );
