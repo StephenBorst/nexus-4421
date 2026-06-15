@@ -26,6 +26,12 @@
     <meta name="twitter:title" content="Nexus Trading Labs" />
     <meta name="twitter:description" content="Non-custodial Perpetual DEX on Arbitrum. Trade crypto, RWAs, and equities on-chain." />
     <meta name="twitter:image" content="https://nexustradinglabs.com/og.png" />
+
+    <!-- Farcaster Mini App embed — makes a cast of any Nexus link render a "Launch" button
+         into /mini. Crawler reads static HTML, so this lives here (not per-route JS). -->
+    <meta name="fc:miniapp" content='{"version":"1","imageUrl":"https://nexustradinglabs.com/og.png","button":{"title":"⚡ Trade Perps","action":{"type":"launch_miniapp","name":"Nexus Trading Labs","url":"https://trade.nexustradinglabs.com/mini","splashImageUrl":"https://trade.nexustradinglabs.com/favicon.webp","splashBackgroundColor":"#0a0e0a"}}}' />
+    <!-- Backward-compat alias for older clients that still read fc:frame/launch_frame. -->
+    <meta name="fc:frame" content='{"version":"1","imageUrl":"https://nexustradinglabs.com/og.png","button":{"title":"⚡ Trade Perps","action":{"type":"launch_frame","name":"Nexus Trading Labs","url":"https://trade.nexustradinglabs.com/mini","splashImageUrl":"https://trade.nexustradinglabs.com/favicon.webp","splashBackgroundColor":"#0a0e0a"}}}' />
   </head>
   <body>
     <div id="root"></div>
