@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller } from "./logic.mjs";
 
 // Recover the signer address from an EIP-191 personal_sign signature.
 function recoverEthAddress(message, sigHex) {
@@ -3584,6 +3584,7 @@ document.getElementById("btn").addEventListener("click",go);
           avgR: Math.round(avgR * 100) / 100,
           totalR: Math.round(a.rSum * 100) / 100,
           score,
+          meritRank: rankCaller(a), // earned identity rank (SIGNAL/SHARP/APEX) or null
         });
       }
       eligible.sort((x, y) => y.score - x.score || y.avgR - x.avgR);

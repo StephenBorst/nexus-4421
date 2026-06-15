@@ -20,6 +20,7 @@ import CommentsPanel from "@/components/CommentsPanel";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import LiveNow from "./LiveNow";
 import Desks from "./Desks";
+import WatchOnlyBanner from "./WatchOnlyBanner";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 
@@ -821,7 +822,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
   }, [board.length]);
 
   // Trustless call grades (public-price graded, on-chain anchored) keyed by wallet.
-  const [graded, setGraded] = useState<Map<string, { hitRate: number; avgR: number; calls: number; score: number }>>(new Map());
+  const [graded, setGraded] = useState<Map<string, { hitRate: number; avgR: number; calls: number; score: number; meritRank: { tier: string; title: string; glyph: string } | null }>>(new Map());
   const [emerging, setEmerging] = useState<Map<string, { calls: number; toQualify: number }>>(new Map());
   const [callLedger, setCallLedger] = useState<{ ledgerHash?: string; onChain?: { verified?: boolean; explorer?: string } | null } | null>(null);
   useEffect(() => {
@@ -831,9 +832,9 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
       fetch(`${API_BASE}/theses/ledger`).then((r) => r.json()).catch(() => null),
     ]).then(([lb, led]) => {
       if (cancel) return;
-      const m = new Map<string, { hitRate: number; avgR: number; calls: number; score: number }>();
+      const m = new Map<string, { hitRate: number; avgR: number; calls: number; score: number; meritRank: { tier: string; title: string; glyph: string } | null }>();
       for (const e of (lb?.leaderboard || [])) {
-        if (e.wallet) m.set(e.wallet.toLowerCase(), { hitRate: e.hitRate, avgR: e.avgR, calls: e.calls, score: e.score });
+        if (e.wallet) m.set(e.wallet.toLowerCase(), { hitRate: e.hitRate, avgR: e.avgR, calls: e.calls, score: e.score, meritRank: e.meritRank ?? null });
       }
       setGraded(m);
       const em = new Map<string, { calls: number; toQualify: number }>();
@@ -944,6 +945,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                 {/* Badge line — never clipped, wraps if needed */}
                 <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 2 }}>
                   {trader.graded && <span title="Calls graded from public price — trustless" style={{ fontSize: 8, color: "#00ff88", border: "1px solid #1a4a2a", borderRadius: 2, padding: "1px 4px", background: "#0a1a0e" }}>✓ VERIFIED</span>}
+                  {trader.graded?.meritRank && <span title={`${trader.graded.meritRank.title} — merit rank earned from your graded calls (not bought)`} style={{ fontSize: 8, color: "#04130c", fontWeight: "bold", border: "1px solid #00ff88", borderRadius: 2, padding: "1px 5px", background: "#00ff88", letterSpacing: "0.04em" }}>{trader.graded.meritRank.glyph} {trader.graded.meritRank.title.toUpperCase()}</span>}
                   {!trader.graded && emerging.has(trader.wallet.toLowerCase()) && (
                     <span title="Resolved public-price-graded calls — 5 needed to become a Verified Caller" style={{ fontSize: 8, color: "#fbbf24", border: "1px solid #4a3a00", borderRadius: 2, padding: "1px 4px", background: "#1a1206" }}>
                       ◆ EMERGING · {emerging.get(trader.wallet.toLowerCase())!.toQualify} to verify
@@ -1493,7 +1495,10 @@ export default function FeedPage() {
 
       <div style={{ padding: 16, maxWidth: 860, margin: "0 auto" }}>
 
-        {/* ◆ LIVE NOW — open autonomous agent positions (live, verifiable) */}
+        {/* 👁 Watch-only framing for disconnected visitors (cold-start friction) */}
+        {!walletAddress && <WatchOnlyBanner />}
+
+        {/* ◆ LIVE NOW — open positions (agents + opted-in humans, live & verifiable) */}
         {view === "feed" && <LiveNow />}
 
         {/* ── FOLLOWING VIEW ── */}

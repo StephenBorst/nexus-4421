@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-lab-api/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { gradeCall, resolveAiUpstream, bankrGatewayModel } from "./logic.mjs";
+import { gradeCall, resolveAiUpstream, bankrGatewayModel, rankCaller } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
 const series = (t0, bars) => ({
@@ -207,4 +207,25 @@ test("bankrGatewayModel maps tiers, is env-overridable, passes unknown ids throu
   assert.equal(bankrGatewayModel("claude-opus-4-8"), "claude-opus-4.8");
   assert.equal(bankrGatewayModel("claude-opus-4-8", { BANKR_MODEL_OPUS: "claude-opus-4.8-vertex" }), "claude-opus-4.8-vertex");
   assert.equal(bankrGatewayModel("something-else"), "something-else");
+});
+
+// ── rankCaller (merit identity ladder) ──────────────────────────────────────
+test("rankCaller: under 5 calls → unranked (null)", () => {
+  assert.equal(rankCaller({ calls: 4, wins: 4, rSum: 8 }), null);
+});
+test("rankCaller: net-negative R → unranked even with volume", () => {
+  assert.equal(rankCaller({ calls: 40, wins: 10, rSum: -5 }), null);
+});
+test("rankCaller: 5+ calls net-positive → SIGNAL", () => {
+  assert.equal(rankCaller({ calls: 6, wins: 3, rSum: 1.2 }).tier, "SIGNAL");
+});
+test("rankCaller: 15+ / 50% / avgR>=0.5 → SHARP", () => {
+  assert.equal(rankCaller({ calls: 16, wins: 8, rSum: 9 }).tier, "SHARP"); // avgR≈0.56
+});
+test("rankCaller: 30+ / 55% / avgR>=1 → APEX", () => {
+  assert.equal(rankCaller({ calls: 30, wins: 18, rSum: 35 }).tier, "APEX"); // hit 60%, avgR≈1.17
+});
+test("rankCaller: high quality but small sample stays SIGNAL (no farming)", () => {
+  // 6 perfect calls, avgR 2 — strong, but sample too small for SHARP/APEX
+  assert.equal(rankCaller({ calls: 6, wins: 6, rSum: 12 }).tier, "SIGNAL");
 });

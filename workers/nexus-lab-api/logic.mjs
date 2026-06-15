@@ -149,3 +149,20 @@ export function resolveAiUpstream(hostedModel, env = {}) {
   }
   return null;
 }
+
+// ── Merit rank (identity ladder) ─────────────────────────────────────────────
+// A rank EARNED purely from a caller's public-price-graded record — distinct from
+// the $NEXUS holder tiers (which are bought/held). This is "proven right", not
+// "paid for". Thresholds rise with both sample size and quality so it can't be
+// farmed with a few lucky calls. stats = { calls, wins, rSum } from
+// computeCallerStats. Returns null when unranked (emerging or net-negative).
+export function rankCaller(stats) {
+  const calls = stats?.calls || 0;
+  if (calls < 5) return null;                 // still emerging — not yet ranked
+  const hitRate = stats.wins / calls;          // 0..1
+  const avgR = stats.rSum / calls;
+  if (avgR <= 0) return null;                  // net-negative by R → unranked (board rule)
+  if (calls >= 30 && hitRate >= 0.55 && avgR >= 1.0) return { tier: "APEX", title: "Apex", glyph: "✦" };
+  if (calls >= 15 && hitRate >= 0.50 && avgR >= 0.5) return { tier: "SHARP", title: "Sharp", glyph: "◆" };
+  return { tier: "SIGNAL", title: "Signal", glyph: "▪" };
+}
