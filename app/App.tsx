@@ -5,6 +5,7 @@ import OrderlyProvider from "@/components/orderlyProvider";
 import { HttpsRequiredWarning } from "@/components/HttpsRequiredWarning";
 import OnboardingModal from "@/components/OnboardingModal";
 import NexusAssistant from "@/components/NexusAssistant";
+import LiveAlerts from "@/components/LiveAlerts";
 import { withBasePath } from "./utils/base-path";
 import { getSEOConfig, getUserLanguage } from "./utils/seo";
 export default function App() {
@@ -41,6 +42,7 @@ export default function App() {
       <OrderlyProvider>
         <Outlet />
         <NexusAssistant />
+        <LiveAlerts />
       </OrderlyProvider>
     </>
   );
