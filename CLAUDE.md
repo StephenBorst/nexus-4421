@@ -248,6 +248,32 @@ The public agents leaderboard ranks on a risk-adjusted score from live `agent_tr
 - ⚠️ Honest ceiling: verifying a human's *personal Orderly trades* server-side is NOT possible (position_history
   is private-auth; no public per-address endpoint) — that's why we grade the CALL vs public price instead.
 
+## Engagement layer — competitor-informed, on the trustless core (2026-06-15) ⭐
+Studied FOMO (fomo.family) + Legend (app.legend.trade) — both win on live-positions feeds + clans/arena +
+frictionless onboarding, but rank on SELF-REPORTED PnL. Built their engagement surfaces on our verifiable
+grading (the moat they can't copy). 5 shipped this session (#3 Arena/Seasons deferred):
+- **#1 LIVE NOW feed** — `GET /agents/live` aggregates currently-OPEN positions (agents from
+  `agent:state.current_position` non-paper + opted-in humans), uPnL **recomputed from PUBLIC mark price**
+  (never client-claimed). Frontend `app/pages/feed/LiveNow.tsx` (top of feed view, 25s poll, fail-soft).
+  **Human opt-in (Phase 2):** `POST /live/publish {walletAddress, walletSig, positions, displayName?, pfpUrl?}`
+  — can't read others' positions server-side (private key), so the CLIENT publishes a snapshot stored with a
+  ~6-min TTL (`live:human:{addr}`, self-expiring = nothing retained). ecrecover-authed. Mini app has a 📡
+  Broadcast toggle (publishes on each status refresh w/ Farcaster name/pfp; off = clears).
+- **#2 Desks** (clans) — `app/pages/feed/Desks.tsx` in Feed RANKS. `/desks` create/join/leave (walletSig
+  ecrecover, ONE desk per wallet via `desk:mem:{addr}`, `desk:rec:{id}`; auto-disband empty + owner transfer),
+  `GET /desks` ranked board, `GET /desks/:id` detail. **Desk score = AGGREGATE of members' graded calls** via
+  the shared `computeCallerStats(env)` (extracted from /theses/leaderboard so the two never drift).
+- **#4 Real-time alerts** — `app/components/LiveAlerts.tsx` (GLOBAL, mounted in `App.tsx`). Polls /agents/live,
+  diffs new opens (skips backlog on first load), bottom-left toasts + opt-in OS `Notification`. No push infra.
+- **#5 Watch-only** — `app/pages/feed/WatchOnlyBanner.tsx` (disconnected visitors only). Frames the already-
+  public surfaces as explore-before-connect. Dismissible.
+- **#6 Merit ranks (identity ladder)** — `rankCaller(stats)` in lab-api `logic.mjs` (+tests). Earned from
+  graded record, NOT bought (distinct from $NEXUS holder tiers): ▪ Signal (5+ calls, net+R) → ◆ Sharp (15+,
+  ≥50%, ≥0.5R) → ✦ Apex (30+, ≥55%, ≥1R). Attached to /theses/leaderboard entries (`meritRank`) + green badge
+  on VERIFIED CALLERS board.
+- ⚠️ All of the above only POPULATE with real usage (open positions / 5+ graded calls / formed desks) — sparse
+  at cold-start BY DESIGN (fail-soft renders nothing), not broken. KV keys live in LAB_STORE.
+
 ## $NEXUS token & holder perks (pure-meme + flywheel UI)
 $NEXUS = pure community meme token on **Base** (`0x3D958634ab725B627919EF8F2Ed59227309fDba3`, 100B supply,
 18 decimals). **Zero built-in utility / revenue share** — perks are cosmetic/access only; the framing is
@@ -420,6 +446,13 @@ The cold-start/distribution weapon: a slim Nexus surface native to Warpcast, whe
   stat-card grids use `repeat(auto-fit, minmax(NNpx,1fr))` (fluid, desktop unchanged since auto-fit never
   exceeds item count); dense row tables get `overflowX:auto` + `minWidth`; layout-level changes use the
   `useIsMobile()` hook (768px). Lab/Feed/Messages done; Intel partial; SDK pages are Orderly-managed.
+- **⚠️ Restyling an Orderly SDK layout region (e.g. portfolio side-nav):** the scaffold widgets accept
+  `classNames={{ leftSidebar | content | topNavbar | card: "your-class" }}` → that class lands on the region's
+  wrapper div (`@orderly.network/ui-scaffold` does `className: cn(classNames?.leftSidebar)`). Pass a custom class
+  there, then target it in `app/styles/index.css` with `!important` + a descendant `*` to beat the oui- utility
+  classes. Did this for the portfolio side-nav (`.nexus-portfolio-side`) which was chopping labels mid-word
+  ("Overvi/ew") — fix = `word-break:keep-all` + `overflow-wrap:normal` (break only at spaces) + desktop nowrap.
+  ⚠️ /portfolio needs a CONNECTED WALLET to render the rail, so it can't be visually verified in preview unauthed.
 - **⚠️ Mobile overflow playbook (Session 2026-06-02 sweep — the recurring bug class):** fixed-PIXEL
   `gridTemplateColumns` (e.g. `"180px 1fr repeat(4,90px) 28px"`, `"280px 1fr"`, `"1fr 54px 40px 54px"`)
   are THE recurring mobile-clip culprit — they overflow/clip off the right edge on phones. Fixes by case:

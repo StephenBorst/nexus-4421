@@ -12,6 +12,7 @@ export default function PortfolioLayout() {
 
   return (
     <PortfolioLayoutWidget
+      classNames={{ leftSidebar: "nexus-portfolio-side" }}
       footerProps={config.scaffold.footerProps}
       mainNavProps={{
         ...config.scaffold.mainNavProps,
