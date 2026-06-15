@@ -104,6 +104,15 @@ Migrated the single-user bot → full multi-user, non-custodial, autonomous agen
   exec decrypts only at signing time. Legacy plaintext passes through (re-activate to migrate). Orderly keys
   CANNOT withdraw — blast radius is trading only. Phase 1b (dedicated short-lived scoped keys via `AddOrderlyKey`
   w/ `scope`+`expiration`, default 30d) = DEFERRED/optional; 1a agreed as legit stopping point.
+- **⚠️ Agent mutation auth (DONE 2026-06-11 — Bankr PR #451 security review):** EVERY agent control op
+  (`PUT /agent`, `PUT /agent/config`, `DELETE /agent`, `POST /agent/:a/kill`, `bankr/activate`+`bankr/mode`
+  incl. PAPER, `pending/:id/deploy|dismiss`, `paper/reset`, `test-signal`) requires `walletSig` =
+  `sign_message('nexus-trading-key-v1')` in the JSON body. lab-api `ownsAgent`/`requireOwner` ecrecover it
+  (`recoverEthAddress`) and 401 unless it resolves to `:address`. ONLY `GET /agent/:a` is public. Was a real
+  hole: previously zero auth → anyone knowing a wallet could `kill` (force-close positions) or rewrite config.
+  Web AgentView signs once (viem, cached in `sessionStorage` key `nexus_agent_sig_{addr}`) + sends walletSig on
+  all 7 mutation calls; the Bankr skill must too. Don't add a new agent mutation without the `requireOwner` gate.
+  NEVER accept the sig via query string (replayable/leaks to logs) — body only.
 - **Exec scaling (#2 DONE):** per-symbol promise-cached `getMarkPrice` (public price fetched once/tick, not per-user)
   + bounded-concurrency batches (`BATCH_SIZE=10`, `Promise.all`). Remaining ceiling = total subrequests/invocation
   (per-user authed position reconcile is irreducible); time-sharding/Queues is the next lever at hundreds of users.
