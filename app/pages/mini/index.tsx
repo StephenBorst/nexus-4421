@@ -117,6 +117,10 @@ export default function MiniApp() {
   const [candles, setCandles] = useState<number[] | null>(null);
   const [fundsOpen, setFundsOpen] = useState(false);
   const [prefillSide, setPrefillSide] = useState<"LONG" | "SHORT" | null>(null);
+  const [markets, setMarkets] = useState<string[] | null>(null);
+  const [mktSearch, setMktSearch] = useState("");
+  const [maxLev, setMaxLev] = useState(50);
+  const [mmr, setMmr] = useState(0);
 
   // A smart-contract wallet (code at the address) can't be registered with Orderly
   // via ECDSA ecrecover → "address and signature do not match". Detect on Base+Arbitrum.
@@ -170,10 +174,30 @@ export default function MiniApp() {
     let cancelled = false;
     setMinNotional(null);
     fetch(`https://api-evm.orderly.org/v1/public/info/PERP_${sym}_USDC`).then((r) => r.json())
-      .then((d) => { if (!cancelled) setMinNotional(Number(d?.data?.min_notional) || null); })
-      .catch(() => { /* leave null — backend still guards */ });
+      .then((d) => {
+        if (cancelled) return;
+        const info = d?.data ?? {};
+        setMinNotional(Number(info.min_notional) || null);
+        const ml = info.base_imr ? Math.max(1, Math.round(1 / Number(info.base_imr))) : 50; // max leverage = 1/IMR
+        setMaxLev(ml);
+        setMmr(Number(info.base_mmr) || 0);
+        setLev((l) => Math.min(l, ml)); // clamp to this market's real max
+      })
+      .catch(() => { /* leave — backend still guards */ });
     return () => { cancelled = true; };
   }, [sym]);
+
+  // Full tradable market list (all 100+ Orderly perps) for the search picker. Once on mount.
+  useEffect(() => {
+    fetch("https://api-evm.orderly.org/v1/public/info").then((r) => r.json())
+      .then((d) => {
+        const rows = (d?.data?.rows ?? []).filter((m: { status?: string }) => m.status === "ACTIVE");
+        const list = rows.map((m: { display_symbol_name?: string; symbol: string }) => m.display_symbol_name || tk(m.symbol))
+          .sort((a: string, b: string) => a.localeCompare(b));
+        setMarkets(list);
+      })
+      .catch(() => setMarkets([]));
+  }, []);
 
   // Live price + 24h change + funding (polled) and 72×1h closes for the chart.
   // Public Orderly endpoints, fetched client-side (CORS-OK), fail-soft.
@@ -477,6 +501,8 @@ export default function MiniApp() {
 
   const shell: React.CSSProperties = { background: bg, color: "#e5e7eb", minHeight: "100dvh", fontFamily: mono, padding: 14, display: "flex", flexDirection: "column", gap: 11 };
   const card: React.CSSProperties = { background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 6, padding: 12 };
+  const mktChip = (active: boolean): React.CSSProperties => ({ background: active ? "#00ff8815" : "#0a0e0a", border: `1px solid ${active ? "#00ff8860" : "#1e2d1e"}`, borderRadius: 3, padding: "4px 11px", cursor: "pointer", color: active ? green : "#4a7a5a", fontFamily: mono, fontSize: 12 });
+  const levPresets = [2, 5, 10, 25, 50, 100].filter((p) => p < maxLev).concat(maxLev); // per-market, incl. real MAX
   const liveCount = feed?.filter((t) => t.status === "ACTIVE").length ?? 0;
   const margin = notional / (lev || 1);
   const belowMin = minNotional != null && notional < minNotional;
@@ -573,11 +599,26 @@ export default function MiniApp() {
             )}
           </div>
 
-          {/* Market */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-            {MARKETS.map((m) => (
-              <button key={m} onClick={() => { setSym(m); setTradeMsg(null); }} style={{ background: m === sym ? "#00ff8815" : "#0a0e0a", border: `1px solid ${m === sym ? "#00ff8860" : "#1e2d1e"}`, borderRadius: 3, padding: "4px 11px", cursor: "pointer", color: m === sym ? green : "#4a7a5a", fontFamily: mono, fontSize: 12 }}>{m}</button>
-            ))}
+          {/* Market — popular quick-chips + search across all markets */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {MARKETS.map((m) => (
+                <button key={m} onClick={() => { setSym(m); setTradeMsg(null); }} style={mktChip(m === sym)}>{m}</button>
+              ))}
+              {!MARKETS.includes(sym) && <button style={mktChip(true)}>{sym}</button>}
+            </div>
+            <input value={mktSearch} onChange={(e) => setMktSearch(e.target.value.toUpperCase())} placeholder={markets ? `🔍 search ${markets.length} markets…` : "loading markets…"} style={{ width: "100%", boxSizing: "border-box", background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e5e7eb", fontFamily: mono, fontSize: 11, padding: "6px 9px" }} />
+            {mktSearch && markets && (() => {
+              const hits = markets.filter((m) => m.includes(mktSearch));
+              return (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 5, maxHeight: 116, overflowY: "auto" }}>
+                  {hits.slice(0, 36).map((m) => (
+                    <button key={m} onClick={() => { setSym(m); setMktSearch(""); setTradeMsg(null); }} style={mktChip(m === sym)}>{m}</button>
+                  ))}
+                  {hits.length === 0 && <span style={{ fontSize: 9, color: "#3a6a4a" }}>no market matches “{mktSearch}”</span>}
+                </div>
+              );
+            })()}
           </div>
           {/* Size + leverage */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -586,16 +627,25 @@ export default function MiniApp() {
               <input type="number" inputMode="decimal" min={1} value={notional} onChange={(e) => setNotional(Math.max(0, parseFloat(e.target.value) || 0))} style={{ width: "100%", boxSizing: "border-box", marginTop: 4, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e5e7eb", fontFamily: mono, fontSize: 13, padding: "7px 9px" }} />
             </div>
             <div>
-              <div style={{ fontSize: 8, color: "#3a6a4a", letterSpacing: "0.1em" }}>LEVERAGE — {lev}x</div>
-              <input type="range" min={1} max={20} step={1} value={lev} onChange={(e) => setLev(parseInt(e.target.value, 10))} style={{ width: "100%", marginTop: 12 }} />
+              <div style={{ fontSize: 8, color: "#3a6a4a", letterSpacing: "0.1em" }}>LEVERAGE — {lev}x <span style={{ color: "#2a4a3a" }}>· max {maxLev}x</span></div>
+              <input type="range" min={1} max={maxLev} step={1} value={lev} onChange={(e) => setLev(parseInt(e.target.value, 10))} style={{ width: "100%", marginTop: 12 }} />
               <div style={{ display: "flex", gap: 5, marginTop: 6 }}>
-                {[2, 5, 10, 20].map((p) => (
-                  <button key={p} onClick={() => setLev(p)} style={{ flex: 1, background: lev === p ? "#00ff8815" : "#0a0e0a", border: `1px solid ${lev === p ? "#00ff8860" : "#1e2d1e"}`, borderRadius: 3, padding: "4px 0", cursor: "pointer", color: lev === p ? green : "#4a7a5a", fontFamily: mono, fontSize: 10, fontWeight: "bold" }}>{p}x</button>
+                {levPresets.map((p, i) => (
+                  <button key={p} onClick={() => setLev(p)} style={{ flex: 1, background: lev === p ? "#00ff8815" : "#0a0e0a", border: `1px solid ${lev === p ? "#00ff8860" : "#1e2d1e"}`, borderRadius: 3, padding: "4px 0", cursor: "pointer", color: lev === p ? green : "#4a7a5a", fontFamily: mono, fontSize: 10, fontWeight: "bold" }}>{i === levPresets.length - 1 ? "MAX" : `${p}x`}</button>
                 ))}
               </div>
             </div>
           </div>
           <div style={{ fontSize: 9, color: "#5a8a6a" }}>notional <b style={{ color: "#fff" }}>${notional.toFixed(0)}</b> · margin <b style={{ color: "#fff" }}>${margin.toFixed(2)}</b>{minNotional ? <> · min <b style={{ color: "#fff" }}>${minNotional}</b></> : null}</div>
+          {mkt && mkt.price > 0 && notional > 0 && (
+            <div style={{ fontSize: 9, color: "#5a8a6a" }}>
+              ≈ <b style={{ color: "#fff" }}>{(notional / mkt.price).toLocaleString("en-US", { maximumFractionDigits: 4 })} {sym}</b>
+              <span style={{ color: "#3a6a4a" }}> · est. liq </span>
+              <span style={{ color: red }}>L ${fmtPrice(Math.max(0, mkt.price * (1 - 1 / lev + mmr)))}</span>
+              <span style={{ color: "#3a6a4a" }}> / </span>
+              <span style={{ color: red }}>S ${fmtPrice(mkt.price * (1 + 1 / lev - mmr))}</span>
+            </div>
+          )}
           {belowMin && <div style={{ fontSize: 9, color: "#fbbf24", lineHeight: 1.5 }}>↑ {sym} needs ≥ ${minNotional} notional. Raise SIZE to ${minNotional} (bump leverage if the margin doesn&apos;t fit your balance).</div>}
           {/* Long / Short */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
