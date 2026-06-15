@@ -33,7 +33,8 @@ type Thesis = {
   status: string; wallet: string; displayName: string | null; agent?: boolean;
 };
 type TradeMsg = { ok: boolean; text: string; cta?: boolean } | null;
-type Mkt = { price: number; change: number; funding: number; high: number; low: number };
+type Mkt = { price: number; change: number; funding: number; high: number; low: number; vol: number; oi: number; nextFunding: number };
+type Candle = { o: number; h: number; l: number; c: number };
 type PosRow = { symbol: string; position_qty: number; average_open_price: number; mark_price: number; unrealized_pnl: number };
 type Acct = { free: number; total: number };
 
@@ -46,27 +47,47 @@ const fmtPrice = (n: number) =>
   n >= 1000 ? n.toLocaleString("en-US", { maximumFractionDigits: 2 })
   : n.toLocaleString("en-US", { maximumFractionDigits: n < 1 ? 6 : n < 100 ? 4 : 2 });
 
-// Dependency-free price chart (TradingView UDF closes → SVG area+line). Keeps the
-// frame light; mirrors the Lab's terminal aesthetic (mono + #00ff88).
-function AssetChart({ data }: { data: number[] | null }) {
-  const box: React.CSSProperties = { width: "100%", height: 72, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4 };
+// Compact USD (e.g. $35.9M, $1.2B) for volume / open interest.
+const fmtUsd = (n: number) =>
+  n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${(n / 1e3).toFixed(0)}K` : `$${n.toFixed(0)}`;
+
+// "3h 12m" until the next funding timestamp (ms).
+const fundingIn = (ts: number) => {
+  const ms = ts - Date.now();
+  if (ms <= 0) return "soon";
+  const h = Math.floor(ms / 3.6e6), m = Math.floor((ms % 3.6e6) / 6e4);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+};
+
+// Dependency-free candlestick chart (TradingView UDF OHLC → SVG). Keeps the frame
+// light; mirrors the Lab's terminal aesthetic (mono + #00ff88 / #ff4444).
+function AssetChart({ data }: { data: Candle[] | null }) {
+  const box: React.CSSProperties = { width: "100%", height: 88, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4 };
   if (!data || data.length < 2) {
     return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#2a4a3a" }}>{data ? "no chart data" : "loading chart…"}</div>;
   }
-  const W = 320, H = 72, P = 4;
-  const min = Math.min(...data), max = Math.max(...data), range = max - min || 1;
+  const W = 320, H = 88, P = 4;
+  const min = Math.min(...data.map((d) => d.l)), max = Math.max(...data.map((d) => d.h)), range = max - min || 1;
   const n = data.length;
-  const x = (i: number) => P + (i / (n - 1)) * (W - 2 * P);
+  const slot = (W - 2 * P) / n;
+  const x = (i: number) => P + i * slot + slot / 2;
   const y = (v: number) => P + (1 - (v - min) / range) * (H - 2 * P);
-  const up = data[n - 1] >= data[0];
-  const stroke = up ? "#00ff88" : "#ff4444";
-  const line = data.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-  const area = `${P},${H - P} ${line} ${W - P},${H - P}`;
+  const bodyW = Math.max(1, slot * 0.62);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={box}>
-      <polygon points={area} fill={stroke} opacity={0.09} />
-      <polyline points={line} fill="none" stroke={stroke} strokeWidth={1.4} vectorEffect="non-scaling-stroke" />
-      <circle cx={x(n - 1)} cy={y(data[n - 1])} r={2.4} fill={stroke} />
+      {data.map((d, i) => {
+        const up = d.c >= d.o;
+        const col = up ? "#00ff88" : "#ff4444";
+        const cx = x(i);
+        const yTop = Math.min(y(d.o), y(d.c));
+        const bh = Math.max(0.8, Math.abs(y(d.c) - y(d.o)));
+        return (
+          <g key={i}>
+            <line x1={cx} x2={cx} y1={y(d.h)} y2={y(d.l)} stroke={col} strokeWidth={0.6} vectorEffect="non-scaling-stroke" />
+            <rect x={cx - bodyW / 2} y={yTop} width={bodyW} height={bh} fill={col} />
+          </g>
+        );
+      })}
     </svg>
   );
 }
@@ -114,7 +135,7 @@ export default function MiniApp() {
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawMsg, setWithdrawMsg] = useState<TradeMsg>(null);
   const [mkt, setMkt] = useState<Mkt | null>(null);
-  const [candles, setCandles] = useState<number[] | null>(null);
+  const [candles, setCandles] = useState<Candle[] | null>(null);
   const [fundsOpen, setFundsOpen] = useState(false);
   const [prefillSide, setPrefillSide] = useState<"LONG" | "SHORT" | null>(null);
   const [markets, setMarkets] = useState<string[] | null>(null);
@@ -209,8 +230,9 @@ export default function MiniApp() {
       try {
         const now = Math.floor(Date.now() / 1000);
         const d = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${full}&resolution=60&from=${now - 72 * 3600}&to=${now}`).then((r) => r.json());
-        if (!cancelled && d?.s === "ok" && Array.isArray(d.c)) setCandles(d.c.map(Number));
-        else if (!cancelled) setCandles([]);
+        if (!cancelled && d?.s === "ok" && Array.isArray(d.c)) {
+          setCandles(d.c.map((c: number, i: number) => ({ o: Number(d.o[i]), h: Number(d.h[i]), l: Number(d.l[i]), c: Number(c) })));
+        } else if (!cancelled) setCandles([]);
       } catch { if (!cancelled) setCandles([]); }
     })();
     const loadStats = async () => {
@@ -225,6 +247,9 @@ export default function MiniApp() {
           funding: Number(f.last_funding_rate ?? 0),
           high: Number(f["24h_high"] ?? 0),
           low: Number(f["24h_low"] ?? 0),
+          vol: Number(f["24h_amount"] ?? 0),                       // 24h volume in USD
+          oi: Number(f.open_interest ?? 0) * price,                // open interest in USD
+          nextFunding: Number(f.next_funding_time ?? 0),
         });
       } catch { /* leave prior */ }
     };
@@ -595,6 +620,13 @@ export default function MiniApp() {
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#3a6a4a" }}>
                 <span>24h L ${fmtPrice(mkt.low)}</span>
                 <span>H ${fmtPrice(mkt.high)}</span>
+              </div>
+            )}
+            {mkt && (mkt.vol > 0 || mkt.oi > 0) && (
+              <div style={{ display: "flex", gap: 10, fontSize: 8, color: "#3a6a4a", flexWrap: "wrap" }}>
+                <span>24h vol <b style={{ color: "#5a8a6a" }}>{fmtUsd(mkt.vol)}</b></span>
+                <span>OI <b style={{ color: "#5a8a6a" }}>{fmtUsd(mkt.oi)}</b></span>
+                {mkt.nextFunding > 0 && <span style={{ marginLeft: "auto" }}>next funding <b style={{ color: "#5a8a6a" }}>{fundingIn(mkt.nextFunding)}</b></span>}
               </div>
             )}
           </div>
