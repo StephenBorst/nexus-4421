@@ -2,6 +2,7 @@
 // track-record panels, and the Orderly delegated-key readers.
 // Extracted from index.tsx (god-file split).
 import { useState, useEffect } from "react";
+import { createWalletClient, custom } from "viem";
 import type { AgentConfig, AgentState, AgentTrade, AgentLeaderboardEntry, AgentPendingThesis } from "./types";
 import { DEFAULT_CONFIG } from "./types";
 import { agentCardStyle, agentLabelStyle, agentInputStyle, agentBtnStyle, navBtnStyle } from "./styles";
@@ -161,6 +162,25 @@ function getWalletAddress(): string | null {
   return localStorage.getItem(`orderly_${networkId}_address`);
 }
 
+// Ownership proof for agent control ops. Backend ecrecovers a personal_sign of
+// "nexus-trading-key-v1" and requires the recovered address to equal the agent's
+// wallet — so kill/deactivate/config can't be triggered by anyone but the owner.
+// Deterministic message → cache the sig per session (same sig the Orderly key
+// derives from). Signs via the injected wallet (same pattern as Holders Room).
+async function getAgentSig(address: string): Promise<string> {
+  const key = `nexus_agent_sig_${address.toLowerCase()}`;
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(key) || "null");
+    if (cached && typeof cached.sig === "string") return cached.sig;
+  } catch { /* ignore */ }
+  const eth = (window as unknown as { ethereum?: unknown }).ethereum;
+  if (!eth) throw new Error("No wallet found — connect your wallet to control the agent");
+  const client = createWalletClient({ transport: custom(eth as Parameters<typeof custom>[0]) });
+  const sig = await client.signMessage({ account: address as `0x${string}`, message: "nexus-trading-key-v1" });
+  try { sessionStorage.setItem(key, JSON.stringify({ sig })); } catch { /* ignore */ }
+  return sig;
+}
+
 function formatAgentTime(ms: number): string {
   const h = Math.floor(ms / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
@@ -218,6 +238,7 @@ export function AgentView() {
     setSaving(true);
     setError(null);
     try {
+      const walletSig = await getAgentSig(walletAddress);
       const res = await fetch(`${AGENT_API}/agent/${walletAddress}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -225,6 +246,7 @@ export function AgentView() {
           config,
           tradingKey,
           accountId: getOrderlyKeyStore()?.accountId || "",
+          walletSig,
         }),
       });
       if (!res.ok) throw new Error("Failed to activate agent");
@@ -242,7 +264,12 @@ export function AgentView() {
     if (!walletAddress) return;
     setSaving(true);
     try {
-      const res = await fetch(`${AGENT_API}/agent/${walletAddress}`, { method: "DELETE" });
+      const walletSig = await getAgentSig(walletAddress);
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walletSig }),
+      });
       if (!res.ok) throw new Error("Failed to deactivate");
       setAgentState((prev) => prev ? { ...prev, active: false, current_position: null } : null);
       setSuccess("Agent deactivated — trading key removed");
@@ -258,10 +285,11 @@ export function AgentView() {
     if (!walletAddress) return;
     setSaving(true);
     try {
+      const walletSig = await getAgentSig(walletAddress);
       const res = await fetch(`${AGENT_API}/agent/${walletAddress}/config`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config }),
+        body: JSON.stringify({ config, walletSig }),
       });
       if (!res.ok) throw new Error("Failed to save config");
       setSuccess("Config saved");
@@ -278,7 +306,12 @@ export function AgentView() {
     if (!window.confirm("Clear your paper track record? This wipes all simulated trades and resets paper daily stats. Your live record is untouched.")) return;
     setSaving(true);
     try {
-      const res = await fetch(`${AGENT_API}/agent/${walletAddress}/paper/reset`, { method: "POST" });
+      const walletSig = await getAgentSig(walletAddress);
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}/paper/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walletSig }),
+      });
       if (!res.ok) throw new Error("Failed to reset paper record");
       setSuccess("Paper record cleared");
       await fetchAgentData();
@@ -294,10 +327,11 @@ export function AgentView() {
     if (!walletAddress) return;
     setSaving(true);
     try {
+      const walletSig = await getAgentSig(walletAddress);
       const res = await fetch(`${AGENT_API}/agent/${walletAddress}/test-signal`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ direction: "LONG" }),
+        body: JSON.stringify({ direction: "LONG", walletSig }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to inject test signal");
@@ -359,7 +393,12 @@ export function AgentView() {
     if (!window.confirm("KILL SWITCH — This will immediately close any open position and deactivate the agent. Continue?")) return;
     setSaving(true);
     try {
-      const res = await fetch(`${AGENT_API}/agent/${walletAddress}/kill`, { method: "POST" });
+      const walletSig = await getAgentSig(walletAddress);
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}/kill`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walletSig }),
+      });
       if (!res.ok) throw new Error("Kill switch failed");
       setAgentState((prev) => prev ? { ...prev, active: false, current_position: null } : null);
       setSuccess("Agent killed — position closed, key removed");
@@ -376,7 +415,12 @@ export function AgentView() {
     if (!walletAddress) return;
     setPending((prev) => prev.filter((t) => t.id !== id));
     try {
-      await fetch(`${AGENT_API}/agent/${walletAddress}/pending/${id}/${action}`, { method: "POST" });
+      const walletSig = await getAgentSig(walletAddress);
+      await fetch(`${AGENT_API}/agent/${walletAddress}/pending/${id}/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walletSig }),
+      });
     } catch (e) {
       console.error("[agent] resolve pending error:", e);
     }

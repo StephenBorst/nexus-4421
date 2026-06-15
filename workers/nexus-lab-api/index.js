@@ -2799,6 +2799,20 @@ document.getElementById("btn").addEventListener("click",go);
       // somehow absent so the route never hard-crashes.
       const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
 
+      // ── Ownership auth for agent MUTATIONS ──────────────────────────────────
+      // Every state-changing agent op (activate, config, mode, deactivate, kill,
+      // resolve pending) is an account-control action and MUST prove the caller
+      // owns :address — otherwise anyone who knows a wallet could kill an agent or
+      // force-close its positions. Auth = a personal_sign of "nexus-trading-key-v1"
+      // (same sig the skill/web already produce); we ecrecover it and require the
+      // recovered address to equal :address. GET reads stay public.
+      const ownsAgent = (walletSig) =>
+        typeof walletSig === "string" && recoverEthAddress("nexus-trading-key-v1", walletSig) === address;
+      const requireOwner = (walletSig) =>
+        ownsAgent(walletSig)
+          ? null
+          : json({ error: "walletSig_required", hint: "This agent action requires walletSig = sign_message('nexus-trading-key-v1') from the agent's own wallet." }, request, 401);
+
       // GET /agent/:address
       if (request.method === "GET" && !parts[2]) {
         const [configRaw, stateRaw, pendingRaw, signalRaw] = await Promise.all([
@@ -2832,6 +2846,8 @@ document.getElementById("btn").addEventListener("click",go);
 
       // POST /agent/:address/pending/:id/(deploy|dismiss) — resolve a thesis
       if (request.method === "POST" && parts[2] === "pending" && parts[3] && parts[4]) {
+        const pbody = await request.json().catch(() => ({}));
+        const denied = requireOwner(pbody.walletSig); if (denied) return denied;
         const action = parts[4];
         const pendingRaw = await AGENT_KV.get(`agent:pending:${address}`);
         const list = pendingRaw ? JSON.parse(pendingRaw) : [];
@@ -2842,6 +2858,8 @@ document.getElementById("btn").addEventListener("click",go);
 
       // POST /agent/:address/paper/reset — clear the simulated paper ledger
       if (request.method === "POST" && parts[2] === "paper" && parts[3] === "reset") {
+        const prbody = await request.json().catch(() => ({}));
+        const denied = requireOwner(prbody.walletSig); if (denied) return denied;
         const stateRaw = await AGENT_KV.get(`agent:state:${address}`);
         if (!stateRaw) return json({ ok: true, cleared: 0 }, request);
         const state = JSON.parse(stateRaw);
@@ -2865,6 +2883,7 @@ document.getElementById("btn").addEventListener("click",go);
         if (config.mode !== "PAPER") return json({ error: "test-signal only allowed in PAPER mode" }, request, 403);
         let body = {};
         try { body = await request.json(); } catch { /* optional */ }
+        const denied = requireOwner(body?.walletSig); if (denied) return denied;
         const direction = body?.direction === "SHORT" ? "SHORT" : "LONG";
         const symbol = (config.symbols && config.symbols[0]) || "PERP_BTC_USDC";
         let price = 0;
@@ -2889,6 +2908,7 @@ document.getElementById("btn").addEventListener("click",go);
       if (request.method === "PUT" && !parts[2]) {
         let body;
         try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        const denied = requireOwner(body.walletSig); if (denied) return denied;
         const { config, tradingKey, accountId } = body;
         // PAPER mode is fully simulated — it never places real orders, so no
         // trading key is required or stored.
@@ -2917,6 +2937,7 @@ document.getElementById("btn").addEventListener("click",go);
       if (request.method === "PUT" && parts[2] === "config") {
         let body;
         try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        const denied = requireOwner(body.walletSig); if (denied) return denied;
         const { config } = body;
         if (!config) return json({ error: "config required" }, request, 400);
         if (config.signalMode && PRO_STRATEGIES.includes(config.signalMode) && !(await walletIsPro(address, env))) {
@@ -2928,6 +2949,8 @@ document.getElementById("btn").addEventListener("click",go);
 
       // DELETE /agent/:address — deactivate
       if (request.method === "DELETE" && !parts[2]) {
+        const dbody = await request.json().catch(() => ({}));
+        const denied = requireOwner(dbody.walletSig); if (denied) return denied;
         await AGENT_KV.delete(`agent:key:${address}`);
         const stateRaw = await AGENT_KV.get(`agent:state:${address}`);
         if (stateRaw) {
@@ -2946,6 +2969,8 @@ document.getElementById("btn").addEventListener("click",go);
 
       // POST /agent/:address/kill — kill switch
       if (request.method === "POST" && parts[2] === "kill") {
+        const kbody = await request.json().catch(() => ({}));
+        const denied = requireOwner(kbody.walletSig); if (denied) return denied;
         // Emergency stop must be un-clobberable. Write a DEDICATED kill flag the
         // exec consumes + clears — never rely on a state field the exec also
         // rewrites every minute (that write could race and drop the kill).
@@ -2966,6 +2991,9 @@ document.getElementById("btn").addEventListener("click",go);
       if (request.method === "POST" && parts[2] === "bankr" && parts[3] === "activate") {
         let body;
         try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        // Ownership auth for ALL modes (PAPER included) — activating/reconfiguring an
+        // agent is a mutation. Live modes additionally derive the key from this sig below.
+        const denied = requireOwner(body?.walletSig); if (denied) return denied;
         const mode = ["PAPER", "ASSISTED", "AUTONOMOUS"].includes(body?.mode) ? body.mode : "PAPER";
         if (mode === "AUTONOMOUS" && body?.confirm !== "GO LIVE") {
           return json({ error: "confirm_required", hint: 'Live trading needs confirm:"GO LIVE". The agent uses an order-only key that cannot withdraw.' }, request, 409);
@@ -3009,6 +3037,7 @@ document.getElementById("btn").addEventListener("click",go);
       if (request.method === "POST" && parts[2] === "bankr" && parts[3] === "mode") {
         let body;
         try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        const denied = requireOwner(body?.walletSig); if (denied) return denied;
         const mode = body?.mode;
         if (!["PAPER", "ASSISTED", "AUTONOMOUS"].includes(mode)) return json({ error: "mode must be PAPER | ASSISTED | AUTONOMOUS" }, request, 400);
         if (mode === "AUTONOMOUS" && body?.confirm !== "GO LIVE") {
