@@ -33,6 +33,7 @@ type Thesis = {
   status: string; wallet: string; displayName: string | null; agent?: boolean;
 };
 type TradeMsg = { ok: boolean; text: string; cta?: boolean } | null;
+type Mkt = { price: number; change: number; funding: number; high: number; low: number };
 type PosRow = { symbol: string; position_qty: number; average_open_price: number; mark_price: number; unrealized_pnl: number };
 type Acct = { free: number; total: number };
 
@@ -41,6 +42,34 @@ const STATUS_COLOR: Record<string, string> = {
 };
 const tk = (s: string) => s.replace("PERP_", "").replace("_USDC", "");
 const shortAddr = (w: string) => `${w.slice(0, 6)}…${w.slice(-4)}`;
+const fmtPrice = (n: number) =>
+  n >= 1000 ? n.toLocaleString("en-US", { maximumFractionDigits: 2 })
+  : n.toLocaleString("en-US", { maximumFractionDigits: n < 1 ? 6 : n < 100 ? 4 : 2 });
+
+// Dependency-free price chart (TradingView UDF closes → SVG area+line). Keeps the
+// frame light; mirrors the Lab's terminal aesthetic (mono + #00ff88).
+function AssetChart({ data }: { data: number[] | null }) {
+  const box: React.CSSProperties = { width: "100%", height: 72, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4 };
+  if (!data || data.length < 2) {
+    return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#2a4a3a" }}>{data ? "no chart data" : "loading chart…"}</div>;
+  }
+  const W = 320, H = 72, P = 4;
+  const min = Math.min(...data), max = Math.max(...data), range = max - min || 1;
+  const n = data.length;
+  const x = (i: number) => P + (i / (n - 1)) * (W - 2 * P);
+  const y = (v: number) => P + (1 - (v - min) / range) * (H - 2 * P);
+  const up = data[n - 1] >= data[0];
+  const stroke = up ? "#00ff88" : "#ff4444";
+  const line = data.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const area = `${P},${H - P} ${line} ${W - P},${H - P}`;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={box}>
+      <polygon points={area} fill={stroke} opacity={0.09} />
+      <polyline points={line} fill="none" stroke={stroke} strokeWidth={1.4} vectorEffect="non-scaling-stroke" />
+      <circle cx={x(n - 1)} cy={y(data[n - 1])} r={2.4} fill={stroke} />
+    </svg>
+  );
+}
 const toMsgHex = (s: string) => ("0x" + Array.from(new TextEncoder().encode(s)).map((b) => b.toString(16).padStart(2, "0")).join("")) as `0x${string}`;
 
 // Orderly AddOrderlyKey registration constants (mirror lab-api).
@@ -84,6 +113,8 @@ export default function MiniApp() {
   const [withdrawAmt, setWithdrawAmt] = useState(20);
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawMsg, setWithdrawMsg] = useState<TradeMsg>(null);
+  const [mkt, setMkt] = useState<Mkt | null>(null);
+  const [candles, setCandles] = useState<number[] | null>(null);
 
   // A smart-contract wallet (code at the address) can't be registered with Orderly
   // via ECDSA ecrecover → "address and signature do not match". Detect on Base+Arbitrum.
@@ -140,6 +171,40 @@ export default function MiniApp() {
       .then((d) => { if (!cancelled) setMinNotional(Number(d?.data?.min_notional) || null); })
       .catch(() => { /* leave null — backend still guards */ });
     return () => { cancelled = true; };
+  }, [sym]);
+
+  // Live price + 24h change + funding (polled) and 72×1h closes for the chart.
+  // Public Orderly endpoints, fetched client-side (CORS-OK), fail-soft.
+  useEffect(() => {
+    let cancelled = false;
+    const full = `PERP_${sym}_USDC`;
+    setMkt(null); setCandles(null);
+    (async () => {
+      try {
+        const now = Math.floor(Date.now() / 1000);
+        const d = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${full}&resolution=60&from=${now - 72 * 3600}&to=${now}`).then((r) => r.json());
+        if (!cancelled && d?.s === "ok" && Array.isArray(d.c)) setCandles(d.c.map(Number));
+        else if (!cancelled) setCandles([]);
+      } catch { if (!cancelled) setCandles([]); }
+    })();
+    const loadStats = async () => {
+      try {
+        const d = await fetch(`https://api-evm.orderly.org/v1/public/futures/${full}`).then((r) => r.json());
+        const f = d?.data ?? {};
+        const price = Number(f.mark_price ?? f.index_price ?? 0);
+        const open = Number(f["24h_open"] ?? 0);
+        if (!cancelled) setMkt({
+          price,
+          change: open ? ((price - open) / open) * 100 : 0,
+          funding: Number(f.last_funding_rate ?? 0),
+          high: Number(f["24h_high"] ?? 0),
+          low: Number(f["24h_low"] ?? 0),
+        });
+      } catch { /* leave prior */ }
+    };
+    loadStats();
+    const iv = setInterval(loadStats, 25000);
+    return () => { cancelled = true; clearInterval(iv); };
   }, [sym]);
 
   async function buyNexus() {
@@ -476,6 +541,23 @@ export default function MiniApp() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Asset price + chart (glance value) */}
+          <div style={{ borderTop: "1px solid #1a2e1a", paddingTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <span style={{ fontSize: 15, fontWeight: "bold", color: "#fff" }}>{sym}</span>
+              <span style={{ fontSize: 14, color: "#fff" }}>{mkt ? `$${fmtPrice(mkt.price)}` : "—"}</span>
+              {mkt && <span style={{ fontSize: 11, color: mkt.change >= 0 ? green : red }}>{mkt.change >= 0 ? "▲" : "▼"} {Math.abs(mkt.change).toFixed(2)}%</span>}
+              {mkt && <span style={{ marginLeft: "auto", fontSize: 9, color: "#5a8a6a" }}>funding <b style={{ color: mkt.funding >= 0 ? green : red }}>{(mkt.funding * 100).toFixed(4)}%</b></span>}
+            </div>
+            <AssetChart data={candles} />
+            {mkt && (mkt.high > 0 || mkt.low > 0) && (
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#3a6a4a" }}>
+                <span>24h L ${fmtPrice(mkt.low)}</span>
+                <span>H ${fmtPrice(mkt.high)}</span>
+              </div>
+            )}
           </div>
 
           {/* Market */}
