@@ -4,12 +4,24 @@
     "payload": "eyJkb21haW4iOiJ0cmFkZS5uZXh1c3RyYWRpbmdsYWJzLmNvbSJ9",
     "signature": "V3XrskroYaVh69e5lwd7ezE2m/3tF55LSSMCSTem/9ETyCdRFC5pqvfXHq1w+XPBtu40XwGaoSn3IuXzLB0NMhs="
   },
+  "miniapp": {
+    "version": "1",
+    "name": "Nexus Trading Labs",
+    "iconUrl": "https://trade.nexustradinglabs.com/icon-1024.png",
+    "homeUrl": "https://trade.nexustradinglabs.com/mini",
+    "splashImageUrl": "https://trade.nexustradinglabs.com/icon-1024.png",
+    "splashBackgroundColor": "#0a0e0a",
+    "subtitle": "The terminal that makes you better",
+    "description": "One-tap perps, autonomous trading agents, and on-chain-verifiable track records.",
+    "primaryCategory": "finance",
+    "tags": ["perps", "trading", "defi", "agent", "nexus"]
+  },
   "frame": {
     "version": "1",
     "name": "Nexus Trading Labs",
-    "iconUrl": "https://trade.nexustradinglabs.com/icon-512.png",
+    "iconUrl": "https://trade.nexustradinglabs.com/icon-1024.png",
     "homeUrl": "https://trade.nexustradinglabs.com/mini",
-    "splashImageUrl": "https://trade.nexustradinglabs.com/icon-512.png",
+    "splashImageUrl": "https://trade.nexustradinglabs.com/icon-1024.png",
     "splashBackgroundColor": "#0a0e0a",
     "subtitle": "The terminal that makes you better",
     "description": "One-tap perps, autonomous trading agents, and on-chain-verifiable track records.",
