@@ -16,17 +16,27 @@
    to break only at spaces (whole words) — never mid-word. !important + the
    descendant * beat Orderly's utility classes; scoped to our rail class only.
    On desktop, give the rail enough room so labels sit on one line cleanly. */
+.nexus-portfolio-side {
+  --oui-font-size-nav: 12px; /* shrink the rail's nav font so labels fit the item box */
+}
 .nexus-portfolio-side,
 .nexus-portfolio-side * {
-  word-break: keep-all !important;
+  word-break: keep-all !important;     /* never split a word mid-character */
   overflow-wrap: normal !important;
 }
-@media (min-width: 768px) {
-  .nexus-portfolio-side a,
-  .nexus-portfolio-side button,
-  .nexus-portfolio-side [role="menuitem"] {
-    white-space: nowrap !important;
-  }
+.nexus-portfolio-side a,
+.nexus-portfolio-side button,
+.nexus-portfolio-side [role="menuitem"] {
+  white-space: nowrap !important;      /* one line per label */
+  font-size: 12px !important;          /* beats the oui- utility font even if it ignores the var */
+}
+/* Let the label/text element show in full instead of clipping the last char. */
+.nexus-portfolio-side a > *,
+.nexus-portfolio-side button > *,
+.nexus-portfolio-side [role="menuitem"] > * {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  min-width: max-content;
 }
 
 /* Fix mobile dead space — two parts:
