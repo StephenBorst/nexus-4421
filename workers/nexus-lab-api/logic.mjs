@@ -166,3 +166,24 @@ export function rankCaller(stats) {
   if (calls >= 15 && hitRate >= 0.50 && avgR >= 0.5) return { tier: "SHARP", title: "Sharp", glyph: "◆" };
   return { tier: "SIGNAL", title: "Signal", glyph: "▪" };
 }
+
+// ── Funding + OI-divergence + confluence classification ──────────────────────
+// Mirrors the agent brain's deriveSignal rules (funding extreme FADES the crowd;
+// OI-divergence; confluence = both agree) so the public /signals API and the
+// autonomous agent can't drift in spirit. Pure + tested. raw = { fundingRate,
+// priceChange, oiChange, hasPrev } as DECIMALS (e.g. 0.0001 = 0.01%).
+export function confluenceSignal(raw, opts = {}) {
+  const fundingThreshold = (opts.fundingThreshold ?? 0.01) / 100;
+  const oiChangeThreshold = (opts.oiChangeThreshold ?? 0) / 100;
+  const f = raw.fundingRate || 0, p = raw.priceChange || 0, oi = raw.oiChange || 0;
+  const fundingSignal = f >= fundingThreshold ? "SHORT" : f <= -fundingThreshold ? "LONG" : "NONE";
+  let oiSignal = "NONE";
+  if (raw.hasPrev && Math.abs(oi) >= oiChangeThreshold && oi !== 0) {
+    if (p > 0 && oi < 0) oiSignal = "SHORT";       // price up, OI down → fade
+    else if (p < 0 && oi > 0) oiSignal = "LONG";   // price down, OI up → fade
+    else if (p > 0 && oi > 0) oiSignal = "LONG";   // strong up → follow
+    else if (p < 0 && oi < 0) oiSignal = "SHORT";  // strong down → follow
+  }
+  const confluence = fundingSignal !== "NONE" && fundingSignal === oiSignal ? fundingSignal : "NONE";
+  return { fundingSignal, oiSignal, confluence };
+}

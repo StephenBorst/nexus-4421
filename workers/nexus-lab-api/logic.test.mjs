@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-lab-api/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { gradeCall, resolveAiUpstream, bankrGatewayModel, rankCaller } from "./logic.mjs";
+import { gradeCall, resolveAiUpstream, bankrGatewayModel, rankCaller, confluenceSignal } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
 const series = (t0, bars) => ({
@@ -228,4 +228,28 @@ test("rankCaller: 30+ / 55% / avgR>=1 → APEX", () => {
 test("rankCaller: high quality but small sample stays SIGNAL (no farming)", () => {
   // 6 perfect calls, avgR 2 — strong, but sample too small for SHARP/APEX
   assert.equal(rankCaller({ calls: 6, wins: 6, rSum: 12 }).tier, "SIGNAL");
+});
+
+// ── confluenceSignal (machine signals API + agent parity) ───────────────────
+test("confluenceSignal: positive funding extreme → SHORT (fade longs)", () => {
+  const s = confluenceSignal({ fundingRate: 0.0002, priceChange: 0, oiChange: 0, hasPrev: false });
+  assert.equal(s.fundingSignal, "SHORT");
+});
+test("confluenceSignal: negative funding extreme → LONG", () => {
+  assert.equal(confluenceSignal({ fundingRate: -0.0002, priceChange: 0, oiChange: 0, hasPrev: false }).fundingSignal, "LONG");
+});
+test("confluenceSignal: below threshold → NONE", () => {
+  assert.equal(confluenceSignal({ fundingRate: 0.00005, priceChange: 0, oiChange: 0, hasPrev: false }).fundingSignal, "NONE");
+});
+test("confluenceSignal: OI divergence price-up/OI-down → SHORT", () => {
+  assert.equal(confluenceSignal({ fundingRate: 0, priceChange: 0.01, oiChange: -0.02, hasPrev: true }).oiSignal, "SHORT");
+});
+test("confluenceSignal: confluence only when BOTH agree", () => {
+  // funding SHORT + oi SHORT → confluence SHORT
+  assert.equal(confluenceSignal({ fundingRate: 0.0002, priceChange: 0.01, oiChange: -0.02, hasPrev: true }).confluence, "SHORT");
+  // funding SHORT + oi LONG → no confluence
+  assert.equal(confluenceSignal({ fundingRate: 0.0002, priceChange: -0.01, oiChange: 0.02, hasPrev: true }).confluence, "NONE");
+});
+test("confluenceSignal: no prior snapshot → oiSignal NONE", () => {
+  assert.equal(confluenceSignal({ fundingRate: 0, priceChange: 0.05, oiChange: 0.05, hasPrev: false }).oiSignal, "NONE");
 });

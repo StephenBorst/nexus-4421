@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal } from "./logic.mjs";
 
 // Recover the signer address from an EIP-191 personal_sign signature.
 function recoverEthAddress(message, sigHex) {
@@ -3299,6 +3299,43 @@ document.getElementById("btn").addEventListener("click",go);
         };
       }).sort((a, b) => (b.opened_at || 0) - (a.opened_at || 0));
       return json({ count: positions.length, positions }, request);
+    }
+
+    // ── /signals — machine-readable current funding + OI-divergence reads ────────
+    // The agent's actual edge, exposed as data: per symbol, the funding-extreme
+    // (fade-the-crowd) + OI-divergence reads + confluence, classified by the SAME
+    // rules as the autonomous agent (confluenceSignal, tested). Deltas are vs the
+    // brain's ~5-min prior snapshot (market:prev:{symbol}). The premium x402 product.
+    if (parts[0] === "signals") {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+      const KV = env.NEXUS_AGENT || env.LAB_STORE;
+      const SYMS = ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC", "PERP_ARB_USDC", "PERP_HYPE_USDC", "PERP_XRP_USDC", "PERP_DOGE_USDC"];
+      const rows = await Promise.all(SYMS.map(async (sym) => {
+        try {
+          const d = (await (await fetch(`https://api-evm.orderly.org/v1/public/futures/${sym}`)).json())?.data;
+          if (!d || !d.mark_price) return null;
+          const mark = Number(d.mark_price), funding = Number(d.last_funding_rate) || 0, oi = Number(d.open_interest) || 0;
+          const prev = JSON.parse((await KV.get(`market:prev:${sym}`)) || "null");
+          const priceChange = prev?.price ? (mark - prev.price) / prev.price : 0;
+          const oiChange = prev?.oi ? (oi - prev.oi) / prev.oi : 0;
+          const sig = confluenceSignal({ fundingRate: funding, priceChange, oiChange, hasPrev: !!prev });
+          return {
+            symbol: sym.replace("PERP_", "").replace("_USDC", ""),
+            mark_price: mark, funding_rate_8h: funding, open_interest: oi,
+            price_change_pct: Number((priceChange * 100).toFixed(3)),
+            oi_change_pct: Number((oiChange * 100).toFixed(3)),
+            funding_signal: sig.fundingSignal, oi_signal: sig.oiSignal, confluence: sig.confluence,
+          };
+        } catch { return null; }
+      }));
+      const signals = rows.filter(Boolean).sort(
+        (a, b) => (b.confluence !== "NONE") - (a.confluence !== "NONE") || Math.abs(b.funding_rate_8h) - Math.abs(a.funding_rate_8h)
+      );
+      return json({
+        generated_at: new Date().toISOString(),
+        note: "Funding-extreme (fade the crowd) + OI-divergence reads, same rules as the Nexus autonomous agent. confluence = both rules agree (strongest). Deltas vs ~5-min prior snapshot.",
+        signals,
+      }, request);
     }
 
     // ── /desks — team layer ("clans") ranked by aggregate TRUSTLESS call score ──

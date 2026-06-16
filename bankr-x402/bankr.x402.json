@@ -2,8 +2,20 @@
   "network": "base",
   "services": {
     "nexus-callers": {
-      "description": "Nexus verified-caller leaderboard — trustless trading calls graded from public price and anchored on-chain (unfakeable). Machine-readable JSON for agents.",
+      "description": "Nexus verified-caller leaderboard — trustless trading calls graded from public price and anchored on-chain (unfakeable). Machine-readable JSON.",
       "price": "10000",
+      "currency": "NEXUS",
+      "tokenAddress": "0x3D958634ab725B627919EF8F2Ed59227309fDba3"
+    },
+    "nexus-agents-live": {
+      "description": "Nexus LIVE NOW — currently-open agent + opted-in human positions with uPnL recomputed from public mark price. Real-time, verifiable.",
+      "price": "10000",
+      "currency": "NEXUS",
+      "tokenAddress": "0x3D958634ab725B627919EF8F2Ed59227309fDba3"
+    },
+    "nexus-signals": {
+      "description": "Nexus signals — current funding-extreme + OI-divergence reads per symbol, classified by the same rules as the Nexus autonomous agent. The edge, as data. PREMIUM.",
+      "price": "50000",
       "currency": "NEXUS",
       "tokenAddress": "0x3D958634ab725B627919EF8F2Ed59227309fDba3"
     }
