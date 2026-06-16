@@ -6,6 +6,7 @@ import { HttpsRequiredWarning } from "@/components/HttpsRequiredWarning";
 import OnboardingModal from "@/components/OnboardingModal";
 import NexusAssistant from "@/components/NexusAssistant";
 import LiveAlerts from "@/components/LiveAlerts";
+import VhDebug from "@/components/VhDebug";
 import { withBasePath } from "./utils/base-path";
 import { getSEOConfig, getUserLanguage } from "./utils/seo";
 export default function App() {
@@ -51,6 +52,7 @@ export default function App() {
         <link rel="icon" type="image/webp" href={withBasePath("/favicon.webp")} />
       </Helmet>
       <HttpsRequiredWarning />
+      <VhDebug />
       {showOnboarding && (
         <OnboardingModal
           onComplete={() => {
