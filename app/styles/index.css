@@ -54,4 +54,11 @@
   .oui-scaffold-footer {
     display: none !important;
   }
+  /* Leaderboard TOP void: the SDK title/header banner is a FIXED height
+     (oui-h-[114px] desktop / oui-h-[88px] mobile) but renders little/no content on
+     phones → ~88px of empty space above the table. Let it size to its content. */
+  .oui-trading-leaderboard-title {
+    height: auto !important;
+    min-height: 0 !important;
+  }
 }
