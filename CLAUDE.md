@@ -429,6 +429,53 @@ The cold-start/distribution weapon: a slim Nexus surface native to Warpcast, whe
   `package-lock.json` + desyncs `yarn.lock` → CI `yarn install` fails → deploy skipped). Bit us once on the
   miniapp-sdk add.
 
+### ✅ PUBLISHED + INSTALLABLE (2026-06-15) — full money loop + the manifest gotchas that blocked publishing
+- **Money loop COMPLETE:** added **in-frame WITHDRAWAL** (deposit/trade/close already shipped). Frame EOA signs
+  the Orderly `Withdraw` EIP-712 CLIENT-side (non-custodial); two lab-api routes: `POST /withdraw/prepare`
+  (derives ed25519 from walletSig, gets withdraw_nonce, returns typedData; `settle:true` settles PnL first +
+  recomputes safe amount from free_collateral) + `POST /withdraw/submit` (relays `{message,signature}` to
+  `/v1/withdraw_request`; returns `needsSettle` on Orderly **code 78** → client re-signs with settle:true).
+  Receiver is server-guarded to == caller's wallet. Ported from `/proxy/bankr-withdraw` (which signs server-side
+  via Bankr). Withdraw `verifyingContract` = `0x6F7a338F2aA472838dEFD3283eB360d4Dff5D203` **passed in the POST body**.
+- **⚠️ Orderly OFF-CHAIN EIP-712 verifyingContract = the all-C sentinel `0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC`**
+  for **registration/AddOrderlyKey** (Orderly reconstructs the hash with THIS + ecrecovers). The miniapp had copied
+  the wrong `0x6F7a338F…` from the Bankr path → **"address and signature do not match"** on every enable/trade.
+  Fixed. (The Bankr/withdraw flows use `0x6F7a338F…` but ONLY because they pass `verifyingContract` in the body.)
+  Match the web ENABLE flow / Orderly docs: registration→all-C; withdraw→0x6F7a338F-in-body.
+- **Trading slickness pass:** live price + 24h change + **funding** header + **candlestick chart** (dependency-free
+  SVG from public `GET /tv/history` OHLC) + 24h vol / OI / funding-countdown — all public client fetches, 25s poll,
+  fail-soft. **ALL ~106 markets** via a search picker (full list from `/v1/public/info`; popular quick-chips +
+  search) replacing the hardcoded 6. **Per-asset max leverage = 1/base_imr** (BTC 100x, small-caps 20x) drives
+  slider max + dynamic preset chips + clamps on symbol switch. **Accuracy line:** position-size estimate + est.
+  liquidation price (mark ± maint-margin). **Progressive disclosure** (Fund/Withdraw behind a ⚙ MANAGE FUNDS
+  toggle). **Copy-trade loop:** ⚡ TRADE on a feed call prefills the panel (symbol+direction, highlights the side).
+  **Share PnL to cast** (↗ on each open position → composeCast w/ entry→mark + uPnL, embeds /mini).
+- **⚠️ PUBLISHING/MANIFEST — the gotchas that blocked "Add" (all fixed; see memory `farcaster-miniapp-publish-gotchas`):**
+  (1) A Mini App is public the moment its **signed manifest** is valid — no app-store approval. (2) You CANNOT open
+  it by visiting the URL in a browser — only in-frame (cast embed Launch button / dev tool / search). (3) Manifest
+  `iconUrl` **must be 1024×1024 PNG, no alpha** — a `.webp` or 512px fails validation → can't add. (4) Top-level key
+  must be **`miniapp`** (current spec); `frame` is legacy alias — include both. (5) **Field length limits are
+  enforced and reject the WHOLE manifest** — `subtitle` ≤30 (a 34-char value gave `addMiniApp()` "Invalid domain
+  manifest"), name ≤32, description ≤170. (6) For casts to render a **Launch button**, add `fc:miniapp` (+`fc:frame`
+  alias) embed meta to `index.html` (crawler reads STATIC html, so per-route JS-injected tags don't count). (7)
+  Diagnostic that cracked it: **surface the `addMiniApp()` error** instead of swallowing it. (8) `accountAssociation`
+  verified: sig recovers to FID 389456's on-chain custody (IdRegistry `custodyOf` on Optimism). Manifest served as
+  `application/json`, no BOM.
+- **PnL share posters:** custom posters live in `public/pnl/poster_bg_{1..4}.png` (+ `.webp`), gated by
+  `VITE_USE_CUSTOM_PNL_POSTERS=true` / `VITE_CUSTOM_PNL_POSTER_COUNT`. ⚠️ Orderly overlays its OWN text (title, %,
+  stats, **QR bottom-left**) on the **LEFT** — so the poster bg must keep the **left dark/empty** and put branding
+  on the RIGHT, else it doubles/garbles (bit us). Built one from the real brand banner (`nexustradinglabs.com/preview.png`).
+
+### Trading page (perp) customization
+- **Collapsible order book** (`app/pages/perp/Symbol.tsx`): desktop ⊟/⊞ toggle hides the order book via
+  `<TradingPage disableFeatures={["orderBook"]}>` → chart reflows wider; persisted (`nexus_ob_collapsed`).
+  ⚠️ `TradingFeatures` enum is NOT exported — pass the string literal, typed via the prop's own type; and **`key`
+  the TradingPage** on the toggle so the SDK re-applies disableFeatures (it reads them at mount).
+- **⚠️ `<MarketsHomePage>` / `<TradingPage>` are black-box SDK widgets** — only the props they expose are
+  customizable (`disableFeatures`/`overrideFeatures` on TradingPage; `comparisonProps`/`onSymbolChange` on Markets).
+  The markets overview "New listings/gainers/losers" cards render a FIXED preview (no scroll prop) — making them
+  scrollable needs a rebuild from granular widgets (`NewListingListWidget`, `MarketsListWidget`, etc.), not a tweak.
+
 ## Testing (money-path + trust-path)
 - Pure logic is extracted into `logic.mjs` next to each worker's `index.js` (which imports it, so
   tests cover the REAL deployed code, not a copy). Tests = zero-dep `node:test` in `logic.test.mjs`.
