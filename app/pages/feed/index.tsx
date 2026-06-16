@@ -1153,31 +1153,34 @@ function FeedEmptyState({ variant }: { variant: "feed" | "ranks" }) {
 // ─── Thin-feed contribute prompt ─────────────────────────────────────────────
 // Shown when the feed has a few theses but is still sparse — converts "looks
 // quiet" into "be one of the first" instead of letting a recruit bounce.
-function ContributePrompt() {
+function ContributePrompt({ prominent = false }: { prominent?: boolean }) {
   const navigate = useNavigate();
   return (
     <div style={{
-      background: "linear-gradient(180deg,#0a1a0e,#0a0e0a)", border: "1px solid #1a4a2a",
-      borderRadius: 6, padding: "16px 18px", display: "flex", alignItems: "center",
-      gap: 14, flexWrap: "wrap", marginTop: 4,
+      background: "linear-gradient(180deg,#0a1a0e,#0a0e0a)", border: `1px solid ${prominent ? "#00ff88" : "#1a4a2a"}`,
+      borderRadius: 6, padding: prominent ? "18px 20px" : "16px 18px", display: "flex", alignItems: "center",
+      gap: 14, flexWrap: "wrap", marginBottom: prominent ? 12 : 0, marginTop: prominent ? 0 : 4,
+      boxShadow: prominent ? "0 0 0 1px #00ff8830, 0 8px 24px -12px #00ff8840" : undefined,
     }}>
       <div style={{ flex: 1, minWidth: 200 }}>
-        <div style={{ fontFamily: "monospace", fontSize: 12, color: "#00ff88", fontWeight: "bold", marginBottom: 3 }}>
-          📡 The feed's still early — claim your spot
+        <div style={{ fontFamily: "monospace", fontSize: prominent ? 14 : 12, color: "#00ff88", fontWeight: "bold", marginBottom: 4 }}>
+          {prominent ? "📡 Be the first verified caller on Nexus" : "📡 The feed's still early — claim your spot"}
         </div>
-        <div style={{ fontFamily: "monospace", fontSize: 10, color: "#5a7a6a", lineHeight: 1.55 }}>
-          Publish a thesis and it's graded against public price, on-chain. Early callers build rep fastest — get to 5 graded calls and you're a Verified Caller.
+        <div style={{ fontFamily: "monospace", fontSize: prominent ? 11 : 10, color: "#7a9a8a", lineHeight: 1.6 }}>
+          {prominent
+            ? "Post a call (symbol · direction · entry/stop/target) — it's graded against public price on-chain, not self-reported. 5 graded calls = Verified Caller. Get in before the board fills up."
+            : "Publish a thesis and it's graded against public price, on-chain. Early callers build rep fastest — get to 5 graded calls and you're a Verified Caller."}
         </div>
       </div>
       <button
         onClick={() => navigate("/lab?tab=thesis")}
         style={{
-          background: "#00ff8815", border: "1px solid #00ff88", borderRadius: 4,
-          color: "#00ff88", fontFamily: "monospace", fontSize: 11, fontWeight: "bold",
-          padding: "9px 16px", cursor: "pointer", letterSpacing: "0.05em", flexShrink: 0,
+          background: prominent ? "#00ff88" : "#00ff8815", border: "1px solid #00ff88", borderRadius: 4,
+          color: prominent ? "#04130c" : "#00ff88", fontFamily: "monospace", fontSize: 11, fontWeight: "bold",
+          padding: prominent ? "11px 18px" : "9px 16px", cursor: "pointer", letterSpacing: "0.05em", flexShrink: 0,
         }}
       >
-        → PUBLISH A THESIS
+        → POST YOUR FIRST CALL
       </button>
     </div>
   );
@@ -1501,6 +1504,10 @@ export default function FeedPage() {
         {/* ◆ LIVE NOW — open positions (agents + opted-in humans, live & verifiable) */}
         {view === "feed" && <LiveNow />}
 
+        {/* Cold-start: when the feed is sparse, put the "post the first call" CTA up top
+            so every visitor sees it immediately (not buried at the bottom). */}
+        {view === "feed" && !loading && feed.length < 3 && <ContributePrompt prominent />}
+
         {/* ── FOLLOWING VIEW ── */}
         {view === "following" && (
           <>
@@ -1640,8 +1647,9 @@ export default function FeedPage() {
                     onFollowToggle={handleFollowToggle}
                   />
                 ))}
-                {/* Thin feed → invite contribution instead of just trailing off. */}
-                {feed.length < 12 && <ContributePrompt />}
+                {/* Thin feed → invite contribution instead of just trailing off.
+                    (Skip when very sparse — the prominent top nudge already shows.) */}
+                {feed.length >= 3 && feed.length < 12 && <ContributePrompt />}
               </div>
             )}
           </>
