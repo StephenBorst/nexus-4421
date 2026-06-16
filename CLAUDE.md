@@ -62,6 +62,16 @@ is everything built on top:
 - XMTP: `app/hooks/useXMTP.ts` (env: `production`). Unread tracking: `app/utils/xmtpUnread.ts`.
 
 ## ⚠️ DEPLOYMENT — read before touching CI/CD
+- **⚠️ REPO TOPOLOGY (single source of truth = `StephenBorst/nexus-4421`).** Fork chain:
+  `OrderlyNetworkDexCreator/dex-creator-template` (upstream template) → `OrderlyNetworkDexCreator/nexus-4421`
+  (Orderly DEX Creator's managed fork → deploys to **GitHub Pages**, NOT prod; we don't control it — it's in
+  Orderly's org) → **`StephenBorst/nexus-4421`** (OUR repo → Cloudflare → `trade.nexustradinglabs.com`, all
+  custom product work). **The `dex.orderly.network/en/dex/config` UI writes to the Orderly FORK, not prod** —
+  so changes made there (broker name, theme, menus, PnL posters, etc.) DO NOT reach the live site. **Rule: make
+  ALL config + code changes in `StephenBorst` (edit `public/config.js` directly); do NOT use the Orderly config
+  UI** (or if you must, mirror the change into `public/config.js`). The two have diverged far past meaningful
+  merge — don't try to sync repos; just keep prod authoritative. (2026-06-15 reconcile: pulled 4 drifted config
+  values fork→prod — APP/SEO description, theme `#000000`, menus incl. Campaigns.)
 - **Live app** = Cloudflare **Pages** project **`nexus-trading-lab`** → domains `trade.nexustradinglabs.com`
   + `nexus-trading-lab.pages.dev`. **It has NO Git connection** — deployed ONLY by the custom GitHub
   Action `.github/workflows/deploy.yml` (wrangler direct-upload). Do NOT expect Git auto-builds here.
