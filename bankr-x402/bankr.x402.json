@@ -1,0 +1,11 @@
+{
+  "network": "base",
+  "services": {
+    "nexus-callers": {
+      "description": "Nexus verified-caller leaderboard — trustless trading calls graded from public price and anchored on-chain (unfakeable). Machine-readable JSON for agents.",
+      "price": "10000",
+      "currency": "NEXUS",
+      "tokenAddress": "0x3D958634ab725B627919EF8F2Ed59227309fDba3"
+    }
+  }
+}
