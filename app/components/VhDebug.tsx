@@ -25,12 +25,22 @@ export default function VhDebug() {
   const de = document.documentElement;
   const root = document.querySelector(".oui-scaffold-root") as HTMLElement | null;
   const rootRect = root?.getBoundingClientRect();
+  // Measure what each CSS viewport unit actually resolves to in this webview.
+  const probe = (unit: string) => {
+    const d = document.createElement("div");
+    d.style.cssText = `position:absolute;top:0;left:0;width:1px;height:100${unit};visibility:hidden;pointer-events:none`;
+    document.body.appendChild(d);
+    const h = Math.round(d.getBoundingClientRect().height);
+    d.remove();
+    return h;
+  };
   const rows: [string, string | number][] = [
     ["innerHeight", window.innerHeight],
     ["outerHeight", window.outerHeight],
     ["visualVp.h", window.visualViewport ? Math.round(window.visualViewport.height) : "n/a"],
     ["docEl.clientH", de.clientHeight],
     ["screen.avail", window.screen?.availHeight ?? "n/a"],
+    ["svh / dvh / lvh", `${probe("svh")} / ${probe("dvh")} / ${probe("lvh")}`],
     ["--app-vh", getComputedStyle(de).getPropertyValue("--app-vh").trim() || "unset"],
     ["scaffold.h", rootRect ? Math.round(rootRect.height) : "no-root"],
     ["scaffold.bottom", rootRect ? Math.round(rootRect.bottom) : "no-root"],

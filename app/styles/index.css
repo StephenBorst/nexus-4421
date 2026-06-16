@@ -49,9 +49,12 @@
       mobile and let the content area reclaim the space. */
 @media (max-width: 767px) {
   .oui-scaffold-root {
-    /* --app-vh is set from window.innerHeight in App.tsx (robust in wallet webviews
-       like Zerion that mis-compute dvh); 100dvh is the fallback for normal browsers. */
-    height: var(--app-vh, 100dvh) !important;
+    /* Wallet webviews (Zerion) report a SMALL viewport (svh/dvh ≈ innerHeight) but
+       render into the LARGE viewport — so dvh/innerHeight leaves a dead strip below
+       the app. lvh = large viewport height fills the whole surface. dvh is the
+       fallback for browsers without lvh. */
+    height: 100dvh !important;
+    height: 100lvh !important;
   }
   .oui-scaffold-footer {
     display: none !important;
