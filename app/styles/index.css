@@ -39,22 +39,24 @@
   min-width: max-content;
 }
 
-/* Fix mobile dead space — two parts:
-   1) 100vh includes browser chrome; 100dvh sizes to the visible viewport.
-   2) The Orderly scaffold footer ("Charts powered by TradingView" + socials) is
-      a position:fixed dark bar pinned to the layout-viewport bottom. On a mobile
-      in-app browser the layout viewport is taller than the visible area, so that
-      fixed bar (plus the h-full container overflow) shows up as a dead dark band
-      above the browser toolbar. It's low-value chrome on a phone — hide it on
-      mobile and let the content area reclaim the space. */
+/* ⚠️ Wallet-webview dead space (Zerion etc.): the webview reports EVERY CSS viewport
+   unit the same (innerHeight = svh = dvh = lvh ≈ 684) but PAINTS a taller surface
+   (down to its URL bar, ~755) and fills the extra ~70px strip with the page
+   background. No CSS height can reach below the reported viewport — so we make that
+   strip seamless instead: force the page background to the app dark everywhere, and
+   stop overscroll from revealing a different color. (Verified via ?vhdebug on Zerion.) */
+html, body, #root {
+  background: #0a0e0a !important;
+}
+html, body {
+  overscroll-behavior: none;
+}
+
+/* Fix mobile dead space: 100vh includes browser chrome; 100dvh sizes to the visible
+   viewport. Also hide the low-value scaffold footer on phones. */
 @media (max-width: 767px) {
   .oui-scaffold-root {
-    /* Wallet webviews (Zerion) report a SMALL viewport (svh/dvh ≈ innerHeight) but
-       render into the LARGE viewport — so dvh/innerHeight leaves a dead strip below
-       the app. lvh = large viewport height fills the whole surface. dvh is the
-       fallback for browsers without lvh. */
     height: 100dvh !important;
-    height: 100lvh !important;
   }
   .oui-scaffold-footer {
     display: none !important;
