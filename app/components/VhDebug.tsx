@@ -40,10 +40,11 @@ export default function VhDebug() {
     ["visualVp.h", window.visualViewport ? Math.round(window.visualViewport.height) : "n/a"],
     ["docEl.clientH", de.clientHeight],
     ["screen.avail", window.screen?.availHeight ?? "n/a"],
-    ["svh / dvh / lvh", `${probe("svh")} / ${probe("dvh")} / ${probe("lvh")}`],
+    ["svh/dvh/lvh/vh", `${probe("svh")}/${probe("dvh")}/${probe("lvh")}/${probe("vh")}`],
     ["--app-vh", getComputedStyle(de).getPropertyValue("--app-vh").trim() || "unset"],
     ["scaffold.h", rootRect ? Math.round(rootRect.height) : "no-root"],
     ["scaffold.bottom", rootRect ? Math.round(rootRect.bottom) : "no-root"],
+    ["navBar.bottom", (() => { const n = document.querySelector(".oui-scaffold-bottomNav") as HTMLElement | null; return n ? Math.round(n.getBoundingClientRect().bottom) : "no-nav"; })()],
     ["gap(inner-bottom)", rootRect ? Math.round(window.innerHeight - rootRect.bottom) : "n/a"],
     ["dpr", window.devicePixelRatio],
   ];
