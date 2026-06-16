@@ -5,6 +5,7 @@ import { useLabStorage } from "@/hooks/useLabStorage";
 import { HoldersRoom } from "@/components/HoldersRoom";
 import { QuickTrade } from "./QuickTrade";
 import { NexusMarket } from "@/components/NexusMarket";
+import { NexusBrokerStats } from "@/components/NexusBrokerStats";
 import { NexusPro } from "@/components/NexusPro";
 import type { TabId, DayGroup, ProcessedTrade } from "./types";
 import { getDayKey } from "./helpers";
@@ -158,6 +159,9 @@ export default function TheLabPage() {
       <div style={{ padding: isMobile ? 12 : 16 }}>
         <div style={{ marginBottom: 12 }}>
           <NexusMarket />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <NexusBrokerStats />
         </div>
         {connected && (
           <div style={{ marginBottom: 12 }}>
