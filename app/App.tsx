@@ -20,6 +20,24 @@ export default function App() {
       setShowOnboarding(false);
     }
   }, []);
+
+  // Robust mobile viewport height. Some in-app wallet browsers (e.g. Zerion) mis-compute
+  // CSS 100dvh/100vh → the scaffold renders taller than the visible area → app-wide dead
+  // space on the mobile layout (desktop view is fine). window.innerHeight is reported
+  // correctly by these webviews, so expose it as --app-vh and use it for the mobile height.
+  useEffect(() => {
+    const setVh = () =>
+      document.documentElement.style.setProperty("--app-vh", `${window.innerHeight}px`);
+    setVh();
+    window.addEventListener("resize", setVh);
+    window.addEventListener("orientationchange", setVh);
+    window.visualViewport?.addEventListener("resize", setVh);
+    return () => {
+      window.removeEventListener("resize", setVh);
+      window.removeEventListener("orientationchange", setVh);
+      window.visualViewport?.removeEventListener("resize", setVh);
+    };
+  }, []);
   
   return (
     <>

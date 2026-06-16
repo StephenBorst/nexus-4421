@@ -49,7 +49,9 @@
       mobile and let the content area reclaim the space. */
 @media (max-width: 767px) {
   .oui-scaffold-root {
-    height: 100dvh !important;
+    /* --app-vh is set from window.innerHeight in App.tsx (robust in wallet webviews
+       like Zerion that mis-compute dvh); 100dvh is the fallback for normal browsers. */
+    height: var(--app-vh, 100dvh) !important;
   }
   .oui-scaffold-footer {
     display: none !important;
