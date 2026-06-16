@@ -20,7 +20,16 @@ is everything built on top:
 - **Money map:** broker fees → `borst.eth` (Orderly-registered, don't churn) · subs/AI revenue → EOA
   `0x06cD9c281E6ab09906B46a10e059F2770EfdE49A` (`SUBSCRIPTION_RECEIVER`) · **treasury Safe**
   `0x4Fe2c01bbeFaFFa35706C994646a3F8493B1C733` (1/1, Arbitrum+Base, signer `0x53Ce…9D33`). Sweep the
-  two receivers → the Safe on a cadence. Safe is set as `NEXUS_TREASURY_ADDRESS` → public treasury banner live.
+  receivers → the Safe on a cadence. Safe is set as `NEXUS_TREASURY_ADDRESS` → public treasury banner live.
+- **⚠️ x402 data revenue (LIVE 2026-06-15) → 3rd sweep source.** Three Bankr x402 cloud endpoints sell Nexus
+  data priced in **$NEXUS** on Base (`x402.bankr.bot/<deployerWallet>/<name>`): `nexus-signals` (50k $NEXUS/req,
+  the agent's funding+OI edge via `/signals`), `nexus-callers` (10k, `/theses/leaderboard`), `nexus-agents-live`
+  (10k, `/agents/live`). Bankr hosts + wraps payment; we just supply handler+config (`bankr-x402/`). **Payout =
+  the DEPLOYER wallet** (currently the Bankr wallet `0xd9f7…b449`), **95% after Bankr's 5% fee**, accrues as the
+  $NEXUS ERC-20 (no withdraw step). To route to treasury: **sweep `0xd9f7…b449` → the Safe on the same cadence**
+  (do NOT redeploy from the Safe — a multisig can't be the Bankr deployer; or ask Bankr support to migrate
+  `payTo`). Narrative: treasury accumulates $NEXUS from EARNED, recurring revenue (stronger than "buy the lows");
+  agents needing $NEXUS to pay = token demand from usage. x402 challenge verified live (402 + correct amounts).
 - **PRO payment rail LIVE** (`PAYMENTS_LIVE=true`): `POST /sub/verify {txHash,chain}` verifies ONE tx receipt
   → grants 30d PRO to the tx's `from` (spoof-proof, replay-guarded). USDC/Arbitrum $20 · $NEXUS/Base $15
   (DexScreener-priced, 12% tolerance, fails closed). `walletIsPro` reads `sub:{addr}`. Logic+tests in lab-api `logic.mjs`.
