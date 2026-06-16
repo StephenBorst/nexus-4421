@@ -26,7 +26,10 @@ export default function App() {
       <Helmet>
         <html lang={seoConfig.language || defaultLanguage} />
         <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Must keep viewport-fit=cover — Helmet was overriding index.html's and dropping it,
+            so wallet in-app browsers reserved safe-area margins → app-wide dead space.
+            Landing keeps cover and is clean; this restores parity. */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link rel="icon" type="image/webp" href={withBasePath("/favicon.webp")} />
       </Helmet>
       <HttpsRequiredWarning />
