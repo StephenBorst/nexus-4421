@@ -150,6 +150,28 @@ export default function AnalyzePage() {
           </div>
         </>
       )}
+
+      {/* Cross-verify on Orderly — the trustless bridge. Shows for any valid address
+          (even with no Hyperliquid history), deep-linking the wallet into Orderly's
+          official explorer (trades, deposits/withdrawals, liquidations, PnL). */}
+      {address && isAddress(address) && !loading && (
+        <div style={{ marginTop: trades && trades.length ? 16 : 24, padding: "16px 18px", border: "1px solid #15324a", borderRadius: 8, background: "#0a1320" }}>
+          <div style={{ fontSize: 11, letterSpacing: "0.15em", color: "#4a9fff", marginBottom: 8 }}>// CROSS-VERIFY ON ORDERLY</div>
+          <p style={{ fontSize: 12.5, color: "#8aa6c0", lineHeight: 1.6, margin: "0 0 12px", maxWidth: 640 }}>
+            Nexus runs on <b style={{ color: "#cfe0f0" }}>Orderly Network</b>&apos;s omnichain liquidity. Don&apos;t trust our
+            numbers — independently verify this wallet&apos;s on-chain trading (executed trades, deposits &amp;
+            withdrawals, liquidations, realized PnL) on Orderly&apos;s official explorer.
+          </p>
+          <a
+            href={`https://orderly-dashboard.orderly.network/explorer?q=${address}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: "inline-block", background: "#0a1f33", color: "#4a9fff", border: "1px solid #1f4a6e", textDecoration: "none", borderRadius: 6, padding: "10px 18px", fontFamily: mono, fontWeight: 700, fontSize: 12, letterSpacing: "0.06em" }}
+          >
+            VERIFY {address.slice(0, 6)}…{address.slice(-4)} ON ORDERLY ↗
+          </a>
+        </div>
+      )}
     </div>
   );
 }
