@@ -23,12 +23,11 @@ const COOLDOWN_MS = 15 * 60 * 1000; // 15 min between trades
 // heartbeat instead of looking abandoned (cold-start fix). Records are written
 // per-user to agent:feed:{address} (single-writer: only this user's processUser
 // touches its own key, so no cross-user race). lab-api's /feed merges them.
-// ⚠️ OFF while the strategy's edge is being re-validated (net-negative right now).
-// Broadcasting a losing beta to the public feed actively undermines the "makes you
-// a better trader" brand. The agent's OWNER still sees full truth on their dash;
-// this only stops PUBLIC marketing of unproven trades. Re-enable (true) once the
-// agent is net-positive in PAPER — ideally gate it to net-positive agents then.
-const PUBLISH_AGENT_FEED = false;
+// Re-enabled: the agent's win rate / track record is already public on the agents
+// leaderboard, so withholding entries from the feed wasn't actually hiding the
+// performance — it just made the agent look abandoned. The OWNER always sees full
+// truth on their dash; this surfaces real autonomous entries/closes publicly again.
+const PUBLISH_AGENT_FEED = true;
 // Keep simulated PAPER trades OUT of the public feed — the feed is the "these are
 // real calls" surface and mixing sims (even labeled) dilutes the trust moat.
 const PUBLISH_PAPER_TO_FEED = false;
