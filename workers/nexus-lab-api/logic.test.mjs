@@ -253,3 +253,109 @@ test("confluenceSignal: confluence only when BOTH agree", () => {
 test("confluenceSignal: no prior snapshot → oiSignal NONE", () => {
   assert.equal(confluenceSignal({ fundingRate: 0, priceChange: 0.05, oiChange: 0.05, hasPrev: false }).oiSignal, "NONE");
 });
+
+// ── Request-bound (v2) signing ──────────────────────────────────────────────
+import { buildChallenge, verifyV2, AUTH_V2_DOMAIN } from "./logic.mjs";
+
+const WALLET = "0xAbC0000000000000000000000000000000000001";
+const walletL = WALLET.toLowerCase();
+// Fake injected ecrecover: returns WALLET only for the sig "GOOD" over the exact
+// challenge it was minted for; anything else recovers a different address. This
+// isolates the binding/expiry/replay logic from real crypto (recoverEthAddress is
+// already battle-tested elsewhere).
+const mkRecover = (validChallenge) => (challenge, sig) =>
+  (sig === "GOOD" && challenge === validChallenge) ? WALLET : "0xdead000000000000000000000000000000000000";
+
+const mkRecord = (over = {}) => ({
+  action: "withdraw", wallet: walletL, nonce: "n-123", amount: "25.5", expires: 2000, ...over,
+});
+// Build the challenge a correct client would sign for a given record.
+const chalFor = (rec) => buildChallenge(rec);
+
+test("buildChallenge: canonical format, lower-cases wallet, '-' for empty amount", () => {
+  const c = buildChallenge({ action: "trade", wallet: WALLET, nonce: "n1", amount: "", expires: 100 });
+  assert.equal(c,
+    `nexus:v2\naction:trade\nwallet:${walletL}\nnonce:n1\namount:-\ndomain:${AUTH_V2_DOMAIN}\nexpires:100`);
+});
+
+test("verifyV2: valid signature + matching request → ok", () => {
+  const rec = mkRecord();
+  const v = verifyV2({ record: rec, sig: "GOOD", expected: { action: "withdraw", amount: "25.5", wallet: WALLET },
+    now: 1000, recover: mkRecover(chalFor(rec)) });
+  assert.equal(v.ok, true);
+  assert.equal(v.wallet, walletL);
+});
+
+test("verifyV2: expired challenge → reject", () => {
+  const rec = mkRecord();
+  const v = verifyV2({ record: rec, sig: "GOOD", expected: { action: "withdraw", amount: "25.5" },
+    now: 2001, recover: mkRecover(chalFor(rec)) });
+  assert.equal(v.ok, false);
+  assert.equal(v.reason, "challenge expired");
+});
+
+test("verifyV2: amount mismatch (signed 25.5, request 999) → reject", () => {
+  const rec = mkRecord();
+  const v = verifyV2({ record: rec, sig: "GOOD", expected: { action: "withdraw", amount: "999" },
+    now: 1000, recover: mkRecover(chalFor(rec)) });
+  assert.equal(v.ok, false);
+  assert.equal(v.reason, "amount mismatch");
+});
+
+test("verifyV2: action mismatch (signed withdraw, request trade) → reject", () => {
+  const rec = mkRecord();
+  const v = verifyV2({ record: rec, sig: "GOOD", expected: { action: "trade", amount: "25.5" },
+    now: 1000, recover: mkRecover(chalFor(rec)) });
+  assert.equal(v.ok, false);
+  assert.equal(v.reason, "action mismatch");
+});
+
+test("verifyV2: signer recovers to a DIFFERENT wallet → reject", () => {
+  const rec = mkRecord();
+  // wrong sig → fake recover returns the dead address
+  const v = verifyV2({ record: rec, sig: "FORGED", expected: { action: "withdraw", amount: "25.5" },
+    now: 1000, recover: mkRecover(chalFor(rec)) });
+  assert.equal(v.ok, false);
+  assert.equal(v.reason, "signature does not match wallet");
+});
+
+test("verifyV2: signature for a DIFFERENT challenge (replay onto new nonce) → reject", () => {
+  const rec = mkRecord({ nonce: "n-999" });
+  // recover only validates the ORIGINAL nonce's challenge; this record has a new nonce
+  const recoverForOldNonce = mkRecover(chalFor(mkRecord({ nonce: "n-123" })));
+  const v = verifyV2({ record: rec, sig: "GOOD", expected: { action: "withdraw", amount: "25.5" },
+    now: 1000, recover: recoverForOldNonce });
+  assert.equal(v.ok, false);
+  assert.equal(v.reason, "signature does not match wallet");
+});
+
+test("verifyV2: domain mismatch (signed for a foreign domain) → reject", () => {
+  const rec = mkRecord();
+  // client signed against a different domain; server verifies under AUTH_V2_DOMAIN
+  const foreign = buildChallenge({ ...rec, domain: "evil.example" });
+  const v = verifyV2({ record: rec, sig: "GOOD", expected: { action: "withdraw", amount: "25.5" },
+    now: 1000, recover: mkRecover(foreign) });
+  assert.equal(v.ok, false);
+  assert.equal(v.reason, "signature does not match wallet");
+});
+
+test("verifyV2: action not in the allow-list → reject", () => {
+  const rec = mkRecord({ action: "drain" });
+  const v = verifyV2({ record: rec, sig: "GOOD", now: 1000, recover: mkRecover(chalFor(rec)) });
+  assert.equal(v.ok, false);
+  assert.equal(v.reason, "action not allowed");
+});
+
+test("verifyV2: missing record / missing sig → reject (no throw)", () => {
+  assert.equal(verifyV2({ record: null, sig: "GOOD", now: 1, recover: mkRecover("") }).ok, false);
+  assert.equal(verifyV2({ record: mkRecord(), sig: "", now: 1000, recover: mkRecover("") }).reason, "missing signature");
+});
+
+test("verifyV2: wallet binding — request claims a different wallet than signed → reject", () => {
+  const rec = mkRecord();
+  const v = verifyV2({ record: rec, sig: "GOOD",
+    expected: { action: "withdraw", amount: "25.5", wallet: "0x9999999999999999999999999999999999999999" },
+    now: 1000, recover: mkRecover(chalFor(rec)) });
+  assert.equal(v.ok, false);
+  assert.equal(v.reason, "wallet mismatch");
+});
