@@ -1175,6 +1175,17 @@ export default {
       };
 
       if (walletSig && walletAddress) {
+        // Phase 3 (#14): request-bound v2 on user-wallet trades. Binds the single-use
+        // challenge to action+wallet+notional, so a leaked static walletSig can't place
+        // an order (or a different-sized one). No-op unless AUTH_V2 is on. Reduce-only
+        // exits (closePosition) skip the gate — they only ever shrink risk.
+        if (!isReduceOnly) {
+          const deniedV2 = await requireOwnerV2(env, request, {
+            action: "trade", wallet: walletAddress.toLowerCase().trim(), amount: String(notional),
+            nonce: body.nonce, v2Sig: body.v2Sig,
+          });
+          if (deniedV2) return deniedV2;
+        }
         // Check KV for a registered per-user Orderly key
         const walletNorm = walletAddress.toLowerCase().trim();
         const userRaw    = await env.LAB_STORE.get("user:" + walletNorm);
@@ -3176,6 +3187,10 @@ document.getElementById("btn").addEventListener("click",go);
       if (request.method === "POST" && parts[2] === "kill") {
         const kbody = await request.json().catch(() => ({}));
         const denied = requireOwner(kbody.walletSig); if (denied) return denied;
+        // Phase 3 (#14): kill force-closes positions → request-bound v2 on top of the
+        // static sig. No-op unless AUTH_V2 is on.
+        const deniedV2 = await requireOwnerV2(env, request, { action: "agent.kill", wallet: address, nonce: kbody.nonce, v2Sig: kbody.v2Sig });
+        if (deniedV2) return deniedV2;
         // Emergency stop must be un-clobberable. Write a DEDICATED kill flag the
         // exec consumes + clears — never rely on a state field the exec also
         // rewrites every minute (that write could race and drop the kill).
@@ -3202,6 +3217,12 @@ document.getElementById("btn").addEventListener("click",go);
         const mode = ["PAPER", "ASSISTED", "AUTONOMOUS"].includes(body?.mode) ? body.mode : "PAPER";
         if (mode === "AUTONOMOUS" && body?.confirm !== "GO LIVE") {
           return json({ error: "confirm_required", hint: 'Live trading needs confirm:"GO LIVE". The agent uses an order-only key that cannot withdraw.' }, request, 409);
+        }
+        // Phase 3 (#14): going live (AUTONOMOUS) arms real-money trading → request-bound
+        // v2 on top of confirm + static sig. Sim/assisted modes keep the static-sig gate.
+        if (mode === "AUTONOMOUS") {
+          const deniedV2 = await requireOwnerV2(env, request, { action: "agent.activate", wallet: address, nonce: body?.nonce, v2Sig: body?.v2Sig });
+          if (deniedV2) return deniedV2;
         }
         const defaults = { symbols: ["PERP_BTC_USDC"], leverage: 5, capitalPerTrade: 30, tpPercent: 1.5, slPercent: 0.75, maxHoldHours: 4, maxTradesPerDay: 10, maxDailyLossUsdc: 5, fundingThreshold: 0.01 };
         const config = { ...defaults, ...(body?.config || {}), mode };
@@ -3247,6 +3268,11 @@ document.getElementById("btn").addEventListener("click",go);
         if (!["PAPER", "ASSISTED", "AUTONOMOUS"].includes(mode)) return json({ error: "mode must be PAPER | ASSISTED | AUTONOMOUS" }, request, 400);
         if (mode === "AUTONOMOUS" && body?.confirm !== "GO LIVE") {
           return json({ error: "confirm_required", hint: 'Going live needs confirm:"GO LIVE".' }, request, 409);
+        }
+        // Phase 3 (#14): flipping live → request-bound v2 (same as activate go-live).
+        if (mode === "AUTONOMOUS") {
+          const deniedV2 = await requireOwnerV2(env, request, { action: "agent.mode", wallet: address, nonce: body?.nonce, v2Sig: body?.v2Sig });
+          if (deniedV2) return deniedV2;
         }
         const configRaw = await AGENT_KV.get(`agent:config:${address}`);
         if (!configRaw) return json({ error: "no_agent", hint: "Activate the agent first via /agent/:address/bankr/activate." }, request, 400);
