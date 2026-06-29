@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS } from "./logic.mjs";
 
 // Recover the signer address from an EIP-191 personal_sign signature.
 function recoverEthAddress(message, sigHex) {
@@ -53,6 +53,35 @@ function holdersRoomMessage(address, ts) {
 // Hosted-AI access challenge (proves the caller owns a PRO wallet).
 function aiAccessMessage(address, ts) {
   return `Nexus AI Access\nAddress: ${address.toLowerCase()}\nTimestamp: ${ts}`;
+}
+
+// ── Request-bound (v2) auth gate — Phase 2 of #14 ────────────────────────────
+// ADDITIVE + flag-gated: a no-op unless env.AUTH_V2 === "true", so enabling it is a
+// deliberate migration step and merging this changes no live behavior. When on, a
+// high-risk route requires a FRESH per-request challenge signature (single-use nonce
+// + action + amount + domain + short expiry) on top of the existing walletSig — so a
+// captured static walletSig alone can no longer move funds / arm an agent. The signed
+// fields are read back from the server-minted KV record (never the client body), then
+// the nonce is burned on success (replay guard). Returns a 401 json Response to short-
+// circuit the route, or null to proceed. recoverEthAddress is injected into verifyV2.
+async function requireOwnerV2(env, request, { action, wallet, amount, nonce, v2Sig }) {
+  if (env.AUTH_V2 !== "true") return null; // disabled during migration → no-op
+  const KV = env.NEXUS_AGENT || env.LAB_STORE;
+  if (!nonce || !v2Sig) {
+    return json({ error: "v2_auth_required",
+      hint: "GET /auth/challenge?wallet=&action=&amount= then sign the returned challenge; send { nonce, v2Sig } in the body." },
+      request, 401);
+  }
+  const recRaw = await KV.get(`auth:nonce:${nonce}`);
+  if (!recRaw) return json({ error: "challenge_unknown_or_expired" }, request, 401);
+  let record;
+  try { record = JSON.parse(recRaw); } catch { return json({ error: "challenge_corrupt" }, request, 401); }
+  const v = verifyV2({
+    record, sig: v2Sig, expected: { action, amount, wallet }, now: Date.now(), recover: recoverEthAddress,
+  });
+  if (!v.ok) return json({ error: "v2_verify_failed", reason: v.reason }, request, 401);
+  await KV.delete(`auth:nonce:${nonce}`); // single-use → burn so it can't be replayed
+  return null;
 }
 
 let resvgReady = false;
@@ -1606,6 +1635,29 @@ export default {
     }
 
     // ── /mark-price — get current mark price for a symbol ───────────────────
+    // ── GET /auth/challenge — mint a request-bound (v2) signing challenge (Phase 2 of #14) ──
+    // Public to ISSUE (it grants nothing); the signature proves ownership at verify time.
+    // ?wallet=&action=&amount=  → { challenge, nonce, expires }. The client signs `challenge`
+    // (personal_sign) and replays { nonce, v2Sig } on the high-risk call. The nonce + signed
+    // fields are stored server-side (KV, ~120s TTL) so verifyV2 rebuilds the canonical message
+    // from the TRUSTED record, not client input. Single-use: burned on first successful verify.
+    if (parts[0] === "auth" && parts[1] === "challenge" && request.method === "GET") {
+      const qa = url.searchParams;
+      const wallet = (qa.get("wallet") || "").toLowerCase().trim();
+      const action = qa.get("action") || "";
+      const amount = qa.has("amount") ? qa.get("amount") : null;
+      if (!/^0x[0-9a-f]{40}$/.test(wallet)) return json({ error: "valid wallet required (0x… 40 hex)" }, request, 400);
+      if (!AUTH_V2_ACTIONS.has(action)) return json({ error: "unknown action", allowed: [...AUTH_V2_ACTIONS] }, request, 400);
+      const TTL_SEC = 120;
+      const nonce = crypto.randomUUID();
+      const expires = Date.now() + TTL_SEC * 1000;
+      const record = { action, wallet, nonce, amount, expires };
+      const KV = env.NEXUS_AGENT || env.LAB_STORE;
+      await KV.put(`auth:nonce:${nonce}`, JSON.stringify(record), { expirationTtl: TTL_SEC });
+      const challenge = buildChallenge({ action, wallet, nonce, amount, expires });
+      return json({ challenge, nonce, expires, action, wallet, amount, ttlSeconds: TTL_SEC }, request);
+    }
+
     // Public endpoint, no auth required. Symbol: BTC, ETH, SOL, or PERP suffix.
     // Returns { symbol, markPrice, indexPrice, lastPrice }
     if (parts[0] === "mark-price" && request.method === "GET") {
@@ -2592,6 +2644,18 @@ export default {
         // Guard: the signed receiver must be the caller's own wallet (no redirecting funds).
         if (String(message.receiver).toLowerCase() !== walletNorm) {
           return json({ error: "receiver_mismatch", hint: "Withdrawal receiver must equal your wallet address." }, request, 400);
+        }
+        // Request-bound (v2) auth — withdraw is the highest-blast-radius action, so it's
+        // the first route gated (Phase 2 of #14). No-op unless AUTH_V2 is enabled. Binds the
+        // single-use challenge to action+wallet (+amount if the client included one), so a
+        // leaked static walletSig can't replay a withdrawal. Enforced on submit (the money move).
+        {
+          const denied = await requireOwnerV2(env, request, {
+            action: "withdraw", wallet: walletNorm,
+            amount: body.amount != null ? String(body.amount) : undefined,
+            nonce: body.nonce, v2Sig: body.v2Sig,
+          });
+          if (denied) return denied;
         }
         const withdrawRes = await oReq("POST", "/v1/withdraw_request", {
           message, signature, userAddress: walletNorm, verifyingContract: VC_W,

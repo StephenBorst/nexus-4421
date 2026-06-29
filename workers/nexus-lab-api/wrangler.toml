@@ -25,6 +25,10 @@ id = "c3c0582ec71c4d049d0795872f39f033"
 # supported). Remove this var to revert to direct Anthropic.
 [vars]
 AI_GATEWAY = "bankr"
+# Request-bound (v2) signing enforcement (issue #14). Unset/"false" = no-op (legacy
+# static walletSig only). Set to "true" to REQUIRE a fresh /auth/challenge signature
+# on gated high-risk routes (withdraw first). Flip on only once clients send v2.
+# AUTH_V2 = "true"
 
 [observability.logs]
 enabled = true
