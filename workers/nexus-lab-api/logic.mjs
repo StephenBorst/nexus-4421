@@ -187,3 +187,69 @@ export function confluenceSignal(raw, opts = {}) {
   const confluence = fundingSignal !== "NONE" && fundingSignal === oiSignal ? fundingSignal : "NONE";
   return { fundingSignal, oiSignal, confluence };
 }
+
+// ── Request-bound (v2) signing ───────────────────────────────────────────────
+// The legacy auth signs a STATIC message ("nexus-trading-key-v1"), so its
+// signature is deterministic — a single captured walletSig is a permanent bearer
+// token good for trade/withdraw/agent-control until the key rotates. v2 binds each
+// high-risk action to a single request: the client signs a server-issued challenge
+// carrying a single-use nonce + the exact action + amount + domain + a short expiry.
+// A leaked signature then can't be replayed for a different action/amount, can't be
+// reused after it expires, and can't be reused at all (the nonce is burned on first
+// verify by the caller). Pure here — ecrecover is injected as `recover` so this
+// stays crypto/network-free and unit-testable; index.js passes recoverEthAddress.
+export const AUTH_V2_DOMAIN = "og.nexustradinglabs.com";
+export const AUTH_V2_ACTIONS = new Set([
+  "trade", "withdraw",
+  "agent.activate", "agent.mode", "agent.config", "agent.deactivate", "agent.kill",
+]);
+
+// Canonical challenge string — the ONE format both client and server build, so the
+// recovered signature is meaningful only for these exact fields. amount is "-" when
+// not applicable (reads/control with no value at risk). wallet lower-cased so the
+// hash never depends on checksum casing.
+export function buildChallenge({ action, wallet, nonce, amount, expires, domain = AUTH_V2_DOMAIN }) {
+  const amt = (amount === undefined || amount === null || amount === "") ? "-" : String(amount);
+  return [
+    "nexus:v2",
+    `action:${action}`,
+    `wallet:${String(wallet).toLowerCase()}`,
+    `nonce:${nonce}`,
+    `amount:${amt}`,
+    `domain:${domain}`,
+    `expires:${expires}`,
+  ].join("\n");
+}
+
+// Verify a v2 signature against the TRUSTED challenge record the server minted +
+// stored (never client-supplied fields), binding it to what the request actually
+// does. Steps: action allowed → not expired → the request's action/amount/wallet
+// match the signed record → ecrecover(challenge) === record.wallet. Returns
+// { ok:true, wallet } or { ok:false, reason }. The caller is responsible for the
+// nonce lifecycle (exists/unconsumed in KV, then burn on success) — replay defense
+// lives at the KV layer; this function is the pure binding+expiry+signer check.
+export function verifyV2({ record, sig, expected, now, recover, domain = AUTH_V2_DOMAIN }) {
+  if (!record || typeof record !== "object") return { ok: false, reason: "no challenge record" };
+  const { action, wallet, nonce, amount, expires } = record;
+  if (!AUTH_V2_ACTIONS.has(action)) return { ok: false, reason: "action not allowed" };
+  if (typeof sig !== "string" || !sig) return { ok: false, reason: "missing signature" };
+  if (!Number.isFinite(now) || !Number.isFinite(expires)) return { ok: false, reason: "bad timestamps" };
+  if (now > expires) return { ok: false, reason: "challenge expired" };
+
+  const walletL = String(wallet).toLowerCase();
+  const norm = (v) => (v === undefined || v === null || v === "" ? "-" : String(v));
+  if (expected) {
+    if (expected.action !== action) return { ok: false, reason: "action mismatch" };
+    if (norm(expected.amount) !== norm(amount)) return { ok: false, reason: "amount mismatch" };
+    if (expected.wallet !== undefined && String(expected.wallet).toLowerCase() !== walletL)
+      return { ok: false, reason: "wallet mismatch" };
+  }
+
+  const challenge = buildChallenge({ action, wallet: walletL, nonce, amount, expires, domain });
+  let recovered;
+  try { recovered = recover(challenge, sig); } catch { return { ok: false, reason: "recover threw" }; }
+  if (!recovered || String(recovered).toLowerCase() !== walletL)
+    return { ok: false, reason: "signature does not match wallet" };
+
+  return { ok: true, wallet: walletL };
+}
