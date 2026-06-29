@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS } from "./logic.mjs";
 
 // Recover the signer address from an EIP-191 personal_sign signature.
 function recoverEthAddress(message, sigHex) {
@@ -53,6 +53,35 @@ function holdersRoomMessage(address, ts) {
 // Hosted-AI access challenge (proves the caller owns a PRO wallet).
 function aiAccessMessage(address, ts) {
   return `Nexus AI Access\nAddress: ${address.toLowerCase()}\nTimestamp: ${ts}`;
+}
+
+// ── Request-bound (v2) auth gate — Phase 2 of #14 ────────────────────────────
+// ADDITIVE + flag-gated: a no-op unless env.AUTH_V2 === "true", so enabling it is a
+// deliberate migration step and merging this changes no live behavior. When on, a
+// high-risk route requires a FRESH per-request challenge signature (single-use nonce
+// + action + amount + domain + short expiry) on top of the existing walletSig — so a
+// captured static walletSig alone can no longer move funds / arm an agent. The signed
+// fields are read back from the server-minted KV record (never the client body), then
+// the nonce is burned on success (replay guard). Returns a 401 json Response to short-
+// circuit the route, or null to proceed. recoverEthAddress is injected into verifyV2.
+async function requireOwnerV2(env, request, { action, wallet, amount, nonce, v2Sig }) {
+  if (env.AUTH_V2 !== "true") return null; // disabled during migration → no-op
+  const KV = env.NEXUS_AGENT || env.LAB_STORE;
+  if (!nonce || !v2Sig) {
+    return json({ error: "v2_auth_required",
+      hint: "GET /auth/challenge?wallet=&action=&amount= then sign the returned challenge; send { nonce, v2Sig } in the body." },
+      request, 401);
+  }
+  const recRaw = await KV.get(`auth:nonce:${nonce}`);
+  if (!recRaw) return json({ error: "challenge_unknown_or_expired" }, request, 401);
+  let record;
+  try { record = JSON.parse(recRaw); } catch { return json({ error: "challenge_corrupt" }, request, 401); }
+  const v = verifyV2({
+    record, sig: v2Sig, expected: { action, amount, wallet }, now: Date.now(), recover: recoverEthAddress,
+  });
+  if (!v.ok) return json({ error: "v2_verify_failed", reason: v.reason }, request, 401);
+  await KV.delete(`auth:nonce:${nonce}`); // single-use → burn so it can't be replayed
+  return null;
 }
 
 let resvgReady = false;
@@ -1146,6 +1175,17 @@ export default {
       };
 
       if (walletSig && walletAddress) {
+        // Phase 3 (#14): request-bound v2 on user-wallet trades. Binds the single-use
+        // challenge to action+wallet+notional, so a leaked static walletSig can't place
+        // an order (or a different-sized one). No-op unless AUTH_V2 is on. Reduce-only
+        // exits (closePosition) skip the gate — they only ever shrink risk.
+        if (!isReduceOnly) {
+          const deniedV2 = await requireOwnerV2(env, request, {
+            action: "trade", wallet: walletAddress.toLowerCase().trim(), amount: String(notional),
+            nonce: body.nonce, v2Sig: body.v2Sig,
+          });
+          if (deniedV2) return deniedV2;
+        }
         // Check KV for a registered per-user Orderly key
         const walletNorm = walletAddress.toLowerCase().trim();
         const userRaw    = await env.LAB_STORE.get("user:" + walletNorm);
@@ -1606,6 +1646,29 @@ export default {
     }
 
     // ── /mark-price — get current mark price for a symbol ───────────────────
+    // ── GET /auth/challenge — mint a request-bound (v2) signing challenge (Phase 2 of #14) ──
+    // Public to ISSUE (it grants nothing); the signature proves ownership at verify time.
+    // ?wallet=&action=&amount=  → { challenge, nonce, expires }. The client signs `challenge`
+    // (personal_sign) and replays { nonce, v2Sig } on the high-risk call. The nonce + signed
+    // fields are stored server-side (KV, ~120s TTL) so verifyV2 rebuilds the canonical message
+    // from the TRUSTED record, not client input. Single-use: burned on first successful verify.
+    if (parts[0] === "auth" && parts[1] === "challenge" && request.method === "GET") {
+      const qa = url.searchParams;
+      const wallet = (qa.get("wallet") || "").toLowerCase().trim();
+      const action = qa.get("action") || "";
+      const amount = qa.has("amount") ? qa.get("amount") : null;
+      if (!/^0x[0-9a-f]{40}$/.test(wallet)) return json({ error: "valid wallet required (0x… 40 hex)" }, request, 400);
+      if (!AUTH_V2_ACTIONS.has(action)) return json({ error: "unknown action", allowed: [...AUTH_V2_ACTIONS] }, request, 400);
+      const TTL_SEC = 120;
+      const nonce = crypto.randomUUID();
+      const expires = Date.now() + TTL_SEC * 1000;
+      const record = { action, wallet, nonce, amount, expires };
+      const KV = env.NEXUS_AGENT || env.LAB_STORE;
+      await KV.put(`auth:nonce:${nonce}`, JSON.stringify(record), { expirationTtl: TTL_SEC });
+      const challenge = buildChallenge({ action, wallet, nonce, amount, expires });
+      return json({ challenge, nonce, expires, action, wallet, amount, ttlSeconds: TTL_SEC }, request);
+    }
+
     // Public endpoint, no auth required. Symbol: BTC, ETH, SOL, or PERP suffix.
     // Returns { symbol, markPrice, indexPrice, lastPrice }
     if (parts[0] === "mark-price" && request.method === "GET") {
@@ -2593,6 +2656,18 @@ export default {
         if (String(message.receiver).toLowerCase() !== walletNorm) {
           return json({ error: "receiver_mismatch", hint: "Withdrawal receiver must equal your wallet address." }, request, 400);
         }
+        // Request-bound (v2) auth — withdraw is the highest-blast-radius action, so it's
+        // the first route gated (Phase 2 of #14). No-op unless AUTH_V2 is enabled. Binds the
+        // single-use challenge to action+wallet (+amount if the client included one), so a
+        // leaked static walletSig can't replay a withdrawal. Enforced on submit (the money move).
+        {
+          const denied = await requireOwnerV2(env, request, {
+            action: "withdraw", wallet: walletNorm,
+            amount: body.amount != null ? String(body.amount) : undefined,
+            nonce: body.nonce, v2Sig: body.v2Sig,
+          });
+          if (denied) return denied;
+        }
         const withdrawRes = await oReq("POST", "/v1/withdraw_request", {
           message, signature, userAddress: walletNorm, verifyingContract: VC_W,
         });
@@ -3112,6 +3187,10 @@ document.getElementById("btn").addEventListener("click",go);
       if (request.method === "POST" && parts[2] === "kill") {
         const kbody = await request.json().catch(() => ({}));
         const denied = requireOwner(kbody.walletSig); if (denied) return denied;
+        // Phase 3 (#14): kill force-closes positions → request-bound v2 on top of the
+        // static sig. No-op unless AUTH_V2 is on.
+        const deniedV2 = await requireOwnerV2(env, request, { action: "agent.kill", wallet: address, nonce: kbody.nonce, v2Sig: kbody.v2Sig });
+        if (deniedV2) return deniedV2;
         // Emergency stop must be un-clobberable. Write a DEDICATED kill flag the
         // exec consumes + clears — never rely on a state field the exec also
         // rewrites every minute (that write could race and drop the kill).
@@ -3138,6 +3217,12 @@ document.getElementById("btn").addEventListener("click",go);
         const mode = ["PAPER", "ASSISTED", "AUTONOMOUS"].includes(body?.mode) ? body.mode : "PAPER";
         if (mode === "AUTONOMOUS" && body?.confirm !== "GO LIVE") {
           return json({ error: "confirm_required", hint: 'Live trading needs confirm:"GO LIVE". The agent uses an order-only key that cannot withdraw.' }, request, 409);
+        }
+        // Phase 3 (#14): going live (AUTONOMOUS) arms real-money trading → request-bound
+        // v2 on top of confirm + static sig. Sim/assisted modes keep the static-sig gate.
+        if (mode === "AUTONOMOUS") {
+          const deniedV2 = await requireOwnerV2(env, request, { action: "agent.activate", wallet: address, nonce: body?.nonce, v2Sig: body?.v2Sig });
+          if (deniedV2) return deniedV2;
         }
         const defaults = { symbols: ["PERP_BTC_USDC"], leverage: 5, capitalPerTrade: 30, tpPercent: 1.5, slPercent: 0.75, maxHoldHours: 4, maxTradesPerDay: 10, maxDailyLossUsdc: 5, fundingThreshold: 0.01 };
         const config = { ...defaults, ...(body?.config || {}), mode };
@@ -3183,6 +3268,11 @@ document.getElementById("btn").addEventListener("click",go);
         if (!["PAPER", "ASSISTED", "AUTONOMOUS"].includes(mode)) return json({ error: "mode must be PAPER | ASSISTED | AUTONOMOUS" }, request, 400);
         if (mode === "AUTONOMOUS" && body?.confirm !== "GO LIVE") {
           return json({ error: "confirm_required", hint: 'Going live needs confirm:"GO LIVE".' }, request, 409);
+        }
+        // Phase 3 (#14): flipping live → request-bound v2 (same as activate go-live).
+        if (mode === "AUTONOMOUS") {
+          const deniedV2 = await requireOwnerV2(env, request, { action: "agent.mode", wallet: address, nonce: body?.nonce, v2Sig: body?.v2Sig });
+          if (deniedV2) return deniedV2;
         }
         const configRaw = await AGENT_KV.get(`agent:config:${address}`);
         if (!configRaw) return json({ error: "no_agent", hint: "Activate the agent first via /agent/:address/bankr/activate." }, request, 400);
