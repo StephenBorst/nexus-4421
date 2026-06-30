@@ -169,6 +169,57 @@ export function agentCloseStatus(reason) {
   return "CLOSED";
 }
 
+// ── DCA / safety orders (PRO mode) ───────────────────────────────────────────
+// Averages INTO a position on adverse moves, recomputing TP off the blended avg.
+// The whole ladder (base + N safety orders) fits inside capitalPerTrade — base
+// margin = capitalPerTrade / Σ vs^i (i=0..N), safety order k margin = base·vs^k —
+// so it reuses the existing balance guardrail (no extra pre-check / -1101 risk).
+// Pure + tested; the exec handles ordering/snapping/persistence.
+
+/** Base-order margin so base + all safety orders sum to capitalPerTrade. */
+export function dcaUnitMargin(capitalPerTrade, dca) {
+  const n = Math.max(0, Math.floor(Number(dca?.maxSafetyOrders) || 0));
+  const vs = Number(dca?.safetyOrderVolumeScale) || 1;
+  let U = 0;
+  for (let i = 0; i <= n; i++) U += Math.pow(vs, i);
+  return U > 0 ? capitalPerTrade / U : capitalPerTrade;
+}
+
+/**
+ * Should the next safety order fire? Triggers at a cumulative deviation from the
+ * BASE entry (each step widened by safetyOrderStepScale), against the position.
+ * @returns {{ shouldAdd:boolean, soMargin?:number, trigger?:number, level?:number }}
+ */
+export function nextSafetyOrder(pos, price, capitalPerTrade, dca) {
+  const filled = pos.filled_safety_orders || 0;
+  const maxSO = Math.floor(Number(dca?.maxSafetyOrders) || 0);
+  const step = Number(dca?.safetyOrderStepPct) || 0;
+  if (filled >= maxSO || !(step > 0) || !(price > 0)) return { shouldAdd: false };
+  const stepScale = Number(dca.safetyOrderStepScale) || 1;
+  const vs = Number(dca.safetyOrderVolumeScale) || 1;
+  const k = filled + 1; // the safety order under consideration (1-based)
+  let cumDev = 0;
+  for (let i = 0; i < k; i++) cumDev += step * Math.pow(stepScale, i);
+  const base = pos.base_entry_price ?? pos.entry_price;
+  const trigger = pos.direction === "LONG" ? base * (1 - cumDev / 100) : base * (1 + cumDev / 100);
+  const hit = pos.direction === "LONG" ? price <= trigger : price >= trigger;
+  const soMargin = dcaUnitMargin(capitalPerTrade, dca) * Math.pow(vs, k);
+  return { shouldAdd: hit, soMargin, trigger, level: k };
+}
+
+/** Blend a fill into the running average. */
+export function blendAvg(qty0, avg0, qty1, price1) {
+  const newQty = qty0 + qty1;
+  if (!(newQty > 0)) return { newQty: 0, newAvg: avg0 };
+  return { newQty, newAvg: (qty0 * avg0 + qty1 * price1) / newQty };
+}
+
+/** Take-profit price a given % off the (blended) average entry. */
+export function dcaTakeProfitPrice(avg, tpPct, direction) {
+  const move = avg * ((Number(tpPct) || 0) / 100);
+  return direction === "LONG" ? avg + move : avg - move;
+}
+
 /**
  * Volatility-scaled TP/SL (opt-in via config.volScaledStops). FIXED-% stops are
  * the core leak: 0.75% noise-stops a high-vol symbol (SOL) but over-gives on a

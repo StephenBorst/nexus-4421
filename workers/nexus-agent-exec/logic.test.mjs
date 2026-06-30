@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-agent-exec/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice } from "./logic.mjs";
 
 // ─── snapQty ───────────────────────────────────────────────
 test("snapQty: snaps cleanly to base_tick (no float artifacts)", () => {
@@ -211,4 +211,55 @@ test("volScaledLevels: clamps SL to [0.3, 3.0]", () => {
 test("volScaledLevels: slAtrMult widens the stop", () => {
   const cfg = { tpPercent: 1.5, slPercent: 0.75, slAtrMult: 1.5 };
   assert.equal(volScaledLevels(1.0, cfg).slPercent, 1.5); // 1.0 ATR × 1.5
+});
+
+// ─── DCA / safety orders ───────────────────────────────────
+test("dcaUnitMargin: base + safety orders sum to capitalPerTrade", () => {
+  // 3 SOs, volumeScale 1 (flat) → 4 equal units of 100/4 = 25
+  assert.equal(dcaUnitMargin(100, { maxSafetyOrders: 3, safetyOrderVolumeScale: 1 }), 25);
+  // volumeScale 2 → units 1+2+4 = 7 → base 70/7 = 10
+  assert.equal(dcaUnitMargin(70, { maxSafetyOrders: 2, safetyOrderVolumeScale: 2 }), 10);
+  // no safety orders → whole budget is the base
+  assert.equal(dcaUnitMargin(50, { maxSafetyOrders: 0 }), 50);
+});
+
+test("nextSafetyOrder: fires when price deviates past the cumulative step (LONG)", () => {
+  const dca = { maxSafetyOrders: 2, safetyOrderStepPct: 1, safetyOrderStepScale: 1, safetyOrderVolumeScale: 2 };
+  const pos = { direction: "LONG", base_entry_price: 100, filled_safety_orders: 0 };
+  // SO1 triggers at 1% below base = 99
+  assert.equal(nextSafetyOrder(pos, 99.5, 70, dca).shouldAdd, false);
+  const so = nextSafetyOrder(pos, 99, 70, dca);
+  assert.equal(so.shouldAdd, true);
+  assert.equal(so.trigger, 99);
+  assert.equal(so.level, 1);
+  // SO1 margin = base(10) * vs^1 = 20
+  assert.equal(so.soMargin, 20);
+});
+
+test("nextSafetyOrder: SHORT inverts trigger direction + cumulative step widens", () => {
+  const dca = { maxSafetyOrders: 2, safetyOrderStepPct: 1, safetyOrderStepScale: 2, safetyOrderVolumeScale: 1 };
+  const pos = { direction: "SHORT", base_entry_price: 100, filled_safety_orders: 1 };
+  // already filled 1; next is SO2 at cumDev = 1*(1) + 1*(2) = 3% ABOVE base = 103
+  const so = nextSafetyOrder(pos, 103, 40, dca);
+  assert.equal(so.shouldAdd, true);
+  assert.equal(so.trigger, 103);
+  assert.equal(so.level, 2);
+});
+
+test("nextSafetyOrder: stops once maxSafetyOrders reached", () => {
+  const dca = { maxSafetyOrders: 2, safetyOrderStepPct: 1 };
+  assert.equal(nextSafetyOrder({ direction: "LONG", base_entry_price: 100, filled_safety_orders: 2 }, 50, 70, dca).shouldAdd, false);
+});
+
+test("blendAvg: weighted average of two fills", () => {
+  const r = blendAvg(1, 100, 1, 90); // equal qty → midpoint 95
+  assert.equal(r.newQty, 2);
+  assert.equal(r.newAvg, 95);
+  const r2 = blendAvg(3, 100, 1, 80); // (300+80)/4 = 95
+  assert.equal(r2.newAvg, 95);
+});
+
+test("dcaTakeProfitPrice: TP off avg, direction-aware", () => {
+  assert.equal(dcaTakeProfitPrice(100, 2, "LONG"), 102);
+  assert.equal(dcaTakeProfitPrice(100, 2, "SHORT"), 98);
 });
