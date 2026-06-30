@@ -1,5 +1,12 @@
 # 3Commas-Informed Agent Adaptations — Build Spec
 
+> **Status: ALL THREE SHIPPED (2026-06-30).** #2 multi-TP + trailing (commits
+> f8131b7, bf25b9c) · #1 signal webhook (e956e21) · #3 DCA/safety orders (26602ce,
+> 202eb14). Each landed pure-logic-first with `node:test` coverage, server-enforced
+> PRO gates where noted, and is backward-compatible. Optional Supabase migration for
+> per-slice ledgering (#2) was applied: `parent_id text, exit_seq int`.
+
+
 Studied 3Commas (DCA bots, grid bots, signal/TradingView bots, smart-trade multi-exit,
 backtesting, paper trading). We already match/beat them on the trust layer (non-custodial
 order-only keys, PAPER mode, guardrails, and the thing they lack entirely: **publicly,
