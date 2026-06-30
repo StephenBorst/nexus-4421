@@ -141,7 +141,12 @@ async function orderlyRequest(keyData, method, path, body = null) {
     body: body ? bodyStr : undefined,
   });
 
-  return res.json();
+  // Orderly normally returns JSON; a Cloudflare challenge / outage to the worker
+  // IP returns an HTML page, which res.json() would surface as the opaque
+  // "Unexpected token '<'". Parse defensively so logs name the real failure.
+  const text = await res.text();
+  try { return JSON.parse(text); }
+  catch { throw new Error(`orderly ${method} ${path} non-JSON (HTTP ${res.status}): ${text.slice(0, 80)}`); }
 }
 
 // Per-invocation mark-price cache. The public futures price is identical for
@@ -152,7 +157,10 @@ function getMarkPrice(symbol, env, cache) {
   if (!cache.has(symbol)) {
     cache.set(symbol, (async () => {
       const res = await fetch(`${ORDERLY_API}/v1/public/futures/${symbol}`);
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); }
+      catch { throw new Error(`futures ${symbol} non-JSON (HTTP ${res.status}): ${text.slice(0, 80)}`); }
       return parseFloat(data.data.mark_price);
     })());
   }
@@ -474,8 +482,29 @@ async function monitorPosition(address, state, config, env, cache) {
     }
   }
 
-  // Fetch current price (shared per-symbol cache)
-  const currentPrice = await getMarkPrice(pos.symbol, env, cache);
+  // Fetch current price (shared per-symbol cache). If the public price fetch
+  // fails (transient Orderly outage / HTML challenge to the worker IP), fall back
+  // to the last known price so the SAFETY-NET exits still run — otherwise a price
+  // hiccup strands the position open indefinitely past its max hold (the exit
+  // checks live below getMarkPrice, so an unguarded throw here skips them).
+  let currentPrice;
+  try {
+    currentPrice = await getMarkPrice(pos.symbol, env, cache);
+  } catch (e) {
+    currentPrice = pos.current_price;
+    console.error(`[exec] ${address.slice(0, 10)} mark price fetch failed, using cached ${currentPrice}:`, e.message);
+  }
+
+  // No usable price at all (no cached value either): the only exit we can judge
+  // without a price is the time-based TIMEOUT. Fire it so a position can't be held
+  // forever during a price outage, then bail.
+  if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+    if (Date.now() - pos.opened_at >= config.maxHoldHours * 60 * 60 * 1000) {
+      console.log(`[exec] ${address.slice(0, 10)} no price + past max hold — force TIMEOUT close`);
+      await closePosition(address, state, env, "TIMEOUT", cache);
+    }
+    return;
+  }
 
   // Calculate P&L % (tested in logic.mjs)
   const { pnlPct } = computePnl(pos.direction, pos.entry_price, currentPrice, pos.qty);
