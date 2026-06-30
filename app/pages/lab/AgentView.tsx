@@ -213,6 +213,11 @@ export function AgentView() {
   const { isPro } = useSubscription(walletAddress);
   const [proNote, setProNote] = useState(false);
   const [standing, setStanding] = useState<AgentStanding | null>(null);
+  const [webhookEnabled, setWebhookEnabled] = useState(false);
+  const [webhookInfo, setWebhookInfo] = useState<{ url: string; passphrase: string } | null>(() => {
+    try { return JSON.parse(sessionStorage.getItem(`nexus_webhook_${(walletAddress || "").toLowerCase()}`) || "null"); }
+    catch { return null; }
+  });
 
   useEffect(() => {
     if (!walletAddress) { setLoading(false); return; }
@@ -231,6 +236,7 @@ export function AgentView() {
         if (data.state) setAgentState(data.state);
         if (data.trades) setTrades(data.trades);
         if (data.pending) setPending(data.pending);
+        setWebhookEnabled(!!data.webhook?.enabled);
       }
     } catch (e) {
       console.error("[agent] fetch error:", e);
@@ -272,6 +278,33 @@ export function AgentView() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // Signal webhook (TradingView / external). enable & rotate mint a fresh secret
+  // URL; disable revokes it. The URL is a secret — cache it client-side (session)
+  // since the API only returns it on enable/rotate, never on the public GET.
+  async function manageWebhook(op: "enable" | "rotate" | "disable") {
+    if (!walletAddress) { setError("Connect wallet first"); return; }
+    setSaving(true); setError(null);
+    try {
+      const walletSig = await getAgentSig(walletAddress);
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}/webhook/${op}`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ walletSig }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.hint || data.error || "Webhook request failed");
+      const key = `nexus_webhook_${walletAddress.toLowerCase()}`;
+      if (op === "disable") {
+        setWebhookEnabled(false); setWebhookInfo(null); sessionStorage.removeItem(key);
+        setSuccess("Webhook disabled");
+      } else {
+        const info = { url: data.url, passphrase: data.passphrase };
+        setWebhookEnabled(true); setWebhookInfo(info);
+        sessionStorage.setItem(key, JSON.stringify(info));
+        setSuccess(op === "rotate" ? "Webhook rotated — old URL revoked" : "Webhook enabled");
+      }
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (e: any) { setError(e.message); } finally { setSaving(false); }
   }
 
   async function deactivateAgent() {
@@ -868,6 +901,59 @@ export function AgentView() {
               </div>
             );
           })()}
+
+          {/* ── SIGNAL WEBHOOK — TradingView / external signal → your agent (PRO) ── */}
+          <div style={agentCardStyle}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              <div style={agentLabelStyle}>// SIGNAL WEBHOOK</div>
+              <span style={{ fontFamily: "monospace", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
+            </div>
+            {!isPro ? (
+              <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
+                Route TradingView (or any external) alerts straight to your agent — it executes them through the same guardrails + trustless grading. A Nexus PRO feature: hold ARCHITECT-tier $NEXUS or subscribe.
+              </div>
+            ) : !webhookEnabled ? (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 11, lineHeight: 1.5, marginBottom: 10 }}>
+                  Generate a private webhook URL. Point a TradingView alert (or any system) at it and your agent trades the signal in its current mode — {config.mode === "PAPER" ? "simulated in PAPER" : config.mode === "ASSISTED" ? "queued for review in ASSISTED" : "executed live in AUTONOMOUS"}.
+                </div>
+                <button onClick={() => manageWebhook("enable")} disabled={saving} style={{ ...agentBtnStyle, opacity: saving ? 0.5 : 1 }}>
+                  ENABLE WEBHOOK
+                </button>
+              </div>
+            ) : (
+              <div style={{ marginTop: 10 }}>
+                {webhookInfo ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div>
+                      <div style={{ ...agentLabelStyle, fontSize: 9 }}>WEBHOOK URL (secret — keep private)</div>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <code style={{ flex: 1, minWidth: 0, overflowX: "auto", whiteSpace: "nowrap", color: "#00ff88", background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 3, padding: "6px 8px", fontSize: 11 }}>{webhookInfo.url}</code>
+                        <button onClick={() => navigator.clipboard?.writeText(webhookInfo.url)} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 10px" }}>COPY</button>
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ ...agentLabelStyle, fontSize: 9 }}>ALERT MESSAGE (paste into TradingView)</div>
+                      <code style={{ display: "block", color: "#c0c0c0", background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 3, padding: "8px", fontSize: 10, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                        {`{ "action": "BUY", "symbol": "BTC", "passphrase": "${webhookInfo.passphrase}" }`}
+                      </code>
+                      <div style={{ color: "#3a6a4a", fontFamily: "monospace", fontSize: 9, marginTop: 6, lineHeight: 1.5 }}>
+                        action = BUY (long) · SELL (short) · CLOSE (flatten). symbol = any perp (BTC, ETH, SOL…). Webhook signals bypass the cooldown; while a position is open, a new OPEN is ignored (no stacking).
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 11, lineHeight: 1.5 }}>
+                    Webhook is enabled, but the secret URL is only shown on this device when created. Rotate to reveal a fresh URL (this revokes the old one).
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                  <button onClick={() => manageWebhook("rotate")} disabled={saving} style={{ ...navBtnStyle, fontSize: 10, padding: "6px 14px", opacity: saving ? 0.5 : 1 }}>ROTATE URL</button>
+                  <button onClick={() => manageWebhook("disable")} disabled={saving} style={{ ...navBtnStyle, fontSize: 10, padding: "6px 14px", color: "#ff4444", borderColor: "#ff444450", opacity: saving ? 0.5 : 1 }}>DISABLE</button>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div style={agentCardStyle}>
             <div style={agentLabelStyle}>// RISK SUMMARY</div>

@@ -413,3 +413,43 @@ test("agentStanding: all gates use AGENT_BOARD thresholds", () => {
   assert.equal(s.total, 3);
   assert.equal(s.eligible, false);
 });
+
+import { parseWebhookAlert, normalizeSymbol } from "./logic.mjs";
+
+test("normalizeSymbol: many shapes → canonical PERP_<BASE>_USDC", () => {
+  assert.equal(normalizeSymbol("BTC"), "PERP_BTC_USDC");
+  assert.equal(normalizeSymbol("btcusdt"), "PERP_BTC_USDC");
+  assert.equal(normalizeSymbol("ETH/USDC"), "PERP_ETH_USDC");
+  assert.equal(normalizeSymbol("PERP_SOL_USDC"), "PERP_SOL_USDC");
+  assert.equal(normalizeSymbol("HYPE-USD"), "PERP_HYPE_USDC");
+  assert.equal(normalizeSymbol(""), null);
+  assert.equal(normalizeSymbol("!!!"), null);
+});
+
+test("parseWebhookAlert: BUY/LONG → open long, SELL/SHORT → open short", () => {
+  assert.deepEqual(parseWebhookAlert({ action: "BUY", symbol: "BTC" }),
+    { ok: true, action: "OPEN", direction: "LONG", symbol: "PERP_BTC_USDC", sizeOverride: null });
+  assert.deepEqual(parseWebhookAlert({ side: "short", ticker: "ethusdt" }),
+    { ok: true, action: "OPEN", direction: "SHORT", symbol: "PERP_ETH_USDC", sizeOverride: null });
+});
+
+test("parseWebhookAlert: CLOSE needs no symbol", () => {
+  const r = parseWebhookAlert({ action: "close" });
+  assert.equal(r.ok, true);
+  assert.equal(r.action, "CLOSE");
+  assert.equal(r.direction, null);
+});
+
+test("parseWebhookAlert: OPEN without symbol → error", () => {
+  assert.equal(parseWebhookAlert({ action: "BUY" }).ok, false);
+});
+
+test("parseWebhookAlert: unknown action → error", () => {
+  assert.match(parseWebhookAlert({ action: "yolo", symbol: "BTC" }).error, /unknown action/);
+  assert.equal(parseWebhookAlert(null).ok, false);
+});
+
+test("parseWebhookAlert: size override parsed when positive", () => {
+  assert.equal(parseWebhookAlert({ action: "BUY", symbol: "BTC", size: 25 }).sizeOverride, 25);
+  assert.equal(parseWebhookAlert({ action: "BUY", symbol: "BTC", size: -1 }).sizeOverride, null);
+});

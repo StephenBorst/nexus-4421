@@ -167,6 +167,46 @@ export function rankCaller(stats) {
   return { tier: "SIGNAL", title: "Signal", glyph: "▪" };
 }
 
+// ── Signal-webhook ingestion (TradingView / bring-your-own-signal) ───────────
+// External signals can't wallet-sign, so the per-user secret token in the URL is
+// the auth (it only authorizes order placement on the order-only key, and is
+// rotatable). This pure layer just normalizes + validates the alert payload; the
+// route writes the result to KV for the exec cron to pick up through the normal
+// pipeline (inheriting every guardrail). Tested.
+
+// Normalize a symbol from many shapes (BTC, BTCUSDT, BTC/USDC, PERP_BTC_USDC) to
+// the Orderly perp id PERP_<BASE>_USDC. Returns null if unrecognizable.
+export function normalizeSymbol(raw) {
+  if (!raw) return null;
+  let s = String(raw).trim().toUpperCase().replace(/\s+/g, "");
+  if (/^PERP_[A-Z0-9]+_USDC$/.test(s)) return s;          // already canonical
+  s = s.replace(/[\/\-_]/g, "").replace(/^PERP/, "");      // strip separators + PERP prefix
+  s = s.replace(/(USDC|USDT|USD)$/g, "");                  // strip quote suffix
+  if (!/^[A-Z0-9]{1,15}$/.test(s)) return null;
+  return `PERP_${s}_USDC`;
+}
+
+// Parse + validate an inbound webhook alert into a normalized intent.
+// action mapping (perp semantics): BUY/LONG → open long · SELL/SHORT → open short ·
+// CLOSE/EXIT/FLAT → close the open position. Returns { ok, action, direction,
+// symbol, sizeOverride } or { ok:false, error }.
+export function parseWebhookAlert(body) {
+  if (!body || typeof body !== "object") return { ok: false, error: "empty body" };
+  const raw = String(body.action ?? body.side ?? "").trim().toUpperCase();
+  let action, direction = null;
+  if (["CLOSE", "EXIT", "FLAT"].includes(raw)) action = "CLOSE";
+  else if (["BUY", "LONG"].includes(raw)) { action = "OPEN"; direction = "LONG"; }
+  else if (["SELL", "SHORT"].includes(raw)) { action = "OPEN"; direction = "SHORT"; }
+  else return { ok: false, error: `unknown action "${raw}" (use BUY/SELL/CLOSE)` };
+
+  // CLOSE doesn't strictly need a symbol (close whatever's open), but accept one.
+  const symbol = normalizeSymbol(body.symbol ?? body.ticker);
+  if (action === "OPEN" && !symbol) return { ok: false, error: "missing/invalid symbol" };
+
+  const sizeOverride = Number(body.size) > 0 ? Number(body.size) : null;
+  return { ok: true, action, direction, symbol, sizeOverride };
+}
+
 // ── Agent leaderboard eligibility + score ────────────────────────────────────
 // Shared by /agents/leaderboard (the public ranking) and /agents/standing/:addr
 // (a single agent's "why am I / am I not ranked" readout) so the two can never

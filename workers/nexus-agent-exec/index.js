@@ -264,24 +264,53 @@ async function processUser(address, env, cache) {
     return;
   }
 
+  // ── WEBHOOK INTENT (TradingView / external) ───────────
+  // The user's OWN signal, consumed once (delete on read) and given priority over
+  // the brain. A CLOSE acts even while holding; an OPEN is dispatched below through
+  // the normal mode logic (so it inherits PAPER/ASSISTED/AUTONOMOUS + guardrails).
+  let whSignal = null;
+  const whRaw = await env.NEXUS_AGENT.get(`agent:webhook_signal:${address}`);
+  if (whRaw) {
+    await env.NEXUS_AGENT.delete(`agent:webhook_signal:${address}`);
+    try {
+      const wh = JSON.parse(whRaw);
+      if (now - (wh.timestamp || 0) <= 10 * 60 * 1000) { // ignore stale alerts
+        if (wh.action === "CLOSE") {
+          if (state.current_position) {
+            await closePosition(address, state, env, "WEBHOOK_CLOSE", cache);
+            console.log(`[exec] ${address.slice(0, 10)} WEBHOOK CLOSE`);
+          }
+          return;
+        }
+        if (wh.direction === "LONG" || wh.direction === "SHORT") {
+          whSignal = { symbol: wh.symbol, direction: wh.direction, confidence: 100, price: 0, funding: 0, timestamp: wh.timestamp, source: "WEBHOOK" };
+        }
+      }
+    } catch { /* ignore malformed intent */ }
+  }
+
   // ── HOLDING POSITION ──────────────────────────────────
+  // (after the webhook CLOSE check above so an external CLOSE can flatten.) An OPEN
+  // that arrives while already in a position is dropped — we don't stack entries.
   if (state.current_position) {
     await monitorPosition(address, state, config, env, cache);
     return;
   }
 
   // ── NO POSITION — CHECK FOR SIGNAL ────────────────────
-  const signalRaw = await env.NEXUS_AGENT.get(`agent:signal:${address}`);
-  if (!signalRaw) return;
-  const signal = JSON.parse(signalRaw);
+  // Prefer the user's webhook signal; otherwise read the brain's.
+  let signal = whSignal;
+  if (!signal) {
+    const signalRaw = await env.NEXUS_AGENT.get(`agent:signal:${address}`);
+    if (!signalRaw) return;
+    signal = JSON.parse(signalRaw);
+    if (now - signal.timestamp > 10 * 60 * 1000) return; // < 10 min old
+    if (signal.direction === "NONE") return;
+    if (signal.confidence < 50) return;
+  }
 
-  // Signal must be recent (< 10 min old)
-  if (now - signal.timestamp > 10 * 60 * 1000) return;
-  if (signal.direction === "NONE") return;
-  if (signal.confidence < 50) return;
-
-  // Cooldown check
-  if (state.last_trade_time && now - state.last_trade_time < COOLDOWN_MS) return;
+  // Cooldown check — webhook signals are explicit user intent, so they bypass it.
+  if (signal.source !== "WEBHOOK" && state.last_trade_time && now - state.last_trade_time < COOLDOWN_MS) return;
 
   // Mode check
   if (config.mode === "ASSISTED") {

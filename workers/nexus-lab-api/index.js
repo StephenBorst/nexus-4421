@@ -23,7 +23,13 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert } from "./logic.mjs";
+
+// URL-safe random token (hook secret / passphrase). Crypto-strong via Web Crypto.
+function randToken(bytes = 24) {
+  const a = crypto.getRandomValues(new Uint8Array(bytes));
+  return btoa(String.fromCharCode(...a)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
 
 // Recover the signer address from an EIP-191 personal_sign signature.
 function recoverEthAddress(message, sigHex) {
@@ -3006,6 +3012,34 @@ document.getElementById("btn").addEventListener("click",go);
       return new Response(html, { status: 200, headers: { "Content-Type": "text/html;charset=UTF-8", "Access-Control-Allow-Origin": "*" } });
     }
 
+    // ── POST /agent/hook/:token — TradingView / external signal webhook ──────
+    // Token-authed (no walletSig — TradingView can't sign). The token only
+    // authorizes order placement on the user's order-only key (can't withdraw) and
+    // is rotatable. We validate + write the intent to KV; the exec cron picks it up
+    // through the normal pipeline, inheriting every guardrail. Must be fast (<3s,
+    // TV timeout) so it never places the order inline.
+    if (parts[0] === "agent" && parts[1] === "hook" && parts[2] && request.method === "POST") {
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+      const metaRaw = await AGENT_KV.get(`agent:webhook:${parts[2]}`);
+      if (!metaRaw) return json({ error: "invalid or revoked token" }, request, 401);
+      const meta = JSON.parse(metaRaw);
+      if (!meta.enabled) return json({ error: "webhook disabled" }, request, 403);
+      let body; try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      if (meta.passphrase && String(body.passphrase || "") !== meta.passphrase) {
+        return json({ error: "bad passphrase" }, request, 401);
+      }
+      const parsed = parseWebhookAlert(body);
+      if (!parsed.ok) return json({ error: parsed.error }, request, 400);
+      const intent = {
+        action: parsed.action, direction: parsed.direction, symbol: parsed.symbol,
+        sizeOverride: parsed.sizeOverride, timestamp: Date.now(), source: "WEBHOOK",
+      };
+      // Short TTL: a stale alert self-expires so it can't fire late (exec also gates
+      // on age). Latest write wins — exec consumes (deletes) on pickup.
+      await AGENT_KV.put(`agent:webhook_signal:${meta.address}`, JSON.stringify(intent), { expirationTtl: 600 });
+      return json({ ok: true, queued: intent }, request);
+    }
+
     // ── /feed ──────────────────────────────────────────────
     // ── /agent/:address — agent config, state, trade history ──
     if (parts[0] === "agent" && parts[1]) {
@@ -3031,11 +3065,12 @@ document.getElementById("btn").addEventListener("click",go);
 
       // GET /agent/:address
       if (request.method === "GET" && !parts[2]) {
-        const [configRaw, stateRaw, pendingRaw, signalRaw] = await Promise.all([
+        const [configRaw, stateRaw, pendingRaw, signalRaw, whMetaRaw] = await Promise.all([
           AGENT_KV.get(`agent:config:${address}`),
           AGENT_KV.get(`agent:state:${address}`),
           AGENT_KV.get(`agent:pending:${address}`),
           AGENT_KV.get(`agent:signal:${address}`),
+          AGENT_KV.get(`agent:webhook_meta:${address}`),
         ]);
         const config = configRaw ? JSON.parse(configRaw) : null;
         const state = stateRaw ? JSON.parse(stateRaw) : null;
@@ -3057,7 +3092,40 @@ document.getElementById("btn").addEventListener("click",go);
             if (tradesRes.ok) trades = await tradesRes.json();
           } catch (e) { console.error("[agent-api] supabase fetch error:", e); }
         }
-        return json({ config, state, trades, pending }, request);
+        // Non-secret webhook status only (the token is NEVER returned on the public GET).
+        let webhook = null;
+        if (whMetaRaw) { try { webhook = { enabled: !!JSON.parse(whMetaRaw).enabled }; } catch { /* ignore */ } }
+        return json({ config, state, trades, pending, webhook }, request);
+      }
+
+      // POST /agent/:address/webhook/(enable|rotate|disable) — manage the signal
+      // webhook. enable/rotate mint a fresh token+passphrase (rotate revokes the old
+      // token); disable revokes without minting. PRO-gated. Owner-authed (walletSig).
+      // The token is a SECRET — returned ONLY here, never on the public GET.
+      if (request.method === "POST" && parts[2] === "webhook" && ["enable", "rotate", "disable"].includes(parts[3])) {
+        const wbody = await request.json().catch(() => ({}));
+        const denied = requireOwner(wbody.walletSig); if (denied) return denied;
+        const metaKey = `agent:webhook_meta:${address}`;
+        const prevRaw = await AGENT_KV.get(metaKey);
+        const prev = prevRaw ? JSON.parse(prevRaw) : null;
+
+        if (parts[3] === "disable") {
+          if (prev?.token) await AGENT_KV.delete(`agent:webhook:${prev.token}`);
+          await AGENT_KV.put(metaKey, JSON.stringify({ ...(prev || {}), enabled: false, token: null }));
+          return json({ ok: true, enabled: false }, request);
+        }
+
+        // enable / rotate both require PRO and produce a new token.
+        if (!(await walletIsPro(address, env))) {
+          return json({ error: "pro_webhook_locked", hint: "The signal webhook is a Nexus PRO feature — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
+        }
+        if (prev?.token) await AGENT_KV.delete(`agent:webhook:${prev.token}`); // revoke old on rotate
+        const token = randToken(24);
+        const passphrase = randToken(9);
+        await AGENT_KV.put(`agent:webhook:${token}`, JSON.stringify({ address, passphrase, enabled: true, createdAt: Date.now() }));
+        await AGENT_KV.put(metaKey, JSON.stringify({ token, passphrase, enabled: true, createdAt: Date.now() }));
+        const base = new URL(request.url).origin;
+        return json({ ok: true, enabled: true, url: `${base}/agent/hook/${token}`, token, passphrase }, request);
       }
 
       // POST /agent/:address/pending/:id/(deploy|dismiss) — resolve a thesis
