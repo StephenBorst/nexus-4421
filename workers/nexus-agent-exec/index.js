@@ -626,7 +626,10 @@ async function closePosition(address, state, env, reason, cache) {
   }
 
   // Resolve the published feed thesis (if this trade was published on entry).
-  if (PUBLISH_AGENT_FEED && pos.feed_id) {
+  // NOT gated by PUBLISH_AGENT_FEED: if an entry was published (has a feed_id),
+  // always resolve it to CLOSED on exit — otherwise toggling the publish flag off
+  // between entry and close orphans the card as ACTIVE forever (zombie position).
+  if (pos.feed_id) {
     try {
       await publishAgentClose(address, env, pos.feed_id, { reason, pnlUsdc, exitPrice });
     } catch (e) {
