@@ -75,6 +75,15 @@ export interface AgentConfig {
   takeProfits?: { pct: number; sizePct: number }[];
   trailingStopPct?: number;  // 0/unset = off; trails the stop this % below peak P&L
   trailActivatePct?: number; // P&L% the trail arms at (default = first TP level)
+  // DCA / safety-order mode (PRO). The whole ladder fits inside capitalPerTrade;
+  // TP is taken off the blended average. dcaEnabled gates the behavior.
+  dcaEnabled?: boolean;
+  dca?: {
+    maxSafetyOrders: number;       // how many averaging orders to allow
+    safetyOrderStepPct: number;    // % adverse move to the first safety order
+    safetyOrderStepScale: number;  // widen each subsequent step by this factor
+    safetyOrderVolumeScale: number;// scale each safety order's size (martingale)
+  };
   mode: "ASSISTED" | "AUTONOMOUS" | "PAPER";
 }
 

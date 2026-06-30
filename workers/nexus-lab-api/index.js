@@ -3201,6 +3201,9 @@ document.getElementById("btn").addEventListener("click",go);
         if (config.signalMode && PRO_STRATEGIES.includes(config.signalMode) && !(await walletIsPro(address, env))) {
           return json({ error: "pro_strategy_locked", strategy: config.signalMode, hint: "MOMENTUM and MEAN_REVERSION require Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe. Free: CONFLUENCE, FUNDING_ONLY, OI_ONLY." }, request, 402);
         }
+        if (config.dcaEnabled && !(await walletIsPro(address, env))) {
+          return json({ error: "pro_dca_locked", hint: "DCA / safety-order mode requires Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
+        }
         await AGENT_KV.put(`agent:config:${address}`, JSON.stringify(config));
         if (!isPaper) {
           // Encrypt the trading key at rest — KV never holds it in plaintext.
@@ -3226,6 +3229,9 @@ document.getElementById("btn").addEventListener("click",go);
         if (!config) return json({ error: "config required" }, request, 400);
         if (config.signalMode && PRO_STRATEGIES.includes(config.signalMode) && !(await walletIsPro(address, env))) {
           return json({ error: "pro_strategy_locked", strategy: config.signalMode, hint: "MOMENTUM and MEAN_REVERSION require Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe. Free: CONFLUENCE, FUNDING_ONLY, OI_ONLY." }, request, 402);
+        }
+        if (config.dcaEnabled && !(await walletIsPro(address, env))) {
+          return json({ error: "pro_dca_locked", hint: "DCA / safety-order mode requires Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
         }
         await AGENT_KV.put(`agent:config:${address}`, JSON.stringify(config));
         return json({ ok: true }, request);
@@ -3298,6 +3304,9 @@ document.getElementById("btn").addEventListener("click",go);
         // PRO strategy gate — reject before doing any key/crypto work.
         if (config.signalMode && PRO_STRATEGIES.includes(config.signalMode) && !(await walletIsPro(address, env))) {
           return json({ error: "pro_strategy_locked", strategy: config.signalMode, hint: "MOMENTUM and MEAN_REVERSION require Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe. Free strategies: CONFLUENCE, FUNDING_ONLY, OI_ONLY." }, request, 402);
+        }
+        if (config.dcaEnabled && !(await walletIsPro(address, env))) {
+          return json({ error: "pro_dca_locked", hint: "DCA / safety-order mode requires Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
         }
 
         // Live modes need the delegated key. Derive it from the wallet signature

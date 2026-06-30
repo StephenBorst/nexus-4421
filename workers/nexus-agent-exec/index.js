@@ -13,7 +13,7 @@
 
 import * as ed from "@noble/ed25519";
 import bs58 from "bs58";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice } from "./logic.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const COOLDOWN_MS = 15 * 60 * 1000; // 15 min between trades
@@ -374,10 +374,15 @@ async function enterPosition(address, state, config, signal, env, cache) {
   const baseMin = info.base_min || baseTick;
   const minNotional = info.min_notional || 0;
 
+  // DCA mode reserves the rest of capitalPerTrade for safety orders, so the BASE
+  // order is only a fraction of it (the ladder sums back to capitalPerTrade).
+  const dca = config.dcaEnabled ? config.dca : null;
+  const baseMargin = dca ? dcaUnitMargin(config.capitalPerTrade, dca) : config.capitalPerTrade;
+
   // Calculate qty, snapped to base_tick (tested in logic.mjs — guards the
   // -1104 step-size float artifact + base_min / min_notional constraints).
   const snap = snapQty({
-    capitalPerTrade: config.capitalPerTrade, leverage: config.leverage,
+    capitalPerTrade: baseMargin, leverage: config.leverage,
     markPrice, baseTick, baseMin, minNotional,
   });
   if (!snap.ok) {
@@ -456,6 +461,16 @@ async function enterPosition(address, state, config, signal, env, cache) {
     base_tick: baseTick,
     base_min: baseMin,
     min_notional: minNotional,
+    // DCA state (averaging mode). The monitor manages these on a separate path:
+    // base_entry_price anchors the safety-order triggers; avg_entry/total_qty are
+    // the running blended position; TP is taken off avg_entry, not the base.
+    ...(dca ? {
+      dca: { ...dca, takeProfitPct: config.tpPercent },
+      base_entry_price: markPrice,
+      avg_entry: markPrice,
+      total_qty: qty,
+      filled_safety_orders: 0,
+    } : {}),
   };
   state.last_trade_time = Date.now();
   state.trades_today = (state.trades_today || 0) + 1;
@@ -552,6 +567,36 @@ async function monitorPosition(address, state, config, env, cache) {
     return;
   }
 
+  // ── DCA / averaging path ──────────────────────────────
+  // Managed separately from evaluateExit: P&L is off the BLENDED avg, TP is taken
+  // off avg, adverse moves ADD safety orders (up to maxSafetyOrders), and only once
+  // the ladder is exhausted does the slPercent stop cut the loss. The daily-loss cap
+  // + kill switch stay absolute overrides (enforced in processUser).
+  if (pos.dca) {
+    const { pnlPct: dcaPnl } = computePnl(pos.direction, pos.avg_entry, currentPrice, pos.total_qty);
+    pos.current_price = currentPrice;
+    pos.pnl_percent = dcaPnl;
+    const holdMs = Date.now() - pos.opened_at;
+    const maxSO = Math.floor(Number(pos.dca.maxSafetyOrders) || 0);
+
+    if (dcaPnl >= (pos.dca.takeProfitPct || config.tpPercent)) {
+      await closePosition(address, state, env, "TP", cache); return;
+    }
+    if (holdMs >= config.maxHoldHours * 60 * 60 * 1000) {
+      await closePosition(address, state, env, "TIMEOUT", cache); return;
+    }
+    const so = nextSafetyOrder(pos, currentPrice, config.capitalPerTrade, pos.dca);
+    if (so.shouldAdd) { await addSafetyOrder(address, state, config, env, so, currentPrice); return; }
+    pos.next_safety_price = so.trigger ?? pos.next_safety_price;
+    // Final stop — only after the whole ladder is spent (averaging is done).
+    if ((pos.filled_safety_orders || 0) >= maxSO && pos.slPercent && dcaPnl <= -pos.slPercent) {
+      await closePosition(address, state, env, "SL", cache); return;
+    }
+    await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
+    console.log(`[exec] ${address.slice(0, 10)} ${pos.paper ? "PAPER " : ""}DCA HOLD ${pos.direction} ${pos.symbol.replace("PERP_", "").replace("_USDC", "")} avgPnl=${dcaPnl.toFixed(3)}% SOs=${pos.filled_safety_orders || 0}/${maxSO}`);
+    return;
+  }
+
   // Calculate P&L % (tested in logic.mjs)
   const { pnlPct } = computePnl(pos.direction, pos.entry_price, currentPrice, pos.qty);
 
@@ -615,6 +660,52 @@ async function logAgentTrade(address, env, auditable) {
   } catch (e) {
     console.error(`[exec] ${address.slice(0, 10)} supabase log failed:`, e.message);
   }
+}
+
+// Average INTO a position (DCA safety order): place a same-side market order for
+// this safety order's margin, blend it into avg_entry/total_qty, advance the ladder.
+// Not reduce-only — it ADDS to the position. The whole ladder is pre-budgeted within
+// capitalPerTrade so total exposure stays bounded.
+async function addSafetyOrder(address, state, config, env, so, price) {
+  const pos = state.current_position;
+  if (!pos) return;
+  const paper = !!pos.paper;
+  const tick = pos.base_tick || 0.001;
+  const snap = snapQty({
+    capitalPerTrade: so.soMargin, leverage: config.leverage,
+    markPrice: price, baseTick: tick, baseMin: pos.base_min || tick, minNotional: pos.min_notional || 0,
+  });
+  if (!snap.ok) {
+    // This safety order is too small to place — consume the level so we advance the
+    // ladder (and can still hit the final stop) instead of retrying forever.
+    pos.filled_safety_orders = (pos.filled_safety_orders || 0) + 1;
+    await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
+    console.log(`[exec] ${address.slice(0, 10)} DCA SO${so.level} skipped (${snap.reason})`);
+    return;
+  }
+  const addQty = snap.qty;
+  const side = pos.direction === "LONG" ? "BUY" : "SELL";
+  if (!paper) {
+    const keyRaw = await env.NEXUS_AGENT.get(`agent:key:${address}`);
+    if (keyRaw) {
+      try {
+        const keyData = JSON.parse(keyRaw);
+        keyData.tradingKey = await decryptTradingKey(keyData.tradingKey, env);
+        const r = await orderlyRequest(keyData, "POST", "/v1/order", {
+          symbol: pos.symbol, order_type: "MARKET", side, order_quantity: addQty, broker_id: "nexus_trading",
+        });
+        if (r && r.success === false) { console.error(`[exec] ${address.slice(0, 10)} DCA SO order failed:`, JSON.stringify(r)); return; }
+      } catch (e) { console.error(`[exec] ${address.slice(0, 10)} DCA SO error:`, e.message); return; }
+    }
+  }
+  const blended = blendAvg(pos.total_qty, pos.avg_entry, addQty, price);
+  pos.avg_entry = blended.newAvg;
+  pos.total_qty = blended.newQty;
+  pos.remaining_qty = blended.newQty;
+  pos.qty = blended.newQty; // keep qty in sync (used by the reduce-only close)
+  pos.filled_safety_orders = (pos.filled_safety_orders || 0) + 1;
+  await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
+  console.log(`[exec] ${address.slice(0, 10)} ${paper ? "PAPER " : ""}DCA SO${so.level} +${addQty} @ ${price} → avg ${pos.avg_entry.toFixed(4)} qty ${pos.total_qty}`);
 }
 
 // Scale OUT a fraction of an open position at a take-profit level (multi-TP). Sends
@@ -741,7 +832,10 @@ async function closePosition(address, state, env, reason, cache) {
     exitPrice = await getMarkPrice(pos.symbol, env, cache);
   } catch (e) {}
 
-  const { pnlPct, pnlUsdc } = computePnl(pos.direction, pos.entry_price, exitPrice, closeQty);
+  // DCA positions realize P&L against the BLENDED average entry (the honest cost
+  // basis after averaging in); single-entry positions use their entry price.
+  const entryForPnl = pos.avg_entry ?? pos.entry_price;
+  const { pnlPct, pnlUsdc } = computePnl(pos.direction, entryForPnl, exitPrice, closeQty);
 
   // Update daily P&L
   state.daily_pnl = (state.daily_pnl || 0) + pnlUsdc;
@@ -750,7 +844,7 @@ async function closePosition(address, state, env, reason, cache) {
   const trade = {
     symbol: pos.symbol,
     direction: pos.direction,
-    entry_price: pos.entry_price,
+    entry_price: entryForPnl,
     exit_price: exitPrice,
     qty: closeQty,
     pnl: pnlUsdc,

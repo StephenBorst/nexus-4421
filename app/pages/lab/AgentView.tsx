@@ -902,6 +902,62 @@ export function AgentView() {
             );
           })()}
 
+          {/* ── DCA / SAFETY ORDERS — average-in mode (PRO) ── */}
+          {(() => {
+            const dca = config.dca || { maxSafetyOrders: 3, safetyOrderStepPct: 1.5, safetyOrderStepScale: 1.2, safetyOrderVolumeScale: 1.5 };
+            const on = !!config.dcaEnabled;
+            const setDca = (k: string, v: number) => setConfig({ ...config, dca: { ...dca, [k]: v }, dcaEnabled: true });
+            const toggle = () => setConfig({ ...config, dcaEnabled: !on, dca });
+            // Preview the worst-case averaged exposure (base + all safety orders = capitalPerTrade).
+            const units = (() => { let U = 0; for (let i = 0; i <= dca.maxSafetyOrders; i++) U += Math.pow(dca.safetyOrderVolumeScale, i); return U; })();
+            let cumDev = 0; for (let i = 0; i < dca.maxSafetyOrders; i++) cumDev += dca.safetyOrderStepPct * Math.pow(dca.safetyOrderStepScale, i);
+            return (
+              <div style={agentCardStyle}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={agentLabelStyle}>// DCA / SAFETY ORDERS</div>
+                    <span style={{ fontFamily: "monospace", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
+                  </div>
+                  <button onClick={isPro ? toggle : undefined} disabled={!isPro} style={{
+                    fontFamily: "monospace", fontSize: 10, padding: "4px 12px", borderRadius: 3, cursor: isPro ? "pointer" : "not-allowed",
+                    background: on ? "#00ff8815" : "#0a0e0a",
+                    border: `1px solid ${on ? "#00ff88" : "#1e2d1e"}`,
+                    color: on ? "#00ff88" : "#4a7a5a", opacity: isPro ? 1 : 0.5,
+                  }}>
+                    {on ? "ON" : "OFF"}
+                  </button>
+                </div>
+                {!isPro ? (
+                  <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
+                    Average into a position on adverse moves and take profit off the blended entry — a Nexus PRO feature. The whole ladder stays inside your CAPITAL / TRADE budget.
+                  </div>
+                ) : on && (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 10 }}>
+                      {[
+                        { key: "maxSafetyOrders", label: "MAX SAFETY ORDERS", min: 1, max: 8, step: 1, suffix: "" },
+                        { key: "safetyOrderStepPct", label: "FIRST STEP", min: 0.25, max: 10, step: 0.25, suffix: "%" },
+                        { key: "safetyOrderStepScale", label: "STEP SCALE", min: 1, max: 3, step: 0.1, suffix: "×" },
+                        { key: "safetyOrderVolumeScale", label: "VOLUME SCALE", min: 1, max: 3, step: 0.1, suffix: "×" },
+                      ].map(({ key, label, min, max, step, suffix }) => (
+                        <div key={key}>
+                          <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <NumberField value={(dca as any)[key]} min={min} max={max} step={step} onCommit={(n) => setDca(key, n)} />
+                            <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>{suffix}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ color: "#3a6a4a", fontFamily: "monospace", fontSize: 10, marginTop: 10, lineHeight: 1.6 }}>
+                      Base order ≈ ${(config.capitalPerTrade / units).toFixed(0)} of your ${config.capitalPerTrade} budget; up to {dca.maxSafetyOrders} safety orders average in if price moves ~{cumDev.toFixed(1)}% against you. TP is taken at {config.tpPercent}% off the blended average; the stop only cuts once all safety orders are spent. Daily-loss cap + kill switch still override.
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
           {/* ── SIGNAL WEBHOOK — TradingView / external signal → your agent (PRO) ── */}
           <div style={agentCardStyle}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
