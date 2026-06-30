@@ -167,6 +167,64 @@ export function rankCaller(stats) {
   return { tier: "SIGNAL", title: "Signal", glyph: "▪" };
 }
 
+// ── Agent leaderboard eligibility + score ────────────────────────────────────
+// Shared by /agents/leaderboard (the public ranking) and /agents/standing/:addr
+// (a single agent's "why am I / am I not ranked" readout) so the two can never
+// drift. The gate is anti-gaming: a meaningful sample, spread over time, and
+// actually net-positive (we won't surface a losing agent as "top").
+export const AGENT_BOARD = { minTrades: 10, minDays: 3, fullConfTrades: 30 };
+
+// Aggregate a wallet's closed trades into raw counters. rows = [{ pnl, closed_at }].
+export function aggregateAgentTrades(rows) {
+  let trades = 0, wins = 0, net = 0, grossWin = 0, grossLoss = 0, first = Infinity, last = 0;
+  for (const r of rows || []) {
+    const pnl = parseFloat(r.pnl) || 0;
+    const closed = new Date(r.closed_at).getTime() || 0;
+    trades++; net += pnl;
+    if (pnl > 0) { wins++; grossWin += pnl; } else { grossLoss += Math.abs(pnl); }
+    if (closed) { first = Math.min(first, closed); last = Math.max(last, closed); }
+  }
+  const daysActive = first === Infinity ? 0 : Math.max(1, Math.round((last - first) / 86400000));
+  return { trades, wins, net, grossWin, grossLoss, daysActive };
+}
+
+// Risk-adjusted 0–100 score: win rate + capped profit factor, shrunk by sample
+// size so a lucky 3-trade run can't outrank a proven record.
+export function agentScore(a, cfg = AGENT_BOARD) {
+  const winRate = a.trades ? a.wins / a.trades : 0;
+  const profitFactor = a.grossLoss > 0 ? a.grossWin / a.grossLoss : (a.grossWin > 0 ? 99 : 0);
+  const pfScore = Math.min(profitFactor, 5) / 5;
+  const sampleConf = Math.min(1, a.trades / cfg.fullConfTrades);
+  const score = Math.round((0.5 * winRate + 0.5 * pfScore) * sampleConf * 1000) / 10;
+  return { winRate, profitFactor, score };
+}
+
+// Per-agent eligibility breakdown for the UI readout: each criterion with its
+// met/unmet flag + current value, plus the derived stats. `eligible` is the AND
+// of all criteria — identical to the leaderboard's inclusion test.
+export function agentStanding(a, cfg = AGENT_BOARD) {
+  const { winRate, profitFactor, score } = agentScore(a, cfg);
+  const criteria = [
+    { key: "trades", label: `${cfg.minTrades}+ closed trades`, met: a.trades >= cfg.minTrades, value: a.trades, target: cfg.minTrades },
+    { key: "days", label: `active ${cfg.minDays}+ days`, met: a.daysActive >= cfg.minDays, value: a.daysActive, target: cfg.minDays },
+    { key: "profitable", label: "net-positive P&L", met: a.net > 0, value: Math.round(a.net * 100) / 100, target: 0 },
+  ];
+  const eligible = criteria.every((c) => c.met);
+  return {
+    eligible,
+    metCount: criteria.filter((c) => c.met).length,
+    total: criteria.length,
+    criteria,
+    stats: {
+      trades: a.trades, daysActive: a.daysActive,
+      winRate: Math.round(winRate * 1000) / 10,
+      netPnl: Math.round(a.net * 100) / 100,
+      profitFactor: Math.round(Math.min(profitFactor, 99) * 100) / 100,
+      score,
+    },
+  };
+}
+
 // ── Funding + OI-divergence + confluence classification ──────────────────────
 // Mirrors the agent brain's deriveSignal rules (funding extreme FADES the crowd;
 // OI-divergence; confluence = both agree) so the public /signals API and the

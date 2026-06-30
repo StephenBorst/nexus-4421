@@ -178,6 +178,16 @@ async function getAgentSig(address: string): Promise<string> {
   return sig;
 }
 
+// This agent's own leaderboard standing (mirrors lab-api /agents/standing).
+type AgentStandingCriterion = { key: string; label: string; met: boolean; value: number; target: number };
+type AgentStanding = {
+  eligible: boolean;
+  metCount: number;
+  total: number;
+  criteria: AgentStandingCriterion[];
+  stats: { trades: number; daysActive: number; winRate: number; netPnl: number; profitFactor: number; score: number } | null;
+};
+
 function formatAgentTime(ms: number): string {
   const h = Math.floor(ms / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
@@ -202,6 +212,7 @@ export function AgentView() {
   const tradingKey = findOrderlyTradingKey();
   const { isPro } = useSubscription(walletAddress);
   const [proNote, setProNote] = useState(false);
+  const [standing, setStanding] = useState<AgentStanding | null>(null);
 
   useEffect(() => {
     if (!walletAddress) { setLoading(false); return; }
@@ -226,6 +237,12 @@ export function AgentView() {
     } finally {
       setLoading(false);
     }
+    // This agent's own leaderboard standing — fail-soft (a thin/new agent just
+    // shows "not yet ranked"); separate try so it never blocks the core load.
+    try {
+      const sres = await fetch(`${AGENT_API}/agents/standing/${walletAddress}`);
+      if (sres.ok) setStanding(await sres.json());
+    } catch { /* fail-soft */ }
   }
 
   async function activateAgent() {
@@ -952,6 +969,44 @@ export function AgentView() {
               </div>
             </div>
           </div>
+
+          {/* ── LEADERBOARD STANDING — why this agent is / isn't on TOP AGENTS ── */}
+          {standing && standing.stats && standing.stats.trades > 0 && (
+            <div style={{ ...agentCardStyle, borderColor: standing.eligible ? "#1a3a2a" : "#2a2a1a" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                <div style={{ ...agentLabelStyle, color: standing.eligible ? "#00ff88" : "#fbbf24" }}>
+                  ◆ LEADERBOARD STANDING
+                </div>
+                <span style={{ fontFamily: "monospace", fontSize: 11, color: standing.eligible ? "#00ff88" : "#fbbf24" }}>
+                  {standing.eligible ? "✓ RANKED ON TOP AGENTS" : `${standing.metCount} of ${standing.total} criteria met`}
+                </span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginTop: 12 }}>
+                {standing.criteria.map((c) => (
+                  <div key={c.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ color: c.met ? "#00ff88" : "#ff6644", fontFamily: "monospace", fontSize: 13 }}>
+                      {c.met ? "✓" : "✗"}
+                    </span>
+                    <div>
+                      <div style={{ color: c.met ? "#c0c0c0" : "#9a9a8a", fontFamily: "monospace", fontSize: 11 }}>{c.label}</div>
+                      <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 10 }}>
+                        {c.key === "profitable"
+                          ? `now: ${c.value >= 0 ? "+" : ""}$${c.value.toFixed(2)}`
+                          : `${c.value} / ${c.target}`}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 10, marginTop: 10, lineHeight: 1.5 }}>
+                {standing.eligible
+                  ? `Ranked — score ${standing.stats.score}/100 · ${standing.stats.winRate}% win · PF ${standing.stats.profitFactor} over ${standing.stats.trades} graded trades.`
+                  : standing.criteria.find((c) => c.key === "profitable" && !c.met)
+                    ? `Your agent is recording fine (${standing.stats.trades} trades, ${standing.stats.winRate}% win) — TOP AGENTS only ranks net-positive agents, so it appears automatically once P&L turns green. Not a bug.`
+                    : `Recording fine — keep trading to meet the remaining criteria; ranking is automatic once all three are met.`}
+              </div>
+            </div>
+          )}
 
           {/* ── GUARDRAILS (always visible while live) ── */}
           {(() => {

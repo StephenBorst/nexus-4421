@@ -359,3 +359,57 @@ test("verifyV2: wallet binding — request claims a different wallet than signed
   assert.equal(v.ok, false);
   assert.equal(v.reason, "wallet mismatch");
 });
+
+import { aggregateAgentTrades, agentStanding, AGENT_BOARD } from "./logic.mjs";
+
+// Helper: build n trade rows with the given pnls, spread `days` apart.
+function mkTrades(pnls, days = 5) {
+  const start = Date.parse("2026-06-01T00:00:00Z");
+  const span = (days * 86400000) / Math.max(1, pnls.length - 1);
+  return pnls.map((pnl, i) => ({ pnl, closed_at: new Date(start + i * span).toISOString() }));
+}
+
+test("aggregateAgentTrades: counts wins, net, gross, daysActive", () => {
+  const a = aggregateAgentTrades(mkTrades([10, -5, 8, -2], 6));
+  assert.equal(a.trades, 4);
+  assert.equal(a.wins, 2);
+  assert.equal(a.net, 11);
+  assert.equal(a.grossWin, 18);
+  assert.equal(a.grossLoss, 7);
+  assert.equal(a.daysActive, 6);
+});
+
+test("agentStanding: net-positive agent meeting all gates is eligible", () => {
+  // 12 trades, net positive, spread 10 days
+  const pnls = [5, 5, 5, 5, 5, 5, 5, -2, -2, -2, 5, 5];
+  const s = agentStanding(aggregateAgentTrades(mkTrades(pnls, 10)));
+  assert.equal(s.eligible, true);
+  assert.equal(s.metCount, 3);
+  assert.ok(s.stats.score > 0);
+});
+
+test("agentStanding: net-NEGATIVE agent fails only the profitable gate", () => {
+  // 12 trades over 10 days but net negative
+  const pnls = [2, 2, 2, 2, -5, -5, -5, -5, 2, 2, -4, -4];
+  const s = agentStanding(aggregateAgentTrades(mkTrades(pnls, 10)));
+  assert.equal(s.eligible, false);
+  assert.equal(s.metCount, 2);
+  const profitable = s.criteria.find((c) => c.key === "profitable");
+  assert.equal(profitable.met, false);
+  assert.equal(s.criteria.find((c) => c.key === "trades").met, true);
+  assert.equal(s.criteria.find((c) => c.key === "days").met, true);
+});
+
+test("agentStanding: too few trades fails the sample gate", () => {
+  const s = agentStanding(aggregateAgentTrades(mkTrades([5, 5, 5], 4)));
+  assert.equal(s.eligible, false);
+  assert.equal(s.criteria.find((c) => c.key === "trades").met, false);
+});
+
+test("agentStanding: all gates use AGENT_BOARD thresholds", () => {
+  assert.equal(AGENT_BOARD.minTrades, 10);
+  assert.equal(AGENT_BOARD.minDays, 3);
+  const s = agentStanding(aggregateAgentTrades([]));
+  assert.equal(s.total, 3);
+  assert.equal(s.eligible, false);
+});

@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding } from "./logic.mjs";
 
 // Recover the signer address from an EIP-191 personal_sign signature.
 function recoverEthAddress(message, sigHex) {
@@ -3525,16 +3525,16 @@ document.getElementById("btn").addEventListener("click",go);
       if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
       const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
 
-      const MIN_TRADES = 10;   // anti-gaming: meaningful sample
-      const MIN_DAYS = 3;      // anti-gaming: spread over time, not one session
-      const FULL_CONF_TRADES = 30;
+      const MIN_TRADES = AGENT_BOARD.minTrades;  // anti-gaming: meaningful sample
+      const MIN_DAYS = AGENT_BOARD.minDays;       // anti-gaming: spread over time
       const TOP_N = 25;
 
       if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
         return json({ leaderboard: [], criteria: { minTrades: MIN_TRADES, minDays: MIN_DAYS } }, request);
       }
 
-      // One pull of all live agent trades; aggregate per wallet in-worker.
+      // One pull of all live agent trades; group per wallet in-worker, then score
+      // each via the SAME shared helper /agents/standing uses (no drift).
       let rows = [];
       try {
         const res = await fetch(
@@ -3544,36 +3544,18 @@ document.getElementById("btn").addEventListener("click",go);
         if (res.ok) rows = await res.json();
       } catch (e) { console.error("[leaderboard] supabase error:", e); }
 
-      const byWallet = {};
+      const rowsByWallet = {};
       for (const r of rows) {
         const w = (r.wallet_address || "").toLowerCase();
         if (!w) continue;
-        const pnl = parseFloat(r.pnl) || 0;
-        const closed = new Date(r.closed_at).getTime() || 0;
-        if (!byWallet[w]) byWallet[w] = { trades: 0, wins: 0, net: 0, grossWin: 0, grossLoss: 0, first: Infinity, last: 0 };
-        const a = byWallet[w];
-        a.trades++; a.net += pnl;
-        if (pnl > 0) { a.wins++; a.grossWin += pnl; } else { a.grossLoss += Math.abs(pnl); }
-        if (closed) { a.first = Math.min(a.first, closed); a.last = Math.max(a.last, closed); }
+        (rowsByWallet[w] = rowsByWallet[w] || []).push(r);
       }
 
-      const dayMs = 86400000;
       const eligible = [];
-      for (const [wallet, a] of Object.entries(byWallet)) {
-        const daysActive = a.first === Infinity ? 0 : Math.max(1, Math.round((a.last - a.first) / dayMs));
-        if (a.trades < MIN_TRADES || daysActive < MIN_DAYS || a.net <= 0) continue;
-        const winRate = a.wins / a.trades;
-        const profitFactor = a.grossLoss > 0 ? a.grossWin / a.grossLoss : (a.grossWin > 0 ? 99 : 0);
-        const pfScore = Math.min(profitFactor, 5) / 5;
-        const sampleConf = Math.min(1, a.trades / FULL_CONF_TRADES);
-        const score = Math.round((0.5 * winRate + 0.5 * pfScore) * sampleConf * 1000) / 10; // 0–100
-        eligible.push({
-          wallet, trades: a.trades, daysActive,
-          winRate: Math.round(winRate * 1000) / 10,
-          netPnl: Math.round(a.net * 100) / 100,
-          profitFactor: Math.round(Math.min(profitFactor, 99) * 100) / 100,
-          score,
-        });
+      for (const [wallet, wRows] of Object.entries(rowsByWallet)) {
+        const standing = agentStanding(aggregateAgentTrades(wRows));
+        if (!standing.eligible) continue;
+        eligible.push({ wallet, ...standing.stats });
       }
 
       eligible.sort((x, y) => y.score - x.score || y.netPnl - x.netPnl);
@@ -3602,6 +3584,27 @@ document.getElementById("btn").addEventListener("click",go);
       }));
 
       return json({ leaderboard: enriched, criteria: { minTrades: MIN_TRADES, minDays: MIN_DAYS } }, request);
+    }
+
+    // ── /agents/standing/:address — this agent's own leaderboard standing ──────
+    // Tells an owner exactly WHY their agent is / isn't on the board (e.g. "2 of 3
+    // criteria met — needs net-positive P&L") so an unranked-but-recording agent
+    // reads as a known state, not a bug. Uses the SAME gate as the board.
+    if (parts[0] === "agents" && parts[1] === "standing" && parts[2]) {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+      const addr = String(parts[2]).toLowerCase();
+      if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+        return json({ eligible: false, criteria: [], stats: null, criteriaConfig: AGENT_BOARD }, request);
+      }
+      let rows = [];
+      try {
+        const res = await fetch(
+          `${env.SUPABASE_URL}/rest/v1/agent_trades?select=pnl,closed_at&wallet_address=ilike.${addr}&limit=10000`,
+          { headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` } }
+        );
+        if (res.ok) rows = await res.json();
+      } catch (e) { console.error("[standing] supabase error:", e); }
+      return json({ ...agentStanding(aggregateAgentTrades(rows)), criteriaConfig: AGENT_BOARD }, request);
     }
 
     // ── /agents/ledger — verifiable, canonical hash of the agent trade ledger ──
