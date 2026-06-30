@@ -70,6 +70,11 @@ export interface AgentConfig {
   respectRegime?: boolean; // opt-in: brain skips NEW entries that fight a strong market regime
   volScaledStops?: boolean; // opt-in: TP/SL scaled to each symbol's ATR instead of a flat %
   slAtrMult?: number;       // optional: stop = slAtrMult × ATR (default 1.0 in exec)
+  // Multi-level take-profit ladder (scale-out). Unset = single 100% TP at tpPercent
+  // (legacy). Ascending pct levels; sizePct = fraction of the original position.
+  takeProfits?: { pct: number; sizePct: number }[];
+  trailingStopPct?: number;  // 0/unset = off; trails the stop this % below peak P&L
+  trailActivatePct?: number; // P&L% the trail arms at (default = first TP level)
   mode: "ASSISTED" | "AUTONOMOUS" | "PAPER";
 }
 

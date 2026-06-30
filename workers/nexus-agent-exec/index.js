@@ -13,7 +13,7 @@
 
 import * as ed from "@noble/ed25519";
 import bs58 from "bs58";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus, volScaledLevels } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits } from "./logic.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const COOLDOWN_MS = 15 * 60 * 1000; // 15 min between trades
@@ -397,6 +397,11 @@ async function enterPosition(address, state, config, signal, env, cache) {
     console.log(`[exec] ${address.slice(0, 10)} volScaledStops atr%=${atrPct == null ? "n/a" : atrPct.toFixed(2)} → tp=${effTp} sl=${effSl}`);
   }
 
+  // Resolve the take-profit ladder for this entry. Explicit config.takeProfits
+  // (multi-level scale-out) wins; otherwise a single 100%-size level from the
+  // effective tpPercent — so legacy/simple configs behave exactly as before.
+  const takeProfits = normTakeProfits({ takeProfits: config.takeProfits, tpPercent: effTp }, config);
+
   // Update state
   state.current_position = {
     symbol,
@@ -410,6 +415,18 @@ async function enterPosition(address, state, config, signal, env, cache) {
     paper,
     tpPercent: effTp,
     slPercent: effSl,
+    // Multi-TP + trailing exit state (evaluateExit). remaining_qty shrinks as
+    // levels scale out; tp_hits records filled levels; peak_pnl_pct ratchets the
+    // trailing stop. Legacy positions without these fall back to single-TP/SL.
+    takeProfits,
+    remaining_qty: qty,
+    tp_hits: [],
+    peak_pnl_pct: 0,
+    // Exchange step/min constraints, stored so partial scale-outs can snap the
+    // reduce-only slice to base_tick (avoids -1104) without re-fetching info.
+    base_tick: baseTick,
+    base_min: baseMin,
+    min_notional: minNotional,
   };
   state.last_trade_time = Date.now();
   state.trades_today = (state.trades_today || 0) + 1;
@@ -513,17 +530,29 @@ async function monitorPosition(address, state, config, env, cache) {
   pos.current_price = currentPrice;
   pos.pnl_percent = pnlPct;
 
-  // Exit decision: TP → SL → timeout (tested in logic.mjs). Prefer the per-position
-  // levels resolved at entry (vol-scaled) over the flat config, falling back to
-  // config for positions opened before this field existed.
-  const reason = exitReason(pnlPct, Date.now() - pos.opened_at, {
+  // Exit decision: multi-TP scale-out + trailing stop, with hard-stop priority
+  // SL→TIMEOUT→trail over take-profit (tested in logic.mjs). Uses per-position
+  // levels resolved at entry, falling back to config for legacy positions.
+  const action = evaluateExit(pos, pnlPct, Date.now() - pos.opened_at, {
     tpPercent: pos.tpPercent ?? config.tpPercent,
     slPercent: pos.slPercent ?? config.slPercent,
     maxHoldHours: config.maxHoldHours,
+    takeProfits: pos.takeProfits,
+    trailingStopPct: config.trailingStopPct,
+    trailActivatePct: config.trailActivatePct,
   });
-  if (reason) {
-    await closePosition(address, state, env, reason, cache);
+
+  if (action && action.type === "FULL_CLOSE") {
+    await closePosition(address, state, env, action.reason, cache);
     return;
+  }
+  if (action && action.type === "PARTIAL_TP") {
+    await partialClose(address, state, config, env, action, cache);
+    return; // partialClose persists state (and full-closes if only dust remains)
+  }
+  if (action && action.type === "TRAIL_UPDATE") {
+    pos.peak_pnl_pct = action.peak;
+    pos.trail_stop = action.trailStop;
   }
 
   // Still holding — save updated state
@@ -531,11 +560,124 @@ async function monitorPosition(address, state, config, env, cache) {
   console.log(`[exec] ${address.slice(0, 10)} HOLDING ${pos.direction} ${pos.symbol.replace("PERP_","").replace("_USDC","")} pnl=${pnlPct.toFixed(3)}%`);
 }
 
+// Insert a closed-trade (or scale-out slice) row into Supabase agent_trades.
+// Tries the full auditable row (order IDs + ladder parent_id/exit_seq); if those
+// optional columns aren't migrated yet PostgREST 400s, so it retries with just the
+// core columns and logging never breaks. SERVICE key = least privilege (anon RLS
+// blocks forged inserts). Shared by closePosition + partialClose so the write path
+// (and its fallback) can't drift.
+async function logAgentTrade(address, env, auditable) {
+  const writeKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY;
+  const insert = async (payload) => fetch(`${env.SUPABASE_URL}/rest/v1/agent_trades`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: writeKey, Authorization: `Bearer ${writeKey}` },
+    body: JSON.stringify(payload),
+  });
+  // Core row = drop optional columns that may not be migrated yet.
+  const { entry_order_id, close_order_id, parent_id, exit_seq, ...core } = auditable;
+  try {
+    let res = await insert({ wallet_address: address, ...auditable });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.warn(`[exec] ${address.slice(0, 10)} auditable insert failed (${res.status}) — retrying core row:`, detail.slice(0, 120));
+      res = await insert({ wallet_address: address, ...core });
+      if (!res.ok) console.error(`[exec] ${address.slice(0, 10)} core insert also failed (${res.status})`);
+    }
+  } catch (e) {
+    console.error(`[exec] ${address.slice(0, 10)} supabase log failed:`, e.message);
+  }
+}
+
+// Scale OUT a fraction of an open position at a take-profit level (multi-TP). Sends
+// a reduce-only market order for the slice, realizes its P&L to a per-slice Supabase
+// row (shared parent_id, exit_seq), and keeps the runner. If what would remain is
+// dust (below base_min / min_notional), close the whole thing instead so we never
+// strand an unsellable remainder.
+async function partialClose(address, state, config, env, action, cache) {
+  const pos = state.current_position;
+  if (!pos) return;
+  const paper = !!pos.paper;
+  const remaining = pos.remaining_qty ?? pos.qty;
+  const tick = pos.base_tick || 0.001;
+  const decimals = Math.max(0, Math.round(-Math.log10(tick)));
+
+  // Slice = sizePct of the ORIGINAL qty, snapped to the tick.
+  const rawSlice = pos.qty * (action.sizePct / 100);
+  let slice = parseFloat((Math.floor(rawSlice / tick) * tick).toFixed(decimals));
+  const afterRemain = parseFloat((remaining - slice).toFixed(decimals));
+
+  // Dust guard: if the slice is too small to place, or the leftover would be below
+  // the exchange minimum, just close the full remainder as a TP.
+  const price = pos.current_price;
+  const tooSmallSlice = slice < (pos.base_min || tick) || slice <= 0;
+  const leftoverDust = afterRemain > 0 && (afterRemain < (pos.base_min || tick) ||
+    (pos.min_notional && afterRemain * price < pos.min_notional));
+  if (tooSmallSlice || leftoverDust || afterRemain <= 0) {
+    await closePosition(address, state, env, "TP", cache);
+    return;
+  }
+
+  // Place the reduce-only slice (real positions only).
+  let sliceOrderId = null;
+  if (!paper) {
+    const keyRaw = await env.NEXUS_AGENT.get(`agent:key:${address}`);
+    if (keyRaw) {
+      try {
+        const keyData = JSON.parse(keyRaw);
+        keyData.tradingKey = await decryptTradingKey(keyData.tradingKey, env);
+        const closeSide = pos.direction === "LONG" ? "SELL" : "BUY";
+        const r = await orderlyRequest(keyData, "POST", "/v1/order", {
+          symbol: pos.symbol, order_type: "MARKET", side: closeSide,
+          order_quantity: slice, reduce_only: true, broker_id: "nexus_trading",
+        });
+        if (r && r.success === false) {
+          console.error(`[exec] ${address.slice(0, 10)} partial TP order failed:`, JSON.stringify(r));
+          return; // leave the position intact; try again next tick
+        }
+        sliceOrderId = r?.data?.order_id ?? null;
+      } catch (e) {
+        console.error(`[exec] ${address.slice(0, 10)} partial TP error:`, e.message);
+        return;
+      }
+    }
+  }
+
+  // Realize this slice's P&L and advance the ladder state.
+  const { pnlPct, pnlUsdc } = computePnl(pos.direction, pos.entry_price, price, slice);
+  state.daily_pnl = (state.daily_pnl || 0) + pnlUsdc;
+  pos.remaining_qty = afterRemain;
+  pos.tp_hits = [...(pos.tp_hits || []), action.level];
+
+  const sliceTrade = {
+    symbol: pos.symbol, direction: pos.direction, entry_price: pos.entry_price,
+    exit_price: price, qty: slice, pnl: pnlUsdc, pnl_percent: pnlPct,
+    reason: "TP_PARTIAL",
+    opened_at: new Date(pos.opened_at).toISOString(), closed_at: new Date().toISOString(),
+  };
+  if (paper) {
+    state.paper_trades = state.paper_trades || [];
+    state.paper_trades.unshift({ id: `paper_${Date.now()}`, ...sliceTrade });
+    if (state.paper_trades.length > 50) state.paper_trades.pop();
+  } else {
+    await logAgentTrade(address, env, {
+      ...sliceTrade,
+      entry_order_id: pos.order_id ?? null, close_order_id: sliceOrderId,
+      parent_id: `agent_${address.slice(2, 8)}_${pos.opened_at}`, exit_seq: pos.tp_hits.length,
+    });
+  }
+
+  await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
+  console.log(`[exec] ${address.slice(0, 10)} ${paper ? "PAPER " : ""}PARTIAL TP L${action.level} ${action.sizePct}% slice=${slice} pnl=$${pnlUsdc.toFixed(4)} remaining=${afterRemain}`);
+}
+
 async function closePosition(address, state, env, reason, cache) {
   const pos = state.current_position;
   if (!pos) return;
   const paper = !!pos.paper;
   let closeOrderId = null;
+  // After multi-TP scale-outs only the runner remains — close THAT, not the
+  // original size (legacy positions have no remaining_qty → fall back to qty).
+  const closeQty = pos.remaining_qty ?? pos.qty;
 
   // Real positions: send a reduce-only market close. Paper positions never
   // touched the exchange, so there's nothing to close — skip straight to P&L.
@@ -553,7 +695,7 @@ async function closePosition(address, state, env, reason, cache) {
           symbol: pos.symbol,
           order_type: "MARKET",
           side: closeSide,
-          order_quantity: pos.qty,
+          order_quantity: closeQty,
           reduce_only: true,
           broker_id: "nexus_trading",
         });
@@ -570,7 +712,7 @@ async function closePosition(address, state, env, reason, cache) {
     exitPrice = await getMarkPrice(pos.symbol, env, cache);
   } catch (e) {}
 
-  const { pnlPct, pnlUsdc } = computePnl(pos.direction, pos.entry_price, exitPrice, pos.qty);
+  const { pnlPct, pnlUsdc } = computePnl(pos.direction, pos.entry_price, exitPrice, closeQty);
 
   // Update daily P&L
   state.daily_pnl = (state.daily_pnl || 0) + pnlUsdc;
@@ -581,7 +723,7 @@ async function closePosition(address, state, env, reason, cache) {
     direction: pos.direction,
     entry_price: pos.entry_price,
     exit_price: exitPrice,
-    qty: pos.qty,
+    qty: closeQty,
     pnl: pnlUsdc,
     pnl_percent: pnlPct,
     reason,
@@ -590,7 +732,13 @@ async function closePosition(address, state, env, reason, cache) {
   };
   // Orderly order IDs make every record independently auditable against the
   // exchange (anyone can verify the order existed + its fill). Optional columns.
-  const auditable = { ...trade, entry_order_id: pos.order_id ?? null, close_order_id: closeOrderId };
+  // If this position scaled out (tp_hits), tag the final row with the same
+  // parent_id so the slices + runner read as one position in the ledger.
+  const laddered = (pos.tp_hits || []).length > 0;
+  const auditable = {
+    ...trade, entry_order_id: pos.order_id ?? null, close_order_id: closeOrderId,
+    ...(laddered ? { parent_id: `agent_${address.slice(2, 8)}_${pos.opened_at}`, exit_seq: pos.tp_hits.length + 1 } : {}),
+  };
 
   if (paper) {
     // Paper trades live in state (rides along in the API's state response) so
@@ -599,30 +747,7 @@ async function closePosition(address, state, env, reason, cache) {
     state.paper_trades.unshift({ id: `paper_${Date.now()}`, ...auditable });
     if (state.paper_trades.length > 50) state.paper_trades.pop(); // keep last 50
   } else {
-    // Log real trades to Supabase. Writes use the SERVICE key (least privilege:
-    // only the exec can insert). Falls back to the anon key if the service key
-    // isn't set yet so logging never breaks mid-migration. Pair this with an RLS
-    // policy that blocks anon INSERT on agent_trades — then the public anon key
-    // (used for reads) cannot forge trade rows.
-    const writeKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY;
-    const insert = async (payload) => fetch(`${env.SUPABASE_URL}/rest/v1/agent_trades`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: writeKey, Authorization: `Bearer ${writeKey}` },
-      body: JSON.stringify(payload),
-    });
-    try {
-      // Try the auditable row (with order IDs). If the columns aren't migrated
-      // yet, PostgREST 400s — fall back to the core row so logging never breaks.
-      let res = await insert({ wallet_address: address, ...auditable });
-      if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        console.warn(`[exec] ${address.slice(0, 10)} auditable insert failed (${res.status}) — retrying core row:`, detail.slice(0, 120));
-        res = await insert({ wallet_address: address, ...trade });
-        if (!res.ok) console.error(`[exec] ${address.slice(0, 10)} core insert also failed (${res.status})`);
-      }
-    } catch (e) {
-      console.error(`[exec] ${address.slice(0, 10)} supabase log failed:`, e.message);
-    }
+    await logAgentTrade(address, env, auditable);
   }
 
   // Resolve the published feed thesis (if this trade was published on entry).

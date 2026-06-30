@@ -794,6 +794,81 @@ export function AgentView() {
             </div>
           </div>
 
+          {/* ── ADVANCED EXITS — multi-level take-profit + trailing stop ── */}
+          {(() => {
+            const tps = config.takeProfits;
+            const scaleOut = Array.isArray(tps) && tps.length > 1;
+            const ladder = scaleOut ? tps! : [
+              { pct: config.tpPercent, sizePct: 50 },
+              { pct: Math.round(config.tpPercent * 1.8 * 4) / 4, sizePct: 50 },
+            ];
+            const setTp = (i: number, field: "pct" | "sizePct", val: number) => {
+              const next = ladder.map((t) => ({ ...t }));
+              next[i] = { ...next[i], [field]: val };
+              // keep sizes summing to 100 across the two legs
+              if (field === "sizePct") next[i === 0 ? 1 : 0].sizePct = Math.max(0, 100 - val);
+              setConfig({ ...config, takeProfits: next, tpPercent: next[0].pct });
+            };
+            const toggleScaleOut = () => setConfig(scaleOut
+              ? { ...config, takeProfits: undefined }
+              : { ...config, takeProfits: ladder });
+            return (
+              <div style={agentCardStyle}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <div style={agentLabelStyle}>// ADVANCED EXITS</div>
+                  <button onClick={toggleScaleOut} style={{
+                    fontFamily: "monospace", fontSize: 10, padding: "4px 12px", borderRadius: 3, cursor: "pointer",
+                    background: scaleOut ? "#00ff8815" : "#0a0e0a",
+                    border: `1px solid ${scaleOut ? "#00ff88" : "#1e2d1e"}`,
+                    color: scaleOut ? "#00ff88" : "#4a7a5a",
+                  }}>
+                    SCALE-OUT {scaleOut ? "ON" : "OFF"}
+                  </button>
+                </div>
+
+                {scaleOut && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 10 }}>
+                    {ladder.slice(0, 2).map((leg, i) => (
+                      <div key={i} style={{ display: "flex", gap: 10 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ ...agentLabelStyle, fontSize: 9 }}>TP{i + 1} TARGET</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <NumberField value={leg.pct} min={0.25} max={20} step={0.25} onCommit={(n) => setTp(i, "pct", n)} />
+                            <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>%</span>
+                          </div>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ ...agentLabelStyle, fontSize: 9 }}>TP{i + 1} SIZE</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <NumberField value={leg.sizePct} min={5} max={95} step={5} onCommit={(n) => setTp(i, "sizePct", n)} />
+                            <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>%</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 12 }}>
+                  <div>
+                    <div style={{ ...agentLabelStyle, fontSize: 9 }}>TRAILING STOP</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <NumberField value={config.trailingStopPct ?? 0} min={0} max={5} step={0.1} onCommit={(n) => setConfig({ ...config, trailingStopPct: n })} />
+                      <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>% below peak (0 = off)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 10, color: "#3a6a4a", lineHeight: 1.5 }}>
+                  {scaleOut
+                    ? "Scale-out takes partial profit at TP1 and lets the runner ride to TP2 — each slice is graded on its own."
+                    : "Single take-profit at the TAKE PROFIT % above. Turn on SCALE-OUT to bank partial profit early."}
+                  {(config.trailingStopPct ?? 0) > 0 && " Trailing stop arms at TP1 and locks gains as price runs."}
+                </div>
+              </div>
+            );
+          })()}
+
           <div style={agentCardStyle}>
             <div style={agentLabelStyle}>// RISK SUMMARY</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12, marginTop: 8 }}>
