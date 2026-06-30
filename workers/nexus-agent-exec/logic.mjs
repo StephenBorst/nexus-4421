@@ -72,6 +72,77 @@ export function exitReason(pnlPct, holdMs, config) {
 }
 
 /**
+ * Normalize a position's take-profit ladder into ascending [{pct,sizePct}].
+ * Falls back to a single 100%-size level from the legacy single tpPercent so
+ * positions opened before multi-TP existed behave exactly as before.
+ */
+export function normTakeProfits(pos, config) {
+  const tps = pos.takeProfits || config.takeProfits;
+  if (Array.isArray(tps) && tps.length) {
+    return tps
+      .map((t) => ({ pct: Number(t.pct), sizePct: Number(t.sizePct) }))
+      .filter((t) => t.pct > 0 && t.sizePct > 0)
+      .sort((a, b) => a.pct - b.pct);
+  }
+  const tp = pos.tpPercent ?? config.tpPercent;
+  return [{ pct: Number(tp), sizePct: 100 }];
+}
+
+/**
+ * Generalized exit decision (supersedes exitReason for multi-TP + trailing).
+ * Pure: takes the position, current price-move pnlPct, hold time, and config;
+ * returns ONE action for this tick. The exec persists peak_pnl_pct/trail_stop/
+ * tp_hits/remaining_qty between ticks.
+ *
+ *  { type:"FULL_CLOSE", reason:"SL"|"TIMEOUT"|"TRAIL"|"TP" }
+ *  { type:"PARTIAL_TP", level, sizePct }   // scale out this fraction, keep running
+ *  { type:"TRAIL_UPDATE", trailStop, peak } // ratchet the trailing stop (no exit)
+ *  null                                      // hold
+ *
+ * Priority: hard stops (SL → TIMEOUT → trail hit) before profit-taking, so a
+ * disaster exit always wins over a take-profit on the same tick.
+ */
+export function evaluateExit(pos, pnlPct, holdMs, config) {
+  const sl = pos.slPercent ?? config.slPercent;
+  const maxHoldMs = (config.maxHoldHours || 0) * 60 * 60 * 1000;
+
+  // 1) Hard full-close conditions (act on remaining qty).
+  if (sl > 0 && pnlPct <= -sl) return { type: "FULL_CLOSE", reason: "SL" };
+  if (maxHoldMs > 0 && holdMs >= maxHoldMs) return { type: "FULL_CLOSE", reason: "TIMEOUT" };
+
+  const tps = normTakeProfits(pos, config);
+
+  // 2) Trailing stop — only once in profit past the activation threshold, so it
+  // locks gains instead of noise-stopping early. peak ratchets up, never down.
+  const trailPct = Number(config.trailingStopPct) || 0;
+  if (trailPct > 0) {
+    const activate = config.trailActivatePct ?? tps[0]?.pct ?? 0;
+    const peak = Math.max(pos.peak_pnl_pct ?? -Infinity, pnlPct);
+    if (peak >= activate) {
+      const trailStop = peak - trailPct;
+      if (pnlPct <= trailStop) return { type: "FULL_CLOSE", reason: "TRAIL" };
+      if (peak > (pos.peak_pnl_pct ?? -Infinity)) return { type: "TRAIL_UPDATE", trailStop, peak };
+    }
+  }
+
+  // 3) Take-profit ladder — first unfilled level whose target is reached. If it's
+  // the last defined level (or filling it accounts for ~all size) → full close;
+  // otherwise scale out this slice and keep the runner.
+  const hits = pos.tp_hits || [];
+  for (let i = 0; i < tps.length; i++) {
+    if (hits.includes(i)) continue;
+    if (pnlPct >= tps[i].pct) {
+      const moreLevels = tps.some((_, j) => j > i && !hits.includes(j));
+      const cumAfter = [...hits, i].reduce((s, j) => s + (tps[j]?.sizePct || 0), 0);
+      if (!moreLevels || cumAfter >= 100) return { type: "FULL_CLOSE", reason: "TP" };
+      return { type: "PARTIAL_TP", level: i, sizePct: tps[i].sizePct };
+    }
+  }
+
+  return null;
+}
+
+/**
  * Derive thesis-style TP/SL price levels for an agent entry from its plan
  * percentages. tpPercent/slPercent are PRICE-move percents (exitReason compares
  * them directly to the price-move pnlPct from computePnl), so the levels are a

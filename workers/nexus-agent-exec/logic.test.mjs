@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-agent-exec/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus, volScaledLevels } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits } from "./logic.mjs";
 
 // ─── snapQty ───────────────────────────────────────────────
 test("snapQty: snaps cleanly to base_tick (no float artifacts)", () => {
@@ -98,6 +98,70 @@ test("exitReason: TP/SL/timeout priority", () => {
   assert.equal(exitReason(0.5, 1 * 3600_000, cfg), null); // still holding
   // TP takes priority even if also timed out
   assert.equal(exitReason(2, 5 * 3600_000, cfg), "TP");
+});
+
+// ─── evaluateExit (multi-TP + trailing) ───────────────────
+const H = 3600_000;
+
+test("normTakeProfits: legacy single tpPercent → one 100% level", () => {
+  assert.deepEqual(normTakeProfits({ tpPercent: 1.5 }, {}), [{ pct: 1.5, sizePct: 100 }]);
+  // config-level fallback when pos has none
+  assert.deepEqual(normTakeProfits({}, { tpPercent: 2 }), [{ pct: 2, sizePct: 100 }]);
+});
+
+test("normTakeProfits: array is filtered + sorted ascending", () => {
+  const tps = normTakeProfits({ takeProfits: [{ pct: 2.5, sizePct: 50 }, { pct: 1, sizePct: 50 }, { pct: 0, sizePct: 10 }] }, {});
+  assert.deepEqual(tps, [{ pct: 1, sizePct: 50 }, { pct: 2.5, sizePct: 50 }]);
+});
+
+test("evaluateExit: legacy single TP → FULL_CLOSE TP at/above target", () => {
+  const cfg = { tpPercent: 1.5, slPercent: 0.75, maxHoldHours: 4 };
+  assert.deepEqual(evaluateExit({}, 2, 0, cfg), { type: "FULL_CLOSE", reason: "TP" });
+  assert.deepEqual(evaluateExit({}, 1.5, 0, cfg), { type: "FULL_CLOSE", reason: "TP" });
+});
+
+test("evaluateExit: SL and TIMEOUT full-close; SL wins over TP same tick", () => {
+  const cfg = { tpPercent: 1.5, slPercent: 0.75, maxHoldHours: 4 };
+  assert.deepEqual(evaluateExit({}, -1, 0, cfg), { type: "FULL_CLOSE", reason: "SL" });
+  assert.deepEqual(evaluateExit({}, 0.5, 5 * H, cfg), { type: "FULL_CLOSE", reason: "TIMEOUT" });
+  assert.deepEqual(evaluateExit({}, 0.5, 1 * H, cfg), null);
+  // pos.slPercent overrides config (vol-scaled stop stored on the position)
+  assert.deepEqual(evaluateExit({ slPercent: 2 }, -1, 0, cfg), null);
+});
+
+test("evaluateExit: two-level ladder → partial at TP1, full close at TP2", () => {
+  const cfg = { slPercent: 1, maxHoldHours: 4, takeProfits: [{ pct: 1, sizePct: 50 }, { pct: 2.5, sizePct: 50 }] };
+  // hit TP1, none filled yet → scale out 50%
+  assert.deepEqual(evaluateExit({ tp_hits: [] }, 1.2, 0, cfg), { type: "PARTIAL_TP", level: 0, sizePct: 50 });
+  // TP1 already filled, now at TP2 (last level) → full close
+  assert.deepEqual(evaluateExit({ tp_hits: [0] }, 2.6, 0, cfg), { type: "FULL_CLOSE", reason: "TP" });
+});
+
+test("evaluateExit: already-filled level is skipped (no double scale-out)", () => {
+  const cfg = { slPercent: 1, maxHoldHours: 4, takeProfits: [{ pct: 1, sizePct: 50 }, { pct: 2.5, sizePct: 50 }] };
+  // back at TP1 price after filling it, TP2 not reached → hold
+  assert.equal(evaluateExit({ tp_hits: [0] }, 1.1, 0, cfg), null);
+});
+
+test("evaluateExit: cumulative size reaching 100% closes fully even mid-ladder", () => {
+  const cfg = { slPercent: 1, maxHoldHours: 4, takeProfits: [{ pct: 1, sizePct: 60 }, { pct: 2, sizePct: 40 }] };
+  // TP1 (60%) filled, TP2 (40%) reached → cum 100% → full close
+  assert.deepEqual(evaluateExit({ tp_hits: [0] }, 2.1, 0, cfg), { type: "FULL_CLOSE", reason: "TP" });
+});
+
+test("evaluateExit: trailing stop locks gains once activated", () => {
+  const cfg = { slPercent: 1, maxHoldHours: 99, trailingStopPct: 0.5, takeProfits: [{ pct: 1, sizePct: 100 }] };
+  // below activation (TP1=1%) → no trail action, just holding
+  assert.equal(evaluateExit({ peak_pnl_pct: 0.5 }, 0.6, 0, cfg), null);
+  // rose to 1.2% (≥ activation) and is a new peak → ratchet the stop to 0.7
+  assert.deepEqual(evaluateExit({ peak_pnl_pct: 0.5 }, 1.2, 0, cfg), { type: "TRAIL_UPDATE", trailStop: 0.7, peak: 1.2 });
+  // peak was 1.5, now pulled back to 0.9 ≤ (1.5-0.5=1.0) → trail close
+  assert.deepEqual(evaluateExit({ peak_pnl_pct: 1.5 }, 0.9, 0, cfg), { type: "FULL_CLOSE", reason: "TRAIL" });
+});
+
+test("evaluateExit: hard SL still beats an active trailing profit", () => {
+  const cfg = { slPercent: 1, maxHoldHours: 99, trailingStopPct: 0.5, takeProfits: [{ pct: 1, sizePct: 100 }] };
+  assert.deepEqual(evaluateExit({ peak_pnl_pct: 2 }, -1.2, 0, cfg), { type: "FULL_CLOSE", reason: "SL" });
 });
 
 // ─── agent → feed bridge ───────────────────────────────────
