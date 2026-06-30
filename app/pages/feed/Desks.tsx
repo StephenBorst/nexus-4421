@@ -5,7 +5,7 @@
 // Reuses the cached `nexus_agent_sig_{addr}` session signature (no extra prompt if
 // the user already signed for the agent).
 import { useEffect, useState } from "react";
-import { createWalletClient, custom } from "viem";
+import { signWithInjected } from "@/utils/injectedWallet";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 const green = "#00ff88";
@@ -18,10 +18,7 @@ type Desk = {
 async function getSig(address: string): Promise<string> {
   const key = `nexus_agent_sig_${address.toLowerCase()}`;
   try { const c = JSON.parse(sessionStorage.getItem(key) || "null"); if (c?.sig) return c.sig; } catch { /* ignore */ }
-  const eth = (window as unknown as { ethereum?: unknown }).ethereum;
-  if (!eth) throw new Error("connect your wallet");
-  const client = createWalletClient({ transport: custom(eth as Parameters<typeof custom>[0]) });
-  const sig = await client.signMessage({ account: address as `0x${string}`, message: "nexus-trading-key-v1" });
+  const sig = await signWithInjected(address, "nexus-trading-key-v1");
   try { sessionStorage.setItem(key, JSON.stringify({ sig })); } catch { /* ignore */ }
   return sig;
 }

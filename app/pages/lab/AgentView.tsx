@@ -2,7 +2,7 @@
 // track-record panels, and the Orderly delegated-key readers.
 // Extracted from index.tsx (god-file split).
 import { useState, useEffect } from "react";
-import { createWalletClient, custom } from "viem";
+import { signWithInjected } from "@/utils/injectedWallet";
 import type { AgentConfig, AgentState, AgentTrade, AgentLeaderboardEntry, AgentPendingThesis } from "./types";
 import { DEFAULT_CONFIG } from "./types";
 import { agentCardStyle, agentLabelStyle, agentInputStyle, agentBtnStyle, navBtnStyle } from "./styles";
@@ -173,33 +173,7 @@ async function getAgentSig(address: string): Promise<string> {
     const cached = JSON.parse(sessionStorage.getItem(key) || "null");
     if (cached && typeof cached.sig === "string") return cached.sig;
   } catch { /* ignore */ }
-  const eth = (window as unknown as {
-    ethereum?: { request?: (a: { method: string; params?: unknown[] }) => Promise<unknown> };
-  }).ethereum;
-  if (!eth?.request) throw new Error("No wallet found — connect your wallet to control the agent");
-  // Wake/authorize the injected provider so it has an active account THIS session.
-  // Without this, viem's signMessage throws "Wallet is not initialized" when the
-  // provider exists but isn't connected/unlocked (e.g. the extension re-locked, or
-  // the Orderly session connected via a different path). eth_requestAccounts is a
-  // no-op prompt if already authorized.
-  let accounts: string[] = [];
-  try {
-    accounts = (await eth.request({ method: "eth_requestAccounts" })) as string[];
-  } catch {
-    throw new Error("Wallet connection rejected — approve the connection to control the agent");
-  }
-  if (!accounts?.length) throw new Error("Wallet is locked — unlock it in your wallet and try again");
-  // The signature must recover to the agent's wallet, so sign with the account the
-  // provider actually has active. If that isn't the agent wallet, the user has a
-  // different account selected in their extension — tell them plainly.
-  const active = accounts.find((a) => a.toLowerCase() === address.toLowerCase());
-  if (!active) {
-    throw new Error(
-      `Connected wallet ${accounts[0].slice(0, 6)}…${accounts[0].slice(-4)} doesn't match your agent wallet ${address.slice(0, 6)}…${address.slice(-4)} — switch to the agent wallet in your wallet extension.`,
-    );
-  }
-  const client = createWalletClient({ transport: custom(eth as Parameters<typeof custom>[0]) });
-  const sig = await client.signMessage({ account: active as `0x${string}`, message: "nexus-trading-key-v1" });
+  const sig = await signWithInjected(address, "nexus-trading-key-v1");
   try { sessionStorage.setItem(key, JSON.stringify({ sig })); } catch { /* ignore */ }
   return sig;
 }

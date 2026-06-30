@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createWalletClient, custom } from "viem";
+import { signWithInjected } from "@/utils/injectedWallet";
 import {
   useNexusTier,
   TIER_META,
@@ -39,14 +39,8 @@ async function getHoldersAccess(address: string): Promise<{ ts: number; sig: str
     if (cached && Date.now() - cached.ts < 8 * 60 * 1000) return cached;
   } catch { /* ignore */ }
 
-  const eth = (window as unknown as { ethereum?: unknown }).ethereum;
-  if (!eth) throw new Error("No wallet found");
-  const client = createWalletClient({ transport: custom(eth as Parameters<typeof custom>[0]) });
   const ts = Date.now();
-  const sig = await client.signMessage({
-    account: address as `0x${string}`,
-    message: holdersRoomMessage(address, ts),
-  });
+  const sig = await signWithInjected(address, holdersRoomMessage(address, ts));
   const access = { ts, sig };
   try { sessionStorage.setItem(key, JSON.stringify(access)); } catch { /* ignore */ }
   return access;
