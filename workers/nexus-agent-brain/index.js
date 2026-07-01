@@ -126,5 +126,31 @@ async function evaluateSymbol(symbol, env) {
     price: markPrice, oi: openInterest, timestamp: Date.now(),
   }));
 
+  // Build our OWN open-interest history. Orderly exposes only CURRENT OI (no
+  // historical series), so the CONFLUENCE (funding + OI-divergence) flagship can't
+  // be backtested from their API. Snapshotting OI hourly here means that in a few
+  // weeks we can backtest confluence against a real OI series we recorded. Cheap
+  // (the data's already fetched) and best-effort — must never break signal gen.
+  await recordOiSnapshot(symbol, env, { price: markPrice, oi: openInterest, funding: fundingRate });
+
   return { symbol, price: markPrice, oi: openInterest, fundingRate, priceChange, oiChange, hasPrev: !!prev };
+}
+
+// Append an hourly {t, price, oi, funding} point to oi:hist:{symbol}. The brain
+// runs every ~5 min, so we only append when the last point is ≥55 min old →
+// an hourly series. Capped to ~90 days.
+async function recordOiSnapshot(symbol, env, { price, oi, funding }) {
+  try {
+    const key = `oi:hist:${symbol}`;
+    const raw = await env.NEXUS_AGENT.get(key);
+    const hist = raw ? JSON.parse(raw) : [];
+    const now = Date.now();
+    const last = hist[hist.length - 1];
+    if (last && now - last.t < 55 * 60 * 1000) return; // keep it hourly
+    hist.push({ t: now, price, oi, funding });
+    if (hist.length > 2200) hist.splice(0, hist.length - 2200); // ~90d hourly
+    await env.NEXUS_AGENT.put(key, JSON.stringify(hist));
+  } catch (e) {
+    console.error(`[brain] oi-history ${symbol} failed:`, e.message);
+  }
 }

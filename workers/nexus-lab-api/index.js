@@ -3012,6 +3012,16 @@ document.getElementById("btn").addEventListener("click",go);
       return new Response(html, { status: 200, headers: { "Content-Type": "text/html;charset=UTF-8", "Access-Control-Allow-Origin": "*" } });
     }
 
+    // ── GET /agent/oi-history/:symbol — recorded OI series (public market data) ──
+    // The brain snapshots hourly {t,price,oi,funding} into oi:hist:{symbol} because
+    // Orderly has no OI history endpoint. Exposed so the confluence backtest (and
+    // any analytics) can read the series we've accumulated. Read-only, no secrets.
+    if (parts[0] === "agent" && parts[1] === "oi-history" && parts[2] && request.method === "GET") {
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+      const raw = await AGENT_KV.get(`oi:hist:${parts[2]}`);
+      return json({ symbol: parts[2], points: raw ? JSON.parse(raw) : [] }, request);
+    }
+
     // ── POST /agent/hook/:token — TradingView / external signal webhook ──────
     // Token-authed (no walletSig — TradingView can't sign). The token only
     // authorizes order placement on the user's order-only key (can't withdraw) and

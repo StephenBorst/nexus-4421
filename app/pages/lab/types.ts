@@ -155,9 +155,9 @@ export const DEFAULT_CONFIG: AgentConfig = {
   tpPercent: 1.5,
   slPercent: 0.75,
   maxHoldHours: 4,
-  maxTradesPerDay: 10,
+  maxTradesPerDay: 4, // selectivity wins — backtest showed high-frequency configs bleed out
   maxDailyLossUsdc: 5,
-  fundingThreshold: 0.01,
+  fundingThreshold: 0.02, // trade only EXTREME funding (least-bad in the 60d sweep)
   signalMode: "CONFLUENCE", // validated default — both funding + OI must agree
   oiChangeThreshold: 0, // any OI move counts by default
   priceChangeThreshold: 0.5, // % tick move to trigger momentum / mean-reversion
