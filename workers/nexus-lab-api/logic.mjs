@@ -207,6 +207,37 @@ export function parseWebhookAlert(body) {
   return { ok: true, action, direction, symbol, sizeOverride };
 }
 
+// ── Funding / OI percentile-vs-history ───────────────────────────────────────
+// Context beats a raw number: "funding 0.02%" means little; "funding in the 95th
+// percentile of the last 90 days" means the crowd is extremely long. Computed off
+// the oi:hist:{symbol} series the brain records ({t,price,oi,funding}). Pure+tested.
+
+// % of samples <= x (0..100). null on empty.
+export function percentileRank(values, x) {
+  if (!Array.isArray(values) || !values.length) return null;
+  const below = values.reduce((n, v) => n + (v <= x ? 1 : 0), 0);
+  return Math.round((below / values.length) * 100);
+}
+
+// Current funding/OI + their percentile vs the recorded history. Needs a minimum
+// sample so early (thin) history doesn't lie — returns { building:true } until then.
+export function oiStats(series, minSamples = 12) {
+  if (!Array.isArray(series) || series.length < 2) return { building: true, samples: series?.length || 0 };
+  const last = series[series.length - 1];
+  const fundings = series.map((p) => p.funding).filter(Number.isFinite);
+  const ois = series.map((p) => p.oi).filter(Number.isFinite);
+  const stat = (arr, val) => {
+    const s = [...arr].sort((a, b) => a - b);
+    return { value: val, pct: percentileRank(arr, val), min: s[0], max: s[s.length - 1] };
+  };
+  return {
+    building: series.length < minSamples,
+    samples: series.length,
+    funding: stat(fundings, last.funding),
+    oi: stat(ois, last.oi),
+  };
+}
+
 // ── Agent leaderboard eligibility + score ────────────────────────────────────
 // Shared by /agents/leaderboard (the public ranking) and /agents/standing/:addr
 // (a single agent's "why am I / am I not ranked" readout) so the two can never

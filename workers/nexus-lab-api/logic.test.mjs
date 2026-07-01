@@ -453,3 +453,23 @@ test("parseWebhookAlert: size override parsed when positive", () => {
   assert.equal(parseWebhookAlert({ action: "BUY", symbol: "BTC", size: 25 }).sizeOverride, 25);
   assert.equal(parseWebhookAlert({ action: "BUY", symbol: "BTC", size: -1 }).sizeOverride, null);
 });
+
+import { percentileRank, oiStats } from "./logic.mjs";
+
+test("percentileRank: where current sits in the distribution", () => {
+  assert.equal(percentileRank([1,2,3,4,5], 3), 60);
+  assert.equal(percentileRank([1,2,3,4,5], 5), 100);
+  assert.equal(percentileRank([1,2,3,4,5], 0), 0);
+  assert.equal(percentileRank([], 3), null);
+});
+
+test("oiStats: building flag until minSamples, then funding/oi percentiles", () => {
+  const thin = [{ funding: 0.01, oi: 100 }, { funding: 0.02, oi: 110 }];
+  assert.equal(oiStats(thin, 12).building, true);
+  const series = Array.from({ length: 20 }, (_, i) => ({ funding: i / 1000, oi: 100 + i }));
+  const s = oiStats(series, 12);
+  assert.equal(s.building, false);
+  assert.equal(s.samples, 20);
+  assert.equal(s.funding.pct, 100); // last funding is the max → top percentile
+  assert.equal(s.oi.value, 119);
+});

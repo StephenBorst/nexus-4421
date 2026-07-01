@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats } from "./logic.mjs";
 
 import { backtestConfig, runSweep } from "./backtest.mjs";
 
@@ -3057,6 +3057,38 @@ document.getElementById("btn").addEventListener("click",go);
         console.error("[backtest] error:", e);
         return json({ error: "backtest failed", detail: String(e.message || e) }, request, 500);
       }
+    }
+
+    // ── GET /signals/context/:symbol — funding/OI percentile-vs-history ──────
+    // "Is this extreme?" context. FUNDING percentile uses Orderly's months of
+    // funding history (rich NOW); OI percentile uses our recorded oi:hist (matures
+    // over weeks → `building` until it has enough samples). Public read-only.
+    if (parts[0] === "signals" && parts[1] === "context" && parts[2] && request.method === "GET") {
+      const symbol = parts[2];
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+      let rates = [];
+      try {
+        for (let page = 1; page <= 5; page++) {
+          const r = await fetch(`https://api-evm.orderly.org/v1/public/funding_rate_history?symbol=${symbol}&page=${page}&size=100`);
+          const d = await r.json();
+          const rows = d?.data?.rows || [];
+          rates.push(...rows.map((x) => Number(x.funding_rate)).filter(Number.isFinite));
+          if (rows.length < 100) break;
+        }
+      } catch { /* ignore */ }
+      const cur = rates.length ? rates[0] : null; // rows are newest-first
+      const funding = cur == null ? null : {
+        value: cur, pct: percentileRank(rates, cur), samples: rates.length,
+        days: Math.round(rates.length / 3), // ~3 settlements/day
+        min: Math.min(...rates), max: Math.max(...rates),
+      };
+      let oi = null;
+      try {
+        const raw = await AGENT_KV.get(`oi:hist:${symbol}`);
+        const s = oiStats(raw ? JSON.parse(raw) : []);
+        oi = { building: s.building, samples: s.samples, ...(s.oi || {}) };
+      } catch { /* ignore */ }
+      return json({ symbol, funding, oi }, request);
     }
 
     // ── GET /agent/oi-history/:symbol — recorded OI series (public market data) ──

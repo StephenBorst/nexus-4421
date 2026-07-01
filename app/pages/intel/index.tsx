@@ -251,6 +251,23 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
   const [loading,    setLoading]    = useState(true);
   const [countdown,  setCountdown]  = useState(REFRESH_INTERVAL);
   const [timestamp,  setTimestamp]  = useState("");
+  const [contexts,   setContexts]   = useState<Record<string, any>>({});
+
+  // Funding/OI percentile-vs-history (Brighter-Data-style context) for the majors.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const out: Record<string, any> = {};
+      await Promise.all(["BTC", "ETH", "SOL"].map(async (sym) => {
+        try {
+          const r = await fetch(`https://og.nexustradinglabs.com/signals/context/PERP_${sym}_USDC`);
+          if (r.ok) out[sym] = await r.json();
+        } catch { /* fail-soft */ }
+      }));
+      if (!cancelled) setContexts(out);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // ── Live positions from Orderly (wallet must be connected) ──
   const { state: accountState } = useAccount();
@@ -383,7 +400,20 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
           </button>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", rowGap: "2px", columnGap: "8px", fontSize: "12px" }}>
-          <div><span style={{ color: DIM }}>FUNDING 8H  </span><span style={{ color: fc }}>{data ? fmtFunding(data.funding) : "—"}</span></div>
+          <div>
+            <span style={{ color: DIM }}>FUNDING 8H  </span><span style={{ color: fc }}>{data ? fmtFunding(data.funding) : "—"}</span>
+            {(() => {
+              const f = contexts[sym]?.funding;
+              if (!f || f.pct == null) return null;
+              const extreme = f.pct >= 85 || f.pct <= 15;
+              return (
+                <span title={`Funding is in the ${f.pct}th percentile of the last ${f.days} days${extreme ? " — crowd is stretched" : ""}`}
+                  style={{ marginLeft: 6, color: extreme ? (f.pct >= 85 ? GREEN : RED) : MUTED, fontSize: "10px" }}>
+                  {f.pct}th pct{extreme ? " ⚠" : ""}
+                </span>
+              );
+            })()}
+          </div>
           <div><span style={{ color: DIM }}>OI  </span><span style={{ color: MUTED }}>{data ? fmtOI(data.oi) : "—"}</span></div>
           <div><span style={{ color: DIM }}>L/S  </span><span style={{ color: lsColor(ls) }}>{ls !== null ? ls.toFixed(2) : "—"}</span></div>
           <div><span style={{ color: lsColor(ls), fontSize: "11px" }}>{lsLabel(ls)}</span></div>
