@@ -9,6 +9,7 @@ import { agentCardStyle, agentLabelStyle, agentInputStyle, agentBtnStyle, navBtn
 import { useSubscription } from "@/hooks/useSubscription";
 import { isProStrategy } from "@/config/subscription";
 import { STRATEGY_PRESETS } from "@/config/strategyPresets";
+import { STYLE_PRESETS, deriveStyle, type TradingStyle } from "@/config/agentStyles";
 
 const AGENT_API = "https://og.nexustradinglabs.com";
 
@@ -624,10 +625,40 @@ export function AgentView() {
       {/* ─── CONFIG TAB ──────────────────────────────────── */}
       {tab === "config" && (
         <div>
-          {/* Strategy library — one-click deployable presets. Loads into config for
-              review; user still saves explicitly. PRO presets gated by isPro. */}
+          {/* ── TRADING STYLE — the friendly on-ramp: pick a horizon, get a tuned
+              starting config. Day/Swing are the agent's honest home (hourly data +
+              1-min cron + funding edge); scalping/position are intentionally absent. */}
           <div style={agentCardStyle}>
-            <div style={agentLabelStyle}>// STRATEGY LIBRARY <span style={{ color: "#3a6a4a" }}>— load a preset, review, save</span></div>
+            <div style={agentLabelStyle}>// TRADING STYLE <span style={{ color: "#3a6a4a" }}>— pick your horizon to start</span></div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+              {(Object.keys(STYLE_PRESETS) as TradingStyle[]).map((k) => {
+                const p = STYLE_PRESETS[k];
+                const active = deriveStyle(config) === k;
+                return (
+                  <button key={k} onClick={() => {
+                    setConfig((prev) => ({ ...prev, ...p.config }));
+                    setSuccess(`${p.label} style loaded — review params & Save below.`);
+                    setTimeout(() => setSuccess(null), 5000);
+                  }} style={{
+                    flex: "1 1 200px", textAlign: "left", cursor: "pointer",
+                    background: active ? "#00ff8810" : "#0a0e0a",
+                    border: `1px solid ${active ? "#00ff88" : "#1e2d1e"}`, borderRadius: 6, padding: "10px 12px",
+                  }}>
+                    <div style={{ color: active ? "#00ff88" : "#c0c0c0", fontFamily: "monospace", fontSize: 13, fontWeight: 600 }}>{p.label}{active ? " ✓" : ""}</div>
+                    <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 10, marginTop: 3, lineHeight: 1.4 }}>{p.blurb}</div>
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
+              Nexus's agent lives in the day-to-swing middle. Scalping (seconds) needs sub-minute data the funding edge doesn't use; position trading is buy-and-hold — neither fits this tool, so we don't fake them.
+            </div>
+          </div>
+
+          {/* Quick-start preset templates. Loads into config for review; user still
+              saves explicitly. PRO presets gated by isPro. */}
+          <div style={agentCardStyle}>
+            <div style={agentLabelStyle}>// QUICK-START PRESETS <span style={{ color: "#3a6a4a" }}>— load a preset, review, save</span></div>
             <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginTop: 10 }}>
               {STRATEGY_PRESETS.map((p) => {
                 const locked = !!p.pro && !isPro;
@@ -879,7 +910,7 @@ export function AgentView() {
                 { key: "capitalPerTrade", label: "CAPITAL / TRADE", suffix: "USDC", min: 10, max: 10000, step: 10 },
                 { key: "tpPercent", label: "TAKE PROFIT", suffix: "%", min: 0.25, max: 10, step: 0.25 },
                 { key: "slPercent", label: "STOP LOSS", suffix: "%", min: 0.25, max: 5, step: 0.25 },
-                { key: "maxHoldHours", label: "MAX HOLD TIME", suffix: "hrs", min: 1, max: 48, step: 1 },
+                { key: "maxHoldHours", label: "MAX HOLD TIME", suffix: "hrs", min: 1, max: 336, step: 1 },
                 { key: "maxTradesPerDay", label: "MAX TRADES / DAY", suffix: "", min: 1, max: 50, step: 1 },
                 { key: "maxDailyLossUsdc", label: "MAX DAILY LOSS", suffix: "USDC", min: 1, max: 500, step: 1 },
                 { key: "fundingThreshold", label: "FUNDING THRESHOLD", suffix: "%", min: 0.001, max: 0.1, step: 0.001 },
@@ -1220,7 +1251,7 @@ export function AgentView() {
                     <div style={{ minWidth: 0 }}>
                       <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
                       <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 9, marginTop: 2 }}>
-                        {s.config.signalMode} · {s.config.mode} · {s.config.leverage}x · TP{s.config.tpPercent}/SL{s.config.slPercent}
+                        <span style={{ color: "#4a9fff" }}>{deriveStyle(s.config)}</span> · {s.config.signalMode} · {s.config.mode} · {s.config.leverage}x · TP{s.config.tpPercent}/SL{s.config.slPercent}
                         {s.config.dcaEnabled ? " · DCA" : ""}
                         {s.stats ? <span style={{ color: s.stats.netUsd >= 0 ? "#00ff88" : "#ff4444" }}>{`  ·  60d ${s.stats.netUsd >= 0 ? "+" : ""}$${s.stats.netUsd}`}</span> : ""}
                       </div>
