@@ -324,6 +324,14 @@ export function AgentView() {
       setSweep(data);
     } catch (e: any) { setError(e.message); } finally { setSweeping(false); }
   }
+  // Apply a swept winner's strategy params into the editor (keeps the user's
+  // symbols/leverage/capital/mode; swaps mode/threshold/exits). The bridge that
+  // turns "here's what worked" into "now it's my config."
+  function applySweepConfig(cfg: any) {
+    const clean = Object.fromEntries(Object.entries(cfg).filter(([, v]) => v !== undefined));
+    setConfig((prev) => ({ ...prev, ...clean }));
+    setSuccess("Config applied to the editor — review, then Save or Backtest."); setTimeout(() => setSuccess(null), 4000);
+  }
 
   // Strategy library — save the current composed config under a name, load one
   // back into the editor, or delete. The config IS the strategy object.
@@ -1234,7 +1242,9 @@ export function AgentView() {
                           <span>STRATEGY</span><span style={{ textAlign: "right" }}>NET$</span><span style={{ textAlign: "right" }}>WIN%</span><span style={{ textAlign: "right" }}>TRADES</span>
                         </div>
                         {sweep.results.slice(0, 12).map((r: any, i: number) => (
-                          <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 70px 52px 56px", gap: 6, fontFamily: "monospace", fontSize: 10, padding: "4px 0", borderBottom: "1px solid #10160f", color: "#8aaa9a" }}>
+                          <div key={i} onClick={() => r.config && applySweepConfig(r.config)} title="Apply this config to the editor above" style={{ display: "grid", gridTemplateColumns: "1fr 70px 52px 56px", gap: 6, fontFamily: "monospace", fontSize: 10, padding: "5px 4px", borderBottom: "1px solid #10160f", color: "#8aaa9a", cursor: r.config ? "pointer" : "default", borderRadius: 3 }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "#0f1613"; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}>
                             <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{i === 0 ? "★ " : ""}{r.name}</span>
                             <span style={{ textAlign: "right", color: r.netUsd >= 0 ? "#00ff88" : "#ff4444", fontWeight: 600 }}>{r.netUsd >= 0 ? "+" : ""}{r.netUsd}</span>
                             <span style={{ textAlign: "right" }}>{r.winRate}</span>
@@ -1244,7 +1254,7 @@ export function AgentView() {
                       </div>
                     </div>
                     <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
-                      Top of the grid. Note: CONFLUENCE/OI aren't in the sweep (no OI history yet). Every config here was graded on real price — pick a winner, set it above, and paper-test before going live.
+                      ↑ Click any row to apply that config to the editor. CONFLUENCE/OI aren't in the sweep (no OI history yet). Every config here was graded on real price — apply a winner, then paper-test before going live.
                     </div>
                   </div>
                 )}

@@ -2,40 +2,41 @@
 // Extracted from index.tsx (god-file split) — pure constants, no behavior change.
 import type { CSSProperties } from "react";
 import type { ThesisStatus } from "./types";
+import { C, S, RADIUS, MONO } from "./tokens";
 
 export const cardStyle: CSSProperties = {
-  background: "#0d120d",
-  border: "1px solid #1a2e1a",
-  borderRadius: 4,
+  background: C.surfaceAlt,
+  border: `1px solid ${C.border}`,
+  borderRadius: RADIUS.sm,
   padding: "12px 14px",
 };
 
 export const labelStyle: CSSProperties = {
   fontSize: 9,
   letterSpacing: "0.12em",
-  color: "#3a5a4a",
-  marginBottom: 6,
-  fontFamily: "monospace",
+  color: C.text.faint,
+  marginBottom: S.sm,
+  fontFamily: MONO,
 };
 
 export const navBtnStyle: CSSProperties = {
   background: "none",
-  border: "1px solid #1a2e1a",
-  color: "#4a7a5a",
-  fontFamily: "monospace",
+  border: `1px solid ${C.border}`,
+  color: C.text.muted,
+  fontFamily: MONO,
   fontSize: 11,
   padding: "5px 12px",
   cursor: "pointer",
-  borderRadius: 3,
+  borderRadius: RADIUS.sm,
 };
 
 export const inputStyle: CSSProperties = {
   width: "100%",
-  background: "#080c08",
-  border: "1px solid #1a2e1a",
-  borderRadius: 3,
-  color: "#00ff88",
-  fontFamily: "monospace",
+  background: C.inset,
+  border: `1px solid ${C.border}`,
+  borderRadius: RADIUS.sm,
+  color: C.text.bright,
+  fontFamily: MONO,
   fontSize: 12,
   padding: "8px 10px",
   outline: "none",
@@ -44,10 +45,10 @@ export const inputStyle: CSSProperties = {
 
 export const fieldLabelStyle: CSSProperties = {
   fontSize: 9,
-  color: "#3a5a4a",
-  fontFamily: "monospace",
+  color: C.text.faint,
+  fontFamily: MONO,
   letterSpacing: "0.1em",
-  marginBottom: 4,
+  marginBottom: S.xs,
   display: "block",
 };
 
@@ -61,8 +62,6 @@ export const STATUS_CONFIG: Record<ThesisStatus, { label: string; color: string;
 export const CLOSED_STATUSES: ThesisStatus[] = ["HIT_TP", "STOPPED_OUT", "INVALIDATED"];
 
 // ─── Agent (Trading Agent tab) styles — built from the design tokens ─────────
-import { C, S, RADIUS, MONO } from "./tokens";
-
 export const agentCardStyle: CSSProperties = {
   background: C.surface,
   border: `1px solid ${C.border}`,

@@ -140,7 +140,13 @@ export async function runSweep(base, { symbols, days }) {
       const r = runBacktest(data[s].candles, data[s].fundingAt, config);
       net += r.netUsd; trades += r.trades; wins += Math.round((r.winRate / 100) * r.trades);
     }
-    return { name, trades, winRate: trades ? Math.round((wins / trades) * 1000) / 10 : 0, netUsd: Math.round(net * 100) / 100 };
+    // Include the strategy-defining params so the UI can one-click APPLY a winner.
+    const applied = {
+      signalMode: config.signalMode, priceChangeThreshold: config.priceChangeThreshold,
+      fundingThreshold: config.fundingThreshold, tpPercent: config.tpPercent, slPercent: config.slPercent,
+      takeProfits: config.takeProfits || null, trailingStopPct: config.trailingStopPct || 0,
+    };
+    return { name, trades, winRate: trades ? Math.round((wins / trades) * 1000) / 10 : 0, netUsd: Math.round(net * 100) / 100, config: applied };
   }).sort((a, b) => b.netUsd - a.netUsd);
   return { days, symbols, notional: common.capitalPerTrade * common.leverage, results };
 }
