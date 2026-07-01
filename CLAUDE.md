@@ -202,6 +202,48 @@ Bankr/Farcaster users can deploy/control the autonomous agent by chat. Two addit
   apply to next signal + to managing an open position). Brain is per-symbol RAW deltas; `deriveSignal(raw,config)`
   applies each user's mode/thresholds.
 
+## 3Commas-informed agent adaptations (SHIPPED 2026-06-30) — spec `docs/3commas-adaptations-spec.md`
+Studied 3Commas; took only the mechanics that fit the funding-edge + trustless-grading identity. All on `main`,
+pure-logic-first with `node:test`. Positioning: "3Commas automation without the trust problem."
+- **Multi-TP scale-out + trailing stops (FREE):** `evaluateExit(pos,pnlPct,holdMs,config)` in exec `logic.mjs`
+  supersedes `exitReason` — returns `FULL_CLOSE`/`PARTIAL_TP`/`TRAIL_UPDATE`/null (hard-stop priority SL→TIMEOUT→trail
+  over TP). Config `takeProfits:[{pct,sizePct}]` + `trailingStopPct`. `partialClose()` sends reduce-only slices, logs
+  per-slice `agent_trades` rows (`parent_id`/`exit_seq` cols — migrated). `normTakeProfits` keeps legacy single-TP
+  behavior. Backtest finding: **trailing HURTS in chop, scale-out mildly helps.**
+- **Signal webhook / TradingView (PRO):** per-user secret token in URL = auth (order-only scope, rotatable).
+  `POST /agent/hook/:token {action:BUY|SELL|CLOSE,symbol,passphrase}` → `parseWebhookAlert` (lab-api logic.mjs) →
+  writes `agent:webhook_signal:{addr}` (600s TTL); exec consumes it before the holding check (CLOSE flattens even
+  while holding; OPEN bypasses cooldown, no stacking). Owner-authed PRO `/agent/:a/webhook/(enable|rotate|disable)`.
+- **DCA / safety orders (PRO):** whole ladder fits inside `capitalPerTrade` (base = capitalPerTrade/Σvs^i), reuses the
+  balance guardrail. `config.dcaEnabled`+`config.dca{maxSafetyOrders,safetyOrderStepPct,safetyOrderStepScale,
+  safetyOrderVolumeScale}`. exec has a SEPARATE monitor path: P&L off blended `avg_entry`, TP off avg, `addSafetyOrder`
+  averages in via `nextSafetyOrder`/`blendAvg`, slPercent stop only fires once the ladder is spent. Daily-loss cap +
+  kill switch stay absolute. Server-enforced 402 `pro_dca_locked`.
+
+## Strategy workbench (SHIPPED 2026-06-30/07-01) — full detail in memory `strategy-workbench-and-followups`
+The moat-aligned answer to "let users build/validate strategies." Loop: pick STYLE → compose (Config tab) → Test →
+Sweep → Save → Publish → Community board → COPY → activate → graded.
+- **Backtest engine** `workers/nexus-lab-api/backtest.mjs` — imports the REAL deployed `deriveSignal` (brain) +
+  `evaluateExit`/`computePnl` (exec) so results reflect live behavior (wrangler bundles the cross-dir imports; ONE
+  engine, `tools/backtest` runner imports it too). `POST /agent/backtest` (single) + `/agent/backtest/sweep` (ranked
+  ~27-config grid), both **PRO** (walletSig→ecrecover→walletIsPro). Config-tab BACKTEST card (Test/Sweep buttons).
+- **⚠️ Data reality:** Orderly has price OHLC + funding-rate history but **NO OI history** → CONFLUENCE/OI_ONLY are
+  NOT backtestable (flagged `untestable` to UI). Only MOMENTUM/MEAN_REVERSION/FUNDING_ONLY + exits are. First 60d
+  sweep: EVERYTHING net-negative, least-bad = FUNDING_ONLY extreme threshold → drove selective house defaults
+  (`DEFAULT_CONFIG` fundingThreshold 0.02, maxTradesPerDay 4). **Agent net-negative = the #1 real constraint.**
+- **OI history logging:** brain records hourly `{t,price,oi,funding}` into `oi:hist:{symbol}` (core BTC/ETH/SOL +
+  watchlists, independent of position state — bug fixed where it only ran for flat users). `GET /agent/oi-history/
+  :symbol`. **⏳ Once ~2-3 wks mature (≈mid-July 2026) → wire OI into backtest so CONFLUENCE (flagship) is testable.**
+- **Strategy library + sharing:** `/agent/:addr/strategies` CRUD (save/delete owner-authed, list public) + `/publish`
+  toggle; `GET /agents/strategies/public?style=` ranks public strategies by the **author's GRADED record** (not
+  backtest — keeps discovery on-moat), optional style filter. Config-tab STRATEGY LIBRARY + COMMUNITY STRATEGIES cards.
+- **Trading STYLE** (`app/config/agentStyles.ts`): Day/Swing presets + `deriveStyle` (by maxHoldHours). Scalping
+  (sub-minute) + position (buy-and-hold) intentionally ABSENT — don't fit a 1-min-cron funding-edge agent on hourly
+  data. `maxHoldHours` UI cap lifted 48→336h for swing. Active strategy shown on AGENT STATUS + agent feed entries.
+- **⏳ Multi-strategy concurrency (deferred):** the RIGHT path is one **Orderly sub-account per strategy** (NOT separate
+  wallets = bad UX, NOT multi-position-one-account = perps net per symbol/account). Sequence AFTER a proven edge
+  (concurrency multiplies edge). Bonus: sub-accounts → per-STRATEGY graded records → stronger marketplace ranking.
+
 ## Bankr SKILL + marketing assets (where things live)
 - **Bankr skill** = `github.com/BankrBot/skills` → `nexus-trading-labs/SKILL.md` + `references/*.md` (markdown skill,
   YAML frontmatter `name: nexus` + trigger `description`). Published/maintained by Nexus. Update = edit SKILL.md/refs,
