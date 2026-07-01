@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { signWithInjected } from "@/utils/injectedWallet";
 import type { AgentConfig, AgentState, AgentTrade, AgentLeaderboardEntry, AgentPendingThesis } from "./types";
 import { DEFAULT_CONFIG } from "./types";
-import { agentCardStyle, agentLabelStyle, agentInputStyle, agentBtnStyle, navBtnStyle } from "./styles";
+import { agentCardStyle, agentLabelStyle, agentInputStyle, agentBtnStyle, btnPrimary, navBtnStyle } from "./styles";
 import { useSubscription } from "@/hooks/useSubscription";
 import { isProStrategy } from "@/config/subscription";
 import { STRATEGY_PRESETS } from "@/config/strategyPresets";
@@ -1109,7 +1109,7 @@ export function AgentView() {
                 <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 11, lineHeight: 1.5, marginBottom: 10 }}>
                   Generate a private webhook URL. Point a TradingView alert (or any system) at it and your agent trades the signal in its current mode — {config.mode === "PAPER" ? "simulated in PAPER" : config.mode === "ASSISTED" ? "queued for review in ASSISTED" : "executed live in AUTONOMOUS"}.
                 </div>
-                <button onClick={() => manageWebhook("enable")} disabled={saving} style={{ ...agentBtnStyle, opacity: saving ? 0.5 : 1 }}>
+                <button onClick={() => manageWebhook("enable")} disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.5 : 1 }}>
                   ENABLE WEBHOOK
                 </button>
               </div>
@@ -1173,7 +1173,7 @@ export function AgentView() {
               </div>
               {isPro && (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button onClick={runConfigBacktest} disabled={backtesting || sweeping} style={{ ...agentBtnStyle, fontSize: 10, padding: "6px 16px", opacity: (backtesting || sweeping) ? 0.5 : 1 }}>
+                  <button onClick={runConfigBacktest} disabled={backtesting || sweeping} style={{ ...btnPrimary, fontSize: 10, padding: "6px 16px", opacity: (backtesting || sweeping) ? 0.5 : 1 }}>
                     {backtesting ? "RUNNING…" : "▶ TEST THIS CONFIG"}
                   </button>
                   <button onClick={runConfigSweep} disabled={backtesting || sweeping} style={{ ...navBtnStyle, fontSize: 10, padding: "6px 16px", opacity: (backtesting || sweeping) ? 0.5 : 1 }}>
@@ -1266,7 +1266,7 @@ export function AgentView() {
                 maxLength={40}
                 style={{ ...agentInputStyle, flex: 1, minWidth: 160 }}
               />
-              <button onClick={saveStrategy} disabled={saving || !stratName.trim()} style={{ ...agentBtnStyle, fontSize: 10, padding: "6px 16px", opacity: (saving || !stratName.trim()) ? 0.5 : 1 }}>
+              <button onClick={saveStrategy} disabled={saving || !stratName.trim()} style={{ ...btnPrimary, fontSize: 10, padding: "6px 16px", opacity: (saving || !stratName.trim()) ? 0.5 : 1 }}>
                 💾 SAVE
               </button>
             </div>
@@ -1307,7 +1307,7 @@ export function AgentView() {
               Strategies shared by the community, ranked by the author's <strong style={{ color: "#8aaa9a" }}>graded live/paper record</strong> — not backtest (shown only as a hypothesis). Copy one to your editor and make it yours.
             </div>
             {community === null ? (
-              <button onClick={() => loadCommunity("")} style={{ ...agentBtnStyle, fontSize: 10, padding: "6px 16px", marginTop: 10 }}>▤ BROWSE STRATEGIES</button>
+              <button onClick={() => loadCommunity("")} style={{ ...btnPrimary, fontSize: 10, padding: "6px 16px", marginTop: 10 }}>▤ BROWSE STRATEGIES</button>
             ) : community.length === 0 ? (
               <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 11, marginTop: 10 }}>No public strategies{communityStyle ? ` for ${communityStyle}` : ""} yet — publish one from your library to seed the board.</div>
             ) : (
