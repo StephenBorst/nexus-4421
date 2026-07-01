@@ -1,0 +1,15 @@
+# Cloudflare Pages cache rules — prevents stale-chunk errors after deploys.
+# HTML + runtime config must always be fresh so they reference the CURRENT chunk
+# hashes; hashed assets are content-addressed and safe to cache forever.
+
+/index.html
+  Cache-Control: no-cache
+
+/config.js
+  Cache-Control: no-cache
+
+/sw.js
+  Cache-Control: no-cache
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useRouteError, isRouteErrorResponse } from 'react-router-dom';
 
 export function ErrorBoundary() {
@@ -47,7 +48,24 @@ export function ErrorBoundary() {
   const isModuleImportError = errorMessage.includes('Failed to fetch dynamically imported module') ||
                               errorMessage.includes('Failed to fetch') ||
                               (error instanceof Error && error.message.includes('Failed to fetch'));
-  
+
+  // Self-heal stale-chunk errors: a tab left open across a deploy tries to lazy-load
+  // an old chunk hash that the deploy removed → 404. Clear caches + reload ONCE to
+  // pull the fresh index.html + current chunk graph. Guarded by a 15s sessionStorage
+  // stamp so a genuine, persistent failure shows the page instead of reload-looping.
+  useEffect(() => {
+    if (!isModuleImportError) return;
+    const KEY = 'nexus_chunk_reload_ts';
+    if (Date.now() - Number(sessionStorage.getItem(KEY) || 0) < 15000) return;
+    sessionStorage.setItem(KEY, String(Date.now()));
+    (async () => {
+      try {
+        if ('caches' in window) { const ks = await caches.keys(); await Promise.all(ks.map((k) => caches.delete(k))); }
+      } catch { /* best-effort */ }
+      window.location.reload();
+    })();
+  }, [isModuleImportError]);
+
   return (
     <div style={{
       minHeight: '100vh',
