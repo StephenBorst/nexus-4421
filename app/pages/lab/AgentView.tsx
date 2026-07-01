@@ -215,6 +215,8 @@ export function AgentView() {
   const [standing, setStanding] = useState<AgentStanding | null>(null);
   const [backtest, setBacktest] = useState<any | null>(null);
   const [backtesting, setBacktesting] = useState(false);
+  const [sweep, setSweep] = useState<any | null>(null);
+  const [sweeping, setSweeping] = useState(false);
   const [webhookEnabled, setWebhookEnabled] = useState(false);
   const [webhookInfo, setWebhookInfo] = useState<{ url: string; passphrase: string } | null>(() => {
     try { return JSON.parse(sessionStorage.getItem(`nexus_webhook_${(walletAddress || "").toLowerCase()}`) || "null"); }
@@ -297,6 +299,22 @@ export function AgentView() {
       if (!res.ok) throw new Error(data.hint || data.error || "Backtest failed");
       setBacktest(data);
     } catch (e: any) { setError(e.message); } finally { setBacktesting(false); }
+  }
+
+  // Sweep a grid of configs (mode × threshold × exit) and rank by net P&L — the
+  // terminal sweep, in-app. Uses the base config's leverage/capital/symbols.
+  async function runConfigSweep() {
+    if (!walletAddress) { setError("Connect wallet first"); return; }
+    setSweeping(true); setError(null); setSweep(null);
+    try {
+      const walletSig = await getAgentSig(walletAddress);
+      const res = await fetch(`${AGENT_API}/agent/backtest/sweep`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ config, walletSig, days: 60 }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.hint || data.error || "Sweep failed");
+      setSweep(data);
+    } catch (e: any) { setError(e.message); } finally { setSweeping(false); }
   }
 
   // Signal webhook (TradingView / external). enable & rotate mint a fresh secret
@@ -1055,9 +1073,14 @@ export function AgentView() {
                 <span style={{ fontFamily: "monospace", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
               </div>
               {isPro && (
-                <button onClick={runConfigBacktest} disabled={backtesting} style={{ ...agentBtnStyle, fontSize: 10, padding: "6px 16px", opacity: backtesting ? 0.5 : 1 }}>
-                  {backtesting ? "RUNNING…" : "▶ TEST ON 60d HISTORY"}
-                </button>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button onClick={runConfigBacktest} disabled={backtesting || sweeping} style={{ ...agentBtnStyle, fontSize: 10, padding: "6px 16px", opacity: (backtesting || sweeping) ? 0.5 : 1 }}>
+                    {backtesting ? "RUNNING…" : "▶ TEST THIS CONFIG"}
+                  </button>
+                  <button onClick={runConfigSweep} disabled={backtesting || sweeping} style={{ ...navBtnStyle, fontSize: 10, padding: "6px 16px", opacity: (backtesting || sweeping) ? 0.5 : 1 }}>
+                    {sweeping ? "SWEEPING…" : "⊞ SWEEP CONFIGS"}
+                  </button>
+                </div>
               )}
             </div>
             {!isPro ? (
@@ -1098,6 +1121,31 @@ export function AgentView() {
                     </div>
                     <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
                       Past performance ≠ future results. Fees/funding not modeled — live results run slightly worse. 60d hourly, ${(config.capitalPerTrade * config.leverage).toFixed(0)} notional/trade.
+                    </div>
+                  </div>
+                )}
+                {sweep && (
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ ...agentLabelStyle, fontSize: 9, marginBottom: 6 }}>
+                      RANKED — {sweep.results.length} configs · {sweep.symbols.map((s: string) => s.replace("PERP_", "").replace("_USDC", "")).join("/")} · {sweep.days}d · ${sweep.notional} notional
+                    </div>
+                    <div style={{ overflowX: "auto" }}>
+                      <div style={{ minWidth: 340 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 70px 52px 56px", gap: 6, fontFamily: "monospace", fontSize: 9, color: "#4a7a5a", padding: "0 0 4px", borderBottom: "1px solid #1e2d1e" }}>
+                          <span>STRATEGY</span><span style={{ textAlign: "right" }}>NET$</span><span style={{ textAlign: "right" }}>WIN%</span><span style={{ textAlign: "right" }}>TRADES</span>
+                        </div>
+                        {sweep.results.slice(0, 12).map((r: any, i: number) => (
+                          <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 70px 52px 56px", gap: 6, fontFamily: "monospace", fontSize: 10, padding: "4px 0", borderBottom: "1px solid #10160f", color: "#8aaa9a" }}>
+                            <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{i === 0 ? "★ " : ""}{r.name}</span>
+                            <span style={{ textAlign: "right", color: r.netUsd >= 0 ? "#00ff88" : "#ff4444", fontWeight: 600 }}>{r.netUsd >= 0 ? "+" : ""}{r.netUsd}</span>
+                            <span style={{ textAlign: "right" }}>{r.winRate}</span>
+                            <span style={{ textAlign: "right" }}>{r.trades}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
+                      Top of the grid. Note: CONFLUENCE/OI aren't in the sweep (no OI history yet). Every config here was graded on real price — pick a winner, set it above, and paper-test before going live.
                     </div>
                   </div>
                 )}

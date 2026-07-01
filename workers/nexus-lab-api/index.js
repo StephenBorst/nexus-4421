@@ -25,7 +25,7 @@ import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert } from "./logic.mjs";
 
-import { backtestConfig } from "./backtest.mjs";
+import { backtestConfig, runSweep } from "./backtest.mjs";
 
 // URL-safe random token (hook secret / passphrase). Crypto-strong via Web Crypto.
 function randToken(bytes = 24) {
@@ -3012,6 +3012,25 @@ document.getElementById("btn").addEventListener("click",go);
 </body>
 </html>`;
       return new Response(html, { status: 200, headers: { "Content-Type": "text/html;charset=UTF-8", "Access-Control-Allow-Origin": "*" } });
+    }
+
+    // ── POST /agent/backtest/sweep — rank a grid of configs (PRO) ────────────
+    // Fetches each symbol's data once, runs ~27 mode×threshold×exit variants, and
+    // returns them ranked by net P&L — the terminal sweep, in-app.
+    if (parts[0] === "agent" && parts[1] === "backtest" && parts[2] === "sweep" && request.method === "POST") {
+      let body; try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const { config, walletSig } = body || {};
+      const caller = typeof walletSig === "string" ? recoverEthAddress("nexus-trading-key-v1", walletSig) : null;
+      if (!caller) return json({ error: "walletSig_required", hint: "Backtesting requires walletSig = sign_message('nexus-trading-key-v1')." }, request, 401);
+      if (!(await walletIsPro(caller, env))) return json({ error: "pro_backtest_locked", hint: "Strategy backtesting is a Nexus PRO feature — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
+      const symbols = (Array.isArray(config?.symbols) && config.symbols.length ? config.symbols : ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC"]).slice(0, 3);
+      const days = Math.min(90, Math.max(7, Number(body.days) || 60));
+      try {
+        return json(await runSweep(config || {}, { symbols, days }), request);
+      } catch (e) {
+        console.error("[sweep] error:", e);
+        return json({ error: "sweep failed", detail: String(e.message || e) }, request, 500);
+      }
     }
 
     // ── POST /agent/backtest — run a config over real history (PRO) ──────────

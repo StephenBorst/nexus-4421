@@ -114,6 +114,37 @@ export async function fetchFundingAt(symbol) {
   return (tsSec) => { const ms = tsSec * 1000; let rate = 0; for (const row of rows) { if (row.ts <= ms) rate = row.rate; else break; } return rate; };
 }
 
+// Sweep: fetch each symbol's data ONCE, then run a grid of backtestable configs
+// (mode × threshold × exit style) reusing that data, ranked by net P&L. This is the
+// terminal sweep, in-app. Bounded (~36 configs) to stay within a request's budget.
+export async function runSweep(base, { symbols, days }) {
+  const data = {};
+  for (const s of symbols) {
+    const [candles, fundingAt] = await Promise.all([fetchCandles(s, days), fetchFundingAt(s)]);
+    data[s] = { candles, fundingAt };
+  }
+  const EXITS = {
+    "fixed tp1.5/sl0.75": { tpPercent: 1.5, slPercent: 0.75 },
+    "scale-out 1/2.5": { tpPercent: 1, slPercent: 1, takeProfits: [{ pct: 1, sizePct: 50 }, { pct: 2.5, sizePct: 50 }] },
+    "trail 0.5": { tpPercent: 1.5, slPercent: 0.75, trailingStopPct: 0.5 },
+  };
+  const common = { leverage: base.leverage || 5, capitalPerTrade: base.capitalPerTrade || 50, maxHoldHours: base.maxHoldHours || 4, oiChangeThreshold: 0 };
+  const configs = [];
+  for (const [exName, ex] of Object.entries(EXITS)) {
+    for (const p of [0.3, 0.5, 0.8]) for (const mode of ["MOMENTUM", "MEAN_REVERSION"]) configs.push({ name: `${mode} · p${p} · ${exName}`, config: { ...common, ...ex, signalMode: mode, priceChangeThreshold: p } });
+    for (const f of [0.005, 0.01, 0.02]) configs.push({ name: `FUNDING_ONLY · f${f} · ${exName}`, config: { ...common, ...ex, signalMode: "FUNDING_ONLY", fundingThreshold: f } });
+  }
+  const results = configs.map(({ name, config }) => {
+    let net = 0, trades = 0, wins = 0;
+    for (const s of symbols) {
+      const r = runBacktest(data[s].candles, data[s].fundingAt, config);
+      net += r.netUsd; trades += r.trades; wins += Math.round((r.winRate / 100) * r.trades);
+    }
+    return { name, trades, winRate: trades ? Math.round((wins / trades) * 1000) / 10 : 0, netUsd: Math.round(net * 100) / 100 };
+  }).sort((a, b) => b.netUsd - a.netUsd);
+  return { days, symbols, notional: common.capitalPerTrade * common.leverage, results };
+}
+
 // Orchestrator: run one config across symbols, return per-symbol + combined stats.
 export async function backtestConfig(config, { symbols, days }) {
   const perSymbol = [];
