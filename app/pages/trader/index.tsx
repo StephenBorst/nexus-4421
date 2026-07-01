@@ -13,6 +13,8 @@ import { fetchOnChainRepScore } from "@/hooks/useThesisRegistry";
 import { NexusTierBadge } from "@/components/NexusTierBadge";
 import type { ThesisTrade } from "@/pages/lab/types";
 import CommentsPanel from "@/components/CommentsPanel";
+import { deployToAgent } from "@/utils/agentPrefill";
+import { deriveStyle } from "@/config/agentStyles";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 
@@ -487,6 +489,8 @@ export default function TraderPage() {
   const [copied, setCopied] = useState(false);
   // Ph26: on-chain Rep Score from NexusRepScore contract
   const [onChainRep, setOnChainRep] = useState<number | null>(null);
+  const [agentRec, setAgentRec] = useState<any | null>(null);
+  const [pubStrats, setPubStrats] = useState<any[]>([]);
 
   const { state: accountState } = useAccount();
   const walletAddress = (accountState as { address?: string })?.address ?? null;
@@ -510,6 +514,10 @@ export default function TraderPage() {
     fetchOnChainRepScore(wallet)
       .then((result) => setOnChainRep(result.repScore))
       .catch(() => {});
+    // Hub: this trader's graded AGENT record + their published strategies.
+    setAgentRec(null); setPubStrats([]);
+    fetch(`${API_BASE}/agents/standing/${wallet}`).then((r) => r.ok ? r.json() : null).then((d) => setAgentRec(d?.stats && d.stats.trades > 0 ? d.stats : null)).catch(() => {});
+    fetch(`${API_BASE}/agent/${wallet}/strategies`).then((r) => r.ok ? r.json() : null).then((d) => setPubStrats((d?.strategies || []).filter((s: any) => s.public))).catch(() => {});
   }, [wallet]);
 
   // Live prices for active theses
@@ -752,6 +760,44 @@ export default function TraderPage() {
                     />
                   )}
                 </div>
+
+                {/* Hub: this trader's graded autonomous-agent record */}
+                {agentRec && (
+                  <div style={{ marginBottom: 16, border: "1px solid #1a2e1a", borderRadius: 6, padding: 14, background: "#0a0e0a" }}>
+                    <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", letterSpacing: "0.08em", marginBottom: 10 }}>AUTONOMOUS AGENT — GRADED RECORD</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(80px,1fr))", gap: 12 }}>
+                      {[
+                        { l: "NET P&L", v: `${agentRec.netUsd >= 0 ? "+" : ""}$${agentRec.netUsd}`, c: agentRec.netUsd >= 0 ? "#00ff88" : "#ff4444" },
+                        { l: "WIN RATE", v: `${agentRec.winRate}%`, c: "#c0c0c0" },
+                        { l: "TRADES", v: String(agentRec.trades), c: "#c0c0c0" },
+                        { l: "SCORE", v: `${agentRec.score}`, c: "#4a9fff" },
+                      ].map((x) => (
+                        <div key={x.l}>
+                          <div style={{ fontFamily: "monospace", fontSize: 9, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 3 }}>{x.l}</div>
+                          <div style={{ fontFamily: "monospace", fontSize: 16, fontWeight: 600, color: x.c }}>{x.v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Hub: this trader's published strategies — copyable to your own agent */}
+                {pubStrats.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", letterSpacing: "0.08em", marginBottom: 10 }}>PUBLISHED STRATEGIES — copy to your agent</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {pubStrats.map((s) => (
+                        <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 3 }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 600, color: "#c0c0c0" }}>{s.name} <span style={{ color: "#4a9fff", fontSize: 9 }}>{deriveStyle(s.config)}</span></div>
+                            <div style={{ fontFamily: "monospace", fontSize: 9, color: "#5a7a6a", marginTop: 2 }}>{s.config.signalMode} · {s.config.leverage}x · TP{s.config.tpPercent}/SL{s.config.slPercent}</div>
+                          </div>
+                          <button onClick={() => deployToAgent(s.config, `${displayName ?? shortAddr}'s "${s.name}"`)} style={{ background: "none", border: "1px solid #1a4a2a", color: "#00ff88", fontFamily: "monospace", fontSize: 9, padding: "5px 14px", borderRadius: 3, cursor: "pointer", flexShrink: 0 }}>COPY →</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Thesis list */}
                 <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", letterSpacing: "0.08em", marginBottom: 10 }}>

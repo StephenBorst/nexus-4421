@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { usePrivateQuery, useAccount } from "@orderly.network/hooks";
+import { deployToAgent } from "@/utils/agentPrefill";
 
 // ─── Constants ────────────────────────────────────────────────
 const REFRESH_INTERVAL = 60; // seconds
@@ -375,6 +376,11 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
           <span style={{ color: BRIGHT, fontWeight: 700, width: "40px" }}>{sym}</span>
           <span style={{ color: sigC, fontSize: "11px" }}>{sig}</span>
+          <button onClick={() => deployToAgent({ symbols: [`PERP_${sym}_USDC`] }, `the ${sym} funding read`)}
+            title={`Set the trading agent to watch ${sym} — the same funding/OI edge it trades on`}
+            style={{ marginLeft: "auto", background: "none", border: "1px solid #3a2a0a", color: "#ff8800", fontFamily: "monospace", fontSize: "9px", letterSpacing: "0.05em", padding: "3px 8px", borderRadius: "3px", cursor: "pointer" }}>
+            ⚡ AGENT
+          </button>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", rowGap: "2px", columnGap: "8px", fontSize: "12px" }}>
           <div><span style={{ color: DIM }}>FUNDING 8H  </span><span style={{ color: fc }}>{data ? fmtFunding(data.funding) : "—"}</span></div>
