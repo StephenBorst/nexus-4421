@@ -52,8 +52,18 @@ const EXITS = {
   "tp2/sl1": { tpPercent: 2, slPercent: 1 },
   "scaleout 1@50/2.5@50": { tpPercent: 1, slPercent: 1, takeProfits: [{ pct: 1, sizePct: 50 }, { pct: 2.5, sizePct: 50 }] },
   "trail0.5 @tp1.5": { tpPercent: 1.5, slPercent: 0.75, trailingStopPct: 0.5 },
+  // Breakeven / "risk-free trade" stop — arms once P&L crosses the trigger, then
+  // the stop can't fall below entry (+buffer). Compare against the flat tp1.5/sl0.75
+  // baseline: does locking risk-off cut would-be losers, or (like trailing) does it
+  // choke a mean-reversion fade in chop? The sweep answers it honestly (fees on).
+  "be0.5 @tp1.5": { tpPercent: 1.5, slPercent: 0.75, breakevenTriggerPct: 0.5 },
+  "be0.75 @tp1.5": { tpPercent: 1.5, slPercent: 0.75, breakevenTriggerPct: 0.75 },
+  "be1.0 @tp1.5": { tpPercent: 1.5, slPercent: 0.75, breakevenTriggerPct: 1.0 },
+  "be0.75+buf0.1 @tp1.5": { tpPercent: 1.5, slPercent: 0.75, breakevenTriggerPct: 0.75, breakevenBufferPct: 0.1 },
 };
-const BASE = { leverage: 5, capitalPerTrade: 50, maxHoldHours: 4, oiChangeThreshold: 0 };
+// feeBps: 3 = 0.03%/side taker, matching lab-api DEFAULT_FEE_BPS so the dev sweep
+// is as honest as the user-facing backtest (round-trip cost is deducted per trade).
+const BASE = { leverage: 5, capitalPerTrade: 50, maxHoldHours: 4, oiChangeThreshold: 0, feeBps: 3 };
 
 function buildConfigs() {
   const cfgs = [];
