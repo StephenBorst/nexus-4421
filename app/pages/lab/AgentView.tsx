@@ -213,6 +213,8 @@ export function AgentView() {
   const { isPro } = useSubscription(walletAddress);
   const [proNote, setProNote] = useState(false);
   const [standing, setStanding] = useState<AgentStanding | null>(null);
+  const [backtest, setBacktest] = useState<any | null>(null);
+  const [backtesting, setBacktesting] = useState(false);
   const [webhookEnabled, setWebhookEnabled] = useState(false);
   const [webhookInfo, setWebhookInfo] = useState<{ url: string; passphrase: string } | null>(() => {
     try { return JSON.parse(sessionStorage.getItem(`nexus_webhook_${(walletAddress || "").toLowerCase()}`) || "null"); }
@@ -278,6 +280,23 @@ export function AgentView() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // Backtest the CURRENT config over real Orderly history (PRO). Reuses the same
+  // engine the agent runs on, so results reflect real behavior — a "test before you
+  // risk it" moment right in the Config tab.
+  async function runConfigBacktest() {
+    if (!walletAddress) { setError("Connect wallet first"); return; }
+    setBacktesting(true); setError(null); setBacktest(null);
+    try {
+      const walletSig = await getAgentSig(walletAddress);
+      const res = await fetch(`${AGENT_API}/agent/backtest`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ config, walletSig, days: 60 }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.hint || data.error || "Backtest failed");
+      setBacktest(data);
+    } catch (e: any) { setError(e.message); } finally { setBacktesting(false); }
   }
 
   // Signal webhook (TradingView / external). enable & rotate mint a fresh secret
@@ -1026,6 +1045,64 @@ export function AgentView() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* ── BACKTEST — test this exact config on real history (PRO) ── */}
+          <div style={agentCardStyle}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={agentLabelStyle}>// BACKTEST</div>
+                <span style={{ fontFamily: "monospace", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
+              </div>
+              {isPro && (
+                <button onClick={runConfigBacktest} disabled={backtesting} style={{ ...agentBtnStyle, fontSize: 10, padding: "6px 16px", opacity: backtesting ? 0.5 : 1 }}>
+                  {backtesting ? "RUNNING…" : "▶ TEST ON 60d HISTORY"}
+                </button>
+              )}
+            </div>
+            {!isPro ? (
+              <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
+                Replay this exact config over 60 days of real BTC/ETH/SOL data — using the same engine the agent runs on — before risking a cent. A Nexus PRO feature.
+              </div>
+            ) : (
+              <>
+                <div style={{ color: "#3a6a4a", fontFamily: "monospace", fontSize: 10, marginTop: 8, lineHeight: 1.5 }}>
+                  Replays your config on real Orderly history with the deployed signal + exit logic. Verify before you deploy capital.
+                </div>
+                {backtest && (
+                  <div style={{ marginTop: 12 }}>
+                    {backtest.untestable && (
+                      <div style={{ color: "#fbbf24", fontFamily: "monospace", fontSize: 10, lineHeight: 1.5, marginBottom: 10, padding: "6px 8px", border: "1px solid #fbbf2430", borderRadius: 3 }}>
+                        ⚠ {backtest.note}
+                      </div>
+                    )}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12 }}>
+                      {[
+                        { label: "NET P&L (60d)", value: `${backtest.combined.netUsd >= 0 ? "+" : ""}$${backtest.combined.netUsd}`, color: backtest.combined.netUsd >= 0 ? "#00ff88" : "#ff4444" },
+                        { label: "WIN RATE", value: `${backtest.combined.winRate}%`, color: "#c0c0c0" },
+                        { label: "TRADES", value: String(backtest.combined.trades), color: "#c0c0c0" },
+                      ].map(({ label, value, color }) => (
+                        <div key={label}>
+                          <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
+                          <div style={{ color, fontFamily: "monospace", fontSize: 18, fontWeight: 600 }}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+                      {backtest.perSymbol.map((s: any) => (
+                        <div key={s.symbol} style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 10, color: "#5a7a6a", borderTop: "1px solid #1e2d1e", paddingTop: 4 }}>
+                          <span>{s.symbol.replace("PERP_", "").replace("_USDC", "")}</span>
+                          <span>{s.trades} trades · {s.winRate}% win · PF {s.profitFactor} · <span style={{ color: s.netUsd >= 0 ? "#00ff88" : "#ff4444" }}>{s.netUsd >= 0 ? "+" : ""}${s.netUsd}</span></span>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
+                      Past performance ≠ future results. Fees/funding not modeled — live results run slightly worse. 60d hourly, ${(config.capitalPerTrade * config.leverage).toFixed(0)} notional/trade.
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {!isActive && (

@@ -1,7 +1,7 @@
 // Sanity tests for the backtest engine (run: node --test tools/backtest/engine.test.mjs).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runBacktest } from "./engine.mjs";
+import { runBacktest } from "../../workers/nexus-lab-api/backtest.mjs";
 
 // Build a synthetic hourly series from close prices; h/l straddle close slightly.
 function series(closes, startT = 1_700_000_000) {

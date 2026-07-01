@@ -1,6 +1,6 @@
 // Fetch real Orderly history, sweep strategy configs, print a ranked table.
 // Run: node tools/backtest/run.mjs
-import { runBacktest } from "./engine.mjs";
+import { runBacktest } from "../../workers/nexus-lab-api/backtest.mjs";
 
 const API = "https://api-evm.orderly.org";
 const SYMBOLS = ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC"];
