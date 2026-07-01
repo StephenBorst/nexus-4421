@@ -32,16 +32,21 @@ export default {
       // Load each active user's config up front.
       const userConfigs = {};
       const symbolSet = new Set(); // every symbol any active user watches
+      const oiSymbols = new Set(["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC"]); // core + all watchlists
       for (const address of users) {
         const configRaw = await env.NEXUS_AGENT.get(`agent:config:${address}`);
         const stateRaw = await env.NEXUS_AGENT.get(`agent:state:${address}`);
         if (!configRaw || !stateRaw) continue;
         const config = JSON.parse(configRaw);
         const state = JSON.parse(stateRaw);
+        for (const sym of config.symbols || []) oiSymbols.add(sym); // record OI regardless of position
         if (!state.active || state.current_position) continue;
         userConfigs[address] = { config, state };
         for (const sym of config.symbols || []) symbolSet.add(sym);
       }
+
+      // Accumulate OI history independent of the (flat-only) signal path.
+      await recordOiForSymbols(oiSymbols, env);
 
       // Evaluate each unique symbol exactly once this cycle → RAW market deltas.
       // Strategy interpretation (mode/thresholds) is applied PER USER below, so a
@@ -126,14 +131,24 @@ async function evaluateSymbol(symbol, env) {
     price: markPrice, oi: openInterest, timestamp: Date.now(),
   }));
 
-  // Build our OWN open-interest history. Orderly exposes only CURRENT OI (no
-  // historical series), so the CONFLUENCE (funding + OI-divergence) flagship can't
-  // be backtested from their API. Snapshotting OI hourly here means that in a few
-  // weeks we can backtest confluence against a real OI series we recorded. Cheap
-  // (the data's already fetched) and best-effort — must never break signal gen.
-  await recordOiSnapshot(symbol, env, { price: markPrice, oi: openInterest, funding: fundingRate });
-
   return { symbol, price: markPrice, oi: openInterest, fundingRate, priceChange, oiChange, hasPrev: !!prev };
+}
+
+// Snapshot hourly OI for a set of symbols, INDEPENDENT of the signal path (which
+// only evaluates symbols for flat users). Orderly has no OI-history endpoint, so
+// this accumulates our OWN series → CONFLUENCE becomes backtestable in a few weeks.
+// Best-effort; never throws into the caller.
+async function recordOiForSymbols(symbols, env) {
+  for (const symbol of symbols) {
+    try {
+      const res = await fetch(`${ORDERLY_API}/v1/public/futures/${symbol}`);
+      if (!res.ok) continue;
+      const d = (await res.json()).data;
+      await recordOiSnapshot(symbol, env, {
+        price: parseFloat(d.mark_price), oi: parseFloat(d.open_interest) || 0, funding: parseFloat(d.last_funding_rate) || 0,
+      });
+    } catch (e) { console.error(`[brain] oi snapshot ${symbol}:`, e.message); }
+  }
 }
 
 // Append an hourly {t, price, oi, funding} point to oi:hist:{symbol}. The brain
