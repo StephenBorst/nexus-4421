@@ -217,6 +217,8 @@ export function AgentView() {
   const [backtesting, setBacktesting] = useState(false);
   const [sweep, setSweep] = useState<any | null>(null);
   const [sweeping, setSweeping] = useState(false);
+  const [strategies, setStrategies] = useState<any[]>([]);
+  const [stratName, setStratName] = useState("");
   const [webhookEnabled, setWebhookEnabled] = useState(false);
   const [webhookInfo, setWebhookInfo] = useState<{ url: string; passphrase: string } | null>(() => {
     try { return JSON.parse(sessionStorage.getItem(`nexus_webhook_${(walletAddress || "").toLowerCase()}`) || "null"); }
@@ -252,6 +254,11 @@ export function AgentView() {
     try {
       const sres = await fetch(`${AGENT_API}/agents/standing/${walletAddress}`);
       if (sres.ok) setStanding(await sres.json());
+    } catch { /* fail-soft */ }
+    // Saved strategy library (public read).
+    try {
+      const lres = await fetch(`${AGENT_API}/agent/${walletAddress}/strategies`);
+      if (lres.ok) setStrategies((await lres.json()).strategies || []);
     } catch { /* fail-soft */ }
   }
 
@@ -315,6 +322,41 @@ export function AgentView() {
       if (!res.ok) throw new Error(data.hint || data.error || "Sweep failed");
       setSweep(data);
     } catch (e: any) { setError(e.message); } finally { setSweeping(false); }
+  }
+
+  // Strategy library — save the current composed config under a name, load one
+  // back into the editor, or delete. The config IS the strategy object.
+  async function saveStrategy() {
+    if (!walletAddress) { setError("Connect wallet first"); return; }
+    if (!stratName.trim()) { setError("Name your strategy first"); return; }
+    setSaving(true); setError(null);
+    try {
+      const walletSig = await getAgentSig(walletAddress);
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}/strategies`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: stratName.trim(), config, stats: backtest?.combined || null, walletSig }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Save failed");
+      setStrategies(data.strategies || []);
+      setStratName("");
+      setSuccess("Strategy saved"); setTimeout(() => setSuccess(null), 3000);
+    } catch (e: any) { setError(e.message); } finally { setSaving(false); }
+  }
+  function loadStrategy(s: any) {
+    setConfig({ ...DEFAULT_CONFIG, ...s.config });
+    setSuccess(`Loaded "${s.name}" — review + activate`); setTimeout(() => setSuccess(null), 3000);
+  }
+  async function deleteStrategy(id: string) {
+    if (!walletAddress) return;
+    try {
+      const walletSig = await getAgentSig(walletAddress);
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}/strategies/${id}`, {
+        method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ walletSig }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setStrategies(data.strategies || []);
+    } catch { /* ignore */ }
   }
 
   // Signal webhook (TradingView / external). enable & rotate mint a fresh secret
@@ -1150,6 +1192,46 @@ export function AgentView() {
                   </div>
                 )}
               </>
+            )}
+          </div>
+
+          {/* ── STRATEGY LIBRARY — save / load composed configs (free) ── */}
+          <div style={agentCardStyle}>
+            <div style={agentLabelStyle}>// STRATEGY LIBRARY</div>
+            <div style={{ color: "#3a6a4a", fontFamily: "monospace", fontSize: 10, marginTop: 6, marginBottom: 10, lineHeight: 1.5 }}>
+              Save the config above as a named strategy, then load it back anytime. Build → test → save your best.
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <input
+                value={stratName}
+                onChange={(e) => setStratName(e.target.value)}
+                placeholder="name this strategy…"
+                maxLength={40}
+                style={{ ...agentInputStyle, flex: 1, minWidth: 160 }}
+              />
+              <button onClick={saveStrategy} disabled={saving || !stratName.trim()} style={{ ...agentBtnStyle, fontSize: 10, padding: "6px 16px", opacity: (saving || !stratName.trim()) ? 0.5 : 1 }}>
+                💾 SAVE
+              </button>
+            </div>
+            {strategies.length > 0 && (
+              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                {strategies.map((s) => (
+                  <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 3 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                      <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 9, marginTop: 2 }}>
+                        {s.config.signalMode} · {s.config.mode} · {s.config.leverage}x · TP{s.config.tpPercent}/SL{s.config.slPercent}
+                        {s.config.dcaEnabled ? " · DCA" : ""}
+                        {s.stats ? <span style={{ color: s.stats.netUsd >= 0 ? "#00ff88" : "#ff4444" }}>{`  ·  60d ${s.stats.netUsd >= 0 ? "+" : ""}$${s.stats.netUsd}`}</span> : ""}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button onClick={() => loadStrategy(s)} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 12px" }}>LOAD</button>
+                      <button onClick={() => deleteStrategy(s.id)} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 10px", color: "#ff4444", borderColor: "#ff444450" }}>✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 

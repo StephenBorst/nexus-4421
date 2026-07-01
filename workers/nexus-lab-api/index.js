@@ -3185,6 +3185,39 @@ document.getElementById("btn").addEventListener("click",go);
         return json({ ok: true, enabled: true, url: `${base}/agent/hook/${token}`, token, passphrase }, request);
       }
 
+      // ── /agent/:address/strategies — personal saved-strategy library ──────
+      // Compose a config in the builder, name it, save it, load it back later.
+      // FREE (composing/saving is basic UX; backtest/sweep stay PRO). Save/delete
+      // are owner-authed (walletSig); list is public (a config isn't secret, and it
+      // sets up browsing/sharing strategies later).
+      if (parts[2] === "strategies") {
+        const key = `agent:strategies:${address}`;
+        if (request.method === "GET" && !parts[3]) {
+          const raw = await AGENT_KV.get(key);
+          return json({ strategies: raw ? JSON.parse(raw) : [] }, request);
+        }
+        if (request.method === "POST" && !parts[3]) {
+          const b = await request.json().catch(() => ({}));
+          const denied = requireOwner(b.walletSig); if (denied) return denied;
+          if (!b.name || !b.config) return json({ error: "name and config required" }, request, 400);
+          const raw = await AGENT_KV.get(key);
+          const list = raw ? JSON.parse(raw) : [];
+          const strat = { id: `strat_${Date.now()}`, name: String(b.name).slice(0, 40), config: b.config, stats: b.stats || null, createdAt: Date.now() };
+          list.unshift(strat);
+          if (list.length > 20) list.pop();
+          await AGENT_KV.put(key, JSON.stringify(list));
+          return json({ ok: true, strategy: strat, strategies: list }, request);
+        }
+        if (request.method === "DELETE" && parts[3]) {
+          const b = await request.json().catch(() => ({}));
+          const denied = requireOwner(b.walletSig); if (denied) return denied;
+          const raw = await AGENT_KV.get(key);
+          const list = (raw ? JSON.parse(raw) : []).filter((s) => s.id !== parts[3]);
+          await AGENT_KV.put(key, JSON.stringify(list));
+          return json({ ok: true, strategies: list }, request);
+        }
+      }
+
       // POST /agent/:address/pending/:id/(deploy|dismiss) — resolve a thesis
       if (request.method === "POST" && parts[2] === "pending" && parts[3] && parts[4]) {
         const pbody = await request.json().catch(() => ({}));
