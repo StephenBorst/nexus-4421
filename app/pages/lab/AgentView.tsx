@@ -359,6 +359,32 @@ export function AgentView() {
       if (res.ok) setStrategies(data.strategies || []);
     } catch { /* ignore */ }
   }
+  async function togglePublish(s: any) {
+    if (!walletAddress) return;
+    try {
+      const walletSig = await getAgentSig(walletAddress);
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}/strategies/${s.id}/publish`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ walletSig, public: !s.public }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) { setStrategies(data.strategies || []); setSuccess(!s.public ? "Published to community" : "Made private"); setTimeout(() => setSuccess(null), 3000); }
+    } catch { /* ignore */ }
+  }
+
+  // Community strategy browse (public, ranked by author graded record).
+  const [community, setCommunity] = useState<any[] | null>(null);
+  const [communityStyle, setCommunityStyle] = useState<string>("");
+  async function loadCommunity(style: string) {
+    setCommunityStyle(style);
+    try {
+      const res = await fetch(`${AGENT_API}/agents/strategies/public${style ? `?style=${style}` : ""}`);
+      if (res.ok) setCommunity((await res.json()).strategies || []);
+    } catch { setCommunity([]); }
+  }
+  function copyStrategy(s: any) {
+    setConfig({ ...DEFAULT_CONFIG, ...s.config });
+    setSuccess(`Copied "${s.name}" into your editor — set your own risk & save.`); setTimeout(() => setSuccess(null), 4000);
+  }
 
   // Signal webhook (TradingView / external). enable & rotate mint a fresh secret
   // URL; disable revokes it. The URL is a secret — cache it client-side (session)
@@ -1257,11 +1283,53 @@ export function AgentView() {
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button onClick={() => togglePublish(s)} title={s.public ? "Public — click to make private" : "Share to the community board"} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 10px", color: s.public ? "#00ff88" : "#5a7a6a", borderColor: s.public ? "#00ff8850" : "#1e2d1e" }}>{s.public ? "🌐 PUBLIC" : "SHARE"}</button>
                       <button onClick={() => loadStrategy(s)} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 12px" }}>LOAD</button>
                       <button onClick={() => deleteStrategy(s.id)} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 10px", color: "#ff4444", borderColor: "#ff444450" }}>✕</button>
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── COMMUNITY STRATEGIES — browse shared configs, ranked by author's graded record ── */}
+          <div style={agentCardStyle}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              <div style={agentLabelStyle}>// COMMUNITY STRATEGIES</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {[{ k: "", l: "ALL" }, { k: "DAY", l: "DAY" }, { k: "SWING", l: "SWING" }].map(({ k, l }) => (
+                  <button key={l} onClick={() => loadCommunity(k)} style={{ ...navBtnStyle, fontSize: 9, padding: "4px 10px", ...(community !== null && communityStyle === k ? { color: "#00ff88", borderColor: "#00ff8850" } : {}) }}>{l}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ color: "#3a6a4a", fontFamily: "monospace", fontSize: 10, marginTop: 6, lineHeight: 1.5 }}>
+              Strategies shared by the community, ranked by the author's <strong style={{ color: "#8aaa9a" }}>graded live/paper record</strong> — not backtest (shown only as a hypothesis). Copy one to your editor and make it yours.
+            </div>
+            {community === null ? (
+              <button onClick={() => loadCommunity("")} style={{ ...agentBtnStyle, fontSize: 10, padding: "6px 16px", marginTop: 10 }}>▤ BROWSE STRATEGIES</button>
+            ) : community.length === 0 ? (
+              <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 11, marginTop: 10 }}>No public strategies{communityStyle ? ` for ${communityStyle}` : ""} yet — publish one from your library to seed the board.</div>
+            ) : (
+              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                {community.map((s) => (
+                  <div key={s.owner + s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 3 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 12, fontWeight: 600 }}>
+                        {s.name} <span style={{ color: "#4a9fff", fontSize: 9 }}>{s.style}</span>
+                      </div>
+                      <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 9, marginTop: 2 }}>
+                        by {s.owner.slice(0, 6)}…{s.owner.slice(-4)} · {s.config.signalMode} · {s.config.leverage}x
+                        {s.author && s.author.trades > 0
+                          ? <span style={{ color: s.author.netPnl >= 0 ? "#00ff88" : "#ff4444" }}>{`  ·  graded ${s.author.winRate}% win, ${s.author.netPnl >= 0 ? "+" : ""}$${s.author.netPnl} (${s.author.trades}t)`}</span>
+                          : <span style={{ color: "#4a7a5a" }}>  ·  author unproven</span>}
+                        {s.backtest ? <span style={{ color: "#4a7a5a" }}>{`  ·  bt ${s.backtest.netUsd >= 0 ? "+" : ""}$${s.backtest.netUsd}*`}</span> : ""}
+                      </div>
+                    </div>
+                    <button onClick={() => copyStrategy(s)} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 14px", flexShrink: 0 }}>COPY</button>
+                  </div>
+                ))}
+                <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 4 }}>*bt = backtest hypothesis (fees not modeled); ranking uses the author's real graded record.</div>
               </div>
             )}
           </div>

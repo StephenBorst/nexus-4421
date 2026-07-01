@@ -3208,6 +3208,19 @@ document.getElementById("btn").addEventListener("click",go);
           await AGENT_KV.put(key, JSON.stringify(list));
           return json({ ok: true, strategy: strat, strategies: list }, request);
         }
+        // POST /agent/:address/strategies/:id/publish {public} — toggle sharing.
+        if (request.method === "POST" && parts[3] && parts[4] === "publish") {
+          const b = await request.json().catch(() => ({}));
+          const denied = requireOwner(b.walletSig); if (denied) return denied;
+          const raw = await AGENT_KV.get(key);
+          const list = raw ? JSON.parse(raw) : [];
+          const s = list.find((x) => x.id === parts[3]);
+          if (!s) return json({ error: "not found" }, request, 404);
+          s.public = !!b.public;
+          s.publishedAt = s.public ? Date.now() : null;
+          await AGENT_KV.put(key, JSON.stringify(list));
+          return json({ ok: true, strategies: list }, request);
+        }
         if (request.method === "DELETE" && parts[3]) {
           const b = await request.json().catch(() => ({}));
           const denied = requireOwner(b.walletSig); if (denied) return denied;
@@ -3686,6 +3699,46 @@ document.getElementById("btn").addEventListener("click",go);
       }
 
       return json({ error: "not found" }, request, 404);
+    }
+
+    // ── GET /agents/strategies/public — browse shared strategies ─────────────
+    // Community strategy marketplace. Ranked by the AUTHOR's GRADED agent record
+    // (the trustless signal) — NOT by backtest, which is shown only as a labeled
+    // hypothesis. Optional ?style=DAY|SWING|POSITION filter (derived from hold time).
+    if (parts[0] === "agents" && parts[1] === "strategies" && parts[2] === "public") {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+      const styleFilter = url.searchParams.get("style");
+      const derive = (h) => (h <= 8 ? "DAY" : h <= 120 ? "SWING" : "POSITION");
+      const listing = await AGENT_KV.list({ prefix: "agent:strategies:" });
+      const collected = [];
+      for (const k of listing.keys.slice(0, 300)) {
+        const owner = k.name.slice("agent:strategies:".length);
+        const raw = await AGENT_KV.get(k.name);
+        if (!raw) continue;
+        let arr; try { arr = JSON.parse(raw); } catch { continue; }
+        for (const s of arr) {
+          if (!s.public || !s.config) continue;
+          const style = derive(s.config.maxHoldHours ?? 0);
+          if (styleFilter && style !== styleFilter) continue;
+          collected.push({ owner, id: s.id, name: s.name, style, config: s.config, backtest: s.stats || null, publishedAt: s.publishedAt || s.createdAt });
+        }
+      }
+      // Attach each author's GRADED standing — the trust signal we rank on.
+      const owners = [...new Set(collected.map((c) => c.owner))];
+      const standings = {};
+      if (env.SUPABASE_URL && env.SUPABASE_ANON_KEY) {
+        await Promise.all(owners.map(async (o) => {
+          try {
+            const res = await fetch(`${env.SUPABASE_URL}/rest/v1/agent_trades?select=pnl,closed_at&wallet_address=ilike.${o}&limit=10000`, { headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` } });
+            if (res.ok) standings[o] = agentStanding(aggregateAgentTrades(await res.json())).stats;
+          } catch { /* skip */ }
+        }));
+      }
+      const items = collected
+        .map((c) => ({ ...c, author: standings[c.owner] || null }))
+        .sort((a, b) => (b.author?.score || 0) - (a.author?.score || 0) || (b.author?.netPnl || 0) - (a.author?.netPnl || 0));
+      return json({ strategies: items.slice(0, 50), rankedBy: "author_graded_record" }, request);
     }
 
     if (parts[0] === "agents" && parts[1] === "leaderboard") {
