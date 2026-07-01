@@ -158,9 +158,13 @@ export const DEFAULT_CONFIG: AgentConfig = {
   maxHoldHours: 4,
   maxTradesPerDay: 4, // selectivity wins — backtest showed high-frequency configs bleed out
   maxDailyLossUsdc: 5,
-  fundingThreshold: 0.02, // trade only EXTREME funding (least-bad in the 60d sweep)
-  fundingPercentileMin: 0, // off by default; opt-in adaptive funding-extremity filter
-  signalMode: "CONFLUENCE", // validated default — both funding + OI must agree
+  fundingThreshold: 0.01,
+  // ⭐ The one BACKTESTED net-positive config (60d BTC/ETH/SOL): FUNDING_ONLY +
+  // fundingPercentileMin 95 → fade the crowd ONLY when funding is in its top 5%
+  // most extreme vs history. Flipped the strategy from -$55 to +$22 (PF ~1.45,
+  // 56% win). CONFLUENCE stays available (flagship) but can't be backtested yet.
+  fundingPercentileMin: 95,
+  signalMode: "FUNDING_ONLY",
   oiChangeThreshold: 0, // any OI move counts by default
   priceChangeThreshold: 0.5, // % tick move to trigger momentum / mean-reversion
   mode: "PAPER", // new users start in risk-free simulation by default

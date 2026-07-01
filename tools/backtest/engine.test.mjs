@@ -30,3 +30,13 @@ test("no signal → no trades", () => {
   const r = runBacktest(flat, noFunding, { signalMode: "MOMENTUM", priceChangeThreshold: 0.5, tpPercent: 1.5, slPercent: 0.75, maxHoldHours: 4 });
   assert.equal(r.trades, 0);
 });
+
+import { makeFundingPctAt } from "../../workers/nexus-lab-api/backtest.mjs";
+test("makeFundingPctAt: no lookahead — ranks vs only past funding rows", () => {
+  const rows = [{ ts: 1000, rate: 0.01 }, { ts: 2000, rate: 0.02 }, { ts: 3000, rate: 0.05 }];
+  const at = makeFundingPctAt(rows);
+  // at t=2 (ms 2000), only rows <=2000 exist [0.01,0.02]; current 0.02 → 100th pct
+  assert.equal(at(2, 0.02), 100);
+  // at t=1, only [0.01]; a below-history value → 0
+  assert.equal(at(1, 0.005), 0);
+});

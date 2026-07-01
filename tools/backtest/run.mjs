@@ -1,6 +1,6 @@
 // Fetch real Orderly history, sweep strategy configs, print a ranked table.
 // Run: node tools/backtest/run.mjs
-import { runBacktest } from "../../workers/nexus-lab-api/backtest.mjs";
+import { runBacktest, makeFundingPctAt } from "../../workers/nexus-lab-api/backtest.mjs";
 
 const API = "https://api-evm.orderly.org";
 const SYMBOLS = ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC"];
@@ -37,13 +37,13 @@ async function fetchFunding(symbol) {
     if (rs.length < 100) break;
   }
   rows.sort((a, b) => a.ts - b.ts);
-  // return a lookup: most recent rate at/before tsSec
-  return (tsSec) => {
+  const at = (tsSec) => {
     const ms = tsSec * 1000;
     let rate = 0;
     for (const row of rows) { if (row.ts <= ms) rate = row.rate; else break; }
     return rate;
   };
+  return { at, rows };
 }
 
 // ── Config sweep ────────────────────────────────────────────
@@ -66,6 +66,12 @@ function buildConfigs() {
     for (const f of [0.005, 0.01, 0.02]) {
       cfgs.push({ name: `FUNDING_ONLY f${f} ${exName}`, config: { ...BASE, ...ex, signalMode: "FUNDING_ONLY", fundingThreshold: f } });
     }
+    // ── The hunt: funding-only + adaptive PERCENTILE filter (fade only extremes) ──
+    for (const f of [0.005, 0.01]) {
+      for (const pctMin of [80, 90, 95]) {
+        cfgs.push({ name: `FUNDING f${f} pctMin${pctMin} ${exName}`, config: { ...BASE, ...ex, signalMode: "FUNDING_ONLY", fundingThreshold: f, fundingPercentileMin: pctMin } });
+      }
+    }
   }
   return cfgs;
 }
@@ -74,16 +80,16 @@ async function main() {
   const data = {};
   for (const s of SYMBOLS) {
     const candles = await fetchCandles(s);
-    const fundingAt = await fetchFunding(s);
-    data[s] = { candles, fundingAt };
-    console.error(`${s}: ${candles.length} candles`);
+    const { at, rows } = await fetchFunding(s);
+    data[s] = { candles, fundingAt: at, fundingPctAt: makeFundingPctAt(rows) };
+    console.error(`${s}: ${candles.length} candles, ${rows.length} funding rows`);
   }
 
   const results = [];
   for (const { name, config } of buildConfigs()) {
     let net = 0, trades = 0, wins = 0, pf = [];
     for (const s of SYMBOLS) {
-      const r = runBacktest(data[s].candles, data[s].fundingAt, config);
+      const r = runBacktest(data[s].candles, data[s].fundingAt, config, data[s].fundingPctAt);
       net += r.netUsd; trades += r.trades; wins += Math.round(r.winRate / 100 * r.trades);
       if (r.profitFactor) pf.push(r.profitFactor);
     }

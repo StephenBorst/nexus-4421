@@ -10,10 +10,25 @@
 // MOMENTUM / MEAN_REVERSION / FUNDING_ONLY + the full exit toolkit are backtestable.
 import { deriveSignal } from "../nexus-agent-brain/logic.mjs";
 import { computePnl, evaluateExit } from "../nexus-agent-exec/logic.mjs";
+import { percentileRank } from "./logic.mjs";
+
+// Build a NO-LOOKAHEAD funding-percentile lookup from raw funding rows
+// ([{ts(ms), rate}]). At candle time t it ranks the current rate against only the
+// funding history that existed at/before t — so a backtest can test the adaptive
+// funding-percentile filter honestly (no peeking at the future).
+export function makeFundingPctAt(rows) {
+  const sorted = [...(rows || [])].sort((a, b) => a.ts - b.ts);
+  return (tsSec, rate) => {
+    const cutoff = tsSec * 1000;
+    const past = [];
+    for (const r of sorted) { if (r.ts <= cutoff) past.push(r.rate); else break; }
+    return percentileRank(past, rate);
+  };
+}
 
 // candles: [{ t(sec), o, h, l, c }] ascending. fundingAt(tsSec) → funding rate
 // (decimal) at/before ts. config: an agent config. Returns aggregate + trade list.
-export function runBacktest(candles, fundingAt, config) {
+export function runBacktest(candles, fundingAt, config, fundingPctAt = null) {
   const trades = [];
   let pos = null;
   let lastExitIdx = -Infinity;
@@ -56,6 +71,7 @@ export function runBacktest(candles, fundingAt, config) {
     if (!pos && (i - lastExitIdx) > cooldownBars) {
       const priceChange = (c.c - prev.c) / prev.c;
       const raw = { priceChange, oiChange: 0, fundingRate: fundingAt(c.t) || 0, hasPrev: true };
+      if (fundingPctAt && (config.fundingPercentileMin || 0) > 0) raw.fundingPct = fundingPctAt(c.t, raw.fundingRate);
       const sig = deriveSignal(raw, config);
       if (sig.direction && sig.direction !== "NONE" && (sig.confidence ?? 0) >= 50) pos = openTrade(sig.direction, c.c, c.t);
     }
