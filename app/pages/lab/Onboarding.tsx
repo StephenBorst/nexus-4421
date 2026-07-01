@@ -26,7 +26,7 @@ export function LabWelcome() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, maxWidth: 760, margin: "0 auto 28px" }}>
         {features.map((f) => (
           <div key={f.title} style={{ ...cardStyle, padding: "16px 18px" }}>
-            <div style={{ fontSize: 20, color: "#00ff88", marginBottom: 8 }}>{f.icon}</div>
+            <div style={{ fontSize: 20, color: "#2f7a52", marginBottom: 8 }}>{f.icon}</div>
             <div style={{ fontFamily: "monospace", fontSize: 12, color: "#fff", fontWeight: "bold", letterSpacing: "0.08em", marginBottom: 6 }}>{f.title}</div>
             <div style={{ fontFamily: "monospace", fontSize: 11, color: "#5a7a6a", lineHeight: 1.5 }}>{f.desc}</div>
           </div>
