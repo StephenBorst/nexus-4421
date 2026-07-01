@@ -10,6 +10,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { isProStrategy } from "@/config/subscription";
 import { STRATEGY_PRESETS } from "@/config/strategyPresets";
 import { STYLE_PRESETS, deriveStyle, type TradingStyle } from "@/config/agentStyles";
+import { AGENT_PREFILL_KEY, type AgentPrefill } from "@/utils/agentPrefill";
 
 const AGENT_API = "https://og.nexustradinglabs.com";
 
@@ -233,6 +234,7 @@ export function AgentView() {
     return () => clearInterval(interval);
   }, [walletAddress]);
 
+
   async function fetchAgentData() {
     if (!walletAddress) return;
     try {
@@ -240,6 +242,22 @@ export function AgentView() {
       if (res.ok) {
         const data = await res.json();
         if (data.config) setConfig(data.config);
+        // Cross-tab bridge: a prefill handed over from a thesis / signal / call
+        // (deployToAgent) wins over the loaded config. Applied ONCE (key removed),
+        // AFTER the server config so it can never be clobbered by the 10s refresh.
+        try {
+          const raw = window.localStorage.getItem(AGENT_PREFILL_KEY);
+          if (raw) {
+            window.localStorage.removeItem(AGENT_PREFILL_KEY);
+            const p: AgentPrefill = JSON.parse(raw);
+            if (p?.config && typeof p.config === "object") {
+              setConfig((prev) => ({ ...prev, ...p.config }));
+              setTab("config");
+              setSuccess(`Config prefilled${p.source ? ` from ${p.source}` : ""} — review, then Save or Backtest.`);
+              setTimeout(() => setSuccess(null), 5000);
+            }
+          }
+        } catch { /* ignore */ }
         if (data.state) setAgentState(data.state);
         if (data.trades) setTrades(data.trades);
         if (data.pending) setPending(data.pending);
