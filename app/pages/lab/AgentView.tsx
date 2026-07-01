@@ -966,6 +966,7 @@ export function AgentView() {
                 { key: "maxTradesPerDay", label: "MAX TRADES / DAY", suffix: "", min: 1, max: 50, step: 1 },
                 { key: "maxDailyLossUsdc", label: "MAX DAILY LOSS", suffix: "USDC", min: 1, max: 500, step: 1 },
                 { key: "fundingThreshold", label: "FUNDING THRESHOLD", suffix: "%", min: 0.001, max: 0.1, step: 0.001 },
+                { key: "fundingPercentileMin", label: "FUNDING %ILE MIN", suffix: "pct (0=off)", min: 0, max: 99, step: 5 },
                 { key: "oiChangeThreshold", label: "OI MOVE THRESHOLD", suffix: "%", min: 0, max: 10, step: 0.05 },
                 { key: "priceChangeThreshold", label: "PRICE MOVE THRESHOLD", suffix: "%", min: 0.1, max: 10, step: 0.1 },
               ].map(({ key, label, suffix, min, max, step }) => (
@@ -973,7 +974,7 @@ export function AgentView() {
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <NumberField
-                      value={(config as any)[key]}
+                      value={(config as any)[key] ?? 0}
                       min={min} max={max} step={step}
                       onCommit={(n) => setConfig({ ...config, [key]: n })}
                     />

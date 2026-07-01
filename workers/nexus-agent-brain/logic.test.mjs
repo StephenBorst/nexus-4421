@@ -138,3 +138,25 @@ test("respectRegime ON: NEUTRAL never gates", () => {
   const s = deriveSignal(raw({ fundingRate: 0.0002, priceChange: 0.01, oiChange: -0.01 }), { signalMode: "CONFLUENCE", respectRegime: true }, { label: "NEUTRAL", score: 50 });
   assert.equal(s.direction, "SHORT");
 });
+
+// ── funding-percentile gate (opt-in) ──────────────────────────
+test("fundingPercentileMin: FUNDING_ONLY SHORT suppressed when not extreme enough", () => {
+  const cfg = { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01, fundingPercentileMin: 90 };
+  // funding fires SHORT but pct 70 < 90 → suppressed
+  const s = deriveSignal(raw({ fundingRate: 0.0002, fundingPct: 70 }), cfg);
+  assert.equal(s.direction, "NONE");
+});
+test("fundingPercentileMin: SHORT passes when funding is extreme (pct >= min)", () => {
+  const cfg = { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01, fundingPercentileMin: 90 };
+  const s = deriveSignal(raw({ fundingRate: 0.0002, fundingPct: 95 }), cfg);
+  assert.equal(s.direction, "SHORT");
+});
+test("fundingPercentileMin: LONG needs pct <= (100-min) (crowded shorts)", () => {
+  const cfg = { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01, fundingPercentileMin: 90 };
+  assert.equal(deriveSignal(raw({ fundingRate: -0.0002, fundingPct: 30 }), cfg).direction, "NONE"); // 30 > 10
+  assert.equal(deriveSignal(raw({ fundingRate: -0.0002, fundingPct: 5 }), cfg).direction, "LONG");  // 5 <= 10
+});
+test("fundingPercentileMin: off (0/unset) or no pct → unchanged behavior", () => {
+  assert.equal(deriveSignal(raw({ fundingRate: 0.0002, fundingPct: 10 }), { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01 }).direction, "SHORT");
+  assert.equal(deriveSignal(raw({ fundingRate: 0.0002 }), { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01, fundingPercentileMin: 90 }).direction, "SHORT"); // no pct → skip gate
+});

@@ -51,10 +51,12 @@ export default {
       // Evaluate each unique symbol exactly once this cycle → RAW market deltas.
       // Strategy interpretation (mode/thresholds) is applied PER USER below, so a
       // symbol is still fetched once but each user gets their own signal from it.
+      // Only compute the funding percentile if some active user opted into the filter.
+      const needFundingPct = Object.values(userConfigs).some(({ config }) => (config.fundingPercentileMin ?? 0) > 0);
       const rawBySymbol = {};
       for (const symbol of symbolSet) {
         try {
-          rawBySymbol[symbol] = await evaluateSymbol(symbol, env);
+          rawBySymbol[symbol] = await evaluateSymbol(symbol, env, needFundingPct);
         } catch (e) {
           console.error(`[brain] ${symbol} eval error:`, e.message);
         }
@@ -110,7 +112,7 @@ export default {
 // Fetch one symbol's market data and compute RAW deltas vs last cycle.
 // No strategy interpretation here — deriveSignal() applies each user's mode +
 // thresholds. `market:prev:{symbol}` is stored so price/OI deltas are real.
-async function evaluateSymbol(symbol, env) {
+async function evaluateSymbol(symbol, env, computeFundingPct = false) {
   const res = await fetch(`${ORDERLY_API}/v1/public/futures/${symbol}`);
   if (!res.ok) throw new Error(`API ${res.status}`);
   const json = await res.json();
@@ -119,6 +121,27 @@ async function evaluateSymbol(symbol, env) {
   const markPrice = parseFloat(d.mark_price);
   const fundingRate = parseFloat(d.last_funding_rate) || 0;
   const openInterest = parseFloat(d.open_interest) || 0;
+
+  // Funding percentile vs Orderly's history — only when a user's config needs it
+  // (the fundingPercentileMin filter). Skipped otherwise to avoid extra fetches.
+  let fundingPct;
+  if (computeFundingPct) {
+    try {
+      const rates = [];
+      for (let page = 1; page <= 2; page++) {
+        const fr = await fetch(`${ORDERLY_API}/v1/public/funding_rate_history?symbol=${symbol}&page=${page}&size=100`);
+        const fd = await fr.json();
+        const rows = fd?.data?.rows || [];
+        rates.push(...rows.map((x) => Number(x.funding_rate)).filter(Number.isFinite));
+        if (rows.length < 100) break;
+      }
+      if (rates.length) {
+        let atOrBelow = 0;
+        for (const v of rates) if (v <= fundingRate) atOrBelow++;
+        fundingPct = Math.round((atOrBelow / rates.length) * 100);
+      }
+    } catch { /* leave undefined → gate stays off for this tick */ }
+  }
 
   // Prior snapshot for this symbol (set last cycle).
   const prevRaw = await env.NEXUS_AGENT.get(`market:prev:${symbol}`);
@@ -131,7 +154,7 @@ async function evaluateSymbol(symbol, env) {
     price: markPrice, oi: openInterest, timestamp: Date.now(),
   }));
 
-  return { symbol, price: markPrice, oi: openInterest, fundingRate, priceChange, oiChange, hasPrev: !!prev };
+  return { symbol, price: markPrice, oi: openInterest, fundingRate, priceChange, oiChange, hasPrev: !!prev, fundingPct };
 }
 
 // Snapshot hourly OI for a set of symbols, INDEPENDENT of the signal path (which

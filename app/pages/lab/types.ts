@@ -64,6 +64,7 @@ export interface AgentConfig {
   maxTradesPerDay: number;
   maxDailyLossUsdc: number;
   fundingThreshold: number;
+  fundingPercentileMin?: number; // 0=off; fade only when funding is ≥ this percentile vs its history
   signalMode: "CONFLUENCE" | "FUNDING_ONLY" | "OI_ONLY" | "MOMENTUM" | "MEAN_REVERSION";
   oiChangeThreshold: number; // % min OI move for the OI-divergence rule to count (0 = any)
   priceChangeThreshold: number; // % price move on the tick that triggers MOMENTUM / MEAN_REVERSION
@@ -158,6 +159,7 @@ export const DEFAULT_CONFIG: AgentConfig = {
   maxTradesPerDay: 4, // selectivity wins — backtest showed high-frequency configs bleed out
   maxDailyLossUsdc: 5,
   fundingThreshold: 0.02, // trade only EXTREME funding (least-bad in the 60d sweep)
+  fundingPercentileMin: 0, // off by default; opt-in adaptive funding-extremity filter
   signalMode: "CONFLUENCE", // validated default — both funding + OI must agree
   oiChangeThreshold: 0, // any OI move counts by default
   priceChangeThreshold: 0.5, // % tick move to trigger momentum / mean-reversion

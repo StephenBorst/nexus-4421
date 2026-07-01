@@ -91,6 +91,21 @@ export function deriveSignal(raw, config = {}, regime = null) {
       break;
   }
 
+  // Opt-in funding-PERCENTILE filter — fade the crowd only when funding is genuinely
+  // EXTREME vs its own history (context beats a fixed threshold). Applies only to
+  // funding-driven fades (FUNDING_ONLY / CONFLUENCE); raw.fundingPct is 0-100 (the
+  // brain supplies it). Off when fundingPercentileMin is 0/unset or pct is absent —
+  // so existing agents are unchanged.
+  if (direction !== "NONE" && (config.fundingPercentileMin ?? 0) > 0 &&
+      (mode === "FUNDING_ONLY" || mode === "CONFLUENCE") && fundingSignal !== "NONE" &&
+      Number.isFinite(raw.fundingPct)) {
+    const min = config.fundingPercentileMin;
+    const extreme = direction === "SHORT" ? raw.fundingPct >= min : raw.fundingPct <= (100 - min);
+    if (!extreme) {
+      return { direction: "NONE", confidence: 0, reason: `funding not extreme (${raw.fundingPct}th pct, need ${direction === "SHORT" ? `≥${min}` : `≤${100 - min}`})` };
+    }
+  }
+
   // Opt-in regime filter — skip NEW entries that fight a STRONG tape. It never
   // flips direction or touches open positions; it only suppresses a fresh entry.
   if (direction !== "NONE" && config.respectRegime && regime && regime.label !== "NEUTRAL") {
