@@ -1053,6 +1053,22 @@ export function AgentView() {
                       <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>% below peak (0 = off)</span>
                     </div>
                   </div>
+                  <div>
+                    <div style={{ ...agentLabelStyle, fontSize: 9 }}>BREAKEVEN STOP</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <NumberField value={config.breakevenTriggerPct ?? 0} min={0} max={10} step={0.1} onCommit={(n) => setConfig({ ...config, breakevenTriggerPct: n })} />
+                      <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>% in profit arms it (0 = off)</span>
+                    </div>
+                  </div>
+                  {(config.breakevenTriggerPct ?? 0) > 0 && (
+                    <div>
+                      <div style={{ ...agentLabelStyle, fontSize: 9 }}>BREAKEVEN BUFFER</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <NumberField value={config.breakevenBufferPct ?? 0} min={0} max={2} step={0.05} onCommit={(n) => setConfig({ ...config, breakevenBufferPct: n })} />
+                        <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>% above entry the stop locks to</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 10, color: "#3a6a4a", lineHeight: 1.5 }}>
@@ -1060,6 +1076,7 @@ export function AgentView() {
                     ? "Scale-out takes partial profit at TP1 and lets the runner ride to TP2 — each slice is graded on its own."
                     : "Single take-profit at the TAKE PROFIT % above. Turn on SCALE-OUT to bank partial profit early."}
                   {(config.trailingStopPct ?? 0) > 0 && " Trailing stop arms at TP1 and locks gains as price runs."}
+                  {(config.breakevenTriggerPct ?? 0) > 0 && ` Breakeven stop arms at +${config.breakevenTriggerPct}% and moves the SL to +${config.breakevenBufferPct ?? 0}% — once armed, the trade can no longer close at a real loss.`}
                 </div>
               </div>
             );
@@ -1765,7 +1782,7 @@ export function AgentView() {
                     <span style={{ color: trade.pnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontSize: 12, fontWeight: 600 }}>
                       {trade.pnl >= 0 ? "+" : ""}${trade.pnl.toFixed(2)}
                     </span>
-                    <span style={{ fontFamily: "monospace", fontSize: 10, color: trade.reason === "TP" ? "#00ff88" : trade.reason === "SL" ? "#ff4444" : "#ff8800" }}>
+                    <span style={{ fontFamily: "monospace", fontSize: 10, color: trade.reason === "TP" ? "#00ff88" : trade.reason === "SL" ? "#ff4444" : trade.reason === "BE" ? "#4a9fff" : "#ff8800" }}>
                       {trade.reason}
                     </span>
                   </div>

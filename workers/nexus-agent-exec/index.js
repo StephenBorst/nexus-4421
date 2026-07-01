@@ -13,7 +13,7 @@
 
 import * as ed from "@noble/ed25519";
 import bs58 from "bs58";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice, breakevenArmed } from "./logic.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const COOLDOWN_MS = 15 * 60 * 1000; // 15 min between trades
@@ -608,8 +608,13 @@ async function monitorPosition(address, state, config, env, cache) {
   pos.current_price = currentPrice;
   pos.pnl_percent = pnlPct;
 
+  // Breakeven / "risk-free trade" stop: latch pos.be_armed once price has moved
+  // breakevenTriggerPct in our favor (stays latched even through a pullback —
+  // evaluateExit just reads it below). No-op unless the user set a trigger.
+  pos.be_armed = breakevenArmed(pos, pnlPct, config.breakevenTriggerPct);
+
   // Exit decision: multi-TP scale-out + trailing stop, with hard-stop priority
-  // SL→TIMEOUT→trail over take-profit (tested in logic.mjs). Uses per-position
+  // BE→SL→TIMEOUT→trail over take-profit (tested in logic.mjs). Uses per-position
   // levels resolved at entry, falling back to config for legacy positions.
   const action = evaluateExit(pos, pnlPct, Date.now() - pos.opened_at, {
     tpPercent: pos.tpPercent ?? config.tpPercent,
@@ -618,6 +623,7 @@ async function monitorPosition(address, state, config, env, cache) {
     takeProfits: pos.takeProfits,
     trailingStopPct: config.trailingStopPct,
     trailActivatePct: config.trailActivatePct,
+    breakevenBufferPct: config.breakevenBufferPct,
   });
 
   if (action && action.type === "FULL_CLOSE") {

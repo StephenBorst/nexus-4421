@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-agent-exec/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice, breakevenArmed } from "./logic.mjs";
 
 // ─── snapQty ───────────────────────────────────────────────
 test("snapQty: snaps cleanly to base_tick (no float artifacts)", () => {
@@ -162,6 +162,38 @@ test("evaluateExit: trailing stop locks gains once activated", () => {
 test("evaluateExit: hard SL still beats an active trailing profit", () => {
   const cfg = { slPercent: 1, maxHoldHours: 99, trailingStopPct: 0.5, takeProfits: [{ pct: 1, sizePct: 100 }] };
   assert.deepEqual(evaluateExit({ peak_pnl_pct: 2 }, -1.2, 0, cfg), { type: "FULL_CLOSE", reason: "SL" });
+});
+
+// ─── breakevenArmed / breakeven stop ("risk-free trade") ────
+test("breakevenArmed: off when trigger unset, latches on cross, stays latched on pullback", () => {
+  assert.equal(breakevenArmed({}, 5, 0), false); // 0 = feature off, no matter the pnl
+  assert.equal(breakevenArmed({}, 0.5, 1), false); // below trigger, not armed yet
+  assert.equal(breakevenArmed({}, 1, 1), true); // crosses trigger this tick
+  assert.equal(breakevenArmed({ be_armed: true }, -5, 1), true); // once latched, a pullback can't un-arm it
+});
+
+test("evaluateExit: breakeven stop closes flat once armed and price falls back to entry", () => {
+  const cfg = { slPercent: 5, maxHoldHours: 99, breakevenBufferPct: 0 };
+  // armed (be_armed:true from a prior tick), price pulled back to exactly entry (0%)
+  assert.deepEqual(evaluateExit({ be_armed: true }, 0, 0, cfg), { type: "FULL_CLOSE", reason: "BE" });
+  // still above the buffer → holds
+  assert.equal(evaluateExit({ be_armed: true }, 0.2, 0, cfg), null);
+  // not armed yet → the wide 5% SL applies, not breakeven (0.5% loss doesn't close)
+  assert.equal(evaluateExit({}, -0.5, 0, cfg), null);
+});
+
+test("evaluateExit: breakeven buffer locks in a real profit, not just entry price", () => {
+  const cfg = { slPercent: 5, maxHoldHours: 99, breakevenBufferPct: 0.1 };
+  // armed, pulled back to +0.05% — below the 0.1% buffer floor → closes (still a win, covers fees)
+  assert.deepEqual(evaluateExit({ be_armed: true }, 0.05, 0, cfg), { type: "FULL_CLOSE", reason: "BE" });
+  assert.equal(evaluateExit({ be_armed: true }, 0.15, 0, cfg), null);
+});
+
+test("evaluateExit: breakeven fires before the wider hard SL once armed", () => {
+  const cfg = { slPercent: 5, maxHoldHours: 99, breakevenBufferPct: 0 };
+  // a fast reversal to -2% would normally be well inside a 5% SL and hold — but
+  // once armed, breakeven is the tighter, controlling stop.
+  assert.deepEqual(evaluateExit({ be_armed: true }, -2, 0, cfg), { type: "FULL_CLOSE", reason: "BE" });
 });
 
 // ─── agent → feed bridge ───────────────────────────────────

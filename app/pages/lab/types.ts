@@ -76,6 +76,11 @@ export interface AgentConfig {
   takeProfits?: { pct: number; sizePct: number }[];
   trailingStopPct?: number;  // 0/unset = off; trails the stop this % below peak P&L
   trailActivatePct?: number; // P&L% the trail arms at (default = first TP level)
+  // Breakeven / "risk-free trade" stop. Once P&L reaches breakevenTriggerPct, the
+  // stop latches up to entry + breakevenBufferPct — the trade can no longer close
+  // at a real loss. 0/unset trigger = off.
+  breakevenTriggerPct?: number;
+  breakevenBufferPct?: number; // % above entry the stop locks to once armed (default 0)
   // DCA / safety-order mode (PRO). The whole ladder fits inside capitalPerTrade;
   // TP is taken off the blended average. dcaEnabled gates the behavior.
   dcaEnabled?: boolean;

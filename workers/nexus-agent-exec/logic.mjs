@@ -89,22 +89,46 @@ export function normTakeProfits(pos, config) {
 }
 
 /**
+ * Whether the breakeven stop has latched. Once price has moved
+ * breakevenTriggerPct in our favor it latches ON permanently (pos.be_armed is
+ * persisted across ticks) — a pullback afterward does NOT un-arm it, which is
+ * the whole point: the stop only ever ratchets toward less risk, never back.
+ * bePct<=0 means the feature is off (always false).
+ */
+export function breakevenArmed(pos, pnlPct, breakevenTriggerPct) {
+  const bePct = Number(breakevenTriggerPct) || 0;
+  return bePct > 0 && (pos.be_armed === true || pnlPct >= bePct);
+}
+
+/**
  * Generalized exit decision (supersedes exitReason for multi-TP + trailing).
  * Pure: takes the position, current price-move pnlPct, hold time, and config;
  * returns ONE action for this tick. The exec persists peak_pnl_pct/trail_stop/
- * tp_hits/remaining_qty between ticks.
+ * tp_hits/remaining_qty/be_armed between ticks (be_armed is set via
+ * breakevenArmed() BEFORE calling this, so the check below just reads it).
  *
- *  { type:"FULL_CLOSE", reason:"SL"|"TIMEOUT"|"TRAIL"|"TP" }
+ *  { type:"FULL_CLOSE", reason:"SL"|"TIMEOUT"|"TRAIL"|"TP"|"BE" }
  *  { type:"PARTIAL_TP", level, sizePct }   // scale out this fraction, keep running
  *  { type:"TRAIL_UPDATE", trailStop, peak } // ratchet the trailing stop (no exit)
  *  null                                      // hold
  *
- * Priority: hard stops (SL → TIMEOUT → trail hit) before profit-taking, so a
- * disaster exit always wins over a take-profit on the same tick.
+ * Priority: breakeven stop → hard stops (SL → TIMEOUT) → trailing → profit-taking.
+ * Breakeven is checked first because once armed it's a TIGHTER stop than the
+ * original SL by definition (it only arms after enough favorable move) — so it
+ * should fire before a wider SL ever could, on a fast reversal.
  */
 export function evaluateExit(pos, pnlPct, holdMs, config) {
   const sl = pos.slPercent ?? config.slPercent;
   const maxHoldMs = (config.maxHoldHours || 0) * 60 * 60 * 1000;
+
+  // 0) Breakeven / "risk-free trade" stop — once armed, ratchets the stop up to
+  // entry + breakevenBufferPct (default 0 = exact entry price; set slightly
+  // positive to also clear round-trip fees) so the position can no longer close
+  // at a real loss.
+  if (pos.be_armed) {
+    const beStop = Number(config.breakevenBufferPct) || 0;
+    if (pnlPct <= beStop) return { type: "FULL_CLOSE", reason: "BE" };
+  }
 
   // 1) Hard full-close conditions (act on remaining qty).
   if (sl > 0 && pnlPct <= -sl) return { type: "FULL_CLOSE", reason: "SL" };

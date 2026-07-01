@@ -9,7 +9,7 @@
 // NOT (only current). So oiChange is fed as 0 → CONFLUENCE / OI_ONLY are inert here;
 // MOMENTUM / MEAN_REVERSION / FUNDING_ONLY + the full exit toolkit are backtestable.
 import { deriveSignal } from "../nexus-agent-brain/logic.mjs";
-import { computePnl, evaluateExit } from "../nexus-agent-exec/logic.mjs";
+import { computePnl, evaluateExit, breakevenArmed } from "../nexus-agent-exec/logic.mjs";
 import { percentileRank } from "./logic.mjs";
 
 // Build a NO-LOOKAHEAD funding-percentile lookup from raw funding rows
@@ -52,6 +52,7 @@ export function runBacktest(candles, fundingAt, config, fundingPctAt = null) {
       let closed = false;
       for (const px of [adv, fav, c.c]) {
         const { pnlPct } = computePnl(pos.direction, pos.entry, px, 1);
+        pos.state.be_armed = breakevenArmed(pos.state, pnlPct, config.breakevenTriggerPct);
         const action = evaluateExit(pos.state, pnlPct, holdMs, config);
         if (!action) continue;
         if (action.type === "TRAIL_UPDATE") {
