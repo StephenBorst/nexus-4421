@@ -1490,6 +1490,12 @@ export function AgentView() {
                   ${(agentState?.daily_pnl ?? 0).toFixed(2)}
                 </div>
               </div>
+              <div>
+                <div style={{ ...agentLabelStyle, fontSize: 9 }}>STRATEGY</div>
+                <div style={{ color: "#4a9fff", fontFamily: "monospace", fontSize: 13, fontWeight: 600 }}>
+                  {deriveStyle(config)} · {config.signalMode}{config.dcaEnabled ? " · DCA" : ""}
+                </div>
+              </div>
             </div>
           </div>
 

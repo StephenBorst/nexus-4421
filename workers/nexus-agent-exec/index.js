@@ -42,6 +42,9 @@ async function publishAgentEntry(address, env, { config, signal, markPrice, qty 
     entryPrice: markPrice, direction: signal.direction,
     tpPercent: config.tpPercent, slPercent: config.slPercent,
   });
+  // Style is defined by hold time (mirrors the frontend deriveStyle).
+  const style = (config.maxHoldHours ?? 0) <= 8 ? "DAY" : (config.maxHoldHours ?? 0) <= 120 ? "SWING" : "POSITION";
+  const strategy = `${style} · ${config.signalMode || "CONFLUENCE"}${config.dcaEnabled ? " · DCA" : ""}`;
   const record = {
     id: `agent_${address.slice(2, 8)}_${now}`,
     symbol: signal.symbol,
@@ -56,7 +59,8 @@ async function publishAgentEntry(address, env, { config, signal, markPrice, qty 
     status: "ACTIVE",
     actualPnl: null,
     createdAt: now,
-    notes: `Autonomous agent entry on a funding + OI-divergence confluence signal (confidence ${signal.confidence}%). Plan: TP +${config.tpPercent}% / SL -${config.slPercent}% / ${config.maxHoldHours}h max hold.`,
+    strategy,
+    notes: `[${strategy}] Autonomous agent entry (confidence ${signal.confidence}%). Plan: TP +${config.tpPercent}% / SL -${config.slPercent}% / ${config.maxHoldHours}h max hold.`,
     isPublic: true,
     agent: true,
   };
