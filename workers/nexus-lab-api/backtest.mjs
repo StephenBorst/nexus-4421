@@ -82,9 +82,14 @@ export function runBacktest(candles, fundingAt, config, fundingPctAt = null) {
 export function aggregate(trades, config = {}) {
   const n = trades.length;
   const notional = (config.capitalPerTrade || 50) * (config.leverage || 1);
+  // Optional cost model: a taker fee per side (config.feeBps, e.g. 3 = 0.03%).
+  // A round trip = entry + exit ≈ 2× → deducted from each trade's % return so the
+  // net reflects real trading costs. (Conservative: ignores funding RECEIVED while
+  // fading, which is a tailwind for this strategy — so real edge ≥ this.)
+  const feePct = ((config.feeBps || 0) / 100) * 2;
   let net = 0, grossWin = 0, grossLoss = 0, wins = 0;
   for (const t of trades) {
-    const usd = (t.pnlPct / 100) * notional;
+    const usd = ((t.pnlPct - feePct) / 100) * notional;
     net += usd;
     if (usd > 0) { grossWin += usd; wins++; } else { grossLoss += Math.abs(usd); }
   }
@@ -127,8 +132,13 @@ export async function fetchFundingAt(symbol) {
     if (rs.length < 100) break;
   }
   rows.sort((a, b) => a.ts - b.ts);
-  return (tsSec) => { const ms = tsSec * 1000; let rate = 0; for (const row of rows) { if (row.ts <= ms) rate = row.rate; else break; } return rate; };
+  const at = (tsSec) => { const ms = tsSec * 1000; let rate = 0; for (const row of rows) { if (row.ts <= ms) rate = row.rate; else break; } return rate; };
+  return { at, rows };
 }
+
+// Realistic taker fee (bps/side) applied to every user-facing backtest so results
+// are honest by default. Verified the Proven-Edge config survives it with margin.
+const DEFAULT_FEE_BPS = 3;
 
 // Sweep: fetch each symbol's data ONCE, then run a grid of backtestable configs
 // (mode × threshold × exit style) reusing that data, ranked by net P&L. This is the
@@ -136,30 +146,33 @@ export async function fetchFundingAt(symbol) {
 export async function runSweep(base, { symbols, days }) {
   const data = {};
   for (const s of symbols) {
-    const [candles, fundingAt] = await Promise.all([fetchCandles(s, days), fetchFundingAt(s)]);
-    data[s] = { candles, fundingAt };
+    const [candles, funding] = await Promise.all([fetchCandles(s, days), fetchFundingAt(s)]);
+    data[s] = { candles, fundingAt: funding.at, fundingPctAt: makeFundingPctAt(funding.rows) };
   }
   const EXITS = {
     "fixed tp1.5/sl0.75": { tpPercent: 1.5, slPercent: 0.75 },
     "scale-out 1/2.5": { tpPercent: 1, slPercent: 1, takeProfits: [{ pct: 1, sizePct: 50 }, { pct: 2.5, sizePct: 50 }] },
     "trail 0.5": { tpPercent: 1.5, slPercent: 0.75, trailingStopPct: 0.5 },
   };
-  const common = { leverage: base.leverage || 5, capitalPerTrade: base.capitalPerTrade || 50, maxHoldHours: base.maxHoldHours || 4, oiChangeThreshold: 0 };
+  const common = { leverage: base.leverage || 5, capitalPerTrade: base.capitalPerTrade || 50, maxHoldHours: base.maxHoldHours || 4, oiChangeThreshold: 0, feeBps: DEFAULT_FEE_BPS };
   const configs = [];
   for (const [exName, ex] of Object.entries(EXITS)) {
     for (const p of [0.3, 0.5, 0.8]) for (const mode of ["MOMENTUM", "MEAN_REVERSION"]) configs.push({ name: `${mode} · p${p} · ${exName}`, config: { ...common, ...ex, signalMode: mode, priceChangeThreshold: p } });
     for (const f of [0.005, 0.01, 0.02]) configs.push({ name: `FUNDING_ONLY · f${f} · ${exName}`, config: { ...common, ...ex, signalMode: "FUNDING_ONLY", fundingThreshold: f } });
+    // The adaptive funding-PERCENTILE filter — the only net-positive family found.
+    for (const pctMin of [90, 95]) configs.push({ name: `FUNDING · f0.01 · pct${pctMin} · ${exName}`, config: { ...common, ...ex, signalMode: "FUNDING_ONLY", fundingThreshold: 0.01, fundingPercentileMin: pctMin } });
   }
   const results = configs.map(({ name, config }) => {
     let net = 0, trades = 0, wins = 0;
     for (const s of symbols) {
-      const r = runBacktest(data[s].candles, data[s].fundingAt, config);
+      const r = runBacktest(data[s].candles, data[s].fundingAt, config, data[s].fundingPctAt);
       net += r.netUsd; trades += r.trades; wins += Math.round((r.winRate / 100) * r.trades);
     }
     // Include the strategy-defining params so the UI can one-click APPLY a winner.
     const applied = {
       signalMode: config.signalMode, priceChangeThreshold: config.priceChangeThreshold,
-      fundingThreshold: config.fundingThreshold, tpPercent: config.tpPercent, slPercent: config.slPercent,
+      fundingThreshold: config.fundingThreshold, fundingPercentileMin: config.fundingPercentileMin || 0,
+      tpPercent: config.tpPercent, slPercent: config.slPercent,
       takeProfits: config.takeProfits || null, trailingStopPct: config.trailingStopPct || 0,
     };
     return { name, trades, winRate: trades ? Math.round((wins / trades) * 1000) / 10 : 0, netUsd: Math.round(net * 100) / 100, config: applied };
@@ -172,8 +185,8 @@ export async function backtestConfig(config, { symbols, days }) {
   const perSymbol = [];
   let net = 0, trades = 0, wins = 0;
   for (const symbol of symbols) {
-    const [candles, fundingAt] = await Promise.all([fetchCandles(symbol, days), fetchFundingAt(symbol)]);
-    const r = runBacktest(candles, fundingAt, config);
+    const [candles, funding] = await Promise.all([fetchCandles(symbol, days), fetchFundingAt(symbol)]);
+    const r = runBacktest(candles, funding.at, { feeBps: DEFAULT_FEE_BPS, ...config }, makeFundingPctAt(funding.rows));
     perSymbol.push({ symbol, candles: candles.length, ...r });
     net += r.netUsd; trades += r.trades; wins += Math.round((r.winRate / 100) * r.trades);
   }

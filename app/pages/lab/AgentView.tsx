@@ -1246,7 +1246,7 @@ export function AgentView() {
                       ))}
                     </div>
                     <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
-                      Past performance ≠ future results. Fees/funding not modeled — live results run slightly worse. 60d hourly, ${(config.capitalPerTrade * config.leverage).toFixed(0)} notional/trade.
+                      Past performance ≠ future results. Taker fees modeled (~3bps/side); funding RECEIVED while fading is not (a tailwind — live may run better). 60d hourly, ${(config.capitalPerTrade * config.leverage).toFixed(0)} notional/trade.
                     </div>
                   </div>
                 )}
@@ -1358,7 +1358,7 @@ export function AgentView() {
                     <button onClick={() => copyStrategy(s)} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 14px", flexShrink: 0 }}>COPY</button>
                   </div>
                 ))}
-                <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 4 }}>*bt = backtest hypothesis (fees not modeled); ranking uses the author's real graded record.</div>
+                <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 4 }}>*bt = backtest hypothesis; ranking uses the author's real graded record.</div>
               </div>
             )}
           </div>
