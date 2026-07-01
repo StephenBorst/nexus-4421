@@ -6,7 +6,8 @@ import { cardStyle, navBtnStyle } from "./styles";
 export function LabWelcome() {
   const features = [
     { icon: "◈", title: "NEXUS THESIS ENGINE", desc: "Plan every trade — position sizing, R:R, funding cost, live P&L tracking, on-chain proof." },
-    { icon: "⬢", title: "AUTO AGENT", desc: "Deploy an algo that trades funding edges for you. Hard risk caps, kill switch, order-only keys." },
+    { icon: "⬢", title: "AUTO AGENT", desc: "Run a preset or your own strategy hands-free. Scale-out & trailing exits, DCA, TradingView signals. Hard risk caps, kill switch, order-only keys." },
+    { icon: "◆", title: "STRATEGY WORKBENCH", desc: "Build a strategy by trading style, backtest it on real history, then publish it — every result graded on-chain. Verify, don't trust." },
     { icon: "▣", title: "ANALYTICS", desc: "Trading score, win-rate breakdowns, hold-time & leverage analysis — grade yourself like a desk." },
     { icon: "▤", title: "TRADE LOG", desc: "Full journal of every closed day with notes, filters, and a calendar heatmap." },
   ];
