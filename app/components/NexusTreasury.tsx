@@ -16,6 +16,7 @@
 import { useEffect, useState } from "react";
 import { createPublicClient, http, fallback, formatUnits } from "viem";
 import { arbitrum, base } from "viem/chains";
+import { C } from "@/config/theme";
 
 // Nexus Trading Labs Treasury — Safe (1/1), deployed + activated on Arbitrum + Base 2026-06-08.
 // Receives swept USDC (broker fees + PRO subs) and $NEXUS; funds the war chest + Seasons.
@@ -88,17 +89,17 @@ export function NexusTreasury({ compact = false }: { compact?: boolean }) {
       fontFamily: "monospace",
     }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <span style={{ fontSize: 8, letterSpacing: "0.12em", color: "#3a5a4a" }}>🏦 TREASURY (PUBLIC SAFE)</span>
-        <span style={{ fontSize: compact ? 14 : 18, fontWeight: "bold", color: "#4a9fff" }}>{bal}</span>
+        <span style={{ fontSize: 8, letterSpacing: "0.12em", color: C.text.faint }}>🏦 TREASURY (PUBLIC SAFE)</span>
+        <span style={{ fontSize: compact ? 14 : 18, fontWeight: "bold", color: C.text.bright }}>{bal}</span>
       </div>
-      <div style={{ width: 1, alignSelf: "stretch", background: "#1a2e1a" }} />
+      <div style={{ width: 1, alignSelf: "stretch", background: C.border }} />
       <a
         href={`https://app.safe.global/balances?safe=base:${NEXUS_TREASURY_ADDRESS}`}
         target="_blank" rel="noopener noreferrer"
         style={{ display: "flex", flexDirection: "column", gap: 2, textDecoration: "none" }}
       >
-        <span style={{ fontSize: 8, letterSpacing: "0.12em", color: "#3a5a4a" }}>SAFE ADDRESS ↗</span>
-        <span style={{ fontSize: compact ? 11 : 12, color: "#5fd6a0" }}>{short}</span>
+        <span style={{ fontSize: 8, letterSpacing: "0.12em", color: C.text.faint }}>SAFE ADDRESS ↗</span>
+        <span style={{ fontSize: compact ? 11 : 12, color: C.info }}>{short}</span>
       </a>
       {!compact && (
         <div style={{ flex: 1, minWidth: 0, fontSize: 8, color: "#2a4a3a", lineHeight: 1.4, textAlign: "right" }}>

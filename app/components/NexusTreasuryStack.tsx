@@ -13,6 +13,7 @@
 import { useEffect, useState } from "react";
 import { fetchHeldStats } from "@/hooks/useNexusTier";
 import { NEXUS_TREASURY_ADDRESS } from "@/components/NexusTreasury";
+import { C } from "@/config/theme";
 
 function fmt(n: number): string {
   if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
@@ -49,13 +50,13 @@ export function NexusTreasuryStack({ compact = false }: { compact?: boolean }) {
       fontFamily: "monospace",
     }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <span style={{ fontSize: 8, letterSpacing: "0.12em", color: "#3a5a4a" }}>💎 $NEXUS IN TREASURY</span>
-        <span style={{ fontSize: compact ? 14 : 18, fontWeight: "bold", color: "#5fd6a0" }}>{held}</span>
+        <span style={{ fontSize: 8, letterSpacing: "0.12em", color: C.text.faint }}>💎 $NEXUS IN TREASURY</span>
+        <span style={{ fontSize: compact ? 14 : 18, fontWeight: "bold", color: C.text.bright }}>{held}</span>
       </div>
-      <div style={{ width: 1, alignSelf: "stretch", background: "#1a2e1a" }} />
+      <div style={{ width: 1, alignSelf: "stretch", background: C.border }} />
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <span style={{ fontSize: 8, letterSpacing: "0.12em", color: "#3a5a4a" }}>% OF SUPPLY</span>
-        <span style={{ fontSize: compact ? 14 : 18, fontWeight: "bold", color: "#00ff88" }}>{pct}%</span>
+        <span style={{ fontSize: 8, letterSpacing: "0.12em", color: C.text.faint }}>% OF SUPPLY</span>
+        <span style={{ fontSize: compact ? 14 : 18, fontWeight: "bold", color: C.text.bright }}>{pct}%</span>
       </div>
       {!compact && (
         <div style={{ flex: 1, minWidth: 0, fontSize: 8, color: "#2a4a3a", lineHeight: 1.4, textAlign: "right" }}>

@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { BuyNexusButton } from "@/components/BuyNexusButton";
+import { C } from "@/config/theme";
 
 const NEXUS_TOKEN = "0x3D958634ab725B627919EF8F2Ed59227309fDba3";
 const GT_API = `https://api.geckoterminal.com/api/v2/networks/base/tokens/${NEXUS_TOKEN}`;
@@ -41,8 +42,8 @@ function price(n: number | null): string {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <span style={{ fontSize: 8, letterSpacing: "0.12em", color: "#3a5a4a" }}>{label}</span>
-      <span style={{ fontSize: 14, fontWeight: "bold", color: "#e5e7eb" }}>{value}</span>
+      <span style={{ fontSize: 8, letterSpacing: "0.12em", color: C.text.faint }}>{label}</span>
+      <span style={{ fontSize: 14, fontWeight: "bold", color: C.text.bright }}>{value}</span>
     </div>
   );
 }
@@ -74,10 +75,10 @@ export function NexusMarket() {
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap",
-      padding: "12px 16px", background: "#0d120d", border: "1px solid #1a2e1a",
+      padding: "12px 16px", background: C.surfaceAlt, border: `1px solid ${C.border}`,
       borderRadius: 4, fontFamily: "monospace",
     }}>
-      <span style={{ fontSize: 11, fontWeight: "bold", color: "#00ff88", letterSpacing: "0.1em" }}>$NEXUS</span>
+      <span style={{ fontSize: 11, fontWeight: "bold", color: C.accent, letterSpacing: "0.1em" }}>$NEXUS</span>
       <Stat label="PRICE" value={price(m.price)} />
       <Stat label="MARKET CAP" value={usd(m.marketCap)} />
       <Stat label="24H VOL" value={usd(m.volume24h)} />
@@ -86,7 +87,7 @@ export function NexusMarket() {
         <a
           href={GT_PAGE}
           target="_blank" rel="noopener noreferrer"
-          style={{ fontSize: 9, color: "#5fd6a0", textDecoration: "none", letterSpacing: "0.06em", border: "1px solid #1a4a3a", borderRadius: 3, padding: "4px 8px" }}
+          style={{ fontSize: 9, color: C.info, textDecoration: "none", letterSpacing: "0.06em", border: `1px solid ${C.border}`, borderRadius: 3, padding: "4px 8px" }}
           title="View $NEXUS on GeckoTerminal"
         >
           GeckoTerminal ↗
