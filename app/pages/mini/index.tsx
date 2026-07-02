@@ -638,7 +638,7 @@ export default function MiniApp() {
     }
   }
 
-  const shell: React.CSSProperties = { background: bg, color: "#e5e7eb", minHeight: "100dvh", fontFamily: mono, padding: 14, display: "flex", flexDirection: "column", gap: 11 };
+  const shell: React.CSSProperties = { background: bg, color: "#e8f0ea", minHeight: "100dvh", fontFamily: mono, padding: 14, display: "flex", flexDirection: "column", gap: 11 };
   const card: React.CSSProperties = { background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 6, padding: 12 };
   const mktChip = (active: boolean): React.CSSProperties => ({ background: active ? "#00ff8815" : "#0a0e0a", border: `1px solid ${active ? "#00ff8860" : "#1e2d1e"}`, borderRadius: 3, padding: "4px 11px", cursor: "pointer", color: active ? green : "#4a7a5a", fontFamily: mono, fontSize: 12 });
   const levPresets = [2, 5, 10, 25, 50, 100].filter((p) => p < maxLev).concat(maxLev); // per-market, incl. real MAX
@@ -759,7 +759,7 @@ export default function MiniApp() {
               ))}
               {!MARKETS.includes(sym) && <button style={mktChip(true)}>{sym}</button>}
             </div>
-            <input value={mktSearch} onChange={(e) => setMktSearch(e.target.value.toUpperCase())} placeholder={markets ? `🔍 search ${markets.length} markets…` : "loading markets…"} style={{ width: "100%", boxSizing: "border-box", background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e5e7eb", fontFamily: mono, fontSize: 11, padding: "6px 9px" }} />
+            <input value={mktSearch} onChange={(e) => setMktSearch(e.target.value.toUpperCase())} placeholder={markets ? `🔍 search ${markets.length} markets…` : "loading markets…"} style={{ width: "100%", boxSizing: "border-box", background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 11, padding: "6px 9px" }} />
             {mktSearch && markets && (() => {
               const hits = markets.filter((m) => m.includes(mktSearch));
               return (
@@ -776,7 +776,7 @@ export default function MiniApp() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <div>
               <div style={{ fontSize: 8, color: "#3a6a4a", letterSpacing: "0.1em" }}>SIZE (USDC)</div>
-              <input type="number" inputMode="decimal" min={1} value={notional} onChange={(e) => setNotional(Math.max(0, parseFloat(e.target.value) || 0))} style={{ width: "100%", boxSizing: "border-box", marginTop: 4, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e5e7eb", fontFamily: mono, fontSize: 13, padding: "7px 9px" }} />
+              <input type="number" inputMode="decimal" min={1} value={notional} onChange={(e) => setNotional(Math.max(0, parseFloat(e.target.value) || 0))} style={{ width: "100%", boxSizing: "border-box", marginTop: 4, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 13, padding: "7px 9px" }} />
             </div>
             <div>
               <div style={{ fontSize: 8, color: "#3a6a4a", letterSpacing: "0.1em" }}>LEVERAGE — {lev}x <span style={{ color: "#2a4a3a" }}>· max {maxLev}x</span></div>
@@ -822,7 +822,7 @@ export default function MiniApp() {
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ fontSize: 8, color: "#3a6a4a", letterSpacing: "0.1em" }}>💰 FUND ACCOUNT (USDC · Arbitrum)</div>
             <div style={{ display: "flex", gap: 8 }}>
-              <input type="number" inputMode="decimal" min={1} value={depositAmt} onChange={(e) => setDepositAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e5e7eb", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
+              <input type="number" inputMode="decimal" min={1} value={depositAmt} onChange={(e) => setDepositAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
               <button onClick={deposit} disabled={depositing || depositAmt <= 0} style={{ flexShrink: 0, background: "#0a1a2a", color: "#4a9fff", border: "1px solid #1a3a5a", borderRadius: 4, padding: "8px 16px", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: depositing ? "wait" : "pointer", letterSpacing: "0.05em", opacity: depositing ? 0.6 : 1 }}>{depositing ? "…" : "DEPOSIT"}</button>
             </div>
             {depositMsg && <div style={{ fontSize: 10, color: depositMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{depositMsg.text}</div>}
@@ -835,7 +835,7 @@ export default function MiniApp() {
               {acct && <button onClick={() => setWithdrawAmt(Math.max(0, Math.floor(acct.free * 100) / 100))} style={{ marginLeft: "auto", background: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#5a8a6a", fontFamily: mono, fontSize: 9, padding: "2px 7px", cursor: "pointer" }}>MAX ${acct.free.toFixed(2)}</button>}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <input type="number" inputMode="decimal" min={1} value={withdrawAmt} onChange={(e) => setWithdrawAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e5e7eb", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
+              <input type="number" inputMode="decimal" min={1} value={withdrawAmt} onChange={(e) => setWithdrawAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
               <button onClick={withdraw} disabled={withdrawing || withdrawAmt <= 0} style={{ flexShrink: 0, background: "#1a140a", color: "#fbbf24", border: "1px solid #4a3a1a", borderRadius: 4, padding: "8px 16px", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: withdrawing ? "wait" : "pointer", letterSpacing: "0.05em", opacity: withdrawing ? 0.6 : 1 }}>{withdrawing ? "…" : "WITHDRAW"}</button>
             </div>
             {withdrawMsg && <div style={{ fontSize: 10, color: withdrawMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{withdrawMsg.text}</div>}

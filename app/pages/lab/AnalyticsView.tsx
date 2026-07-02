@@ -100,7 +100,7 @@ function TradingScoreSection({ orders, winRate }: { orders: ProcessedTrade[]; wi
 
   return (
     <div style={{ ...cardStyle, marginTop: 12 }}>
-      <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 16, fontFamily: "var(--nx-font-mono)", display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 16, fontFamily: "var(--nx-font-mono)", display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ color: "#3a5a4a" }}>&#9632;</span> TRADING SCORE
       </div>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "280px 1fr", gap: isMobile ? 16 : 24, alignItems: "center", justifyItems: isMobile ? "center" : "stretch" }}>
@@ -450,7 +450,7 @@ function PerformanceAnalysis({ orders }: { orders: ProcessedTrade[] }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
       <div style={cardStyle}>
-        <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; PERFORMANCE ANALYSIS</div>
+        <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; PERFORMANCE ANALYSIS</div>
         <div style={{ marginBottom: 8 }}>
           <div style={{ fontSize: 9, color: "#00ff88", fontFamily: "var(--nx-font-mono)", marginBottom: 4 }}>Best Trade</div>
           <div style={{ background: "#0a150a", border: "1px solid #1a3a1a", borderRadius: 4, padding: "10px 12px" }}>
@@ -474,7 +474,7 @@ function PerformanceAnalysis({ orders }: { orders: ProcessedTrade[] }) {
       </div>
 
       <div style={cardStyle}>
-        <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; LONG vs SHORT</div>
+        <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; LONG vs SHORT</div>
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
             <span style={{ fontSize: 12, color: "#8aaa9a", fontFamily: "var(--nx-font-mono)" }}>Long Trades</span>
@@ -512,7 +512,7 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-        <a href="/analyze" style={{ fontSize: 10, color: "#00ff88", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em", textDecoration: "none", border: "1px solid #1a3a2a", borderRadius: 4, padding: "5px 10px" }}>
+        <a href="/analyze" style={{ fontSize: 10, color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em", textDecoration: "none", border: "1px solid #1a3a2a", borderRadius: 4, padding: "5px 10px" }}>
           ▶ X-RAY ANY WALLET
         </a>
       </div>

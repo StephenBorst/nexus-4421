@@ -296,7 +296,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
     <div style={{ marginTop: 16, marginBottom: 16 }}>
       {/* Breakdown Card */}
       <div style={{ ...cardStyle, marginBottom: 8 }}>
-        <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 16, fontFamily: "var(--nx-font-mono)" }}>
+        <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 16, fontFamily: "var(--nx-font-mono)" }}>
           <span style={{ color: "#3a5a4a" }}>&#9632;</span> ACCURACY BREAKDOWN
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(108px, 1fr))", gap: 8 }}>
@@ -336,7 +336,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8 }}>
           {/* Best Thesis */}
           <div style={cardStyle}>
-            <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; BEST THESIS</div>
+            <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; BEST THESIS</div>
             {bestThesis ? (
               <>
                 <div style={{ background: "#0a150a", border: "1px solid #1a3a1a", borderRadius: 4, padding: "10px 12px", marginBottom: 8 }}>
@@ -390,7 +390,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
 
           {/* Cumulative Thesis P&L Chart */}
           <div style={cardStyle}>
-            <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 4, fontFamily: "var(--nx-font-mono)" }}>&#9632; THESIS P&amp;L</div>
+            <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 4, fontFamily: "var(--nx-font-mono)" }}>&#9632; THESIS P&amp;L</div>
             <PnlChart points={cumulativePoints} />
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
               <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{sortedByDate.length} results plotted</div>
@@ -566,7 +566,7 @@ export function ThesisAnalyticsView() {
       {/* Equity curve */}
       <div style={cardStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#00ff88", letterSpacing: "0.1em" }}>◆ EQUITY CURVE</span>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em" }}>◆ EQUITY CURVE</span>
           {equityPoints.length >= 2 && (
             <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", color: lineColor }}>
               {summaryStats.totalPnl >= 0 ? "+" : ""}${Math.abs(summaryStats.totalPnl).toFixed(2)}
@@ -599,7 +599,7 @@ export function ThesisAnalyticsView() {
 
         {/* Best markets */}
         <div style={cardStyle}>
-          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 10 }}>◆ BEST MARKETS</div>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 10 }}>◆ BEST MARKETS</div>
           {bestAssets.length === 0 ? (
             <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#2a4a3a" }}>no closed theses yet</div>
           ) : (
@@ -856,7 +856,7 @@ export function ThesisView() {
       {/* Header */}
       <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #1a2e1a", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <div style={{ fontSize: 10, color: "#00ff88", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.12em", marginBottom: 4 }}>
+          <div style={{ fontSize: 10, color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.12em", marginBottom: 4 }}>
             &#9632; NEXUS THESIS ENGINE
           </div>
           <div style={{ fontSize: 11, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>
@@ -969,7 +969,7 @@ export function ThesisView() {
         {/* Output Panel */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8, position: isMobile ? "static" : "sticky", top: 16 }}>
           <div style={{ ...cardStyle, border: "1px solid #1a3a2a" }}>
-            <div style={{ fontSize: 10, color: "#00ff88", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 16 }}>&#9632; CALCULATED OUTPUT</div>
+            <div style={{ fontSize: 10, color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 16 }}>&#9632; CALCULATED OUTPUT</div>
             {!calc ? (
               <div style={{ fontSize: 11, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", textAlign: "center", padding: "20px 0" }}>
                 fill in entry, stop, tp1,<br />account size + risk %
@@ -1121,7 +1121,7 @@ export function ThesisView() {
       {trades.length > 0 && (
         <div style={{ marginTop: 16 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-            <div style={{ fontSize: 10, color: "#00ff88", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.12em" }}>
+            <div style={{ fontSize: 10, color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.12em" }}>
               &#9632; THESIS_LOG ({filteredTrades.length}/{trades.length})
             </div>
             <div style={{ display: "flex", gap: 4 }}>

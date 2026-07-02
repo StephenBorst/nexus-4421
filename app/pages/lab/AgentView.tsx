@@ -1222,7 +1222,7 @@ export function AgentView() {
               ].map(({ label, value }) => (
                 <div key={label}>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
-                  <div style={{ color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>{value}</div>
+                  <div style={{ color: "#e8f0ea", fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>{value}</div>
                 </div>
               ))}
             </div>
