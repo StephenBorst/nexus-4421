@@ -501,106 +501,44 @@ function FeedCard({
             <span title={`On-chain verified · thesis #${thesis.onChainId}`} style={{ fontSize: 12, flexShrink: 0 }}>⛓</span>
           )
         )}
-        {/* Share link button */}
+        {/* Card actions — quiet by default (accent rationed), with real hover/focus/
+            motion from the .nx-* CSS layer instead of hand-rolled handlers. */}
         <button
+          className="nx-btn nx-btn-icon"
           onClick={() => navigate(`/feed/thesis/${thesis.wallet}/${thesis.id}`)}
           title="View thesis permalink"
-          style={{
-            background: "none", border: "1px solid #1a2e1a", borderRadius: 3,
-            color: "#2a4a3a", fontFamily: "monospace", fontSize: 9,
-            padding: "3px 7px", cursor: "pointer", flexShrink: 0, letterSpacing: "0.05em",
-          }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#4a9fff"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a3a5a"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#2a4a3a"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a2e1a"; }}
+          style={{ flexShrink: 0 }}
         >↗</button>
-        {/* Follow button — only if wallet connected and not own wallet */}
         {walletAddress && !isOwnThesis && (
           <button
+            className={`nx-btn nx-btn-icon${isFollowing ? " is-active" : ""}`}
             onClick={() => onFollowToggle(thesis.wallet.toLowerCase())}
             title={isFollowing ? "Unfollow trader" : "Follow trader"}
-            style={{
-              background: isFollowing ? "#0a1a0a" : "none",
-              border: `1px solid ${isFollowing ? "#1a4a2a" : "#1a2e1a"}`,
-              borderRadius: 3, color: isFollowing ? "#00ff88" : "#3a5a4a",
-              fontFamily: "monospace", fontSize: 9,
-              padding: "3px 7px", cursor: "pointer", flexShrink: 0, letterSpacing: "0.05em",
-            }}
+            style={{ flexShrink: 0 }}
           >{isFollowing ? "✓" : "+"}</button>
         )}
-        {/* DM button — message the trader directly via XMTP */}
         {walletAddress && !isOwnThesis && (
           <button
+            className="nx-btn nx-btn-icon"
             onClick={() => navigate(`/messages?dm=${thesis.wallet}`)}
             title="Send encrypted DM to trader"
-            style={{
-              background: "none",
-              border: "1px solid #1a2e1a",
-              borderRadius: 3,
-              color: "#3a5a4a",
-              fontFamily: "monospace",
-              fontSize: 9,
-              padding: "3px 7px",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#00ff88";
-              (e.currentTarget as HTMLButtonElement).style.color = "#00ff88";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a2e1a";
-              (e.currentTarget as HTMLButtonElement).style.color = "#3a5a4a";
-            }}
-          >
-            ⬡
-          </button>
+            style={{ flexShrink: 0 }}
+          >⬡</button>
         )}
-        {/* Copy button — only if wallet connected and not your own thesis */}
         {walletAddress && !isOwnThesis && (
           <button
+            className="nx-btn nx-btn-icon"
             onClick={() => onCopy(thesis)}
             title="Copy this thesis to your LAB"
-            style={{
-              background: "none",
-              border: "1px solid #1a3a1a",
-              borderRadius: 3,
-              color: "#3a6a4a",
-              fontFamily: "monospace",
-              fontSize: 9,
-              padding: "3px 7px",
-              cursor: "pointer",
-              flexShrink: 0,
-              letterSpacing: "0.05em",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#00ff88";
-              (e.currentTarget as HTMLButtonElement).style.color = "#00ff88";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a3a1a";
-              (e.currentTarget as HTMLButtonElement).style.color = "#3a6a4a";
-            }}
-          >
-            COPY
-          </button>
+            style={{ flexShrink: 0 }}
+          >COPY</button>
         )}
-        {/* Comments toggle */}
         <button
+          className={`nx-btn nx-btn-icon${commentsOpen ? " is-active" : ""}`}
           onClick={() => setCommentsOpen((o) => !o)}
-          style={{
-            background: commentsOpen ? "#0a1a0a" : "none",
-            border: `1px solid ${commentsOpen ? "#00ff88" : "#1a2e1a"}`,
-            borderRadius: 3,
-            color: commentsOpen ? "#00ff88" : "#3a5a4a",
-            fontFamily: "monospace",
-            fontSize: 9,
-            padding: "3px 7px",
-            cursor: "pointer",
-            flexShrink: 0,
-          }}
-        >
-          💬 {commentCount}
-        </button>
+          title="Comments"
+          style={{ flexShrink: 0 }}
+        >💬 {commentCount}</button>
       </div>
 
       {/* Symbol + direction */}

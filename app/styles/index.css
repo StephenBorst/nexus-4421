@@ -116,6 +116,13 @@ html, body {
 }
 .nx-btn-primary:hover { background: #00ff8824; color: var(--nx-accent); border-color: var(--nx-accent); }
 
+/* Small icon/chip button — same interaction, tighter footprint (feed/card actions). */
+.nx-btn-icon { padding: 3px 7px; font-size: 9px; letter-spacing: 0.05em; text-transform: none; }
+
+/* Active/toggled state — rationed accent tint (following, comments open, etc.). */
+.nx-btn.is-active { color: var(--nx-accent); border-color: #1a4a2a; background: #0a1a0a; }
+.nx-btn.is-active:hover { color: var(--nx-accent); border-color: var(--nx-accent); background: #0a1f0e; }
+
 .nx-badge {
   font-family: monospace; font-size: 9px; letter-spacing: 0.05em;
   border: 1px solid var(--nx-border); border-radius: var(--nx-r-sm); padding: 2px 6px;
