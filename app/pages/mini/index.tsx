@@ -389,7 +389,7 @@ export default function MiniApp() {
       });
       const d = await r.json();
       if (r.ok && d.ok) {
-        setAgentMsg({ ok: true, text: "✓ Proven Edge deployed in PAPER — it now trades a simulated BTC funding-fade. Track it in the full terminal." });
+        setAgentMsg({ ok: true, text: "✓ Deployed in PAPER — it now trades a simulated BTC funding-fade. Track it in the full terminal." });
         await loadAgent(s.addr);
       } else {
         setAgentMsg({ ok: false, text: d.hint || d.error || "deploy failed" });
@@ -865,9 +865,9 @@ export default function MiniApp() {
             ) : (
               <>
                 <div style={{ fontSize: 11, color: "#8aaa9a", lineHeight: 1.5 }}>
-                  Deploy the backtested <span style={{ color: green }}>Proven Edge</span> — a selective BTC funding-fade with a breakeven risk-free stop — <span style={{ color: "#fff" }}>risk-free in PAPER</span>. No funds, no key.
+                  Try the <span style={{ color: "#fbbf24" }}>BTC Funding Fade</span> — a selective funding-fade with a breakeven risk-free stop. <span style={{ color: "#fff" }}>Experimental, PAPER only</span> (it doesn't yet pass our cross-market validation). No funds, no key.
                 </div>
-                <button onClick={deployPaperAgent} disabled={agentBusy} style={{ background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 5, padding: "10px 0", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: agentBusy ? "wait" : "pointer", letterSpacing: "0.04em", opacity: agentBusy ? 0.6 : 1 }}>{agentBusy ? "DEPLOYING…" : "🧪 DEPLOY PROVEN EDGE (PAPER)"}</button>
+                <button onClick={deployPaperAgent} disabled={agentBusy} style={{ background: "#1a140a", color: "#fbbf24", border: "1px solid #4a3a1a", borderRadius: 5, padding: "10px 0", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: agentBusy ? "wait" : "pointer", letterSpacing: "0.04em", opacity: agentBusy ? 0.6 : 1 }}>{agentBusy ? "DEPLOYING…" : "🧪 PAPER-TEST BTC FUNDING FADE"}</button>
               </>
             )}
             {agentMsg && <div style={{ fontSize: 10, color: agentMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{agentMsg.text}</div>}

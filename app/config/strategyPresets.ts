@@ -18,10 +18,10 @@ export interface StrategyPreset {
 export const STRATEGY_PRESETS: StrategyPreset[] = [
   {
     id: "proven-edge",
-    name: "Proven Edge ⭐",
-    tag: "BACKTESTED",
-    accent: "#00ff88",
-    blurb: "Fade funding only when it hits a top-5% extreme vs its own history — then a breakeven stop makes the trade risk-free once it's +1%. The most selective setup we've backtested net-positive on BTC (profit factor ~1.2, fees in). Paper-test before going live.",
+    name: "BTC Funding Fade",
+    tag: "EXPERIMENTAL",
+    accent: "#fbbf24",
+    blurb: "Selective funding-fade on BTC: enters only when funding is a top-5% extreme, with a breakeven risk-free stop. Marginal in single-window tests but it does NOT hold up under our cross-market walk-forward — so we won't call it proven. Treat it as an experiment, PAPER only. We label what's validated and what isn't.",
     config: {
       symbols: ["PERP_BTC_USDC"], signalMode: "FUNDING_ONLY", leverage: 5, capitalPerTrade: 50,
       tpPercent: 1.5, slPercent: 0.75, maxHoldHours: 4, maxTradesPerDay: 4, maxDailyLossUsdc: 5,
