@@ -21,7 +21,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
     name: "Proven Edge ⭐",
     tag: "BACKTESTED",
     accent: "#00ff88",
-    blurb: "The config that backtests net-positive (60d BTC, fees on): fade funding ONLY when it's top-5% extreme vs history, then a breakeven stop locks the trade risk-free once it's +1%. ~+$6.6 net, PF 1.21. Paper-test before going live.",
+    blurb: "Fade funding only when it hits a top-5% extreme vs its own history — then a breakeven stop makes the trade risk-free once it's +1%. The most selective setup we've backtested net-positive on BTC (profit factor ~1.2, fees in). Paper-test before going live.",
     config: {
       symbols: ["PERP_BTC_USDC"], signalMode: "FUNDING_ONLY", leverage: 5, capitalPerTrade: 50,
       tpPercent: 1.5, slPercent: 0.75, maxHoldHours: 4, maxTradesPerDay: 4, maxDailyLossUsdc: 5,
