@@ -61,6 +61,27 @@ test("oiSeriesInfo: samples + day-span coverage", () => {
   assert.deepEqual(oiSeriesInfo([{ t: 0, oi: 0 }, { t: day, oi: NaN }]), { samples: 0, days: 0 });
 });
 
+import { atrPctAt } from "../../workers/nexus-lab-api/backtest.mjs";
+test("atrPctAt: no-lookahead rolling ATR% (null until enough prior candles)", () => {
+  // constant 2-wide bars around a ~100 close → ATR ≈ 2, ATR% ≈ 2%.
+  const candles = Array.from({ length: 20 }, (_, i) => ({ t: i * 3600, o: 100, h: 101, l: 99, c: 100 }));
+  assert.equal(atrPctAt(candles, 2), null, "too few prior candles → null");
+  const a = atrPctAt(candles, 18);
+  assert.ok(a > 1.8 && a < 2.2, `expected ~2%, got ${a}`);
+});
+
+test("runBacktest: volScaledStops overrides the fixed stop from ATR", () => {
+  // A momentum uptrend; compare fixed tight stop vs vol-scaled. Just assert the
+  // vol-scaled run produces a DIFFERENT result (the ATR stop replaced the fixed one).
+  const closes = [100]; for (let i = 0; i < 30; i++) closes.push(closes[closes.length - 1] * 1.008);
+  const candles = closes.map((c, i) => ({ t: 1_700_000_000 + i * 3600, o: c, h: c * 1.004, l: c * 0.996, c }));
+  const base = { signalMode: "MOMENTUM", priceChangeThreshold: 0.5, tpPercent: 1.5, slPercent: 0.75, maxHoldHours: 8, leverage: 1, capitalPerTrade: 100 };
+  const fixed = runBacktest(candles, noFunding, base);
+  const scaled = runBacktest(candles, noFunding, { ...base, volScaledStops: true, slAtrMult: 1.0 });
+  assert.ok(scaled.trades > 0, "vol-scaled still trades");
+  assert.notEqual(scaled.avgPnlPct, fixed.avgPnlPct, "ATR stop should change the exit vs fixed");
+});
+
 test("runBacktest: CONFLUENCE fires only with an oiChangeAt that agrees with funding", () => {
   // i=1 price falls (priceChange<0) while funding is deeply negative (→ funding says
   // LONG) and OI is RISING (oiChange>0) → LONG divergence agrees → CONFLUENCE LONG.

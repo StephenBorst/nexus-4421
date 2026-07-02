@@ -9,8 +9,24 @@
 // NOT (only current). So oiChange is fed as 0 → CONFLUENCE / OI_ONLY are inert here;
 // MOMENTUM / MEAN_REVERSION / FUNDING_ONLY + the full exit toolkit are backtestable.
 import { deriveSignal } from "../nexus-agent-brain/logic.mjs";
-import { computePnl, evaluateExit, breakevenArmed } from "../nexus-agent-exec/logic.mjs";
+import { computePnl, evaluateExit, breakevenArmed, volScaledLevels } from "../nexus-agent-exec/logic.mjs";
 import { percentileRank } from "./logic.mjs";
+
+// Rolling ATR% at candle index i, from the `periods` candles BEFORE i (no lookahead).
+// Mirrors the exec's live fetchAtrPct (ATR as a % of price) so a vol-scaled-stops
+// backtest matches how the agent actually sets its stop at entry. Returns null when
+// there isn't enough history yet → caller falls back to the fixed config stop.
+export function atrPctAt(candles, i, periods = 14) {
+  const start = Math.max(1, i - periods);
+  if (i - start < 3) return null;
+  let trSum = 0, cnt = 0;
+  for (let k = start; k < i; k++) {
+    const tr = Math.max(candles[k].h - candles[k].l, Math.abs(candles[k].h - candles[k - 1].c), Math.abs(candles[k].l - candles[k - 1].c));
+    if (Number.isFinite(tr)) { trSum += tr; cnt++; }
+  }
+  const lastClose = candles[i - 1].c;
+  return cnt && lastClose > 0 ? (trSum / cnt / lastClose) * 100 : null;
+}
 
 // Build a NO-LOOKAHEAD funding-percentile lookup from raw funding rows
 // ([{ts(ms), rate}]). At candle time t it ranks the current rate against only the
@@ -67,13 +83,20 @@ export function runBacktest(candles, fundingAt, config, fundingPctAt = null, oiC
   let lastExitIdx = -Infinity;
   const cooldownBars = Number.isFinite(config.cooldownBars) ? config.cooldownBars : 1;
 
-  const openTrade = (direction, price, t) => ({
+  const openTrade = (direction, price, t, lvl = null) => ({
     direction, entry: price, entryT: t, remaining: 1, realized: 0,
-    state: { tpPercent: config.tpPercent, slPercent: config.slPercent, takeProfits: config.takeProfits, tp_hits: [], peak_pnl_pct: 0 },
+    // Vol-scaled stops (opt-in) override the single tp/sl per-position; an explicit
+    // takeProfits ladder still takes over TP — exactly matching the live exec, which
+    // vol-scales the SL + single-TP fallback but passes config.takeProfits through.
+    state: {
+      tpPercent: lvl ? lvl.tpPercent : config.tpPercent,
+      slPercent: lvl ? lvl.slPercent : config.slPercent,
+      takeProfits: config.takeProfits, tp_hits: [], peak_pnl_pct: 0,
+    },
   });
   const record = (p, exitPrice, reason, exitT) => {
     const { pnlPct } = computePnl(p.direction, p.entry, exitPrice, 1);
-    trades.push({ direction: p.direction, entry: p.entry, exit: exitPrice, reason, pnlPct: p.realized + pnlPct * p.remaining, holdH: (exitT - p.entryT) / 3600 });
+    trades.push({ direction: p.direction, entry: p.entry, exit: exitPrice, reason, pnlPct: p.realized + pnlPct * p.remaining, holdH: (exitT - p.entryT) / 3600, entryT: p.entryT });
   };
 
   for (let i = 1; i < candles.length; i++) {
@@ -110,10 +133,22 @@ export function runBacktest(candles, fundingAt, config, fundingPctAt = null, oiC
       const raw = { priceChange, oiChange, fundingRate: fundingAt(c.t) || 0, hasPrev: true };
       if (fundingPctAt && (config.fundingPercentileMin || 0) > 0) raw.fundingPct = fundingPctAt(c.t, raw.fundingRate);
       const sig = deriveSignal(raw, config);
-      if (sig.direction && sig.direction !== "NONE" && (sig.confidence ?? 0) >= 50) pos = openTrade(sig.direction, c.c, c.t);
+      if (sig.direction && sig.direction !== "NONE" && (sig.confidence ?? 0) >= 50) {
+        // Vol-scaled stops: size the stop to recent ATR at entry (no lookahead),
+        // preserving the configured reward:risk. Falls back to fixed when ATR unavailable.
+        let lvl = null;
+        if (config.volScaledStops) {
+          const atrPct = atrPctAt(candles, i);
+          if (Number.isFinite(atrPct) && atrPct > 0) lvl = volScaledLevels(atrPct, config);
+        }
+        pos = openTrade(sig.direction, c.c, c.t, lvl);
+      }
     }
   }
-  return aggregate(trades, config);
+  // Attach the per-trade detail (entryT + %) so a walk-forward validator can bucket
+  // REAL trades by entry time — no fold-boundary artifacts. Additive; existing callers
+  // read the summary fields and ignore _trades.
+  return { ...aggregate(trades, config), _trades: trades };
 }
 
 export function aggregate(trades, config = {}) {
@@ -243,7 +278,8 @@ export async function backtestConfig(config, { symbols, days }, oiHistBySymbol =
     const oiRows = oiHistBySymbol[symbol];
     const oiChangeAt = oiRows && oiRows.length >= 2 ? makeOiChangeAt(oiRows) : null;
     const r = runBacktest(candles, funding.at, { feeBps: DEFAULT_FEE_BPS, ...config }, makeFundingPctAt(funding.rows), oiChangeAt);
-    perSymbol.push({ symbol, candles: candles.length, ...r });
+    const { _trades, ...summary } = r; // don't leak the full trade list into the API response
+    perSymbol.push({ symbol, candles: candles.length, ...summary });
     net += r.netUsd; trades += r.trades; wins += Math.round((r.winRate / 100) * r.trades);
   }
   return {
