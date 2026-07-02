@@ -352,7 +352,7 @@ function CopyModal({
         {/* Attribution preview */}
         <div style={{ marginBottom: 14, padding: 8, background: "#080c08", borderRadius: 3, border: "1px solid #1a2e1a" }}>
           <div style={labelStyle}>ATTRIBUTION (auto-added to notes)</div>
-          <div style={{ fontFamily: "monospace", fontSize: 9, color: "#5a8a6a", lineHeight: 1.5 }}>
+          <div style={{ fontFamily: "monospace", fontSize: 9, color: "#8aaa9a", lineHeight: 1.5 }}>
             📋 Copied from {traderName}
           </div>
         </div>
@@ -552,7 +552,7 @@ function FeedCard({
         </span>
         {(thesis.copyCount ?? 0) > 0 && (
           <span style={{
-            fontFamily: "monospace", fontSize: 9, color: "#5a8a6a",
+            fontFamily: "monospace", fontSize: 9, color: "#8aaa9a",
             background: "#0a1a0a", border: "1px solid #1a3a1a",
             borderRadius: 3, padding: "2px 6px",
           }}>
@@ -629,7 +629,7 @@ function FeedCard({
       {/* Notes */}
       {thesis.notes && (
         <div style={{
-          fontFamily: "monospace", fontSize: 10, color: "#5a8a6a",
+          fontFamily: "monospace", fontSize: 10, color: "#8aaa9a",
           borderTop: "1px solid #1a2e1a", paddingTop: 8, marginTop: 4,
           lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word",
         }}>
@@ -892,7 +892,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                   <NexusTierBadge address={trader.wallet} />
                 </div>
                 {trader.graded ? (
-                  <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a6a4a", marginTop: 2 }}>
+                  <div style={{ fontFamily: "monospace", fontSize: 9, color: "#4a7a5a", marginTop: 2 }}>
                     {trader.graded.hitRate.toFixed(0)}% hit · {trader.graded.avgR > 0 ? "+" : ""}{trader.graded.avgR.toFixed(2)}R · {trader.graded.calls} graded calls
                   </div>
                 ) : (
@@ -969,20 +969,8 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                 {/* Profile link */}
                 <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
                   <button
+                    className="nx-btn nx-btn-icon"
                     onClick={(e) => { e.stopPropagation(); navigate(`/feed/trader/${trader.wallet}`); }}
-                    style={{
-                      background: "none", border: "1px solid #1a2e1a", borderRadius: 3,
-                      color: "#3a5a4a", fontFamily: "monospace", fontSize: 9,
-                      padding: "3px 8px", cursor: "pointer", letterSpacing: "0.05em",
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = "#00ff88";
-                      (e.currentTarget as HTMLButtonElement).style.color = "#00ff88";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a2e1a";
-                      (e.currentTarget as HTMLButtonElement).style.color = "#3a5a4a";
-                    }}
                   >
                     VIEW PROFILE →
                   </button>
@@ -1024,7 +1012,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                           onClick={(e) => { e.stopPropagation(); onCopy(t); }}
                           style={{
                             background: "none", border: "1px solid #1a3a1a", borderRadius: 3,
-                            color: "#3a6a4a", fontFamily: "monospace", fontSize: 8,
+                            color: "#4a7a5a", fontFamily: "monospace", fontSize: 8,
                             padding: "2px 6px", cursor: "pointer",
                           }}
                         >COPY</button>
@@ -1060,7 +1048,7 @@ function FeedEmptyState({ variant }: { variant: "feed" | "ranks" }) {
       <div style={{ fontFamily: "monospace", fontSize: 20, color: "#fff", fontWeight: "bold", marginBottom: 8, letterSpacing: "0.02em" }}>
         {isRanks ? "The leaderboard is wide open." : "The signal starts here."}
       </div>
-      <div style={{ fontFamily: "monospace", fontSize: 12, color: "#5a7a6a", lineHeight: 1.6, marginBottom: 26 }}>
+      <div style={{ fontFamily: "monospace", fontSize: 12, color: "#8aaa9a", lineHeight: 1.6, marginBottom: 26 }}>
         {isRanks
           ? "No traders ranked yet — rankings build as theses get published and closed out. Publish yours and claim rank #1."
           : "No public theses yet. Publish one from your Lab and it lands in the live feed — others can follow, copy, and grade it. Be the first signal."}
@@ -1104,7 +1092,7 @@ function ContributePrompt({ prominent = false }: { prominent?: boolean }) {
         <div style={{ fontFamily: "monospace", fontSize: prominent ? 14 : 12, color: "#00ff88", fontWeight: "bold", marginBottom: 4 }}>
           {prominent ? "📡 Be the first verified caller on Nexus" : "📡 The feed's still early — claim your spot"}
         </div>
-        <div style={{ fontFamily: "monospace", fontSize: prominent ? 11 : 10, color: "#7a9a8a", lineHeight: 1.6 }}>
+        <div style={{ fontFamily: "monospace", fontSize: prominent ? 11 : 10, color: "#8aaa9a", lineHeight: 1.6 }}>
           {prominent
             ? "Post a call (symbol · direction · entry/stop/target) — it's graded against public price on-chain, not self-reported. 5 graded calls = Verified Caller. Get in before the board fills up."
             : "Publish a thesis and it's graded against public price, on-chain. Early callers build rep fastest — get to 5 graded calls and you're a Verified Caller."}
@@ -1150,7 +1138,7 @@ function AgentTrackRecord() {
     >
       <div style={{ flexShrink: 0 }}>
         <div style={{ fontFamily: "monospace", fontSize: 12, color: "#00ff88", fontWeight: "bold" }}>🤖 NEXUS AUTONOMOUS AGENT</div>
-        <div style={{ fontFamily: "monospace", fontSize: 8.5, color: "#3a6a4a", marginTop: 2 }}>
+        <div style={{ fontFamily: "monospace", fontSize: 8.5, color: "#4a7a5a", marginTop: 2 }}>
           {s.anchored ? "⛓ trustless · on-chain-anchored track record" : "trustless · publicly graded track record"}
         </div>
       </div>
