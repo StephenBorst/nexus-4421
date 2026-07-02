@@ -85,7 +85,7 @@ function NewsTab() {
           {loading
             ? <span style={{ color: TEAL, fontSize: 10 }}>⟳ CONNECTING</span>
             : <span style={{ color: DIM, fontSize: 10 }}>REFRESH {countdown}s</span>}
-          <button onClick={load} style={{ background: "none", border: "1px solid rgba(255,255,255,0.1)", color: MUTED, fontFamily: "monospace", fontSize: 10, padding: "2px 8px", cursor: "pointer" }}>↻</button>
+          <button onClick={load} style={{ background: "none", border: "1px solid rgba(255,255,255,0.1)", color: MUTED, fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "2px 8px", cursor: "pointer" }}>↻</button>
         </div>
       </div>
 
@@ -96,7 +96,7 @@ function NewsTab() {
             background: filter === c ? "rgba(56,210,199,0.08)" : "none",
             border: `1px solid ${filter === c ? TEAL : "rgba(255,255,255,0.08)"}`,
             color: filter === c ? TEAL : DIM,
-            fontFamily: "monospace", fontSize: 10,
+            fontFamily: "var(--nx-font-mono)", fontSize: 10,
             padding: "3px 9px", cursor: "pointer", letterSpacing: "0.06em",
           }}>{c}</button>
         ))}

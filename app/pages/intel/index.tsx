@@ -395,7 +395,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
           <span style={{ color: sigC, fontSize: "11px" }}>{sig}</span>
           <button onClick={() => deployToAgent({ symbols: [`PERP_${sym}_USDC`] }, `the ${sym} funding read`)}
             title={`Set the trading agent to watch ${sym} — the same funding/OI edge it trades on`}
-            style={{ marginLeft: "auto", background: "none", border: "1px solid #3a2a0a", color: "#ff8800", fontFamily: "monospace", fontSize: "9px", letterSpacing: "0.05em", padding: "3px 8px", borderRadius: "3px", cursor: "pointer" }}>
+            style={{ marginLeft: "auto", background: "none", border: "1px solid #3a2a0a", color: "#ff8800", fontFamily: "var(--nx-font-mono)", fontSize: "9px", letterSpacing: "0.05em", padding: "3px 8px", borderRadius: "3px", cursor: "pointer" }}>
             ⚡ AGENT
           </button>
         </div>

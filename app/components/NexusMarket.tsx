@@ -76,7 +76,7 @@ export function NexusMarket() {
     <div style={{
       display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap",
       padding: "12px 16px", background: C.surfaceAlt, border: `1px solid ${C.border}`,
-      borderRadius: 4, fontFamily: "monospace",
+      borderRadius: 4, fontFamily: "var(--nx-font-mono)",
     }}>
       <span style={{ fontSize: 11, fontWeight: "bold", color: C.accent, letterSpacing: "0.1em" }}>$NEXUS</span>
       <Stat label="PRICE" value={price(m.price)} />

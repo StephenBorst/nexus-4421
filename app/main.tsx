@@ -7,6 +7,11 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { withBasePath } from './utils/base-path';
 import { getRuntimeConfig } from './utils/runtime-config';
 
+// Self-hosted IBM Plex Mono (bundled, no external CDN) — the app-wide terminal
+// typeface. Weights match the design system (400 body, 500/600 emphasis).
+import '@fontsource/ibm-plex-mono/400.css';
+import '@fontsource/ibm-plex-mono/500.css';
+import '@fontsource/ibm-plex-mono/600.css';
 import './styles/index.css';
 
 const IndexPage = lazy(() => import('./pages/Index'));

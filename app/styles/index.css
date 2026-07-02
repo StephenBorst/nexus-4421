@@ -81,6 +81,7 @@ html, body {
   --nx-accent: #00ff88; --nx-neg: #ff4444; --nx-warn: #fbbf24; --nx-info: #4a9fff;
   --nx-r-sm: 3px; --nx-r-md: 6px; --nx-r-lg: 8px;
   --nx-dur: 170ms; --nx-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --nx-font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 }
 
 .nx-card {
@@ -93,12 +94,12 @@ html, body {
 .nx-card-interactive:hover { border-color: var(--nx-border-strong); }
 
 .nx-label {
-  font-family: monospace; font-size: 9px; letter-spacing: 0.12em;
+  font-family: var(--nx-font-mono); font-size: 9px; letter-spacing: 0.12em;
   text-transform: uppercase; color: var(--nx-muted);
 }
 
 .nx-btn {
-  font-family: monospace; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
+  font-family: var(--nx-font-mono); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
   color: var(--nx-muted); background: none;
   border: 1px solid var(--nx-border); border-radius: var(--nx-r-sm);
   padding: 8px 16px; cursor: pointer;
@@ -124,12 +125,12 @@ html, body {
 .nx-btn.is-active:hover { color: var(--nx-accent); border-color: var(--nx-accent); background: #0a1f0e; }
 
 .nx-badge {
-  font-family: monospace; font-size: 9px; letter-spacing: 0.05em;
+  font-family: var(--nx-font-mono); font-size: 9px; letter-spacing: 0.05em;
   border: 1px solid var(--nx-border); border-radius: var(--nx-r-sm); padding: 2px 6px;
 }
 
 .nx-input {
-  font-family: monospace; font-size: 12px; color: var(--nx-bright);
+  font-family: var(--nx-font-mono); font-size: 12px; color: var(--nx-bright);
   background: var(--nx-inset); border: 1px solid var(--nx-border);
   border-radius: var(--nx-r-sm); padding: 8px 10px; outline: none; width: 100%;
   box-sizing: border-box;

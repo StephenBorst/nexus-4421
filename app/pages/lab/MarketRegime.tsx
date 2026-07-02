@@ -62,13 +62,13 @@ export function MarketRegime() {
 
   return (
     <div style={{ ...cardStyle, marginBottom: 14 }}>
-      <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "monospace" }}>
+      <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>
         &#9632; MARKET REGIME <span style={{ color: "#4a7a5a" }}>— live, computed</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 16, alignItems: "center" }}>
         <div style={{ textAlign: "center", minWidth: 120 }}>
-          <div style={{ fontSize: 40, fontWeight: "bold", fontFamily: "monospace", color: regime.color, lineHeight: 1 }}>{regime.score}</div>
-          <div style={{ fontSize: 12, fontFamily: "monospace", color: regime.color, letterSpacing: "0.1em", marginTop: 4 }}>{regime.label}</div>
+          <div style={{ fontSize: 40, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: regime.color, lineHeight: 1 }}>{regime.score}</div>
+          <div style={{ fontSize: 12, fontFamily: "var(--nx-font-mono)", color: regime.color, letterSpacing: "0.1em", marginTop: 4 }}>{regime.label}</div>
           <div style={{ height: 4, background: "#1a2e1a", borderRadius: 2, marginTop: 8 }}>
             <div style={{ height: 4, background: regime.color, borderRadius: 2, width: `${regime.score}%` }} />
           </div>
@@ -76,19 +76,19 @@ export function MarketRegime() {
         <div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: 8, marginBottom: 10 }}>
             <div>
-              <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>BREADTH</div>
-              <div style={{ fontSize: 16, color: regime.breadth >= 50 ? "#00ff88" : "#ff4c6a", fontFamily: "monospace" }}>{regime.breadth}% up</div>
+              <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>BREADTH</div>
+              <div style={{ fontSize: 16, color: regime.breadth >= 50 ? "#00ff88" : "#ff4c6a", fontFamily: "var(--nx-font-mono)" }}>{regime.breadth}% up</div>
             </div>
             <div>
-              <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>BTC 24H</div>
-              <div style={{ fontSize: 16, color: regime.btcChg >= 0 ? "#00ff88" : "#ff4c6a", fontFamily: "monospace" }}>{regime.btcChg >= 0 ? "+" : ""}{regime.btcChg.toFixed(2)}%</div>
+              <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>BTC 24H</div>
+              <div style={{ fontSize: 16, color: regime.btcChg >= 0 ? "#00ff88" : "#ff4c6a", fontFamily: "var(--nx-font-mono)" }}>{regime.btcChg >= 0 ? "+" : ""}{regime.btcChg.toFixed(2)}%</div>
             </div>
             <div>
-              <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>FUNDING SKEW</div>
-              <div style={{ fontSize: 16, color: "#fbbf24", fontFamily: "monospace" }}>{regime.fundSkew}% long</div>
+              <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>FUNDING SKEW</div>
+              <div style={{ fontSize: 16, color: "#fbbf24", fontFamily: "var(--nx-font-mono)" }}>{regime.fundSkew}% long</div>
             </div>
           </div>
-          <div style={{ fontSize: 11, color: "#6a8a7a", fontFamily: "monospace", lineHeight: 1.5, borderTop: "1px solid #1a2e1a", paddingTop: 8 }}>
+          <div style={{ fontSize: 11, color: "#6a8a7a", fontFamily: "var(--nx-font-mono)", lineHeight: 1.5, borderTop: "1px solid #1a2e1a", paddingTop: 8 }}>
             <span style={{ color: "#4a7a5a" }}>▶ agent:</span> {regime.agentNote}
           </div>
         </div>

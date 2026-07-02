@@ -66,9 +66,9 @@ export function MiniPriceChart({ symbol, height = 96 }: { symbol: string; height
   return (
     <div ref={wrapRef} style={{ width: "100%" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-        <span style={{ fontFamily: "monospace", fontSize: 9, letterSpacing: "0.1em", color: "#3a6a4a" }}>24H · 15m</span>
+        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.1em", color: "#4a7a5a" }}>24H · 15m</span>
         {changePct != null && (
-          <span style={{ fontFamily: "monospace", fontSize: 11, fontWeight: "bold", color }}>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", color }}>
             {changePct >= 0 ? "+" : ""}{changePct.toFixed(2)}%
           </span>
         )}

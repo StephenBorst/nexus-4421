@@ -26,7 +26,7 @@ function pickDefaultModel(provider: ProviderId, ids: string[]): string {
 }
 
 const AGENT_API = "https://og.nexustradinglabs.com";
-const mono = "monospace";
+const mono = "var(--nx-font-mono)";
 const GREEN = "#00ff88";
 
 type DisplayMsg = ChatMsg & { tools?: string[] };
@@ -75,7 +75,7 @@ function renderRich(text: string): React.ReactNode {
       out.push(
         <table key={i} style={{ borderCollapse: "collapse", margin: "4px 0", fontSize: 10 }}>
           <thead><tr>{header.map((h, k) => (
-            <th key={k} style={{ textAlign: "left", color: "#5a8a6a", borderBottom: "1px solid #1a2e1a", padding: "2px 8px 2px 0", fontWeight: "bold" }}>{inline(h)}</th>
+            <th key={k} style={{ textAlign: "left", color: "#8aaa9a", borderBottom: "1px solid #1a2e1a", padding: "2px 8px 2px 0", fontWeight: "bold" }}>{inline(h)}</th>
           ))}</tr></thead>
           <tbody>{rows.map((r, ri) => (
             <tr key={ri}>{r.map((c, ci) => (
@@ -489,7 +489,7 @@ export default function NexusAssistant() {
           <span style={{ color: GREEN, textShadow: "0 0 10px rgba(0,255,136,0.5)" }}>//</span>
           <span style={{ color: "#fff" }}> NEXUS AI</span>
         </span>
-        <span style={{ fontFamily: mono, fontSize: 8, color: "#3a6a4a" }}>{hostedActive ? `Hosted · ${HOSTED_TIERS.find((t) => t.id === hostedModel)?.label ?? hostedModel}` : `${PROVIDERS[provider].label.split(" ")[0]} · ${model}`}</span>
+        <span style={{ fontFamily: mono, fontSize: 8, color: "#4a7a5a" }}>{hostedActive ? `Hosted · ${HOSTED_TIERS.find((t) => t.id === hostedModel)?.label ?? hostedModel}` : `${PROVIDERS[provider].label.split(" ")[0]} · ${model}`}</span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
           <button onClick={() => setView(view === "settings" ? "chat" : "settings")} title="Settings"
             style={btn(view === "settings")}>⚙</button>
@@ -513,7 +513,7 @@ export default function NexusAssistant() {
           {/* Messages */}
           <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
             {messages.length === 0 && (
-              <div style={{ fontFamily: mono, fontSize: 10, color: "#3a6a4a", lineHeight: 1.7 }}>
+              <div style={{ fontFamily: mono, fontSize: 10, color: "#4a7a5a", lineHeight: 1.7 }}>
                 {ready
                   ? "Ask about your theses, agent, the market, or a trade idea. I can see your live session context."
                   : "Start with Nexus Hosted (PRO — no key needed) or bring your own API key. Tap ⚙ to set it up."}
@@ -543,7 +543,7 @@ export default function NexusAssistant() {
             {messages.map((m, i) => (
               <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%", display: "flex", flexDirection: "column", gap: 4 }}>
                 {m.tools && m.tools.length > 0 && (
-                  <div style={{ fontFamily: mono, fontSize: 8, color: "#3a6a4a", letterSpacing: "0.04em" }}>
+                  <div style={{ fontFamily: mono, fontSize: 8, color: "#4a7a5a", letterSpacing: "0.04em" }}>
                     ⚡ {[...new Set(m.tools)].join(" · ")}
                   </div>
                 )}
@@ -560,7 +560,7 @@ export default function NexusAssistant() {
               </div>
             ))}
             {loading && !messages[messages.length - 1]?.content && (
-              <div style={{ fontFamily: mono, fontSize: 10, color: "#3a6a4a" }}>thinking…</div>
+              <div style={{ fontFamily: mono, fontSize: 10, color: "#4a7a5a" }}>thinking…</div>
             )}
             {error && <div style={{ fontFamily: mono, fontSize: 10, color: "#ff6b6b", lineHeight: 1.5 }}>⚠ {error}</div>}
           </div>
@@ -616,7 +616,7 @@ function CopyBtn({ text }: { text: string }) {
 function btn(active: boolean): React.CSSProperties {
   return {
     background: active ? "#0a1a0a" : "none", border: `1px solid ${active ? "#00ff88" : "#1a2e1a"}`,
-    borderRadius: 3, color: active ? "#00ff88" : "#5a8a6a", fontFamily: mono, fontSize: 11,
+    borderRadius: 3, color: active ? "#00ff88" : "#8aaa9a", fontFamily: mono, fontSize: 11,
     width: 24, height: 24, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
   };
 }
@@ -641,8 +641,8 @@ function SettingsView({
       <div style={{ border: `1px solid ${useHosted && isPro ? GREEN : "#1a2e1a"}`, borderRadius: 6, padding: 12, background: "#0a120a" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <div>
-            <div style={{ fontFamily: mono, fontSize: 11, color: GREEN, fontWeight: "bold" }}>◆ NEXUS HOSTED <span style={{ color: "#5a8a6a", fontWeight: "normal" }}>· PRO</span></div>
-            <div style={{ fontFamily: mono, fontSize: 9, color: "#5a8a6a", lineHeight: 1.5, marginTop: 3 }}>
+            <div style={{ fontFamily: mono, fontSize: 11, color: GREEN, fontWeight: "bold" }}>◆ NEXUS HOSTED <span style={{ color: "#8aaa9a", fontWeight: "normal" }}>· PRO</span></div>
+            <div style={{ fontFamily: mono, fontSize: 9, color: "#8aaa9a", lineHeight: 1.5, marginTop: 3 }}>
               {isPro ? "Run NEXUS AI with no API key — we host it. One wallet signature per session." : "Hosted AI is a PRO benefit. Subscribe or hold ARCHITECT $NEXUS to enable."}
             </div>
           </div>
@@ -655,7 +655,7 @@ function SettingsView({
               cursor: isPro ? "pointer" : "default",
               background: useHosted && isPro ? "#00ff8815" : "#0d120d",
               border: `1px solid ${useHosted && isPro ? GREEN : "#1a2e1a"}`,
-              color: !isPro ? "#3a5a4a" : useHosted ? GREEN : "#5a8a6a",
+              color: !isPro ? "#3a5a4a" : useHosted ? GREEN : "#8aaa9a",
             }}>
             {useHosted && isPro ? "ON" : "OFF"}
           </button>
@@ -664,7 +664,7 @@ function SettingsView({
         {/* Model tier — stronger model = lower daily cap, cheaper = higher cap. */}
         {useHosted && isPro && (
           <div style={{ marginTop: 12, borderTop: "1px solid #1a2e1a", paddingTop: 10 }}>
-            <div style={{ fontFamily: mono, fontSize: 8, color: "#5a8a6a", letterSpacing: "0.12em", marginBottom: 6 }}>MODEL TIER · DAILY CAP</div>
+            <div style={{ fontFamily: mono, fontSize: 8, color: "#8aaa9a", letterSpacing: "0.12em", marginBottom: 6 }}>MODEL TIER · DAILY CAP</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               {HOSTED_TIERS.map((t) => {
                 const on = hostedModel === t.id;
@@ -677,9 +677,9 @@ function SettingsView({
                     }}>
                     <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                       <span style={{ fontFamily: mono, fontSize: 10, color: on ? GREEN : "#7aaa8a", fontWeight: "bold" }}>{t.label}</span>
-                      <span style={{ fontFamily: mono, fontSize: 8, color: "#5a8a6a" }}>{t.note}</span>
+                      <span style={{ fontFamily: mono, fontSize: 8, color: "#8aaa9a" }}>{t.note}</span>
                     </span>
-                    <span style={{ fontFamily: mono, fontSize: 10, color: on ? GREEN : "#5a8a6a", fontWeight: "bold", flexShrink: 0 }}>{t.cap}/day</span>
+                    <span style={{ fontFamily: mono, fontSize: 10, color: on ? GREEN : "#8aaa9a", fontWeight: "bold", flexShrink: 0 }}>{t.cap}/day</span>
                   </button>
                 );
               })}
@@ -701,7 +701,7 @@ function SettingsView({
               style={{
                 flex: 1, background: provider === p ? "#0a1a0a" : "#0d120d",
                 border: `1px solid ${provider === p ? GREEN : "#1a2e1a"}`, borderRadius: 4,
-                color: provider === p ? GREEN : "#5a8a6a", fontFamily: mono, fontSize: 10, padding: "7px 6px", cursor: "pointer",
+                color: provider === p ? GREEN : "#8aaa9a", fontFamily: mono, fontSize: 10, padding: "7px 6px", cursor: "pointer",
               }}>
               {PROVIDERS[p].label}
             </button>
@@ -716,14 +716,14 @@ function SettingsView({
               style={{
                 background: model === mdl ? "#0a1a0a" : "#0d120d",
                 border: `1px solid ${model === mdl ? GREEN : "#1a2e1a"}`, borderRadius: 4,
-                color: model === mdl ? GREEN : "#5a8a6a", fontFamily: mono, fontSize: 9, padding: "5px 9px", cursor: "pointer",
+                color: model === mdl ? GREEN : "#8aaa9a", fontFamily: mono, fontSize: 9, padding: "5px 9px", cursor: "pointer",
               }}>
               {mdl}
             </button>
           ))}
         </div>
         {!availableModels.length && (
-          <div style={{ fontFamily: mono, fontSize: 8, color: "#3a6a4a" }}>
+          <div style={{ fontFamily: mono, fontSize: 8, color: "#4a7a5a" }}>
             Enter your key below to load your account's exact model list.
           </div>
         )}
@@ -753,7 +753,7 @@ function SettingsView({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <div style={{ fontFamily: mono, fontSize: 8, color: "#3a6a4a", letterSpacing: "0.1em" }}>{label}</div>
+      <div style={{ fontFamily: mono, fontSize: 8, color: "#4a7a5a", letterSpacing: "0.1em" }}>{label}</div>
       {children}
     </div>
   );

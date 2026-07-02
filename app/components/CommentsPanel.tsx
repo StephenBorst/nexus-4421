@@ -117,8 +117,8 @@ export default function CommentsPanel({
                 background: reacted ? "#0a1a0a" : "#080c08",
                 border: `1px solid ${reacted ? "#00ff88" : "#1a2e1a"}`,
                 borderRadius: 20,
-                color: reacted ? "#00ff88" : "#5a8a6a",
-                fontFamily: "monospace",
+                color: reacted ? "#00ff88" : "#8aaa9a",
+                fontFamily: "var(--nx-font-mono)",
                 fontSize: 13,
                 padding: "3px 10px",
                 cursor: walletAddress ? "pointer" : "default",
@@ -129,7 +129,7 @@ export default function CommentsPanel({
             >
               {emoji}
               {wallets.length > 0 && (
-                <span style={{ fontSize: 10, color: reacted ? "#00ff88" : "#5a8a6a" }}>
+                <span style={{ fontSize: 10, color: reacted ? "#00ff88" : "#8aaa9a" }}>
                   {wallets.length}
                 </span>
               )}
@@ -140,12 +140,12 @@ export default function CommentsPanel({
 
       {/* Comment list */}
       {loading ? (
-        <div style={{ fontFamily: "monospace", fontSize: 10, color: "#2a4a3a", paddingBottom: 10 }}>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#2a4a3a", paddingBottom: 10 }}>
           loading...
         </div>
       ) : comments.length === 0 ? (
         <div style={{
-          fontFamily: "monospace", fontSize: 10, color: "#2a4a3a",
+          fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#2a4a3a",
           textAlign: "center", padding: "8px 0 12px",
         }}>
           No comments yet.
@@ -168,7 +168,7 @@ export default function CommentsPanel({
                   display: "flex", justifyContent: "space-between",
                   alignItems: "center", marginBottom: 3,
                 }}>
-                  <span style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>
+                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a" }}>
                     {shortWallet(c.wallet)}
                     <span style={{ marginLeft: 8, color: "#2a4a3a" }}>
                       {relativeTime(c.createdAt)}
@@ -181,7 +181,7 @@ export default function CommentsPanel({
                       style={{
                         background: "none", border: "none",
                         color: "#3a5a4a", cursor: "pointer",
-                        fontFamily: "monospace", fontSize: 10,
+                        fontFamily: "var(--nx-font-mono)", fontSize: 10,
                         padding: 0, lineHeight: 1,
                       }}
                     >
@@ -190,7 +190,7 @@ export default function CommentsPanel({
                   )}
                 </div>
                 <div style={{
-                  fontFamily: "monospace", fontSize: 11, color: "#8aaa9a",
+                  fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#8aaa9a",
                   lineHeight: 1.5, wordBreak: "break-word",
                 }}>
                   {c.text}
@@ -221,7 +221,7 @@ export default function CommentsPanel({
                 border: "1px solid #1a2e1a",
                 borderRadius: 3,
                 color: "#00ff88",
-                fontFamily: "monospace",
+                fontFamily: "var(--nx-font-mono)",
                 fontSize: 11,
                 padding: "7px 10px",
                 paddingRight: 44,
@@ -232,7 +232,7 @@ export default function CommentsPanel({
             />
             <span style={{
               position: "absolute", bottom: 6, right: 8,
-              fontFamily: "monospace", fontSize: 9,
+              fontFamily: "var(--nx-font-mono)", fontSize: 9,
               color: text.length >= 260 ? "#fbbf24" : "#2a4a3a",
               pointerEvents: "none",
             }}>
@@ -240,7 +240,7 @@ export default function CommentsPanel({
             </span>
           </div>
           {err && (
-            <div style={{ fontFamily: "monospace", fontSize: 9, color: "#ff4444", marginTop: 4 }}>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ff4444", marginTop: 4 }}>
               {err}
             </div>
           )}
@@ -252,7 +252,7 @@ export default function CommentsPanel({
                 background: text.trim() && !submitting ? "#0a1a0a" : "#080c08",
                 border: `1px solid ${text.trim() && !submitting ? "#00ff88" : "#1a2e1a"}`,
                 color: text.trim() && !submitting ? "#00ff88" : "#2a4a3a",
-                fontFamily: "monospace",
+                fontFamily: "var(--nx-font-mono)",
                 fontSize: 10,
                 padding: "5px 14px",
                 cursor: text.trim() && !submitting ? "pointer" : "default",

@@ -101,7 +101,7 @@ export function ErrorBoundary() {
           borderRadius: '4px',
           marginBottom: '1rem',
           fontSize: '0.9rem',
-          fontFamily: 'monospace',
+          fontFamily: "var(--nx-font-mono)",
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
         }}>

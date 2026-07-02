@@ -24,10 +24,10 @@ export function CopiesView() {
   return (
     <div>
       <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #1a2e1a" }}>
-        <div style={{ fontSize: 10, color: "#00ff88", fontFamily: "monospace", letterSpacing: "0.12em", marginBottom: 4 }}>
+        <div style={{ fontSize: 10, color: "#00ff88", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.12em", marginBottom: 4 }}>
           &#9632; COPY HISTORY — {copiedTheses.length} {copiedTheses.length === 1 ? "thesis" : "theses"} copied
         </div>
-        <div style={{ fontSize: 11, color: "#3a5a4a", fontFamily: "monospace" }}>
+        <div style={{ fontSize: 11, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>
         </div>
       </div>
 
@@ -51,22 +51,22 @@ export function CopiesView() {
               }}>
                 {/* Header row */}
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-                  <span style={{ fontFamily: "monospace", fontSize: 15, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
+                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 15, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
                   <span style={{
-                    fontFamily: "monospace", fontSize: 11,
+                    fontFamily: "var(--nx-font-mono)", fontSize: 11,
                     color: t.direction === "LONG" ? "#00ff88" : "#ff4444",
                   }}>
                     {t.direction === "LONG" ? "↑" : "↓"} {t.direction}
                   </span>
                   <div style={{
-                    fontFamily: "monospace", fontSize: 9, padding: "2px 8px", borderRadius: 3,
+                    fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "2px 8px", borderRadius: 3,
                     background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color,
                   }}>
                     {cfg.label}
                   </div>
                   {t.actualPnl !== null && t.status !== "ACTIVE" && (
                     <span style={{
-                      fontFamily: "monospace", fontSize: 12, fontWeight: "bold",
+                      fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: "bold",
                       color: t.actualPnl >= 0 ? "#00ff88" : "#ff4444",
                     }}>
                       {t.actualPnl >= 0 ? "+" : ""}${t.actualPnl.toFixed(2)}
@@ -77,7 +77,7 @@ export function CopiesView() {
                       onClick={() => navigate(`/feed/trader/${t.copiedFromWallet}`)}
                       style={{
                         background: "none", border: "1px solid #1a2e1a", borderRadius: 3,
-                        color: "#3a5a4a", fontFamily: "monospace", fontSize: 9,
+                        color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 9,
                         padding: "2px 8px", cursor: "pointer", letterSpacing: "0.04em",
                       }}
                       onMouseEnter={(e) => {
@@ -104,8 +104,8 @@ export function CopiesView() {
                     { label: "MAX LOSS", val: `${t.riskPercent}% · $${(t.accountSize * t.riskPercent / 100).toFixed(0)}`, color: "#8aaa9a" as const },
                   ].map(({ label, val, color }) => (
                     <div key={label}>
-                      <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>{label}</div>
-                      <div style={{ fontSize: 11, color, fontFamily: "monospace" }}>{val}</div>
+                      <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
+                      <div style={{ fontSize: 11, color, fontFamily: "var(--nx-font-mono)" }}>{val}</div>
                     </div>
                   ))}
                 </div>

@@ -119,7 +119,7 @@ export default function ProfileAvatar() {
           }}
         >
           {/* Header */}
-          <div style={{ fontFamily: "monospace", fontSize: 9, letterSpacing: "0.12em", color: "#3a5a4a", marginBottom: 12 }}>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.12em", color: "#3a5a4a", marginBottom: 12 }}>
             ■ PROFILE
           </div>
 
@@ -145,15 +145,15 @@ export default function ProfileAvatar() {
               )}
             </div>
             <div>
-              <div style={{ fontFamily: "monospace", fontSize: 11, color: "#8aaa9a" }}>
+              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#8aaa9a" }}>
                 {nameInput || shortAddr}
               </div>
-              <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", marginTop: 2 }}>{shortAddr}</div>
+              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", marginTop: 2 }}>{shortAddr}</div>
             </div>
           </div>
 
           {/* Display name input */}
-          <label style={{ display: "block", fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", letterSpacing: "0.1em", marginBottom: 4 }}>
+          <label style={{ display: "block", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", letterSpacing: "0.1em", marginBottom: 4 }}>
             DISPLAY NAME
           </label>
           <input
@@ -168,7 +168,7 @@ export default function ProfileAvatar() {
               border: "1px solid #1a2e1a",
               borderRadius: 3,
               color: "#00ff88",
-              fontFamily: "monospace",
+              fontFamily: "var(--nx-font-mono)",
               fontSize: 11,
               padding: "6px 8px",
               outline: "none",
@@ -178,7 +178,7 @@ export default function ProfileAvatar() {
           />
 
           {/* PFP URL input */}
-          <label style={{ display: "block", fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", letterSpacing: "0.1em", marginBottom: 4 }}>
+          <label style={{ display: "block", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", letterSpacing: "0.1em", marginBottom: 4 }}>
             PFP IMAGE URL
           </label>
           <input
@@ -192,7 +192,7 @@ export default function ProfileAvatar() {
               border: "1px solid #1a2e1a",
               borderRadius: 3,
               color: "#00ff88",
-              fontFamily: "monospace",
+              fontFamily: "var(--nx-font-mono)",
               fontSize: 11,
               padding: "6px 8px",
               outline: "none",
@@ -210,7 +210,7 @@ export default function ProfileAvatar() {
                 background: "#0a2a0a",
                 border: "1px solid #1a4a2a",
                 color: saving ? "#3a5a4a" : "#00ff88",
-                fontFamily: "monospace",
+                fontFamily: "var(--nx-font-mono)",
                 fontSize: 10,
                 padding: "7px 0",
                 cursor: saving ? "default" : "pointer",
@@ -226,7 +226,7 @@ export default function ProfileAvatar() {
                 background: "none",
                 border: "1px solid #1a2e1a",
                 color: "#4a7a5a",
-                fontFamily: "monospace",
+                fontFamily: "var(--nx-font-mono)",
                 fontSize: 10,
                 padding: "7px 12px",
                 cursor: "pointer",

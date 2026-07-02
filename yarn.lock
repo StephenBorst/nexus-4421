@@ -2125,6 +2125,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@fontsource/ibm-plex-mono@npm:^5.2.7":
+  version: 5.2.7
+  resolution: "@fontsource/ibm-plex-mono@npm:5.2.7"
+  checksum: 10c0/b104ae0f8054def5e6edca395f9c41d9a15b17ceeea522573b1ef223311bfa0d8f0fe3e2d3a56ecea59ff3e3ceee571e16d1ee942093bac97a66c3b8a72eaca3
+  languageName: node
+  linkType: hard
+
 "@formatjs/ecma402-abstract@npm:2.3.6":
   version: 2.3.6
   resolution: "@formatjs/ecma402-abstract@npm:2.3.6"
@@ -15268,6 +15275,7 @@ __metadata:
   resolution: "dex-creator-template@workspace:."
   dependencies:
     "@farcaster/miniapp-sdk": "npm:^0.3.0"
+    "@fontsource/ibm-plex-mono": "npm:^5.2.7"
     "@orderly.network/affiliate": "npm:^3.1.2"
     "@orderly.network/i18n": "npm:^3.1.2"
     "@orderly.network/markets": "npm:^3.1.2"

@@ -81,7 +81,7 @@ const S = {
     gap: 10,
   },
   headerLabel: {
-    fontFamily: "monospace",
+    fontFamily: "var(--nx-font-mono)",
     fontSize: 9,
     letterSpacing: "0.12em",
     color: "#3a5a4a",
@@ -90,7 +90,7 @@ const S = {
     background: "none",
     border: "none",
     color: "#00ff88",
-    fontFamily: "monospace",
+    fontFamily: "var(--nx-font-mono)",
     fontSize: 18,
     lineHeight: 1,
     cursor: "pointer",
@@ -114,7 +114,7 @@ const S = {
   sidebarHeader: {
     padding: "10px 14px",
     borderBottom: "1px solid #1a2e1a",
-    fontFamily: "monospace",
+    fontFamily: "var(--nx-font-mono)",
     fontSize: 9,
     letterSpacing: "0.1em",
     color: "#3a5a4a",
@@ -131,7 +131,7 @@ const S = {
     borderLeft: active ? "2px solid #00ff88" : "2px solid transparent",
   }),
   convoName: {
-    fontFamily: "monospace",
+    fontFamily: "var(--nx-font-mono)",
     fontSize: 11,
     color: "#8aaa9a",
     marginBottom: 2,
@@ -140,7 +140,7 @@ const S = {
     whiteSpace: "nowrap" as const,
   },
   convoPreview: {
-    fontFamily: "monospace",
+    fontFamily: "var(--nx-font-mono)",
     fontSize: 9,
     color: "#3a5a4a",
     overflow: "hidden",
@@ -157,7 +157,7 @@ const S = {
     padding: "10px 16px",
     borderBottom: "1px solid #1a2e1a",
     background: "#080c08",
-    fontFamily: "monospace",
+    fontFamily: "var(--nx-font-mono)",
     fontSize: 11,
     color: "#8aaa9a",
     display: "flex",
@@ -181,14 +181,14 @@ const S = {
     padding: "8px 12px",
   }),
   bubbleText: (isMine: boolean): React.CSSProperties => ({
-    fontFamily: "monospace",
+    fontFamily: "var(--nx-font-mono)",
     fontSize: 11,
     color: isMine ? "#00ff88" : "#8aaa9a",
     lineHeight: 1.5,
     wordBreak: "break-word" as const,
   }),
   bubbleTime: {
-    fontFamily: "monospace",
+    fontFamily: "var(--nx-font-mono)",
     fontSize: 8,
     color: "#2a4a3a",
     marginTop: 4,
@@ -208,7 +208,7 @@ const S = {
     border: "1px solid #1a2e1a",
     borderRadius: 4,
     color: "#00ff88",
-    fontFamily: "monospace",
+    fontFamily: "var(--nx-font-mono)",
     fontSize: 11,
     padding: "8px 10px",
     outline: "none",
@@ -221,7 +221,7 @@ const S = {
     border: `1px solid ${disabled ? "#1a2e1a" : "#00ff88"}`,
     borderRadius: 4,
     color: disabled ? "#2a4a3a" : "#00ff88",
-    fontFamily: "monospace",
+    fontFamily: "var(--nx-font-mono)",
     fontSize: 9,
     letterSpacing: "0.08em",
     padding: "8px 14px",
@@ -239,7 +239,7 @@ const S = {
     padding: 32,
   },
   centerLabel: {
-    fontFamily: "monospace",
+    fontFamily: "var(--nx-font-mono)",
     fontSize: 11,
     color: "#3a5a4a",
     textAlign: "center" as const,
@@ -251,14 +251,14 @@ const S = {
     border: "1px solid #00ff88",
     borderRadius: 4,
     color: "#00ff88",
-    fontFamily: "monospace",
+    fontFamily: "var(--nx-font-mono)",
     fontSize: 10,
     letterSpacing: "0.1em",
     padding: "10px 24px",
     cursor: "pointer",
   },
   errText: {
-    fontFamily: "monospace",
+    fontFamily: "var(--nx-font-mono)",
     fontSize: 9,
     color: "#ff4444",
     textAlign: "center" as const,
@@ -425,7 +425,7 @@ function ThreadView({
       <div style={S.threadHeader}>
         <span style={{ color: "#00ff88", fontSize: 10 }}>⬡</span>
         {peerDisplay}
-        <span style={{ fontFamily: "monospace", fontSize: 8, color: "#2a4a3a", marginLeft: "auto" }}>
+        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#2a4a3a", marginLeft: "auto" }}>
           end-to-end encrypted · XMTP
         </span>
       </div>
@@ -449,7 +449,7 @@ function ThreadView({
       </div>
 
       {sendError && (
-        <div style={{ padding: "5px 12px", fontFamily: "monospace", fontSize: 9, color: "#ff6b6b" }}>
+        <div style={{ padding: "5px 12px", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ff6b6b" }}>
           {sendError}
         </div>
       )}
@@ -624,7 +624,7 @@ export default function MessagesPage() {
       <div style={S.header}>
         <button onClick={goBack} style={S.backBtn} aria-label="Back" title="Back">‹</button>
         <span style={S.headerLabel}>■ MESSAGES</span>
-        <span style={{ fontFamily: "monospace", fontSize: 8, color: "#1a4a2a", marginLeft: "auto" }}>
+        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#1a4a2a", marginLeft: "auto" }}>
           ⬡ XMTP · end-to-end encrypted
         </span>
       </div>
@@ -639,7 +639,7 @@ export default function MessagesPage() {
             <input
               style={{
                 flex: 1, background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 3,
-                color: "#00ff88", fontFamily: "monospace", fontSize: 9, padding: "5px 7px", outline: "none",
+                color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 7px", outline: "none",
               }}
               placeholder="0x… new DM"
               value={dmAddress}
@@ -651,7 +651,7 @@ export default function MessagesPage() {
               disabled={!dmAddress.trim() || openingDM}
               style={{
                 background: "none", border: "1px solid #1a3a1a", borderRadius: 3,
-                color: "#3a6a4a", fontFamily: "monospace", fontSize: 9,
+                color: "#3a6a4a", fontFamily: "var(--nx-font-mono)", fontSize: 9,
                 padding: "4px 8px", cursor: "pointer",
               }}
             >
@@ -659,7 +659,7 @@ export default function MessagesPage() {
             </button>
           </div>
           {dmError && (
-            <div style={{ padding: "6px 10px", borderBottom: "1px solid #1a2e1a", fontFamily: "monospace", fontSize: 9, color: "#ff6b6b", lineHeight: 1.5 }}>
+            <div style={{ padding: "6px 10px", borderBottom: "1px solid #1a2e1a", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ff6b6b", lineHeight: 1.5 }}>
               {dmError}
             </div>
           )}
@@ -674,7 +674,7 @@ export default function MessagesPage() {
             };
             return (
               <div style={{ padding: "8px 10px", borderBottom: "1px solid #1a2e1a", background: "#0a1420" }}>
-                <div style={{ fontFamily: "monospace", fontSize: 9, color: "#4a9fff", lineHeight: 1.5, marginBottom: 6 }}>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#4a9fff", lineHeight: 1.5, marginBottom: 6 }}>
                   {shortAddr(inviteAddr)} isn’t on XMTP yet. Send them this link — it opens Messages and pre-fills a DM back to you:
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
@@ -682,18 +682,18 @@ export default function MessagesPage() {
                     readOnly
                     value={inviteLink}
                     onFocus={(e) => e.currentTarget.select()}
-                    style={{ flex: 1, background: "#0d120d", border: "1px solid #1a3a5a", borderRadius: 3, color: "#8aaa9a", fontFamily: "monospace", fontSize: 8, padding: "5px 7px", outline: "none" }}
+                    style={{ flex: 1, background: "#0d120d", border: "1px solid #1a3a5a", borderRadius: 3, color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 8, padding: "5px 7px", outline: "none" }}
                   />
                   <button
                     onClick={copy}
-                    style={{ background: "none", border: "1px solid #1a3a5a", borderRadius: 3, color: "#4a9fff", fontFamily: "monospace", fontSize: 9, padding: "4px 8px", cursor: "pointer", whiteSpace: "nowrap" }}
+                    style={{ background: "none", border: "1px solid #1a3a5a", borderRadius: 3, color: "#4a9fff", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 8px", cursor: "pointer", whiteSpace: "nowrap" }}
                   >
                     {inviteCopied ? "COPIED ✓" : "COPY"}
                   </button>
                 </div>
                 <button
                   onClick={() => { setInviteAddr(null); setDmAddress(""); }}
-                  style={{ marginTop: 6, background: "none", border: "none", color: "#3a5a4a", fontFamily: "monospace", fontSize: 8, cursor: "pointer", padding: 0 }}
+                  style={{ marginTop: 6, background: "none", border: "none", color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 8, cursor: "pointer", padding: 0 }}
                 >
                   dismiss
                 </button>
@@ -703,12 +703,12 @@ export default function MessagesPage() {
 
           <div style={S.convoList}>
             {loadingConvos && (
-              <div style={{ padding: 14, fontFamily: "monospace", fontSize: 9, color: "#2a4a3a" }}>
+              <div style={{ padding: 14, fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#2a4a3a" }}>
                 loading...
               </div>
             )}
             {!loadingConvos && conversations.length === 0 && (
-              <div style={{ padding: 14, fontFamily: "monospace", fontSize: 9, color: "#2a4a3a", lineHeight: 1.6 }}>
+              <div style={{ padding: 14, fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#2a4a3a", lineHeight: 1.6 }}>
                 no conversations yet
                 <br />paste a wallet address above
               </div>
@@ -735,7 +735,7 @@ export default function MessagesPage() {
               {isMobile && (
                 <button
                   onClick={() => setActiveConvo(null)}
-                  style={{ background: "none", border: "none", borderBottom: "1px solid #1a2e1a", color: "#3a6a4a", fontFamily: "monospace", fontSize: 11, padding: "10px 14px", cursor: "pointer", textAlign: "left", width: "100%" }}
+                  style={{ background: "none", border: "none", borderBottom: "1px solid #1a2e1a", color: "#3a6a4a", fontFamily: "var(--nx-font-mono)", fontSize: 11, padding: "10px 14px", cursor: "pointer", textAlign: "left", width: "100%" }}
                 >
                   ← conversations
                 </button>

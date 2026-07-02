@@ -11,7 +11,7 @@ import { AnalyticsView } from "@/pages/lab/AnalyticsView";
 import type { ProcessedTrade } from "@/pages/lab/types";
 
 const GREEN = "#00ff88";
-const mono = "monospace";
+const mono = "var(--nx-font-mono)";
 
 type HLFill = {
   coin: string; px: string; sz: string; side: string; time: number;

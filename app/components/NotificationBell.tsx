@@ -86,7 +86,7 @@ export default function NotificationBell() {
               minWidth: 16,
               height: 16,
               fontSize: 9,
-              fontFamily: "monospace",
+              fontFamily: "var(--nx-font-mono)",
               fontWeight: "bold",
               display: "flex",
               alignItems: "center",
@@ -130,7 +130,7 @@ export default function NotificationBell() {
           >
             <span
               style={{
-                fontFamily: "monospace",
+                fontFamily: "var(--nx-font-mono)",
                 fontSize: 9,
                 letterSpacing: "0.12em",
                 color: "#3a5a4a",
@@ -145,7 +145,7 @@ export default function NotificationBell() {
                   background: "none",
                   border: "none",
                   color: "#00ff88",
-                  fontFamily: "monospace",
+                  fontFamily: "var(--nx-font-mono)",
                   fontSize: 9,
                   cursor: "pointer",
                   letterSpacing: "0.08em",
@@ -163,7 +163,7 @@ export default function NotificationBell() {
               <div
                 style={{
                   padding: "20px 14px",
-                  fontFamily: "monospace",
+                  fontFamily: "var(--nx-font-mono)",
                   fontSize: 11,
                   color: "#3a5a4a",
                   textAlign: "center",
@@ -192,9 +192,9 @@ export default function NotificationBell() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
                       style={{
-                        fontFamily: "monospace",
+                        fontFamily: "var(--nx-font-mono)",
                         fontSize: 11,
-                        color: n.readAt ? "#5a8a6a" : "#8aaa9a",
+                        color: n.readAt ? "#8aaa9a" : "#8aaa9a",
                         lineHeight: 1.4,
                         wordBreak: "break-word",
                       }}
@@ -203,7 +203,7 @@ export default function NotificationBell() {
                     </div>
                     <div
                       style={{
-                        fontFamily: "monospace",
+                        fontFamily: "var(--nx-font-mono)",
                         fontSize: 9,
                         color: "#2a4a3a",
                         marginTop: 3,

@@ -56,15 +56,15 @@ export default function LiveNow() {
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
-        <span style={{ fontFamily: "monospace", fontSize: 11, fontWeight: "bold", color: green, letterSpacing: "0.12em" }}>
+        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", color: green, letterSpacing: "0.12em" }}>
           ◆ LIVE NOW
         </span>
-        <span style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>
+        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a" }}>
           {positions.length} position{positions.length !== 1 ? "s" : ""} open · live PnL from public price
         </span>
         <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: green, boxShadow: `0 0 6px ${green}` }} />
-          <span style={{ fontFamily: "monospace", fontSize: 8, color: "#3a5a4a" }}>live</span>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#3a5a4a" }}>live</span>
         </span>
       </div>
 
@@ -80,7 +80,7 @@ export default function LiveNow() {
               style={{
                 flexShrink: 0, minWidth: 132, background: "#0a0e0a",
                 border: `1px solid ${pct == null ? "#1e2d1e" : up ? "#1a4a2a" : "#4a1a1a"}`,
-                borderRadius: 5, padding: "8px 10px", fontFamily: "monospace",
+                borderRadius: 5, padding: "8px 10px", fontFamily: "var(--nx-font-mono)",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

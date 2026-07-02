@@ -197,7 +197,7 @@ export default function ThesisPage() {
   if (loading) {
     return (
       <div style={{ background: "#0a0e0a", minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>loading thesis...</div>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#2a4a3a" }}>loading thesis...</div>
       </div>
     );
   }
@@ -206,10 +206,10 @@ export default function ThesisPage() {
     return (
       <div style={{ background: "#0a0e0a", minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
         <div style={{ fontSize: 24, color: "#2a4a3a" }}>◆</div>
-        <div style={{ fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>thesis not found or not public</div>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#2a4a3a" }}>thesis not found or not public</div>
         <button
           onClick={() => navigate("/feed")}
-          style={{ background: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#3a5a4a", fontFamily: "monospace", fontSize: 10, padding: "6px 14px", cursor: "pointer" }}
+          style={{ background: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "6px 14px", cursor: "pointer" }}
         >← BACK TO FEED</button>
       </div>
     );
@@ -247,19 +247,19 @@ export default function ThesisPage() {
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderBottom: "1px solid #1a2e1a", background: "#080c08" }}>
         <button
           onClick={() => navigate(-1)}
-          style={{ background: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, padding: "4px 10px", cursor: "pointer" }}
+          style={{ background: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 10px", cursor: "pointer" }}
         >← BACK</button>
         <div style={{ flex: 1 }} />
         {/* Outbound share — X / Farcaster / copy link */}
         <a
           href={shareX} target="_blank" rel="noopener noreferrer"
           title="Share on X"
-          style={{ textDecoration: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#8aaa9a", fontFamily: "monospace", fontSize: 9, padding: "4px 9px", letterSpacing: "0.05em" }}
+          style={{ textDecoration: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 9px", letterSpacing: "0.05em" }}
         >𝕏 SHARE</a>
         <a
           href={shareFc} target="_blank" rel="noopener noreferrer"
           title="Share on Farcaster"
-          style={{ textDecoration: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#8a7aff", fontFamily: "monospace", fontSize: 9, padding: "4px 9px", letterSpacing: "0.05em" }}
+          style={{ textDecoration: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#8a7aff", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 9px", letterSpacing: "0.05em" }}
         >✦ CAST</a>
         <button
           onClick={handleShare}
@@ -268,7 +268,7 @@ export default function ThesisPage() {
             background: copied ? "#0a1a0a" : "none",
             border: `1px solid ${copied ? "#00ff88" : "#1a2e1a"}`,
             borderRadius: 3, color: copied ? "#00ff88" : "#3a5a4a",
-            fontFamily: "monospace", fontSize: 9, padding: "4px 10px", cursor: "pointer", letterSpacing: "0.05em",
+            fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 10px", cursor: "pointer", letterSpacing: "0.05em",
           }}
         >{copied ? "✓ COPIED" : "⧉ LINK"}</button>
       </div>
@@ -286,8 +286,8 @@ export default function ThesisPage() {
                 onClick={() => navigate(`/feed/trader/${thesis.wallet}`)}
                 style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
               >
-                <div style={{ fontFamily: "monospace", fontSize: 13, color: "#8aaa9a" }}>{traderName}</div>
-                <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>{shortAddr}</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#8aaa9a" }}>{traderName}</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a" }}>{shortAddr}</div>
               </button>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -296,8 +296,8 @@ export default function ThesisPage() {
               ) : thesis.onChainId !== undefined ? (
                 <span style={{ fontSize: 14 }} title="on-chain verified">⛓</span>
               ) : null}
-              <div style={{ fontFamily: "monospace", fontSize: 9, color: "#2a4a3a" }}>{timeAgo}</div>
-              <div style={{ fontFamily: "monospace", fontSize: 9, letterSpacing: "0.08em", padding: "3px 8px", borderRadius: 3, background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color }}>
+              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#2a4a3a" }}>{timeAgo}</div>
+              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.08em", padding: "3px 8px", borderRadius: 3, background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color }}>
                 {cfg.label}
               </div>
             </div>
@@ -305,8 +305,8 @@ export default function ThesisPage() {
 
           {/* Symbol + direction */}
           <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 20 }}>
-            <span style={{ fontFamily: "monospace", fontSize: 36, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
-            <span style={{ fontFamily: "monospace", fontSize: 16, color: thesis.direction === "LONG" ? "#00ff88" : "#ff4444" }}>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 36, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 16, color: thesis.direction === "LONG" ? "#00ff88" : "#ff4444" }}>
               {thesis.direction === "LONG" ? "↑" : "↓"} {thesis.direction} · {thesis.leverage.toFixed(1)}x
             </span>
           </div>
@@ -321,8 +321,8 @@ export default function ThesisPage() {
               { label: "SIZE",  val: `$${thesis.positionSize.toFixed(0)}`,  color: "#8aaa9a" },
             ].map(({ label, val, color }) => (
               <div key={label}>
-                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>{label}</div>
-                <div style={{ fontSize: 14, color, fontFamily: "monospace", fontWeight: "bold" }}>{val}</div>
+                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
+                <div style={{ fontSize: 14, color, fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{val}</div>
               </div>
             ))}
           </div>
@@ -341,8 +341,8 @@ export default function ThesisPage() {
                   { label: "TO TP1",     val: `${toTP.toFixed(2)}%`, color: "#00ff88" },
                 ].map(({ label, val, color }) => (
                   <div key={label}>
-                    <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>{label}</div>
-                    <div style={{ fontSize: 13, color, fontFamily: "monospace", fontWeight: "bold" }}>{val}</div>
+                    <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
+                    <div style={{ fontSize: 13, color, fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{val}</div>
                   </div>
                 ))}
               </div>
@@ -351,14 +351,14 @@ export default function ThesisPage() {
 
           {/* Actual PnL if closed */}
           {thesis.actualPnl !== null && thesis.status !== "ACTIVE" && (
-            <div style={{ fontFamily: "monospace", fontSize: 14, color: thesis.actualPnl >= 0 ? "#00ff88" : "#ff4444", marginBottom: 12 }}>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, color: thesis.actualPnl >= 0 ? "#00ff88" : "#ff4444", marginBottom: 12 }}>
               ACTUAL PnL: {thesis.actualPnl >= 0 ? "+" : ""}${thesis.actualPnl.toFixed(2)}
             </div>
           )}
 
           {/* Notes */}
           {thesis.notes && (
-            <div style={{ fontFamily: "monospace", fontSize: 11, color: "#5a8a6a", borderTop: "1px solid #1a2e1a", paddingTop: 12, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#5a8a6a", borderTop: "1px solid #1a2e1a", paddingTop: 12, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
               {thesis.notes}
             </div>
           )}
@@ -369,8 +369,8 @@ export default function ThesisPage() {
           <div style={{ background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 4, padding: "16px 20px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: "monospace", fontSize: 10, color: "#3a5a4a", letterSpacing: "0.05em" }}>PRICE VERIFICATION</div>
-                <div style={{ fontFamily: "monospace", fontSize: 9, color: "#2a4a3a", marginTop: 2 }}>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#3a5a4a", letterSpacing: "0.05em" }}>PRICE VERIFICATION</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#2a4a3a", marginTop: 2 }}>
                   Cross-check recorded outcome against CoinGecko OHLC data
                 </div>
               </div>
@@ -381,7 +381,7 @@ export default function ThesisPage() {
                   style={{
                     background: "none", border: "1px solid #1a3a1a", borderRadius: 3,
                     color: verifying ? "#2a4a3a" : "#3a6a4a",
-                    fontFamily: "monospace", fontSize: 9, padding: "5px 12px",
+                    fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 12px",
                     cursor: verifying ? "default" : "pointer", letterSpacing: "0.05em",
                   }}
                 >{verifying ? "verifying..." : "VERIFY OUTCOME →"}</button>
@@ -391,38 +391,38 @@ export default function ThesisPage() {
             {verifyResult && (
               <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #1a2e1a" }}>
                 {verifyResult.error ? (
-                  <div style={{ fontFamily: "monospace", fontSize: 10, color: "#ff4444" }}>
+                  <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#ff4444" }}>
                     error: {verifyResult.error}
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <div style={{
-                        fontFamily: "monospace", fontSize: 18, fontWeight: "bold",
+                        fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: "bold",
                         color: verifyResult.verified ? "#00ff88" : "#ff4444",
                       }}>
                         {verifyResult.verified ? "✓ VERIFIED" : "✗ DISPUTED"}
                       </div>
-                      <div style={{ fontFamily: "monospace", fontSize: 9, color: "#2a4a3a" }}>
+                      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#2a4a3a" }}>
                         via {verifyResult.method} · {verifyResult.candlesChecked} candles
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 16 }}>
                       <div>
-                        <div style={{ fontFamily: "monospace", fontSize: 8, color: "#3a5a4a" }}>TP HIT IN DATA</div>
-                        <div style={{ fontFamily: "monospace", fontSize: 11, color: verifyResult.hitTP ? "#00ff88" : "#3a5a4a" }}>
+                        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#3a5a4a" }}>TP HIT IN DATA</div>
+                        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: verifyResult.hitTP ? "#00ff88" : "#3a5a4a" }}>
                           {verifyResult.hitTP ? "yes" : "no"}
                         </div>
                       </div>
                       <div>
-                        <div style={{ fontFamily: "monospace", fontSize: 8, color: "#3a5a4a" }}>SL HIT IN DATA</div>
-                        <div style={{ fontFamily: "monospace", fontSize: 11, color: verifyResult.hitSL ? "#ff4444" : "#3a5a4a" }}>
+                        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#3a5a4a" }}>SL HIT IN DATA</div>
+                        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: verifyResult.hitSL ? "#ff4444" : "#3a5a4a" }}>
                           {verifyResult.hitSL ? "yes" : "no"}
                         </div>
                       </div>
                     </div>
                     {!verifyResult.verified && (
-                      <div style={{ fontFamily: "monospace", fontSize: 9, color: "#5a3a1a" }}>
+                      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#5a3a1a" }}>
                         price data does not confirm recorded outcome — outcome may have been manually set
                       </div>
                     )}
@@ -439,7 +439,7 @@ export default function ThesisPage() {
             onClick={() => navigate(`/feed/trader/${thesis.wallet}`)}
             style={{
               background: "none", border: "1px solid #1a2e1a", borderRadius: 3,
-              color: "#3a5a4a", fontFamily: "monospace", fontSize: 9,
+              color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 9,
               padding: "6px 14px", cursor: "pointer", letterSpacing: "0.05em",
             }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#00ff88"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#00ff88"; }}

@@ -14,11 +14,11 @@ export function LabWelcome() {
   return (
     <div style={{ padding: "32px 8px" }}>
       <div style={{ textAlign: "center", marginBottom: 32 }}>
-        <div style={{ fontFamily: "monospace", fontSize: 11, color: "#00ff88", letterSpacing: "0.3em", marginBottom: 12, textShadow: "0 0 12px rgba(0,255,136,0.5)" }}>// THE LAB</div>
-        <div style={{ fontFamily: "monospace", fontSize: 28, color: "#fff", fontWeight: "bold", marginBottom: 12, lineHeight: 1.25 }}>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#00ff88", letterSpacing: "0.3em", marginBottom: 12, textShadow: "0 0 12px rgba(0,255,136,0.5)" }}>// THE LAB</div>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 28, color: "#fff", fontWeight: "bold", marginBottom: 12, lineHeight: 1.25 }}>
           The trading terminal that<br />makes you a better trader.
         </div>
-        <div style={{ fontFamily: "monospace", fontSize: 13, color: "#8aaa9a", maxWidth: 580, margin: "0 auto", lineHeight: 1.6 }}>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#8aaa9a", maxWidth: 580, margin: "0 auto", lineHeight: 1.6 }}>
           Plan it, automate it, grade it. Most apps just let you trade — The Lab turns every
           position into a repeatable process. Connect your wallet to load your data and unlock every tool.
         </div>
@@ -27,13 +27,13 @@ export function LabWelcome() {
         {features.map((f) => (
           <div key={f.title} style={{ ...cardStyle, padding: "16px 18px" }}>
             <div style={{ fontSize: 20, color: "#2f7a52", marginBottom: 8 }}>{f.icon}</div>
-            <div style={{ fontFamily: "monospace", fontSize: 12, color: "#fff", fontWeight: "bold", letterSpacing: "0.08em", marginBottom: 6 }}>{f.title}</div>
-            <div style={{ fontFamily: "monospace", fontSize: 11, color: "#8aaa9a", lineHeight: 1.5 }}>{f.desc}</div>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#fff", fontWeight: "bold", letterSpacing: "0.08em", marginBottom: 6 }}>{f.title}</div>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#8aaa9a", lineHeight: 1.5 }}>{f.desc}</div>
           </div>
         ))}
       </div>
       <div style={{ textAlign: "center" }}>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "monospace", fontSize: 11, color: "#3a5a4a", border: "1px solid #1a2e1a", borderRadius: 4, padding: "10px 18px", background: "#0a0e0a" }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#3a5a4a", border: "1px solid #1a2e1a", borderRadius: 4, padding: "10px 18px", background: "#0a0e0a" }}>
           <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#fbbf24", boxShadow: "0 0 8px #fbbf24", animation: "pulse 2s infinite" }} />
           Connect your wallet (top right) to load your trades and activate The Lab
         </div>
@@ -78,10 +78,10 @@ export function OnboardingChecklist({
     <div style={{ ...cardStyle, marginBottom: 16, borderColor: allDone ? "#1a4a2a" : "#1a3a2a" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontFamily: "monospace", fontSize: 10, color: "#00ff88", letterSpacing: "0.12em" }}>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#00ff88", letterSpacing: "0.12em" }}>
             {allDone ? "🎉 YOU'RE SET UP" : "// GET STARTED"}
           </span>
-          <span style={{ fontFamily: "monospace", fontSize: 10, color: "#3a5a4a" }}>{doneCount}/{steps.length}</span>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#3a5a4a" }}>{doneCount}/{steps.length}</span>
         </div>
         <button onClick={dismiss} style={{ ...navBtnStyle, fontSize: 9, padding: "3px 10px", color: "#3a5a4a" }}>
           {allDone ? "DISMISS" : "SKIP"}
@@ -98,11 +98,11 @@ export function OnboardingChecklist({
               border: `1px solid ${s.done ? "#00ff88" : "#2a4a3a"}`,
               background: s.done ? "#00ff8820" : "transparent",
               color: s.done ? "#00ff88" : "#2a4a3a",
-              fontFamily: "monospace", fontSize: 11, textAlign: "center", lineHeight: "17px",
+              fontFamily: "var(--nx-font-mono)", fontSize: 11, textAlign: "center", lineHeight: "17px",
             }}>{s.done ? "✓" : ""}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "monospace", fontSize: 12, color: s.done ? "#8aaa9a" : "#fff", textDecoration: s.done ? "line-through" : "none" }}>{s.label}</div>
-              <div style={{ fontFamily: "monospace", fontSize: 10, color: "#3a5a4a", marginTop: 1 }}>{s.hint}</div>
+              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: s.done ? "#8aaa9a" : "#fff", textDecoration: s.done ? "line-through" : "none" }}>{s.label}</div>
+              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#3a5a4a", marginTop: 1 }}>{s.hint}</div>
             </div>
             {!s.done && s.action && (
               <button onClick={s.action} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 12px", color: "#00ff88", borderColor: "#1a4a2a", flexShrink: 0 }}>

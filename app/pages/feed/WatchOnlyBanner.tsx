@@ -11,7 +11,7 @@ export default function WatchOnlyBanner() {
   const [hidden, setHidden] = useState(() => typeof window !== "undefined" && window.localStorage.getItem(DISMISS_KEY) === "1");
   if (hidden) return null;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#0a140e", border: "1px solid #1a3a2a", borderRadius: 6, padding: "9px 12px", marginBottom: 12, fontFamily: "monospace" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#0a140e", border: "1px solid #1a3a2a", borderRadius: 6, padding: "9px 12px", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>
       <span style={{ fontSize: 14 }}>👁</span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 11, color: "#e8f0ea", fontWeight: "bold" }}>Watch-only — you&apos;re exploring without a wallet.</div>

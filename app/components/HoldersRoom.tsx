@@ -68,16 +68,16 @@ function LockScreen() {
   return (
     <div style={{ textAlign: "center", padding: "48px 20px", maxWidth: 480, margin: "0 auto" }}>
       <div style={{ fontSize: 28, marginBottom: 12 }}>🔒</div>
-      <div style={{ fontFamily: "monospace", fontSize: 14, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 10 }}>
+      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 10 }}>
         HOLDERS ROOM — LOCKED
       </div>
-      <div style={{ fontFamily: "monospace", fontSize: 11, color: "#5a8a6a", lineHeight: 1.7, marginBottom: 18 }}>
+      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#8aaa9a", lineHeight: 1.7, marginBottom: 18 }}>
         A private room for $NEXUS holders. Theses from holders, for holders.
         <br />
         Hold at least <b style={{ color: "#fff" }}>{minOperator.toLocaleString()} $NEXUS</b> to unlock the
         {" "}<span style={{ color: TIER_META.OPERATOR.color }}>{TIER_META.OPERATOR.glyph} OPERATOR</span> tier and enter.
       </div>
-      <div style={{ fontFamily: "monospace", fontSize: 9, color: "#2a4a3a", lineHeight: 1.6 }}>
+      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#2a4a3a", lineHeight: 1.6 }}>
         $NEXUS is a pure community meme token — zero built-in utility or revenue share.
         <br />
         Tiers unlock access &amp; status inside the Lab, nothing more.
@@ -122,7 +122,7 @@ export function HoldersRoom({ walletAddress }: { walletAddress: string | null })
 
   if (!walletAddress) {
     return (
-      <div style={{ textAlign: "center", padding: "48px 20px", fontFamily: "monospace", fontSize: 12, color: "#3a6a4a" }}>
+      <div style={{ textAlign: "center", padding: "48px 20px", fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#4a7a5a" }}>
         Connect a wallet to check $NEXUS holder access.
       </div>
     );
@@ -130,7 +130,7 @@ export function HoldersRoom({ walletAddress }: { walletAddress: string | null })
 
   if (tierLoading) {
     return (
-      <div style={{ textAlign: "center", padding: "48px 20px", fontFamily: "monospace", fontSize: 12, color: "#3a6a4a" }}>
+      <div style={{ textAlign: "center", padding: "48px 20px", fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#4a7a5a" }}>
         Checking $NEXUS balance…
       </div>
     );
@@ -142,7 +142,7 @@ export function HoldersRoom({ walletAddress }: { walletAddress: string | null })
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {/* Welcome + burn counter */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-        <div style={{ fontFamily: "monospace", fontSize: 12, color: "#8aaa9a", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#8aaa9a", display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ color: "#00ff88" }}>//</span> HOLDERS ROOM
           <NexusTierBadge tier={tier} size="md" />
         </div>
@@ -150,18 +150,18 @@ export function HoldersRoom({ walletAddress }: { walletAddress: string | null })
       </div>
 
       {loadingFeed && (
-        <div style={{ fontFamily: "monospace", fontSize: 11, color: "#3a6a4a", padding: "20px 0", textAlign: "center" }}>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#4a7a5a", padding: "20px 0", textAlign: "center" }}>
           verifying signature &amp; loading holder theses…
         </div>
       )}
 
       {authError && !loadingFeed && (
-        <div style={{ textAlign: "center", padding: "32px 0", fontFamily: "monospace", fontSize: 11, color: "#fbbf24" }}>
+        <div style={{ textAlign: "center", padding: "32px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#fbbf24" }}>
           Signature required to enter the room.
           <div style={{ marginTop: 12 }}>
             <button
               onClick={() => setSignNonce((n) => n + 1)}
-              style={{ background: "#0a2a1a", border: "1px solid #1a4a3a", borderRadius: 3, color: "#5fd6a0", fontFamily: "monospace", fontSize: 11, padding: "6px 14px", cursor: "pointer", letterSpacing: "0.08em" }}
+              style={{ background: "#0a2a1a", border: "1px solid #1a4a3a", borderRadius: 3, color: "#5fd6a0", fontFamily: "var(--nx-font-mono)", fontSize: 11, padding: "6px 14px", cursor: "pointer", letterSpacing: "0.08em" }}
             >
               ◆ SIGN TO ENTER
             </button>
@@ -170,7 +170,7 @@ export function HoldersRoom({ walletAddress }: { walletAddress: string | null })
       )}
 
       {theses && theses.length === 0 && !loadingFeed && (
-        <div style={{ fontFamily: "monospace", fontSize: 11, color: "#3a6a4a", padding: "32px 0", textAlign: "center" }}>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#4a7a5a", padding: "32px 0", textAlign: "center" }}>
           No holders-only theses yet. In the Nexus Thesis Engine, set a thesis to ◆ HOLDERS to share it here.
         </div>
       )}
@@ -183,19 +183,19 @@ export function HoldersRoom({ walletAddress }: { walletAddress: string | null })
           <div key={t.id} style={{ background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 4, padding: "12px 16px", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
             <button
               onClick={() => navigate(`/feed/trader/${t.wallet}`)}
-              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "monospace", fontSize: 11, color: "#8aaa9a", minWidth: 140 }}
+              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#8aaa9a", minWidth: 140 }}
             >
               {name}
               <NexusTierBadge address={t.wallet} />
             </button>
-            <span style={{ fontFamily: "monospace", fontSize: 14, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
-            <span style={{ fontFamily: "monospace", fontSize: 10, color: t.direction === "LONG" ? "#00ff88" : "#ff4444" }}>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: t.direction === "LONG" ? "#00ff88" : "#ff4444" }}>
               {t.direction === "LONG" ? "↑" : "↓"} {t.direction}
             </span>
-            <span style={{ fontFamily: "monospace", fontSize: 10, color: t.riskReward >= 2 ? "#00ff88" : "#fbbf24" }}>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: t.riskReward >= 2 ? "#00ff88" : "#fbbf24" }}>
               1:{t.riskReward.toFixed(2)}
             </span>
-            <span style={{ marginLeft: "auto", fontFamily: "monospace", fontSize: 9, letterSpacing: "0.08em", color: statusColor, border: `1px solid ${statusColor}33`, borderRadius: 3, padding: "2px 8px" }}>
+            <span style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.08em", color: statusColor, border: `1px solid ${statusColor}33`, borderRadius: 3, padding: "2px 8px" }}>
               {t.status}
             </span>
           </div>

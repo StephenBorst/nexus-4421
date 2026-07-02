@@ -24,7 +24,7 @@ export function BuyNexusButton({ size = "md" }: { size?: "sm" | "md" }) {
         display: "inline-flex",
         alignItems: "center",
         gap: 6,
-        fontFamily: "monospace",
+        fontFamily: "var(--nx-font-mono)",
         fontSize,
         fontWeight: "bold",
         letterSpacing: "0.06em",

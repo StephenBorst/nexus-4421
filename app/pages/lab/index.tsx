@@ -109,8 +109,8 @@ export default function TheLabPage() {
       {/* ── BRIEFING HEADER ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "6px 10px" : "6px 18px", background: "#05080a", borderBottom: "1px solid #0d1f0d", flexWrap: "wrap", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontFamily: "monospace", fontSize: 11, color: "#00ff88", letterSpacing: "0.25em", fontWeight: "bold", textShadow: "0 0 12px rgba(0,255,136,0.5)" }}>//</span>
-          <span style={{ fontFamily: "monospace", fontSize: 11, color: "#fff", letterSpacing: "0.25em", fontWeight: "bold" }}>THE LAB</span>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#00ff88", letterSpacing: "0.25em", fontWeight: "bold", textShadow: "0 0 12px rgba(0,255,136,0.5)" }}>//</span>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#fff", letterSpacing: "0.25em", fontWeight: "bold" }}>THE LAB</span>
           <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#00ff88", boxShadow: "0 0 8px #00ff88", animation: "pulse 2s infinite" }} />
         </div>
         <div style={isMobile
@@ -125,8 +125,8 @@ export default function TheLabPage() {
             { label: "BALANCE", val: connected && availableBalance != null ? `$${(availableBalance as number).toFixed(2)}` : "—", color: "#e5e7eb" },
           ].map(({ label, val, color }) => (
             <div key={label} style={{ display: "flex", flexDirection: "column", alignItems: isMobile ? "center" : "flex-start", gap: 1 }}>
-              <span style={{ fontFamily: "monospace", fontSize: 8, letterSpacing: "0.12em" }}>{label}</span>
-              <span style={{ fontFamily: "monospace", fontSize: isMobile ? 11 : 12, color, fontWeight: "bold", letterSpacing: "0.05em" }}>{val}</span>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.12em" }}>{label}</span>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: isMobile ? 11 : 12, color, fontWeight: "bold", letterSpacing: "0.05em" }}>{val}</span>
             </div>
           ))}
         </div>
@@ -139,7 +139,7 @@ export default function TheLabPage() {
               background: activeTab === tab.id ? "#0a1a0a" : "none",
               border: `1px solid ${activeTab === tab.id ? "#00ff88" : "transparent"}`,
               color: activeTab === tab.id ? "#00ff88" : "#4a7a5a",
-              fontFamily: "monospace",
+              fontFamily: "var(--nx-font-mono)",
               fontSize: isMobile ? 10 : 11,
               padding: isMobile ? "6px 8px" : "5px 12px",
               cursor: "pointer",
@@ -151,7 +151,7 @@ export default function TheLabPage() {
           ))}
         </div>
         {!isMobile && (
-          <div style={{ fontSize: 9, fontFamily: "monospace", letterSpacing: "0.1em", color: syncing ? "#fbbf24" : synced ? "#00ff88" : "#2a4a3a", flexShrink: 0, marginLeft: 8 }}>
+          <div style={{ fontSize: 9, fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", color: syncing ? "#fbbf24" : synced ? "#00ff88" : "#2a4a3a", flexShrink: 0, marginLeft: 8 }}>
             {syncing ? "⟳" : synced ? "●" : rootWalletAddress ? "○" : "○ CONNECT WALLET"}
           </div>
         )}

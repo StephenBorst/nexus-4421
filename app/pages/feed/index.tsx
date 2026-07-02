@@ -139,7 +139,7 @@ function CopyModal({
     border: "1px solid #1a2e1a",
     borderRadius: 3,
     color: "#00ff88",
-    fontFamily: "monospace",
+    fontFamily: "var(--nx-font-mono)",
     fontSize: 11,
     padding: "6px 8px",
     outline: "none",
@@ -150,7 +150,7 @@ function CopyModal({
   const labelStyle: React.CSSProperties = {
     fontSize: 8,
     color: "#3a5a4a",
-    fontFamily: "monospace",
+    fontFamily: "var(--nx-font-mono)",
     marginBottom: 4,
     letterSpacing: "0.05em",
   };
@@ -237,13 +237,13 @@ function CopyModal({
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
           <div>
-            <div style={{ fontFamily: "monospace", fontSize: 16, fontWeight: "bold", color: "#fff" }}>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: "bold", color: "#fff" }}>
               {ticker}
               <span style={{ fontSize: 11, marginLeft: 8, color: thesis.direction === "LONG" ? "#00ff88" : "#ff4444" }}>
                 {thesis.direction === "LONG" ? "↑" : "↓"} {thesis.direction}
               </span>
             </div>
-            <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", marginTop: 2 }}>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", marginTop: 2 }}>
               📋 copying from {traderName}
             </div>
           </div>
@@ -262,8 +262,8 @@ function CopyModal({
             { label: "R:R",   val: `1:${thesis.riskReward.toFixed(2)}`, color: thesis.riskReward >= 2 ? "#00ff88" : "#fbbf24" },
           ].map(({ label, val, color }) => (
             <div key={label}>
-              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>{label}</div>
-              <div style={{ fontSize: 11, color, fontFamily: "monospace", fontWeight: "bold" }}>{val}</div>
+              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
+              <div style={{ fontSize: 11, color, fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{val}</div>
             </div>
           ))}
         </div>
@@ -279,7 +279,7 @@ function CopyModal({
               value={accountSize}
               onChange={(e) => setAccountSize(e.target.value)}
             />
-            {accErr && <div style={{ fontFamily: "monospace", fontSize: 8, color: "#ff4444", marginTop: 3 }}>{accErr}</div>}
+            {accErr && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#ff4444", marginTop: 3 }}>{accErr}</div>}
           </div>
           <div>
             <div style={labelStyle}>RISK %</div>
@@ -291,7 +291,7 @@ function CopyModal({
               value={riskPct}
               onChange={(e) => setRiskPct(e.target.value)}
             />
-            {riskErr && <div style={{ fontFamily: "monospace", fontSize: 8, color: "#ff4444", marginTop: 3 }}>{riskErr}</div>}
+            {riskErr && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#ff4444", marginTop: 3 }}>{riskErr}</div>}
           </div>
           <div>
             <div style={labelStyle}>FUNDING %</div>
@@ -312,27 +312,27 @@ function CopyModal({
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px 10px", padding: 10, background: "#0a1a0a", borderRadius: 4, border: "1px solid #1a3a1a" }}>
               <div>
                 <div style={labelStyle}>YOUR SIZE</div>
-                <div style={{ fontFamily: "monospace", fontSize: 13, color: "#00ff88", fontWeight: "bold" }}>${calc.positionSize.toFixed(0)}</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#00ff88", fontWeight: "bold" }}>${calc.positionSize.toFixed(0)}</div>
               </div>
               <div>
                 <div style={labelStyle}>LEVERAGE</div>
-                <div style={{ fontFamily: "monospace", fontSize: 13, fontWeight: "bold", color: calc.leverage > 25 ? "#ff4444" : calc.leverage > 10 ? "#fbbf24" : "#00ff88" }}>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", color: calc.leverage > 25 ? "#ff4444" : calc.leverage > 10 ? "#fbbf24" : "#00ff88" }}>
                   {calc.leverage.toFixed(1)}x
                 </div>
               </div>
               <div>
                 <div style={labelStyle}>R:R</div>
-                <div style={{ fontFamily: "monospace", fontSize: 13, fontWeight: "bold", color: calc.riskReward >= 2 ? "#00ff88" : "#fbbf24" }}>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", color: calc.riskReward >= 2 ? "#00ff88" : "#fbbf24" }}>
                   1:{calc.riskReward.toFixed(2)}
                 </div>
               </div>
               <div>
                 <div style={labelStyle}>MAX LOSS</div>
-                <div style={{ fontFamily: "monospace", fontSize: 13, color: "#ff4444", fontWeight: "bold" }}>${calc.riskAmount.toFixed(2)}</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#ff4444", fontWeight: "bold" }}>${calc.riskAmount.toFixed(2)}</div>
               </div>
             </div>
           ) : (
-            <div style={{ padding: 10, background: "#080c08", borderRadius: 4, border: "1px solid #1a2e1a", fontFamily: "monospace", fontSize: 9, color: "#2a4a3a", textAlign: "center" }}>
+            <div style={{ padding: 10, background: "#080c08", borderRadius: 4, border: "1px solid #1a2e1a", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#2a4a3a", textAlign: "center" }}>
               enter account size + risk % to calculate your position
             </div>
           )}
@@ -352,14 +352,14 @@ function CopyModal({
         {/* Attribution preview */}
         <div style={{ marginBottom: 14, padding: 8, background: "#080c08", borderRadius: 3, border: "1px solid #1a2e1a" }}>
           <div style={labelStyle}>ATTRIBUTION (auto-added to notes)</div>
-          <div style={{ fontFamily: "monospace", fontSize: 9, color: "#8aaa9a", lineHeight: 1.5 }}>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#8aaa9a", lineHeight: 1.5 }}>
             📋 Copied from {traderName}
           </div>
         </div>
 
         {/* Error */}
         {err && (
-          <div style={{ fontFamily: "monospace", fontSize: 10, color: "#ff4444", marginBottom: 10 }}>{err}</div>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#ff4444", marginBottom: 10 }}>{err}</div>
         )}
 
         {/* Save button */}
@@ -371,7 +371,7 @@ function CopyModal({
             background: saved ? "#0a2a0a" : calc && !hasValidationErr ? "#0a1a0a" : "#080c08",
             border: `1px solid ${saved ? "#00ff88" : calc && !hasValidationErr ? "#00ff88" : "#1a2e1a"}`,
             color: saved ? "#00ff88" : calc && !hasValidationErr ? "#00ff88" : "#2a4a3a",
-            fontFamily: "monospace",
+            fontFamily: "var(--nx-font-mono)",
             fontSize: 11,
             letterSpacing: "0.1em",
             padding: "10px 0",
@@ -465,7 +465,7 @@ function FeedCard({
         <Avatar pfp={thesis.pfp} displayName={thesis.displayName} size={34} />
         <div style={{ flex: 1, minWidth: 120 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-            <span style={{ fontFamily: "monospace", fontSize: 11, color: "#8aaa9a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#8aaa9a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
               {thesis.agent ? "Nexus Agent" : (thesis.displayName ?? shortAddr)}
             </span>
             {thesis.agent ? (
@@ -474,18 +474,18 @@ function FeedCard({
               <span style={{ flexShrink: 0 }}><NexusTierBadge address={thesis.wallet} /></span>
             )}
           </div>
-          {!thesis.agent && thesis.displayName && <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>{shortAddr}</div>}
-          {thesis.agent && <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>autonomous · funding-edge bot</div>}
+          {!thesis.agent && thesis.displayName && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a" }}>{shortAddr}</div>}
+          {thesis.agent && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a" }}>autonomous · funding-edge bot</div>}
         </div>
         <div style={{
-          fontFamily: "monospace", fontSize: 9, letterSpacing: "0.08em",
+          fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.08em",
           padding: "3px 8px", borderRadius: 3,
           background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color,
           flexShrink: 0,
         }}>
           {cfg.label}
         </div>
-        <div style={{ fontFamily: "monospace", fontSize: 9, color: "#2a4a3a", flexShrink: 0 }}>{timeAgo}</div>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#2a4a3a", flexShrink: 0 }}>{timeAgo}</div>
         {/* On-chain verified badge */}
         {thesis.onChainId !== undefined && (
           thesis.onChainTxHash ? (
@@ -543,16 +543,16 @@ function FeedCard({
 
       {/* Symbol + direction */}
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        <span style={{ fontFamily: "monospace", fontSize: 18, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
+        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
         <span style={{
-          fontFamily: "monospace", fontSize: 11,
+          fontFamily: "var(--nx-font-mono)", fontSize: 11,
           color: thesis.direction === "LONG" ? "#00ff88" : "#ff4444",
         }}>
           {thesis.direction === "LONG" ? "↑" : "↓"} {thesis.direction} · {thesis.leverage.toFixed(1)}x
         </span>
         {(thesis.copyCount ?? 0) > 0 && (
           <span style={{
-            fontFamily: "monospace", fontSize: 9, color: "#8aaa9a",
+            fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#8aaa9a",
             background: "#0a1a0a", border: "1px solid #1a3a1a",
             borderRadius: 3, padding: "2px 6px",
           }}>
@@ -561,7 +561,7 @@ function FeedCard({
         )}
         {(thesis.copyCount ?? 0) >= 3 && (
           <span style={{
-            fontFamily: "monospace", fontSize: 9, color: "#f97316",
+            fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#f97316",
             background: "#1a0800", border: "1px solid #3a1800",
             borderRadius: 3, padding: "2px 6px",
           }}>
@@ -580,8 +580,8 @@ function FeedCard({
           { label: "SIZE",  val: `$${thesis.positionSize.toFixed(0)}`, color: undefined },
         ].map(({ label, val, color }) => (
           <div key={label}>
-            <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>{label}</div>
-            <div style={{ fontSize: 12, color: color ?? "#8aaa9a", fontFamily: "monospace" }}>{val}</div>
+            <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
+            <div style={{ fontSize: 12, color: color ?? "#8aaa9a", fontFamily: "var(--nx-font-mono)" }}>{val}</div>
           </div>
         ))}
       </div>
@@ -595,25 +595,25 @@ function FeedCard({
         return (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px 12px", marginBottom: 10, paddingTop: 10, borderTop: "1px solid #1a2e1a" }}>
             <div>
-              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>MARK</div>
-              <div style={{ fontSize: 12, color: "#fff", fontFamily: "monospace", fontWeight: "bold" }}>
+              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>MARK</div>
+              <div style={{ fontSize: 12, color: "#fff", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>
                 ${markPrice.toFixed(markPrice < 10 ? 4 : 2)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>UNREALIZED</div>
-              <div style={{ fontSize: 12, fontFamily: "monospace", fontWeight: "bold", color: isWinning ? "#00ff88" : "#ff4444" }}>
+              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>UNREALIZED</div>
+              <div style={{ fontSize: 12, fontFamily: "var(--nx-font-mono)", fontWeight: "bold", color: isWinning ? "#00ff88" : "#ff4444" }}>
                 {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
                 <span style={{ fontSize: 9, marginLeft: 3, opacity: 0.7 }}>({pct >= 0 ? "+" : ""}{pct.toFixed(2)}%)</span>
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>TO SL</div>
-              <div style={{ fontSize: 12, color: "#ff4444", fontFamily: "monospace", fontWeight: "bold" }}>{toSL.toFixed(2)}%</div>
+              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>TO SL</div>
+              <div style={{ fontSize: 12, color: "#ff4444", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{toSL.toFixed(2)}%</div>
             </div>
             <div>
-              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>TO TP1</div>
-              <div style={{ fontSize: 12, color: "#00ff88", fontFamily: "monospace", fontWeight: "bold" }}>{toTP.toFixed(2)}%</div>
+              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>TO TP1</div>
+              <div style={{ fontSize: 12, color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{toTP.toFixed(2)}%</div>
             </div>
           </div>
         );
@@ -621,7 +621,7 @@ function FeedCard({
 
       {/* Actual PnL (if closed) */}
       {thesis.actualPnl !== null && thesis.status !== "ACTIVE" && (
-        <div style={{ fontFamily: "monospace", fontSize: 12, color: thesis.actualPnl >= 0 ? "#00ff88" : "#ff4444", marginBottom: 8 }}>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: thesis.actualPnl >= 0 ? "#00ff88" : "#ff4444", marginBottom: 8 }}>
           ACTUAL PnL: {thesis.actualPnl >= 0 ? "+" : ""}${thesis.actualPnl.toFixed(2)}
         </div>
       )}
@@ -629,7 +629,7 @@ function FeedCard({
       {/* Notes */}
       {thesis.notes && (
         <div style={{
-          fontFamily: "monospace", fontSize: 10, color: "#8aaa9a",
+          fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#8aaa9a",
           borderTop: "1px solid #1a2e1a", paddingTop: 8, marginTop: 4,
           lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word",
         }}>
@@ -825,19 +825,19 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, paddingLeft: 2 }}>
         <div style={{ width: 6, height: 6, borderRadius: "50%", background: onChainLoading ? "#fbbf24" : graded.size > 0 ? "#00ff88" : emerging.size > 0 ? "#fbbf24" : onChainStats.size > 0 ? "#00ff88" : "#3a5a4a" }} />
-        <span style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>
+        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a" }}>
           {graded.size > 0 ? `✓ ${graded.size} VERIFIED CALLER${graded.size !== 1 ? "S" : ""} · graded from public price` : emerging.size > 0 ? `◆ ${emerging.size} EMERGING CALLER${emerging.size !== 1 ? "S" : ""} · building toward verification (5 graded calls)` : onChainLoading ? "VERIFYING ON-CHAIN STATS..." : onChainStats.size > 0 ? `⛓ ${onChainStats.size} TRADER${onChainStats.size !== 1 ? "S" : ""} VERIFIED ON-CHAIN` : "RANKED BY KV DATA"}
         </span>
       </div>
       {callLedger?.ledgerHash && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10, paddingLeft: 2 }}>
-          <span style={{ fontFamily: "monospace", fontSize: 9, color: "#00ff88" }}>🔗 CALL LEDGER</span>
-          <code style={{ fontFamily: "monospace", fontSize: 9, color: "#8aaa9a", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 3, padding: "2px 6px" }}>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#00ff88" }}>🔗 CALL LEDGER</span>
+          <code style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#8aaa9a", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 3, padding: "2px 6px" }}>
             {callLedger.ledgerHash.slice(0, 10)}…{callLedger.ledgerHash.slice(-8)}
           </code>
-          <a href={`${API_BASE}/theses/ledger`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "monospace", fontSize: 9, color: "#4a9fff", textDecoration: "none" }}>verify ↗</a>
+          <a href={`${API_BASE}/theses/ledger`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#4a9fff", textDecoration: "none" }}>verify ↗</a>
           {callLedger.onChain?.verified && (
-            <a href={callLedger.onChain.explorer || "#"} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "monospace", fontSize: 9, color: "#00ff88", textDecoration: "none", border: "1px solid #1a4a2a", borderRadius: 3, padding: "2px 6px", background: "#0a1a0e" }}>⛓ ANCHORED ON-CHAIN ↗</a>
+            <a href={callLedger.onChain.explorer || "#"} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#00ff88", textDecoration: "none", border: "1px solid #1a4a2a", borderRadius: 3, padding: "2px 6px", background: "#0a1a0e" }}>⛓ ANCHORED ON-CHAIN ↗</a>
           )}
         </div>
       )}
@@ -864,7 +864,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               style={{ padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12, overflowX: "auto" }}
             >
               {/* Rank */}
-              <div style={{ fontFamily: "monospace", fontSize: RANK_MEDALS[rank] ? 16 : 12, minWidth: 28, flexShrink: 0, textAlign: "center", color: "#3a5a4a" }}>
+              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: RANK_MEDALS[rank] ? 16 : 12, minWidth: 28, flexShrink: 0, textAlign: "center", color: "#3a5a4a" }}>
                 {RANK_MEDALS[rank] ?? `#${rank}`}
               </div>
 
@@ -875,7 +875,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               <div style={{ flexGrow: 1, flexShrink: 0, flexBasis: 150, minWidth: 150, maxWidth: 240 }}>
                 {/* Name line — name truncates with ellipsis, YOU stays put */}
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontFamily: "monospace", fontSize: 11, color: "#8aaa9a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#8aaa9a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
                     {trader.displayName ?? shortAddr}
                   </span>
                   {isOwn && <span style={{ color: "#00ff88", fontSize: 9, flexShrink: 0 }}>YOU</span>}
@@ -892,19 +892,19 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                   <NexusTierBadge address={trader.wallet} />
                 </div>
                 {trader.graded ? (
-                  <div style={{ fontFamily: "monospace", fontSize: 9, color: "#4a7a5a", marginTop: 2 }}>
+                  <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#4a7a5a", marginTop: 2 }}>
                     {trader.graded.hitRate.toFixed(0)}% hit · {trader.graded.avgR > 0 ? "+" : ""}{trader.graded.avgR.toFixed(2)}R · {trader.graded.calls} graded calls
                   </div>
                 ) : (
-                  <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", marginTop: 2 }}>{shortAddr}</div>
+                  <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", marginTop: 2 }}>{shortAddr}</div>
                 )}
               </div>
 
               {/* Win rate — hero stat */}
               <div style={{ textAlign: "center", minWidth: 60, flexShrink: 0 }}>
-                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>WIN RATE</div>
+                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>WIN RATE</div>
                 <div style={{
-                  fontFamily: "monospace", fontSize: 16, fontWeight: "bold",
+                  fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: "bold",
                   color: closed === 0 ? "#3a5a4a" : trader.winRate >= 60 ? "#00ff88" : trader.winRate >= 40 ? "#fbbf24" : "#ff4444",
                 }}>
                   {closed === 0 ? "—" : `${trader.winRate.toFixed(0)}%`}
@@ -913,8 +913,8 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
 
               {/* W / L */}
               <div style={{ textAlign: "center", minWidth: 44, flexShrink: 0 }}>
-                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>W / L</div>
-                <div style={{ fontFamily: "monospace", fontSize: 12 }}>
+                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>W / L</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
                   <span style={{ color: "#00ff88" }}>{trader.wins}</span>
                   <span style={{ color: "#3a5a4a" }}> / </span>
                   <span style={{ color: "#ff4444" }}>{trader.losses}</span>
@@ -923,16 +923,16 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
 
               {/* Avg R:R */}
               <div style={{ textAlign: "center", minWidth: 50, flexShrink: 0 }}>
-                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>AVG R:R</div>
-                <div style={{ fontFamily: "monospace", fontSize: 12, color: trader.avgRR >= 2 ? "#00ff88" : "#fbbf24" }}>
+                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>AVG R:R</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: trader.avgRR >= 2 ? "#00ff88" : "#fbbf24" }}>
                   1:{trader.avgRR.toFixed(1)}
                 </div>
               </div>
 
               {/* Active */}
               <div style={{ textAlign: "center", minWidth: 40, flexShrink: 0 }}>
-                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>ACTIVE</div>
-                <div style={{ fontFamily: "monospace", fontSize: 12, color: trader.active > 0 ? "#4a9fff" : "#3a5a4a" }}>
+                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>ACTIVE</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: trader.active > 0 ? "#4a9fff" : "#3a5a4a" }}>
                   {trader.active}
                 </div>
               </div>
@@ -944,11 +944,11 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                 const isOnChain = onChain != null;
                 return (
                   <div style={{ textAlign: "center", minWidth: 44, flexShrink: 0 }}>
-                    <div style={{ fontSize: 8, color: isOnChain ? "#00ff88" : "#3a5a4a", fontFamily: "monospace" }}>
+                    <div style={{ fontSize: 8, color: isOnChain ? "#00ff88" : "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>
                       {isOnChain ? "⛓REP" : "REP"}
                     </div>
                     <div style={{
-                      fontFamily: "monospace", fontSize: 12, fontWeight: "bold",
+                      fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: "bold",
                       color: closed === 0 ? "#3a5a4a" : rep >= 70 ? "#00ff88" : rep >= 40 ? "#fbbf24" : "#ff4444",
                     }}>
                       {closed === 0 ? "—" : rep}
@@ -958,7 +958,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               })()}
 
               {/* Expand chevron */}
-              <div style={{ color: "#2a4a3a", fontSize: 10, fontFamily: "monospace", flexShrink: 0, paddingLeft: 4 }}>
+              <div style={{ color: "#2a4a3a", fontSize: 10, fontFamily: "var(--nx-font-mono)", flexShrink: 0, paddingLeft: 4 }}>
                 {isExpanded ? "▲" : "▼"}
               </div>
             </div>
@@ -976,7 +976,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                   </button>
                 </div>
                 {traderTheses.length === 0 ? (
-                  <div style={{ fontFamily: "monospace", fontSize: 10, color: "#2a4a3a" }}>no theses</div>
+                  <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#2a4a3a" }}>no theses</div>
                 ) : traderTheses.map((t) => {
                   const cfg = STATUS_CONFIG[t.status] ?? STATUS_CONFIG.ACTIVE;
                   const ticker = t.symbol.replace("PERP_", "").replace("_USDC", "");
@@ -987,8 +987,8 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                       display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
                     }}>
                       <div style={{ flex: 1, minWidth: 120 }}>
-                        <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
-                        <span style={{ fontFamily: "monospace", fontSize: 10, marginLeft: 8, color: t.direction === "LONG" ? "#00ff88" : "#ff4444" }}>
+                        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
+                        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, marginLeft: 8, color: t.direction === "LONG" ? "#00ff88" : "#ff4444" }}>
                           {t.direction === "LONG" ? "↑" : "↓"} {t.direction}
                         </span>
                       </div>
@@ -998,13 +998,13 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                           { label: "R:R",   val: `1:${t.riskReward.toFixed(2)}`, color: t.riskReward >= 2 ? "#00ff88" : "#fbbf24" },
                         ].map(({ label, val, color }) => (
                           <div key={label}>
-                            <div style={{ fontSize: 7, color: "#3a5a4a", fontFamily: "monospace" }}>{label}</div>
-                            <div style={{ fontSize: 11, color, fontFamily: "monospace" }}>{val}</div>
+                            <div style={{ fontSize: 7, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
+                            <div style={{ fontSize: 11, color, fontFamily: "var(--nx-font-mono)" }}>{val}</div>
                           </div>
                         ))}
                       </div>
                       <div style={{
-                        fontFamily: "monospace", fontSize: 8, padding: "2px 6px",
+                        fontFamily: "var(--nx-font-mono)", fontSize: 8, padding: "2px 6px",
                         borderRadius: 2, background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color,
                       }}>{cfg.label}</div>
                       {walletAddress && !isOwn && (
@@ -1012,7 +1012,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                           onClick={(e) => { e.stopPropagation(); onCopy(t); }}
                           style={{
                             background: "none", border: "1px solid #1a3a1a", borderRadius: 3,
-                            color: "#4a7a5a", fontFamily: "monospace", fontSize: 8,
+                            color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 8,
                             padding: "2px 6px", cursor: "pointer",
                           }}
                         >COPY</button>
@@ -1045,10 +1045,10 @@ function FeedEmptyState({ variant }: { variant: "feed" | "ranks" }) {
       <div style={{ fontSize: 30, color: "#00ff88", marginBottom: 12, textShadow: "0 0 16px rgba(0,255,136,0.4)" }}>
         {isRanks ? "◆" : "⬡"}
       </div>
-      <div style={{ fontFamily: "monospace", fontSize: 20, color: "#fff", fontWeight: "bold", marginBottom: 8, letterSpacing: "0.02em" }}>
+      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 20, color: "#fff", fontWeight: "bold", marginBottom: 8, letterSpacing: "0.02em" }}>
         {isRanks ? "The leaderboard is wide open." : "The signal starts here."}
       </div>
-      <div style={{ fontFamily: "monospace", fontSize: 12, color: "#8aaa9a", lineHeight: 1.6, marginBottom: 26 }}>
+      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#8aaa9a", lineHeight: 1.6, marginBottom: 26 }}>
         {isRanks
           ? "No traders ranked yet — rankings build as theses get published and closed out. Publish yours and claim rank #1."
           : "No public theses yet. Publish one from your Lab and it lands in the live feed — others can follow, copy, and grade it. Be the first signal."}
@@ -1056,9 +1056,9 @@ function FeedEmptyState({ variant }: { variant: "feed" | "ranks" }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26, textAlign: "left" }}>
         {steps.map((s) => (
           <div key={s.n} style={{ background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 4, padding: "12px 14px" }}>
-            <div style={{ fontFamily: "monospace", fontSize: 10, color: "#00ff88", marginBottom: 6 }}>{s.n}</div>
-            <div style={{ fontFamily: "monospace", fontSize: 12, color: "#fff", fontWeight: "bold", marginBottom: 4 }}>{s.title}</div>
-            <div style={{ fontFamily: "monospace", fontSize: 10, color: "#3a5a4a", lineHeight: 1.5 }}>{s.desc}</div>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#00ff88", marginBottom: 6 }}>{s.n}</div>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#fff", fontWeight: "bold", marginBottom: 4 }}>{s.title}</div>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#3a5a4a", lineHeight: 1.5 }}>{s.desc}</div>
           </div>
         ))}
       </div>
@@ -1066,7 +1066,7 @@ function FeedEmptyState({ variant }: { variant: "feed" | "ranks" }) {
         onClick={() => navigate("/lab")}
         style={{
           background: "#00ff8815", border: "1px solid #00ff88", borderRadius: 4,
-          color: "#00ff88", fontFamily: "monospace", fontSize: 12, fontWeight: "bold",
+          color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: "bold",
           padding: "10px 22px", cursor: "pointer", letterSpacing: "0.05em",
         }}
       >
@@ -1089,10 +1089,10 @@ function ContributePrompt({ prominent = false }: { prominent?: boolean }) {
       boxShadow: prominent ? "0 0 0 1px #00ff8830, 0 8px 24px -12px #00ff8840" : undefined,
     }}>
       <div style={{ flex: 1, minWidth: 200 }}>
-        <div style={{ fontFamily: "monospace", fontSize: prominent ? 14 : 12, color: "#00ff88", fontWeight: "bold", marginBottom: 4 }}>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: prominent ? 14 : 12, color: "#00ff88", fontWeight: "bold", marginBottom: 4 }}>
           {prominent ? "📡 Be the first verified caller on Nexus" : "📡 The feed's still early — claim your spot"}
         </div>
-        <div style={{ fontFamily: "monospace", fontSize: prominent ? 11 : 10, color: "#8aaa9a", lineHeight: 1.6 }}>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: prominent ? 11 : 10, color: "#8aaa9a", lineHeight: 1.6 }}>
           {prominent
             ? "Post a call (symbol · direction · entry/stop/target) — it's graded against public price on-chain, not self-reported. 5 graded calls = Verified Caller. Get in before the board fills up."
             : "Publish a thesis and it's graded against public price, on-chain. Early callers build rep fastest — get to 5 graded calls and you're a Verified Caller."}
@@ -1102,7 +1102,7 @@ function ContributePrompt({ prominent = false }: { prominent?: boolean }) {
         onClick={() => navigate("/lab?tab=thesis")}
         style={{
           background: prominent ? "#00ff88" : "#00ff8815", border: "1px solid #00ff88", borderRadius: 4,
-          color: prominent ? "#04130c" : "#00ff88", fontFamily: "monospace", fontSize: 11, fontWeight: "bold",
+          color: prominent ? "#04130c" : "#00ff88", fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold",
           padding: prominent ? "11px 18px" : "9px 16px", cursor: "pointer", letterSpacing: "0.05em", flexShrink: 0,
         }}
       >
@@ -1137,8 +1137,8 @@ function AgentTrackRecord() {
       style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", padding: "12px 16px", background: "linear-gradient(180deg,#0a160e,#0a0e0a)", border: "1px solid #1a4a2a", borderRadius: 6, marginBottom: 14 }}
     >
       <div style={{ flexShrink: 0 }}>
-        <div style={{ fontFamily: "monospace", fontSize: 12, color: "#00ff88", fontWeight: "bold" }}>🤖 NEXUS AUTONOMOUS AGENT</div>
-        <div style={{ fontFamily: "monospace", fontSize: 8.5, color: "#4a7a5a", marginTop: 2 }}>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#00ff88", fontWeight: "bold" }}>🤖 NEXUS AUTONOMOUS AGENT</div>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8.5, color: "#4a7a5a", marginTop: 2 }}>
           {s.anchored ? "⛓ trustless · on-chain-anchored track record" : "trustless · publicly graded track record"}
         </div>
       </div>
@@ -1149,8 +1149,8 @@ function AgentTrackRecord() {
           { label: "NET P&L", val: `${s.net >= 0 ? "+" : ""}$${Math.abs(s.net).toFixed(2)}`, color: s.net >= 0 ? "#00ff88" : "#ff4444" },
         ].map((x) => (
           <div key={x.label} style={{ textAlign: "right", lineHeight: 1.25 }}>
-            <div style={{ fontFamily: "monospace", fontSize: 14, fontWeight: "bold", color: x.color }}>{x.val}</div>
-            <div style={{ fontFamily: "monospace", fontSize: 7.5, color: "#3a5a4a", letterSpacing: "0.06em" }}>{x.label}</div>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: "bold", color: x.color }}>{x.val}</div>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 7.5, color: "#3a5a4a", letterSpacing: "0.06em" }}>{x.label}</div>
           </div>
         ))}
       </div>
@@ -1188,12 +1188,12 @@ function FeedPulse({ feed }: { feed: FeedThesis[] }) {
       <style>{`@keyframes feedPulse{0%,100%{opacity:1;box-shadow:0 0 8px #00ff88}50%{opacity:0.4;box-shadow:0 0 2px #00ff88}}`}</style>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
         <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#00ff88", animation: "feedPulse 2s infinite" }} />
-        <span style={{ fontFamily: "monospace", fontSize: 10, color: "#00ff88", fontWeight: "bold", letterSpacing: "0.1em" }}>LIVE</span>
+        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#00ff88", fontWeight: "bold", letterSpacing: "0.1em" }}>LIVE</span>
       </div>
       {stats.map((s) => (
         <div key={s.label} style={{ display: "flex", flexDirection: "column", lineHeight: 1.25 }}>
-          <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: "bold", color: s.color || "#fff" }}>{s.val}</span>
-          <span style={{ fontFamily: "monospace", fontSize: 7.5, color: "#3a5a4a", letterSpacing: "0.06em" }}>{s.label}</span>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", color: s.color || "#fff" }}>{s.val}</span>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 7.5, color: "#3a5a4a", letterSpacing: "0.06em" }}>{s.label}</span>
         </div>
       ))}
     </div>
@@ -1311,7 +1311,7 @@ export default function FeedPage() {
     background: active ? "#0a1a0a" : "none",
     border: `1px solid ${active ? "#00ff88" : "#1a2e1a"}`,
     color: active ? "#00ff88" : "#4a7a5a",
-    fontFamily: "monospace",
+    fontFamily: "var(--nx-font-mono)",
     fontSize: 10,
     padding: "5px 10px",
     cursor: "pointer",
@@ -1339,7 +1339,7 @@ export default function FeedPage() {
               background: view === "feed" ? "#0a1a0a" : "none",
               border: `1px solid ${view === "feed" ? "#00ff88" : "#1a2e1a"}`,
               color: view === "feed" ? "#00ff88" : "#4a7a5a",
-              fontFamily: "monospace", fontSize: 10,
+              fontFamily: "var(--nx-font-mono)", fontSize: 10,
               padding: isMobile ? "6px 4px" : "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
               flex: isMobile ? 1 : undefined, textAlign: "center",
             }}
@@ -1350,7 +1350,7 @@ export default function FeedPage() {
               background: view === "ranks" ? "#0a1a0a" : "none",
               border: `1px solid ${view === "ranks" ? "#00ff88" : "#1a2e1a"}`,
               color: view === "ranks" ? "#00ff88" : "#4a7a5a",
-              fontFamily: "monospace", fontSize: 10,
+              fontFamily: "var(--nx-font-mono)", fontSize: 10,
               padding: isMobile ? "6px 4px" : "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
               flex: isMobile ? 1 : undefined, textAlign: "center",
             }}
@@ -1363,7 +1363,7 @@ export default function FeedPage() {
                 background: view === "following" ? "#0a1a2a" : "none",
                 border: `1px solid ${view === "following" ? "#4a9fff" : "#1a2e1a"}`,
                 color: view === "following" ? "#4a9fff" : "#4a7a5a",
-                fontFamily: "monospace", fontSize: 10,
+                fontFamily: "var(--nx-font-mono)", fontSize: 10,
                 padding: isMobile ? "6px 4px" : "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
                 flex: isMobile ? 1 : undefined, textAlign: "center",
               }}
@@ -1380,7 +1380,7 @@ export default function FeedPage() {
                     background: sortMode === mode ? "#0a1a0a" : "none",
                     border: `1px solid ${sortMode === mode ? "#00ff88" : "#1a2e1a"}`,
                     color: sortMode === mode ? "#00ff88" : "#4a7a5a",
-                    fontFamily: "monospace", fontSize: 10,
+                    fontFamily: "var(--nx-font-mono)", fontSize: 10,
                     padding: isMobile ? "6px 4px" : "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
                     flex: isMobile ? 1 : undefined, textAlign: "center",
                   }}
@@ -1392,14 +1392,14 @@ export default function FeedPage() {
           )}
         </div>
         <div style={{ display: isMobile ? "none" : "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-          <div style={{ fontSize: 9, fontFamily: "monospace", color: "#3a5a4a" }}>
+          <div style={{ fontSize: 9, fontFamily: "var(--nx-font-mono)", color: "#3a5a4a" }}>
             {loading ? "loading..." : view === "ranks"
               ? `${feed.length > 0 ? [...new Set(feed.map(t => t.wallet.toLowerCase()))].length : 0} trader${[...new Set(feed.map(t => t.wallet.toLowerCase()))].length !== 1 ? "s" : ""}`
               : `${filtered.length} thesis${filtered.length !== 1 ? "es" : ""}`}
           </div>
           {/* Ph19: on-chain trader count from ThesisRegistered event log scan */}
           {onChainCount !== null && onChainCount > 0 && (
-            <div style={{ fontSize: 8, fontFamily: "monospace", color: "#2a5a3a" }}>
+            <div style={{ fontSize: 8, fontFamily: "var(--nx-font-mono)", color: "#2a5a3a" }}>
               ⛓ {onChainCount} on-chain
             </div>
           )}
@@ -1407,7 +1407,7 @@ export default function FeedPage() {
             const verifiedCount = feed.filter(t => t.onChainId !== undefined).length;
             if (verifiedCount === 0) return null;
             return (
-              <div style={{ fontSize: 8, fontFamily: "monospace", color: "#1a4a2a" }}>
+              <div style={{ fontSize: 8, fontFamily: "var(--nx-font-mono)", color: "#1a4a2a" }}>
                 {verifiedCount}/{feed.length} theses verified
               </div>
             );
@@ -1440,13 +1440,13 @@ export default function FeedPage() {
             {following.size === 0 ? (
               <div style={{ textAlign: "center", padding: "60px 0" }}>
                 <div style={{ fontSize: 20, color: "#2a4a3a", marginBottom: 8 }}>◈</div>
-                <div style={{ fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#2a4a3a" }}>
                   not following anyone yet — hit + on a trader card to follow them
                 </div>
               </div>
             ) : filtered.length === 0 ? (
               <div style={{ textAlign: "center", padding: "60px 0" }}>
-                <div style={{ fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#2a4a3a" }}>
                   no public theses from traders you follow
                 </div>
               </div>
@@ -1472,12 +1472,12 @@ export default function FeedPage() {
         {view === "ranks" && (
           <>
             {loading && (
-              <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>
+              <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#2a4a3a" }}>
                 loading rankings...
               </div>
             )}
             {error && !loading && (
-              <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "monospace", fontSize: 12, color: "#ff4444" }}>
+              <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ff4444" }}>
                 failed to load feed — check connection
               </div>
             )}
@@ -1526,7 +1526,7 @@ export default function FeedPage() {
                   border: "1px solid #1a2e1a",
                   borderRadius: 3,
                   color: "#00ff88",
-                  fontFamily: "monospace",
+                  fontFamily: "var(--nx-font-mono)",
                   fontSize: 10,
                   padding: "5px 10px",
                   outline: "none",
@@ -1536,13 +1536,13 @@ export default function FeedPage() {
             </div>
 
             {loading && (
-              <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>
+              <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#2a4a3a" }}>
                 loading feed...
               </div>
             )}
 
             {error && !loading && (
-              <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "monospace", fontSize: 12, color: "#ff4444" }}>
+              <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ff4444" }}>
                 failed to load feed — check connection
               </div>
             )}
@@ -1553,7 +1553,7 @@ export default function FeedPage() {
                 : (
                   <div style={{ textAlign: "center", padding: "60px 0" }}>
                     <div style={{ fontSize: 20, color: "#2a4a3a", marginBottom: 8 }}>■</div>
-                    <div style={{ fontFamily: "monospace", fontSize: 12, color: "#2a4a3a" }}>
+                    <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#2a4a3a" }}>
                       no results for this filter
                     </div>
                   </div>

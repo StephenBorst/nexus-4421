@@ -24,7 +24,7 @@ const PROVEN_EDGE = STRATEGY_PRESETS.find((p) => p.id === "proven-edge")?.config
 const bg = "#0a0e0a";
 const green = "#00ff88";
 const red = "#ff4444";
-const mono = "monospace";
+const mono = "var(--nx-font-mono)";
 const APP = "https://trade.nexustradinglabs.com";
 const API = "https://og.nexustradinglabs.com";
 const NEXUS = "0x3D958634ab725B627919EF8F2Ed59227309fDba3";

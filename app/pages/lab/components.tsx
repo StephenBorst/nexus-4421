@@ -5,7 +5,7 @@
 export function PnlChart({ points }: { points: number[] }) {
   if (points.length < 2) {
     return (
-      <div style={{ height: 160, display: "flex", alignItems: "center", justifyContent: "center", color: "#2a4a3a", fontFamily: "monospace", fontSize: 11 }}>
+      <div style={{ height: 160, display: "flex", alignItems: "center", justifyContent: "center", color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>
         no data yet
       </div>
     );
@@ -29,7 +29,7 @@ export function PnlChart({ points }: { points: number[] }) {
 // ─── Empty State ─────────────────────────────────────────
 export function EmptyState({ message }: { message: string }) {
   return (
-    <div style={{ padding: "40px 0", textAlign: "center", color: "#2a4a3a", fontFamily: "monospace", fontSize: 12 }}>
+    <div style={{ padding: "40px 0", textAlign: "center", color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
       <div style={{ fontSize: 20, marginBottom: 8 }}>&#9632;</div>
       {message}
     </div>

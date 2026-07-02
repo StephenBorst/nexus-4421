@@ -34,11 +34,11 @@ function RadarChart({ scores }: { scores: { label: string; value: number }[] }) 
       {dataPoints.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="4" fill="#00ff88" />)}
       {scores.map((s, i) => {
         const p = getPoint(i, r + 20);
-        return <text key={i} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 10, fill: "#3a5a4a", fontFamily: "monospace" }}>{s.label}</text>;
+        return <text key={i} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 10, fill: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{s.label}</text>;
       })}
       {scores.map((s, i) => {
         const p = getPoint(i, r - 16);
-        return <text key={i} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 9, fill: "#00ff88", fontFamily: "monospace" }}>{s.value}</text>;
+        return <text key={i} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 9, fill: "#00ff88", fontFamily: "var(--nx-font-mono)" }}>{s.value}</text>;
       })}
     </svg>
   );
@@ -100,14 +100,14 @@ function TradingScoreSection({ orders, winRate }: { orders: ProcessedTrade[]; wi
 
   return (
     <div style={{ ...cardStyle, marginTop: 12 }}>
-      <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 16, fontFamily: "monospace", display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 16, fontFamily: "var(--nx-font-mono)", display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ color: "#3a5a4a" }}>&#9632;</span> TRADING SCORE
       </div>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "280px 1fr", gap: isMobile ? 16 : 24, alignItems: "center", justifyItems: isMobile ? "center" : "stretch" }}>
         <RadarChart scores={metrics.scores} />
         <div style={{ width: isMobile ? "100%" : undefined }}>
-          <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: 4 }}>COMPOSITE SCORE</div>
-          <div style={{ fontSize: 64, fontWeight: "bold", color: "#00ff88", fontFamily: "monospace", lineHeight: 1 }}>{metrics.composite}</div>
+          <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 4 }}>COMPOSITE SCORE</div>
+          <div style={{ fontSize: 64, fontWeight: "bold", color: "#00ff88", fontFamily: "var(--nx-font-mono)", lineHeight: 1 }}>{metrics.composite}</div>
           <div style={{ height: 4, background: "#1a2e1a", borderRadius: 2, margin: "10px 0 16px" }}>
             <div style={{ height: 4, background: "#00ff88", borderRadius: 2, width: `${metrics.composite}%` }} />
           </div>
@@ -115,12 +115,12 @@ function TradingScoreSection({ orders, winRate }: { orders: ProcessedTrade[]; wi
             {metrics.details.map((d) => (
               <div key={d.label} style={{ background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 4, padding: "8px 10px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace", letterSpacing: "0.08em" }}>{d.label}</span>
-                  <span style={{ fontSize: 8, color: "#2a4a3a", fontFamily: "monospace" }}>{d.weight}</span>
+                  <span style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em" }}>{d.label}</span>
+                  <span style={{ fontSize: 8, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)" }}>{d.weight}</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <span style={{ fontSize: 16, color: "#00ff88", fontFamily: "monospace", fontWeight: "bold" }}>{d.score}</span>
-                  <span style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "monospace" }}>/100 {d.raw}</span>
+                  <span style={{ fontSize: 16, color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{d.score}</span>
+                  <span style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>/100 {d.raw}</span>
                 </div>
                 <div style={{ height: 3, background: "#1a2e1a", borderRadius: 2, marginTop: 6 }}>
                   <div style={{ height: 3, background: d.score > 80 ? "#00ff88" : d.score > 50 ? "#fbbf24" : "#ff4444", borderRadius: 2, width: `${d.score}%` }} />
@@ -129,8 +129,8 @@ function TradingScoreSection({ orders, winRate }: { orders: ProcessedTrade[]; wi
             ))}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <div style={{ background: "#0a0e0a", border: "1px solid #1a3a2a", borderRadius: 3, padding: "5px 12px", fontSize: 11, color: "#00ff88", fontFamily: "monospace" }}>{metrics.traderType}</div>
-            <div style={{ background: "#0a0e0a", border: "1px solid #1a3a2a", borderRadius: 3, padding: "5px 12px", fontSize: 11, color: "#00ff88", fontFamily: "monospace" }}>{metrics.avgLev}X AVG LEV</div>
+            <div style={{ background: "#0a0e0a", border: "1px solid #1a3a2a", borderRadius: 3, padding: "5px 12px", fontSize: 11, color: "#00ff88", fontFamily: "var(--nx-font-mono)" }}>{metrics.traderType}</div>
+            <div style={{ background: "#0a0e0a", border: "1px solid #1a3a2a", borderRadius: 3, padding: "5px 12px", fontSize: 11, color: "#00ff88", fontFamily: "var(--nx-font-mono)" }}>{metrics.avgLev}X AVG LEV</div>
           </div>
         </div>
       </div>
@@ -202,18 +202,18 @@ function BreakdownRow({ orders }: { orders: ProcessedTrade[] }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginTop: 8 }}>
       <div style={cardStyle}>
-        <div style={{ fontSize: 10, color: "#fbbf24", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "monospace" }}>&#9632; HOLD TIME</div>
+        <div style={{ fontSize: 10, color: "#fbbf24", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; HOLD TIME</div>
         {holdTime.map((b) => (
           <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <div style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "monospace", width: 40 }}>{b.label}</div>
+            <div style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", width: 40 }}>{b.label}</div>
             <div style={{ flex: 1, height: 20, background: "#0a0e0a", borderRadius: 3, overflow: "hidden" }}>
               {b.count > 0 && (
                 <div style={{ height: "100%", background: "#1a4a2a", width: `${(b.count / orders.length) * 100}%`, display: "flex", alignItems: "center", paddingLeft: 6 }}>
-                  <span style={{ fontSize: 9, color: "#00ff88", fontFamily: "monospace" }}>{b.count} ({Math.round((b.count / orders.length) * 100)}%)</span>
+                  <span style={{ fontSize: 9, color: "#00ff88", fontFamily: "var(--nx-font-mono)" }}>{b.count} ({Math.round((b.count / orders.length) * 100)}%)</span>
                 </div>
               )}
             </div>
-            <div style={{ fontSize: 10, color: b.pnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "monospace", width: 44, textAlign: "right" }}>
+            <div style={{ fontSize: 10, color: b.pnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", width: 44, textAlign: "right" }}>
               {b.count > 0 ? formatPnl(b.pnl) : "+$0"}
             </div>
           </div>
@@ -221,42 +221,42 @@ function BreakdownRow({ orders }: { orders: ProcessedTrade[] }) {
       </div>
 
       <div style={cardStyle}>
-        <div style={{ fontSize: 10, color: "#4a9fff", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "monospace" }}>&#9632; WEEKDAY BREAKDOWN</div>
+        <div style={{ fontSize: 10, color: "#4a9fff", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; WEEKDAY BREAKDOWN</div>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 80, marginBottom: 12 }}>
           {weekday.days.map((d) => (
             <div key={d.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-              {d.trades > 0 && <div style={{ fontSize: 8, color: "#00ff88", fontFamily: "monospace" }}>{Math.round((d.wins / d.trades) * 100)}%</div>}
+              {d.trades > 0 && <div style={{ fontSize: 8, color: "#00ff88", fontFamily: "var(--nx-font-mono)" }}>{Math.round((d.wins / d.trades) * 100)}%</div>}
               <div style={{ width: "100%", height: d.trades > 0 ? `${(d.trades / maxDayTrades) * 60}px` : "4px", background: d.trades > 0 ? "#1a4a2a" : "#0a150a", borderRadius: 3, border: "1px solid #1a3a1a" }} />
-              <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>{d.label}</div>
+              <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{d.label}</div>
             </div>
           ))}
         </div>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <div><div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>WEEKDAY WR</div><div style={{ fontSize: 16, color: "#00ff88", fontFamily: "monospace" }}>{weekday.weekdayWR}%</div></div>
-          <div style={{ textAlign: "right" }}><div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>WEEKEND WR</div><div style={{ fontSize: 16, color: parseFloat(weekday.weekendWR) > 0 ? "#00ff88" : "#ff4444", fontFamily: "monospace" }}>{weekday.weekendWR}%</div></div>
+          <div><div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>WEEKDAY WR</div><div style={{ fontSize: 16, color: "#00ff88", fontFamily: "var(--nx-font-mono)" }}>{weekday.weekdayWR}%</div></div>
+          <div style={{ textAlign: "right" }}><div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>WEEKEND WR</div><div style={{ fontSize: 16, color: parseFloat(weekday.weekendWR) > 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)" }}>{weekday.weekendWR}%</div></div>
         </div>
       </div>
 
       <div style={cardStyle}>
-        <div style={{ fontSize: 10, color: "#a855f7", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "monospace" }}>&#9632; LEVERAGE ANALYSIS</div>
+        <div style={{ fontSize: 10, color: "#a855f7", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; LEVERAGE ANALYSIS</div>
         {leverage.buckets.length === 0
-          ? <div style={{ fontSize: 11, color: "#2a4a3a", fontFamily: "monospace" }}>no leverage data available</div>
+          ? <div style={{ fontSize: 11, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)" }}>no leverage data available</div>
           : leverage.buckets.map((b) => (
             <div key={b.label} style={{ marginBottom: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 11, color: "#fff", fontFamily: "monospace" }}>{b.label}</span>
-                <span style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "monospace" }}>{b.trades} trades {b.trades ? `${Math.round((b.wins / b.trades) * 100)}%` : ""}</span>
+                <span style={{ fontSize: 11, color: "#fff", fontFamily: "var(--nx-font-mono)" }}>{b.label}</span>
+                <span style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{b.trades} trades {b.trades ? `${Math.round((b.wins / b.trades) * 100)}%` : ""}</span>
               </div>
               <div style={{ height: 4, background: "#1a2e1a", borderRadius: 2 }}>
                 <div style={{ height: 4, background: "#fbbf24", borderRadius: 2, width: `${(b.trades / orders.length) * 100}%` }} />
               </div>
-              <div style={{ fontSize: 10, color: b.pnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "monospace", marginTop: 3 }}>{formatPnl(b.pnl)}</div>
+              <div style={{ fontSize: 10, color: b.pnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", marginTop: 3 }}>{formatPnl(b.pnl)}</div>
             </div>
           ))
         }
         <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #1a2e1a", display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>AVG LEVERAGE</span>
-          <span style={{ fontSize: 16, color: "#fbbf24", fontFamily: "monospace" }}>{leverage.avgLev}x</span>
+          <span style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>AVG LEVERAGE</span>
+          <span style={{ fontSize: 16, color: "#fbbf24", fontFamily: "var(--nx-font-mono)" }}>{leverage.avgLev}x</span>
         </div>
       </div>
     </div>
@@ -280,21 +280,21 @@ function TopAssets({ orders }: { orders: ProcessedTrade[] }) {
 
   return (
     <div style={{ ...cardStyle, marginTop: 8 }}>
-      <div style={{ fontSize: 10, color: "#4a9fff", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "monospace" }}>&#9632; TOP ASSETS</div>
+      <div style={{ fontSize: 10, color: "#4a9fff", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; TOP ASSETS</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(108px, 1fr))", gap: 8 }}>
         {assets.map(([sym, data]) => {
           const wr = Math.round((data.wins / data.trades) * 100);
           return (
             <div key={sym} style={{ background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 4, padding: "10px 12px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: 13, color: "#fff", fontWeight: "bold", fontFamily: "monospace" }}>{sym}</span>
-                <span style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "monospace" }}>{data.trades}</span>
+                <span style={{ fontSize: 13, color: "#fff", fontWeight: "bold", fontFamily: "var(--nx-font-mono)" }}>{sym}</span>
+                <span style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{data.trades}</span>
               </div>
-              <div style={{ fontSize: 16, color: data.pnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontWeight: "bold", marginBottom: 8 }}>{formatPnl(data.pnl)}</div>
+              <div style={{ fontSize: 16, color: data.pnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontWeight: "bold", marginBottom: 8 }}>{formatPnl(data.pnl)}</div>
               <div style={{ height: 3, background: "#1a2e1a", borderRadius: 2, marginBottom: 4 }}>
                 <div style={{ height: 3, background: wr > 50 ? "#00ff88" : "#ff4444", borderRadius: 2, width: `${wr}%` }} />
               </div>
-              <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>{wr}% WR</div>
+              <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{wr}% WR</div>
             </div>
           );
         })}
@@ -356,30 +356,30 @@ function TimingAndRisk({ orders }: { orders: ProcessedTrade[] }) {
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8, marginTop: 8 }}>
       {/* Streaks */}
       <div style={cardStyle}>
-        <div style={{ fontSize: 10, color: "#fbbf24", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "monospace" }}>&#9632; STREAKS</div>
+        <div style={{ fontSize: 10, color: "#fbbf24", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "var(--nx-font-mono)" }}>&#9632; STREAKS</div>
         <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>CURRENT</div>
-          <div style={{ fontSize: 28, fontWeight: "bold", fontFamily: "monospace", color: stats.current >= 0 ? "#00ff88" : "#ff4444" }}>
+          <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>CURRENT</div>
+          <div style={{ fontSize: 28, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: stats.current >= 0 ? "#00ff88" : "#ff4444" }}>
             {Math.abs(stats.current)} {stats.current >= 0 ? "W" : "L"}
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>BEST WIN</div>
-            <div style={{ fontSize: 18, color: "#00ff88", fontFamily: "monospace" }}>{stats.bestWin}</div>
+            <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>BEST WIN</div>
+            <div style={{ fontSize: 18, color: "#00ff88", fontFamily: "var(--nx-font-mono)" }}>{stats.bestWin}</div>
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>WORST LOSS</div>
-            <div style={{ fontSize: 18, color: "#ff4444", fontFamily: "monospace" }}>{stats.worstLoss}</div>
+            <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>WORST LOSS</div>
+            <div style={{ fontSize: 18, color: "#ff4444", fontFamily: "var(--nx-font-mono)" }}>{stats.worstLoss}</div>
           </div>
         </div>
       </div>
 
       {/* Risk-adjusted (gated) */}
       <div style={cardStyle}>
-        <div style={{ fontSize: 10, color: "#a855f7", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "monospace" }}>&#9632; RISK-ADJUSTED</div>
+        <div style={{ fontSize: 10, color: "#a855f7", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "var(--nx-font-mono)" }}>&#9632; RISK-ADJUSTED</div>
         {gated ? (
-          <div style={{ fontSize: 11, color: "#3a5a4a", fontFamily: "monospace", lineHeight: 1.7 }}>
+          <div style={{ fontSize: 11, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", lineHeight: 1.7 }}>
             need <span style={{ color: "#fbbf24" }}>{RISK_SAMPLE_GATE - stats.n}</span> more closed trades<br />
             <span style={{ color: "#2a4a3a" }}>ratios are meaningless under {RISK_SAMPLE_GATE} samples — we won&apos;t fake them</span>
           </div>
@@ -391,8 +391,8 @@ function TimingAndRisk({ orders }: { orders: ProcessedTrade[] }) {
               { label: "EXPECTANCY", num: stats.expectancy, value: formatPnl(stats.expectancy) },
             ].map((r) => (
               <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <span style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "monospace", letterSpacing: "0.06em" }}>{r.label}</span>
-                <span style={{ fontSize: 18, color: r.num >= 0 ? "#00ff88" : "#ff4c6a", fontFamily: "monospace" }}>{r.value}</span>
+                <span style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.06em" }}>{r.label}</span>
+                <span style={{ fontSize: 18, color: r.num >= 0 ? "#00ff88" : "#ff4c6a", fontFamily: "var(--nx-font-mono)" }}>{r.value}</span>
               </div>
             ))}
           </div>
@@ -401,7 +401,7 @@ function TimingAndRisk({ orders }: { orders: ProcessedTrade[] }) {
 
       {/* Peak hours + heatmap */}
       <div style={{ ...cardStyle, gridColumn: isMobile ? "auto" : "span 2" }}>
-        <div style={{ fontSize: 10, color: "#4a9fff", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "monospace" }}>&#9632; PEAK HOURS <span style={{ color: "#2a4a3a" }}>(local)</span></div>
+        <div style={{ fontSize: 10, color: "#4a9fff", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; PEAK HOURS <span style={{ color: "#2a4a3a" }}>(local)</span></div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(24, 1fr)", gap: 2, marginBottom: 12 }}>
           {stats.hours.map((b) => {
             const wr = b.trades ? Math.round((b.wins / b.trades) * 100) : 0;
@@ -415,11 +415,11 @@ function TimingAndRisk({ orders }: { orders: ProcessedTrade[] }) {
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {stats.peak.length === 0
-            ? <span style={{ fontSize: 11, color: "#2a4a3a", fontFamily: "monospace" }}>no timing data</span>
+            ? <span style={{ fontSize: 11, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)" }}>no timing data</span>
             : stats.peak.map((b) => (
               <div key={b.h} style={{ background: "#0a150a", border: "1px solid #1a3a1a", borderRadius: 4, padding: "6px 10px" }}>
-                <div style={{ fontSize: 12, color: "#fff", fontFamily: "monospace" }}>{fmtHr(b.h)}-{fmtHr((b.h + 1) % 24)}</div>
-                <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "monospace" }}>{b.trades} trades · <span style={{ color: "#00ff88" }}>{Math.round((b.wins / b.trades) * 100)}%</span></div>
+                <div style={{ fontSize: 12, color: "#fff", fontFamily: "var(--nx-font-mono)" }}>{fmtHr(b.h)}-{fmtHr((b.h + 1) % 24)}</div>
+                <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{b.trades} trades · <span style={{ color: "#00ff88" }}>{Math.round((b.wins / b.trades) * 100)}%</span></div>
               </div>
             ))}
         </div>
@@ -450,50 +450,50 @@ function PerformanceAnalysis({ orders }: { orders: ProcessedTrade[] }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
       <div style={cardStyle}>
-        <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "monospace" }}>&#9632; PERFORMANCE ANALYSIS</div>
+        <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; PERFORMANCE ANALYSIS</div>
         <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 9, color: "#00ff88", fontFamily: "monospace", marginBottom: 4 }}>Best Trade</div>
+          <div style={{ fontSize: 9, color: "#00ff88", fontFamily: "var(--nx-font-mono)", marginBottom: 4 }}>Best Trade</div>
           <div style={{ background: "#0a150a", border: "1px solid #1a3a1a", borderRadius: 4, padding: "10px 12px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <span style={{ fontSize: 14, color: "#fff", fontWeight: "bold", fontFamily: "monospace" }}>{bestSym} {data.best.direction.toLowerCase()}</span>
-              <span style={{ fontSize: 16, color: "#00ff88", fontFamily: "monospace", fontWeight: "bold" }}>{formatPnl(data.best.pnl)}</span>
+              <span style={{ fontSize: 14, color: "#fff", fontWeight: "bold", fontFamily: "var(--nx-font-mono)" }}>{bestSym} {data.best.direction.toLowerCase()}</span>
+              <span style={{ fontSize: 16, color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{formatPnl(data.best.pnl)}</span>
             </div>
-            {data.best.leverage && <div style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "monospace", marginTop: 4 }}>{data.best.leverage}x leverage</div>}
+            {data.best.leverage && <div style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginTop: 4 }}>{data.best.leverage}x leverage</div>}
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 9, color: "#ff4444", fontFamily: "monospace", marginBottom: 4 }}>Worst Trade</div>
+          <div style={{ fontSize: 9, color: "#ff4444", fontFamily: "var(--nx-font-mono)", marginBottom: 4 }}>Worst Trade</div>
           <div style={{ background: "#150a0a", border: "1px solid #3a1a1a", borderRadius: 4, padding: "10px 12px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <span style={{ fontSize: 14, color: "#fff", fontWeight: "bold", fontFamily: "monospace" }}>{worstSym} {data.worst.direction.toLowerCase()}</span>
-              <span style={{ fontSize: 16, color: "#ff4444", fontFamily: "monospace", fontWeight: "bold" }}>{formatPnl(data.worst.pnl)}</span>
+              <span style={{ fontSize: 14, color: "#fff", fontWeight: "bold", fontFamily: "var(--nx-font-mono)" }}>{worstSym} {data.worst.direction.toLowerCase()}</span>
+              <span style={{ fontSize: 16, color: "#ff4444", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{formatPnl(data.worst.pnl)}</span>
             </div>
-            {data.worst.leverage && <div style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "monospace", marginTop: 4 }}>{data.worst.leverage}x leverage</div>}
+            {data.worst.leverage && <div style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginTop: 4 }}>{data.worst.leverage}x leverage</div>}
           </div>
         </div>
       </div>
 
       <div style={cardStyle}>
-        <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "monospace" }}>&#9632; LONG vs SHORT</div>
+        <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; LONG vs SHORT</div>
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 12, color: "#8aaa9a", fontFamily: "monospace" }}>Long Trades</span>
-            <span style={{ fontSize: 12, color: "#3a5a4a", fontFamily: "monospace" }}>{data.longs.length} trades</span>
+            <span style={{ fontSize: 12, color: "#8aaa9a", fontFamily: "var(--nx-font-mono)" }}>Long Trades</span>
+            <span style={{ fontSize: 12, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{data.longs.length} trades</span>
           </div>
           <div style={{ height: 6, background: "#1a2e1a", borderRadius: 3, marginBottom: 4 }}>
             <div style={{ height: 6, background: data.longs.length ? "#4a9fff" : "#1a2e1a", borderRadius: 3, width: `${data.longs.length ? (data.longWins / data.longs.length) * 100 : 0}%` }} />
           </div>
-          <div style={{ fontSize: 11, color: "#3a5a4a", fontFamily: "monospace" }}>{data.longs.length ? `${Math.round((data.longWins / data.longs.length) * 100)}%` : "0%"}</div>
+          <div style={{ fontSize: 11, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{data.longs.length ? `${Math.round((data.longWins / data.longs.length) * 100)}%` : "0%"}</div>
         </div>
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 12, color: "#8aaa9a", fontFamily: "monospace" }}>Short Trades</span>
-            <span style={{ fontSize: 12, color: "#3a5a4a", fontFamily: "monospace" }}>{data.shorts.length} trades</span>
+            <span style={{ fontSize: 12, color: "#8aaa9a", fontFamily: "var(--nx-font-mono)" }}>Short Trades</span>
+            <span style={{ fontSize: 12, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{data.shorts.length} trades</span>
           </div>
           <div style={{ height: 6, background: "#1a2e1a", borderRadius: 3, marginBottom: 4 }}>
             <div style={{ height: 6, background: data.shorts.length ? "#00ff88" : "#1a2e1a", borderRadius: 3, width: `${data.shorts.length ? (data.shortWins / data.shorts.length) * 100 : 0}%` }} />
           </div>
-          <div style={{ fontSize: 11, color: "#3a5a4a", fontFamily: "monospace" }}>{data.shorts.length ? `${Math.round((data.shortWins / data.shorts.length) * 100)}%` : "0%"}</div>
+          <div style={{ fontSize: 11, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{data.shorts.length ? `${Math.round((data.shortWins / data.shorts.length) * 100)}%` : "0%"}</div>
         </div>
       </div>
     </div>
@@ -512,30 +512,30 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-        <a href="/analyze" style={{ fontSize: 10, color: "#00ff88", fontFamily: "monospace", letterSpacing: "0.08em", textDecoration: "none", border: "1px solid #1a3a2a", borderRadius: 4, padding: "5px 10px" }}>
+        <a href="/analyze" style={{ fontSize: 10, color: "#00ff88", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em", textDecoration: "none", border: "1px solid #1a3a2a", borderRadius: 4, padding: "5px 10px" }}>
           ▶ X-RAY ANY WALLET
         </a>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 8 }}>
         <div style={cardStyle}>
           <div style={labelStyle}>TOTAL PNL</div>
-          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "monospace", color: totalPnl >= 0 ? "#00ff88" : "#ff4444" }}>{formatPnl(totalPnl)}</div>
-          <div style={{ fontSize: 10, color: "#3a5a4a", marginTop: 4, fontFamily: "monospace" }}>realized</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: totalPnl >= 0 ? "#00ff88" : "#ff4444" }}>{formatPnl(totalPnl)}</div>
+          <div style={{ fontSize: 10, color: "#3a5a4a", marginTop: 4, fontFamily: "var(--nx-font-mono)" }}>realized</div>
         </div>
         <div style={cardStyle}>
           <div style={labelStyle}>WIN RATE</div>
-          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "monospace", color: "#4a9fff" }}>{orders.length ? `${winRate.toFixed(1)}%` : "—"}</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#4a9fff" }}>{orders.length ? `${winRate.toFixed(1)}%` : "—"}</div>
           <div style={{ height: 4, background: "#1a2e1a", borderRadius: 2, marginTop: 8 }}><div style={{ height: 4, background: "#4a9fff", borderRadius: 2, width: `${winRate}%` }} /></div>
         </div>
         <div style={cardStyle}>
           <div style={labelStyle}>TRADES</div>
-          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "monospace", color: "#a855f7" }}>{orders.length}</div>
-          <div style={{ fontSize: 10, color: "#3a5a4a", marginTop: 4, fontFamily: "monospace" }}>closed</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#a855f7" }}>{orders.length}</div>
+          <div style={{ fontSize: 10, color: "#3a5a4a", marginTop: 4, fontFamily: "var(--nx-font-mono)" }}>closed</div>
         </div>
         <div style={cardStyle}>
           <div style={labelStyle}>BALANCE</div>
-          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "monospace", color: "#fbbf24" }}>{collateral > 0 ? `$${collateral.toFixed(2)}` : "—"}</div>
-          <div style={{ fontSize: 10, color: "#3a5a4a", marginTop: 4, fontFamily: "monospace" }}>usdc</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#fbbf24" }}>{collateral > 0 ? `$${collateral.toFixed(2)}` : "—"}</div>
+          <div style={{ fontSize: 10, color: "#3a5a4a", marginTop: 4, fontFamily: "var(--nx-font-mono)" }}>usdc</div>
         </div>
       </div>
 
@@ -545,7 +545,7 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
           {orders.length ? <PnlChart points={cumulativePnl} /> : <EmptyState message="connect wallet + make trades to see curve" />}
         </div>
         <div style={cardStyle}>
-          <div style={{ fontSize: 10, color: "#4a9fff", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "monospace" }}>PERFORMANCE</div>
+          <div style={{ fontSize: 10, color: "#4a9fff", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "var(--nx-font-mono)" }}>PERFORMANCE</div>
           {[
             { label: "AVG WIN", value: orders.length ? `$${avgWin.toFixed(2)}` : "—" },
             { label: "AVG LOSS", value: orders.length ? `$${avgLoss.toFixed(2)}` : "—" },
@@ -554,8 +554,8 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
             { label: "VOLUME", value: volume > 0 ? `$${volume.toFixed(0)}` : "—" },
           ].map((r) => (
             <div key={r.label} style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 9, color: "#3a5a4a", letterSpacing: "0.08em", fontFamily: "monospace" }}>{r.label}</div>
-              <div style={{ fontSize: 18, color: "#00ff88", fontFamily: "monospace" }}>{r.value}</div>
+              <div style={{ fontSize: 9, color: "#3a5a4a", letterSpacing: "0.08em", fontFamily: "var(--nx-font-mono)" }}>{r.label}</div>
+              <div style={{ fontSize: 18, color: "#00ff88", fontFamily: "var(--nx-font-mono)" }}>{r.value}</div>
             </div>
           ))}
         </div>

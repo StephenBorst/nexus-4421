@@ -76,14 +76,14 @@ function AgentTrackRecord({ title, accent, trades, paper, onReset }: {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ ...agentLabelStyle, color: accent }}>{title}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {since && <span style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>since {since}</span>}
+          {since && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a" }}>since {since}</span>}
           {onReset && tr > 0 && (
             <button onClick={onReset} style={{ ...navBtnStyle, fontSize: 9, padding: "3px 10px", color: "#4a9fff", borderColor: "#1a3a5a" }}>RESET</button>
           )}
         </div>
       </div>
       {tr === 0 ? (
-        <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 11, marginTop: 8, lineHeight: 1.6 }}>
+        <div style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 11, marginTop: 8, lineHeight: 1.6 }}>
           {paper
             ? <>No paper trades yet — switch to 🧪 PAPER and activate to build a simulated track record against live prices. Risk-free.</>
             : <>No live track record yet — this agent hasn't traded for you. Stats build here transparently from its first trade. <strong style={{ color: "#8aaa9a" }}>Start small.</strong></>}
@@ -100,11 +100,11 @@ function AgentTrackRecord({ title, accent, trades, paper, onReset }: {
             ].map(({ label, value, color }) => (
               <div key={label}>
                 <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
-                <div style={{ color, fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>{value}</div>
+                <div style={{ color, fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>{value}</div>
               </div>
             ))}
           </div>
-          <div style={{ marginTop: 10, fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", lineHeight: 1.5 }}>
+          <div style={{ marginTop: 10, fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", lineHeight: 1.5 }}>
             {paper
               ? "🧪 Simulated results — paper trades never touch the exchange. A great paper record is encouraging, not a guarantee."
               : "⚠ Past performance does not guarantee future results. Markets are risky — only deploy capital you can afford to lose, and start small."}
@@ -628,7 +628,7 @@ export function AgentView() {
   if (!walletAddress) {
     return (
       <div style={{ ...agentCardStyle, textAlign: "center", padding: 40 }}>
-        <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 13 }}>
+        <div style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 13 }}>
           // CONNECT WALLET TO CONFIGURE AGENT
         </div>
       </div>
@@ -638,7 +638,7 @@ export function AgentView() {
   if (loading) {
     return (
       <div style={{ ...agentCardStyle, textAlign: "center", padding: 40 }}>
-        <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 13 }}>
+        <div style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 13 }}>
           // LOADING AGENT STATE...
         </div>
       </div>
@@ -653,11 +653,11 @@ export function AgentView() {
       {/* ─── Header ──────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, rowGap: 10, marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontFamily: "monospace", fontSize: 14, color: "#00ff88", fontWeight: 600 }}>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, color: "#00ff88", fontWeight: 600 }}>
             // NEXUS AGENT
           </span>
           <span style={{
-            fontFamily: "monospace", fontSize: 10, padding: "3px 10px", borderRadius: 3,
+            fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "3px 10px", borderRadius: 3,
             background: isActive ? "#00ff8815" : "#ff444415",
             border: `1px solid ${isActive ? "#00ff8840" : "#ff444440"}`,
             color: isActive ? "#00ff88" : "#ff4444",
@@ -672,7 +672,7 @@ export function AgentView() {
               background: tab === t ? "#0a1a0a" : "none",
               border: `1px solid ${tab === t ? "#00ff88" : "transparent"}`,
               color: tab === t ? "#00ff88" : "#4a7a5a",
-              fontFamily: "monospace", fontSize: 10, padding: "4px 10px",
+              fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "4px 10px",
               cursor: "pointer", letterSpacing: "0.05em", borderRadius: 3,
               textTransform: "uppercase",
             }}>
@@ -684,13 +684,13 @@ export function AgentView() {
 
       {error && (
         <div style={{ ...agentCardStyle, borderColor: "#ff4444", background: "#1a0a0a", marginBottom: 12 }}>
-          <span style={{ color: "#ff4444", fontFamily: "monospace", fontSize: 12 }}>⚠ {error}</span>
+          <span style={{ color: "#ff4444", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>⚠ {error}</span>
           <span onClick={() => setError(null)} style={{ float: "right", cursor: "pointer", color: "#ff4444" }}>✕</span>
         </div>
       )}
       {success && (
         <div style={{ ...agentCardStyle, borderColor: "#00ff88", background: "#0a1a0a", marginBottom: 12 }}>
-          <span style={{ color: "#00ff88", fontFamily: "monospace", fontSize: 12 }}>✓ {success}</span>
+          <span style={{ color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>✓ {success}</span>
         </div>
       )}
 
@@ -716,13 +716,13 @@ export function AgentView() {
                     background: active ? "#00ff8810" : "#0a0e0a",
                     border: `1px solid ${active ? "#00ff88" : "#1e2d1e"}`, borderRadius: 6, padding: "10px 12px",
                   }}>
-                    <div style={{ color: active ? "#00ff88" : "#c0c0c0", fontFamily: "monospace", fontSize: 13, fontWeight: 600 }}>{p.label}{active ? " ✓" : ""}</div>
-                    <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 10, marginTop: 3, lineHeight: 1.4 }}>{p.blurb}</div>
+                    <div style={{ color: active ? "#00ff88" : "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>{p.label}{active ? " ✓" : ""}</div>
+                    <div style={{ color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 10, marginTop: 3, lineHeight: 1.4 }}>{p.blurb}</div>
                   </button>
                 );
               })}
             </div>
-            <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
+            <div style={{ color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
               Nexus's agent lives in the day-to-swing middle. Scalping (seconds) needs sub-minute data the funding edge doesn't use; position trading is buy-and-hold — neither fits this tool, so we don't fake them.
             </div>
           </div>
@@ -749,10 +749,10 @@ export function AgentView() {
                       borderRadius: 6, padding: "10px 12px",
                     }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, color: locked ? "#3a5a4a" : "#fff", fontFamily: "monospace", fontWeight: "bold" }}>{p.name}{locked ? " ◆" : ""}</span>
+                      <span style={{ fontSize: 12, color: locked ? "#3a5a4a" : "#fff", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{p.name}{locked ? " ◆" : ""}</span>
                     </div>
-                    <div style={{ fontSize: 8, color: p.accent, fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: 6 }}>{p.tag}</div>
-                    <div style={{ fontSize: 9.5, color: "#6a8a7a", fontFamily: "monospace", lineHeight: 1.5 }}>{p.blurb}</div>
+                    <div style={{ fontSize: 8, color: p.accent, fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em", marginBottom: 6 }}>{p.tag}</div>
+                    <div style={{ fontSize: 9.5, color: "#6a8a7a", fontFamily: "var(--nx-font-mono)", lineHeight: 1.5 }}>{p.blurb}</div>
                   </button>
                 );
               })}
@@ -775,22 +775,22 @@ export function AgentView() {
             return (
               <div style={{ ...agentCardStyle, borderColor: "#1a4a2a", background: "#0a1a0e" }}>
                 <div style={{ ...agentLabelStyle, color: "#00ff88" }}>🎓 READY TO GO LIVE?</div>
-                <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 12, lineHeight: 1.6, marginTop: 8 }}>
+                <div style={{ color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 12, lineHeight: 1.6, marginTop: 8 }}>
                   Your paper agent is proven — <strong style={{ color: "#00ff88" }}>+${net.toFixed(2)}</strong> over{" "}
                   <strong style={{ color: "#fff" }}>{pt.length}</strong> simulated trades ({wr}% win rate). Same strategy,
                   same guardrails — switch it to live to put it to work for real.
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                   <button onClick={() => { setConfig({ ...config, mode: "ASSISTED" }); setSuccess("Mode → ASSISTED. Review params + hit Update below."); setTimeout(() => setSuccess(null), 4000); }}
-                    style={{ background: "#00ff8815", border: "1px solid #00ff88", borderRadius: 4, color: "#00ff88", fontFamily: "monospace", fontSize: 11, padding: "8px 16px", cursor: "pointer" }}>
+                    style={{ background: "#00ff8815", border: "1px solid #00ff88", borderRadius: 4, color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontSize: 11, padding: "8px 16px", cursor: "pointer" }}>
                     → GO ASSISTED
                   </button>
                   <button onClick={() => { setConfig({ ...config, mode: "AUTONOMOUS" }); setSuccess("Mode → AUTONOMOUS. Needs a trading key — review below."); setTimeout(() => setSuccess(null), 4000); }}
-                    style={{ background: "#ff880015", border: "1px solid #ff8800", borderRadius: 4, color: "#ff8800", fontFamily: "monospace", fontSize: 11, padding: "8px 16px", cursor: "pointer" }}>
+                    style={{ background: "#ff880015", border: "1px solid #ff8800", borderRadius: 4, color: "#ff8800", fontFamily: "var(--nx-font-mono)", fontSize: 11, padding: "8px 16px", cursor: "pointer" }}>
                     → GO AUTONOMOUS
                   </button>
                 </div>
-                <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", marginTop: 10, lineHeight: 1.5 }}>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", marginTop: 10, lineHeight: 1.5 }}>
                   Paper results don't guarantee live results — live trades face real fills, slippage, and funding. Start with size you can afford to lose.
                 </div>
               </div>
@@ -802,7 +802,7 @@ export function AgentView() {
           {/* Onboarding + key-status panel */}
           <div style={{ ...agentCardStyle, borderColor: tradingKey ? "#1a3a2a" : "#4a3a00" }}>
             <div style={agentLabelStyle}>// HOW THE AGENT WORKS</div>
-            <ol style={{ margin: "8px 0 0", paddingLeft: 18, color: "#8aaa9a", fontFamily: "monospace", fontSize: 11, lineHeight: 1.7 }}>
+            <ol style={{ margin: "8px 0 0", paddingLeft: 18, color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 11, lineHeight: 1.7 }}>
               <li>Place at least one manual trade on Nexus — this generates your Orderly trading key (order-only, <strong style={{ color: "#c0c0c0" }}>cannot withdraw funds</strong>).</li>
               <li>Pick your symbols, risk params, and mode below.</li>
               <li><strong style={{ color: "#c0c0c0" }}>ASSISTED</strong> = the agent surfaces signals for you to place yourself. <strong style={{ color: "#c0c0c0" }}>AUTONOMOUS</strong> = it trades within your risk limits.</li>
@@ -812,7 +812,7 @@ export function AgentView() {
               marginTop: 10, padding: "8px 10px", borderRadius: 3,
               background: tradingKey ? "#0a1a0a" : "#1a1400",
               border: `1px solid ${tradingKey ? "#1a4a2a" : "#4a3a00"}`,
-              fontFamily: "monospace", fontSize: 11,
+              fontFamily: "var(--nx-font-mono)", fontSize: 11,
               color: tradingKey ? "#00ff88" : "#fbbf24",
             }}>
               {tradingKey
@@ -837,7 +837,7 @@ export function AgentView() {
                     border: `1px solid ${sel ? color : "#1e2d1e"}`,
                     borderRadius: 4, padding: "10px 16px", cursor: "pointer",
                     color: sel ? color : "#4a7a5a",
-                    fontFamily: "monospace", fontSize: 12, letterSpacing: "0.05em",
+                    fontFamily: "var(--nx-font-mono)", fontSize: 12, letterSpacing: "0.05em",
                   }}>
                     <div style={{ fontWeight: 600 }}>{mode === "PAPER" ? "🧪 PAPER" : mode}</div>
                     <div style={{ fontSize: 9, marginTop: 4, opacity: 0.7 }}>{desc}</div>
@@ -847,14 +847,14 @@ export function AgentView() {
             </div>
             {config.mode === "AUTONOMOUS" && (
               <div style={{ marginTop: 8, padding: 8, background: "#1a0e00", border: "1px solid #ff880030", borderRadius: 3 }}>
-                <span style={{ color: "#ff8800", fontFamily: "monospace", fontSize: 10 }}>
+                <span style={{ color: "#ff8800", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
                   ⚠ AUTONOMOUS MODE — Agent will execute trades using your Orderly trading key. Your wallet keys are never stored. The trading key can place orders but CANNOT withdraw funds. You can deactivate at any time.
                 </span>
               </div>
             )}
             {config.mode === "PAPER" && (
               <div style={{ marginTop: 8, padding: 8, background: "#0a1420", border: "1px solid #4a9fff30", borderRadius: 3 }}>
-                <span style={{ color: "#4a9fff", fontFamily: "monospace", fontSize: 10 }}>
+                <span style={{ color: "#4a9fff", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
                   🧪 PAPER MODE — The agent runs its full strategy against live prices but places <strong>zero real orders</strong>. No trading key required. Results are recorded to a separate paper track record below so you can prove it out before risking a cent.
                 </span>
               </div>
@@ -881,7 +881,7 @@ export function AgentView() {
                     border: `1px solid ${sel ? "#00ff8860" : "#1e2d1e"}`,
                     borderRadius: 3, padding: "4px 10px", cursor: "pointer",
                     color: locked ? "#3a5a4a" : sel ? "#00ff88" : "#4a7a5a",
-                    fontFamily: "monospace", fontSize: 11,
+                    fontFamily: "var(--nx-font-mono)", fontSize: 11,
                   }}>{label}{locked ? " ◆" : ""}</button>
                 );
               })}
@@ -915,7 +915,7 @@ export function AgentView() {
               </div>
               <button onClick={() => setConfig({ ...config, respectRegime: !config.respectRegime })}
                 style={{
-                  flexShrink: 0, cursor: "pointer", fontFamily: "monospace", fontSize: 11, borderRadius: 4, padding: "6px 16px",
+                  flexShrink: 0, cursor: "pointer", fontFamily: "var(--nx-font-mono)", fontSize: 11, borderRadius: 4, padding: "6px 16px",
                   background: config.respectRegime ? "#00ff8815" : "#0a0e0a",
                   border: `1px solid ${config.respectRegime ? "#00ff88" : "#1e2d1e"}`,
                   color: config.respectRegime ? "#00ff88" : "#4a7a5a",
@@ -936,7 +936,7 @@ export function AgentView() {
               </div>
               <button onClick={() => setConfig({ ...config, volScaledStops: !config.volScaledStops })}
                 style={{
-                  flexShrink: 0, cursor: "pointer", fontFamily: "monospace", fontSize: 11, borderRadius: 4, padding: "6px 16px",
+                  flexShrink: 0, cursor: "pointer", fontFamily: "var(--nx-font-mono)", fontSize: 11, borderRadius: 4, padding: "6px 16px",
                   background: config.volScaledStops ? "#00ff8815" : "#0a0e0a",
                   border: `1px solid ${config.volScaledStops ? "#00ff88" : "#1e2d1e"}`,
                   color: config.volScaledStops ? "#00ff88" : "#4a7a5a",
@@ -965,7 +965,7 @@ export function AgentView() {
                     border: `1px solid ${selected ? "#00ff8860" : "#1e2d1e"}`,
                     borderRadius: 3, padding: "4px 10px", cursor: "pointer",
                     color: selected ? "#00ff88" : "#4a7a5a",
-                    fontFamily: "monospace", fontSize: 11,
+                    fontFamily: "var(--nx-font-mono)", fontSize: 11,
                   }}>
                     {label}
                   </button>
@@ -998,7 +998,7 @@ export function AgentView() {
                       min={min} max={max} step={step}
                       onCommit={(n) => setConfig({ ...config, [key]: n })}
                     />
-                    <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>{suffix}</span>
+                    <span style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>{suffix}</span>
                   </div>
                 </div>
               ))}
@@ -1033,7 +1033,7 @@ export function AgentView() {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                   <div style={agentLabelStyle}>// ADVANCED EXITS</div>
                   <button onClick={toggleScaleOut} style={{
-                    fontFamily: "monospace", fontSize: 10, padding: "4px 12px", borderRadius: 3, cursor: "pointer",
+                    fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "4px 12px", borderRadius: 3, cursor: "pointer",
                     background: scaleOut ? "#00ff8815" : "#0a0e0a",
                     border: `1px solid ${scaleOut ? "#00ff88" : "#1e2d1e"}`,
                     color: scaleOut ? "#00ff88" : "#4a7a5a",
@@ -1050,14 +1050,14 @@ export function AgentView() {
                           <div style={{ ...agentLabelStyle, fontSize: 9 }}>TP{i + 1} TARGET</div>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                             <NumberField value={leg.pct} min={0.25} max={20} step={0.25} onCommit={(n) => setTp(i, "pct", n)} />
-                            <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>%</span>
+                            <span style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>%</span>
                           </div>
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ ...agentLabelStyle, fontSize: 9 }}>TP{i + 1} SIZE</div>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                             <NumberField value={leg.sizePct} min={5} max={95} step={5} onCommit={(n) => setTp(i, "sizePct", n)} />
-                            <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>%</span>
+                            <span style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>%</span>
                           </div>
                         </div>
                       </div>
@@ -1070,14 +1070,14 @@ export function AgentView() {
                     <div style={{ ...agentLabelStyle, fontSize: 9 }}>TRAILING STOP</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <NumberField value={config.trailingStopPct ?? 0} min={0} max={5} step={0.1} onCommit={(n) => setConfig({ ...config, trailingStopPct: n })} />
-                      <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>% below peak (0 = off)</span>
+                      <span style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>% below peak (0 = off)</span>
                     </div>
                   </div>
                   <div>
                     <div style={{ ...agentLabelStyle, fontSize: 9 }}>BREAKEVEN STOP</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <NumberField value={config.breakevenTriggerPct ?? 0} min={0} max={10} step={0.1} onCommit={(n) => setConfig({ ...config, breakevenTriggerPct: n })} />
-                      <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>% in profit arms it (0 = off)</span>
+                      <span style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>% in profit arms it (0 = off)</span>
                     </div>
                   </div>
                   {(config.breakevenTriggerPct ?? 0) > 0 && (
@@ -1085,7 +1085,7 @@ export function AgentView() {
                       <div style={{ ...agentLabelStyle, fontSize: 9 }}>BREAKEVEN BUFFER</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <NumberField value={config.breakevenBufferPct ?? 0} min={0} max={2} step={0.05} onCommit={(n) => setConfig({ ...config, breakevenBufferPct: n })} />
-                        <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>% above entry the stop locks to</span>
+                        <span style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>% above entry the stop locks to</span>
                       </div>
                     </div>
                   )}
@@ -1116,10 +1116,10 @@ export function AgentView() {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div style={agentLabelStyle}>// DCA / SAFETY ORDERS</div>
-                    <span style={{ fontFamily: "monospace", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
+                    <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
                   </div>
                   <button onClick={isPro ? toggle : undefined} disabled={!isPro} style={{
-                    fontFamily: "monospace", fontSize: 10, padding: "4px 12px", borderRadius: 3, cursor: isPro ? "pointer" : "not-allowed",
+                    fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "4px 12px", borderRadius: 3, cursor: isPro ? "pointer" : "not-allowed",
                     background: on ? "#00ff8815" : "#0a0e0a",
                     border: `1px solid ${on ? "#00ff88" : "#1e2d1e"}`,
                     color: on ? "#00ff88" : "#4a7a5a", opacity: isPro ? 1 : 0.5,
@@ -1128,7 +1128,7 @@ export function AgentView() {
                   </button>
                 </div>
                 {!isPro ? (
-                  <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
+                  <div style={{ color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
                     Average into a position on adverse moves and take profit off the blended entry — a Nexus PRO feature. The whole ladder stays inside your CAPITAL / TRADE budget.
                   </div>
                 ) : on && (
@@ -1144,12 +1144,12 @@ export function AgentView() {
                           <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                             <NumberField value={(dca as any)[key]} min={min} max={max} step={step} onCommit={(n) => setDca(key, n)} />
-                            <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>{suffix}</span>
+                            <span style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>{suffix}</span>
                           </div>
                         </div>
                       ))}
                     </div>
-                    <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10, marginTop: 10, lineHeight: 1.6 }}>
+                    <div style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 10, marginTop: 10, lineHeight: 1.6 }}>
                       Base order ≈ ${(config.capitalPerTrade / units).toFixed(0)} of your ${config.capitalPerTrade} budget; up to {dca.maxSafetyOrders} safety orders average in if price moves ~{cumDev.toFixed(1)}% against you. TP is taken at {config.tpPercent}% off the blended average; the stop only cuts once all safety orders are spent. Daily-loss cap + kill switch still override.
                     </div>
                   </>
@@ -1162,15 +1162,15 @@ export function AgentView() {
           <div style={agentCardStyle}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
               <div style={agentLabelStyle}>// SIGNAL WEBHOOK</div>
-              <span style={{ fontFamily: "monospace", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
             </div>
             {!isPro ? (
-              <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
+              <div style={{ color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
                 Route TradingView (or any external) alerts straight to your agent — it executes them through the same guardrails + trustless grading. A Nexus PRO feature: hold ARCHITECT-tier $NEXUS or subscribe.
               </div>
             ) : !webhookEnabled ? (
               <div style={{ marginTop: 10 }}>
-                <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 11, lineHeight: 1.5, marginBottom: 10 }}>
+                <div style={{ color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 11, lineHeight: 1.5, marginBottom: 10 }}>
                   Generate a private webhook URL. Point a TradingView alert (or any system) at it and your agent trades the signal in its current mode — {config.mode === "PAPER" ? "simulated in PAPER" : config.mode === "ASSISTED" ? "queued for review in ASSISTED" : "executed live in AUTONOMOUS"}.
                 </div>
                 <button onClick={() => manageWebhook("enable")} disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.5 : 1 }}>
@@ -1193,13 +1193,13 @@ export function AgentView() {
                       <code style={{ display: "block", color: "#c0c0c0", background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 3, padding: "8px", fontSize: 10, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
                         {`{ "action": "BUY", "symbol": "BTC", "passphrase": "${webhookInfo.passphrase}" }`}
                       </code>
-                      <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 9, marginTop: 6, lineHeight: 1.5 }}>
+                      <div style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 9, marginTop: 6, lineHeight: 1.5 }}>
                         action = BUY (long) · SELL (short) · CLOSE (flatten). symbol = any perp (BTC, ETH, SOL…). Webhook signals bypass the cooldown; while a position is open, a new OPEN is ignored (no stacking).
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 11, lineHeight: 1.5 }}>
+                  <div style={{ color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 11, lineHeight: 1.5 }}>
                     Webhook is enabled, but the secret URL is only shown on this device when created. Rotate to reveal a fresh URL (this revokes the old one).
                   </div>
                 )}
@@ -1222,7 +1222,7 @@ export function AgentView() {
               ].map(({ label, value }) => (
                 <div key={label}>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
-                  <div style={{ color: "#00ff88", fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>{value}</div>
+                  <div style={{ color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>{value}</div>
                 </div>
               ))}
             </div>
@@ -1233,7 +1233,7 @@ export function AgentView() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <div style={agentLabelStyle}>// BACKTEST</div>
-                <span style={{ fontFamily: "monospace", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
               </div>
               {isPro && (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1250,25 +1250,25 @@ export function AgentView() {
               )}
             </div>
             {!isPro ? (
-              <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
+              <div style={{ color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
                 Replay this exact config over 60 days of real BTC/ETH/SOL data — using the same engine the agent runs on — before risking a cent. A Nexus PRO feature.
               </div>
             ) : (
               <>
-                <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10, marginTop: 8, lineHeight: 1.5 }}>
+                <div style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 10, marginTop: 8, lineHeight: 1.5 }}>
                   Replays your config on real Orderly history with the deployed signal + exit logic. Verify before you deploy capital.
                 </div>
                 {backtest && (
                   <div style={{ marginTop: 12 }}>
                     {backtest.untestable && (
-                      <div style={{ color: "#fbbf24", fontFamily: "monospace", fontSize: 10, lineHeight: 1.5, marginBottom: 10, padding: "6px 8px", border: "1px solid #fbbf2430", borderRadius: 3 }}>
+                      <div style={{ color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontSize: 10, lineHeight: 1.5, marginBottom: 10, padding: "6px 8px", border: "1px solid #fbbf2430", borderRadius: 3 }}>
                         ⚠ {backtest.note}
                       </div>
                     )}
                     {/* When OI-driven modes ARE testable, surface the OI-window caveat
                         (funding+price span the full window; confluence only the recorded OI). */}
                     {!backtest.untestable && backtest.note && (
-                      <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10, lineHeight: 1.5, marginBottom: 10, padding: "6px 8px", border: "1px solid #1e2d1e", borderRadius: 3 }}>
+                      <div style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 10, lineHeight: 1.5, marginBottom: 10, padding: "6px 8px", border: "1px solid #1e2d1e", borderRadius: 3 }}>
                         ◆ {backtest.note}
                       </div>
                     )}
@@ -1280,19 +1280,19 @@ export function AgentView() {
                       ].map(({ label, value, color }) => (
                         <div key={label}>
                           <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
-                          <div style={{ color, fontFamily: "monospace", fontSize: 18, fontWeight: 600 }}>{value}</div>
+                          <div style={{ color, fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 600 }}>{value}</div>
                         </div>
                       ))}
                     </div>
                     <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
                       {backtest.perSymbol.map((s: any) => (
-                        <div key={s.symbol} style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 10, color: "#8aaa9a", borderTop: "1px solid #1e2d1e", paddingTop: 4 }}>
+                        <div key={s.symbol} style={{ display: "flex", justifyContent: "space-between", fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#8aaa9a", borderTop: "1px solid #1e2d1e", paddingTop: 4 }}>
                           <span>{s.symbol.replace("PERP_", "").replace("_USDC", "")}</span>
                           <span>{s.trades} trades · {s.winRate}% win · PF {s.profitFactor} · <span style={{ color: s.netUsd >= 0 ? "#00ff88" : "#ff4444" }}>{s.netUsd >= 0 ? "+" : ""}${s.netUsd}</span></span>
                         </div>
                       ))}
                     </div>
-                    <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
+                    <div style={{ color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
                       Past performance ≠ future results. Taker fees modeled (~3bps/side); funding RECEIVED while fading is not (a tailwind — live may run better). 60d hourly, ${(config.capitalPerTrade * config.leverage).toFixed(0)} notional/trade.
                     </div>
                   </div>
@@ -1307,19 +1307,19 @@ export function AgentView() {
                         WALK-FORWARD — {validation.totalSymbols} symbols · {validation.folds} time folds · {validation.days}d · fees on
                       </div>
                       {validation.untestable ? (
-                        <div style={{ color: "#fbbf24", fontFamily: "monospace", fontSize: 10, lineHeight: 1.5, padding: "6px 8px", border: "1px solid #fbbf2430", borderRadius: 3 }}>⚠ {validation.note}</div>
+                        <div style={{ color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontSize: 10, lineHeight: 1.5, padding: "6px 8px", border: "1px solid #fbbf2430", borderRadius: 3 }}>⚠ {validation.note}</div>
                       ) : (
                         <>
                           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 10px", border: `1px solid ${vc}44`, borderRadius: 4, background: `${vc}0c` }}>
-                            <span style={{ fontFamily: "monospace", fontSize: 14, fontWeight: 700, color: vc }}>{vlabel}</span>
-                            <span style={{ fontFamily: "monospace", fontSize: 10, color: "#8aaa9a" }}>
+                            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: 700, color: vc }}>{vlabel}</span>
+                            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#8aaa9a" }}>
                               net-positive on {validation.posSymbols}/{validation.totalSymbols} markets · {validation.foldConsistency}% of folds positive · net <span style={{ color: validation.totalNet >= 0 ? "#00ff88" : "#ff4444" }}>{validation.totalNet >= 0 ? "+" : ""}${validation.totalNet}</span>
                             </span>
                           </div>
                           <div style={{ marginTop: 8, overflowX: "auto" }}>
                             <div style={{ minWidth: 320 }}>
                               {validation.perSymbol.map((s: any) => (
-                                <div key={s.symbol} style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "monospace", fontSize: 10, padding: "3px 0", borderTop: "1px solid #10160f" }}>
+                                <div key={s.symbol} style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "3px 0", borderTop: "1px solid #10160f" }}>
                                   <span style={{ width: 46, color: "#c0c0c0" }}>{s.symbol.replace("PERP_", "").replace("_USDC", "")}</span>
                                   <span style={{ width: 66, textAlign: "right", color: s.net >= 0 ? "#00ff88" : "#ff4444" }}>{s.net >= 0 ? "+" : ""}${s.net}</span>
                                   <span style={{ width: 54, textAlign: "right", color: "#8aaa9a" }}>{s.foldsPositive}/{validation.folds}f</span>
@@ -1330,7 +1330,7 @@ export function AgentView() {
                               ))}
                             </div>
                           </div>
-                          <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
+                          <div style={{ color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
                             The honest test: an edge that only works on one market in one window is NOT robust. We hold our own presets to this — nothing wears "proven" until it passes. Past performance ≠ future results.
                           </div>
                         </>
@@ -1345,11 +1345,11 @@ export function AgentView() {
                     </div>
                     <div style={{ overflowX: "auto" }}>
                       <div style={{ minWidth: 340 }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 70px 52px 56px", gap: 6, fontFamily: "monospace", fontSize: 9, color: "#4a7a5a", padding: "0 0 4px", borderBottom: "1px solid #1e2d1e" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 70px 52px 56px", gap: 6, fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#4a7a5a", padding: "0 0 4px", borderBottom: "1px solid #1e2d1e" }}>
                           <span>STRATEGY</span><span style={{ textAlign: "right" }}>NET$</span><span style={{ textAlign: "right" }}>WIN%</span><span style={{ textAlign: "right" }}>TRADES</span>
                         </div>
                         {sweep.results.slice(0, 12).map((r: any, i: number) => (
-                          <div key={i} onClick={() => r.config && applySweepConfig(r.config)} title="Apply this config to the editor above" style={{ display: "grid", gridTemplateColumns: "1fr 70px 52px 56px", gap: 6, fontFamily: "monospace", fontSize: 10, padding: "5px 4px", borderBottom: "1px solid #10160f", color: "#8aaa9a", cursor: r.config ? "pointer" : "default", borderRadius: 3 }}
+                          <div key={i} onClick={() => r.config && applySweepConfig(r.config)} title="Apply this config to the editor above" style={{ display: "grid", gridTemplateColumns: "1fr 70px 52px 56px", gap: 6, fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "5px 4px", borderBottom: "1px solid #10160f", color: "#8aaa9a", cursor: r.config ? "pointer" : "default", borderRadius: 3 }}
                             onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "#0f1613"; }}
                             onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}>
                             <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{i === 0 ? "★ " : ""}{r.name}</span>
@@ -1360,7 +1360,7 @@ export function AgentView() {
                         ))}
                       </div>
                     </div>
-                    <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
+                    <div style={{ color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
                       ↑ Click any row to apply that config to the editor. CONFLUENCE/OI aren't in the sweep (no OI history yet). Every config here was graded on real price — apply a winner, then paper-test before going live.
                     </div>
                   </div>
@@ -1372,7 +1372,7 @@ export function AgentView() {
           {/* ── STRATEGY LIBRARY — save / load composed configs (free) ── */}
           <div style={agentCardStyle}>
             <div style={agentLabelStyle}>// STRATEGY LIBRARY</div>
-            <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10, marginTop: 6, marginBottom: 10, lineHeight: 1.5 }}>
+            <div style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 10, marginTop: 6, marginBottom: 10, lineHeight: 1.5 }}>
               Save the config above as a named strategy, then load it back anytime. Build → test → save your best.
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1392,8 +1392,8 @@ export function AgentView() {
                 {strategies.map((s) => (
                   <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 3 }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
-                      <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 9, marginTop: 2 }}>
+                      <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                      <div style={{ color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 9, marginTop: 2 }}>
                         <span style={{ color: "#4a9fff" }}>{deriveStyle(s.config)}</span> · {s.config.signalMode} · {s.config.mode} · {s.config.leverage}x · TP{s.config.tpPercent}/SL{s.config.slPercent}
                         {s.config.dcaEnabled ? " · DCA" : ""}
                         {s.stats ? <span style={{ color: s.stats.netUsd >= 0 ? "#00ff88" : "#ff4444" }}>{`  ·  60d ${s.stats.netUsd >= 0 ? "+" : ""}$${s.stats.netUsd}`}</span> : ""}
@@ -1420,19 +1420,19 @@ export function AgentView() {
                 ))}
               </div>
             </div>
-            <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10, marginTop: 6, lineHeight: 1.5 }}>
+            <div style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 10, marginTop: 6, lineHeight: 1.5 }}>
               Strategies shared by the community, ranked by the author's <strong style={{ color: "#8aaa9a" }}>graded live/paper record</strong> — not backtest (shown only as a hypothesis). Copy one to your editor and make it yours.
             </div>
             {community === null ? (
               <button onClick={() => loadCommunity("")} style={{ ...btnPrimary, fontSize: 10, padding: "6px 16px", marginTop: 10 }}>▤ BROWSE STRATEGIES</button>
             ) : community.length === 0 ? (
-              <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 11, marginTop: 10 }}>No public strategies{communityStyle ? ` for ${communityStyle}` : ""} yet — publish one from your library to seed the board.</div>
+              <div style={{ color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 11, marginTop: 10 }}>No public strategies{communityStyle ? ` for ${communityStyle}` : ""} yet — publish one from your library to seed the board.</div>
             ) : (
               <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
                 {community.map((s) => (
                   <div key={s.owner + s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 3 }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                         {s.name} <span style={{ color: "#4a9fff", fontSize: 9 }}>{s.style}</span>
                         {(() => {
                           const v = s.validation;
@@ -1445,7 +1445,7 @@ export function AgentView() {
                           return <span title={`Walk-forward: net-positive on ${v.posSymbols}/${v.totalSymbols} markets, ${v.foldConsistency}% of folds`} style={{ fontSize: 8, color: vc, border: `1px solid ${vc}55`, borderRadius: 3, padding: "1px 5px" }}>{lbl}</span>;
                         })()}
                       </div>
-                      <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 9, marginTop: 2 }}>
+                      <div style={{ color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 9, marginTop: 2 }}>
                         by {s.owner.slice(0, 6)}…{s.owner.slice(-4)} · {s.config.signalMode} · {s.config.leverage}x
                         {s.author && s.author.trades > 0
                           ? <span style={{ color: s.author.netPnl >= 0 ? "#00ff88" : "#ff4444" }}>{`  ·  graded ${s.author.winRate}% win, ${s.author.netPnl >= 0 ? "+" : ""}$${s.author.netPnl} (${s.author.trades}t)`}</span>
@@ -1456,14 +1456,14 @@ export function AgentView() {
                     <button onClick={() => copyStrategy(s)} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 14px", flexShrink: 0 }}>COPY</button>
                   </div>
                 ))}
-                <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 4 }}>*bt = backtest hypothesis; ranking uses the author's real graded record. Badge = our walk-forward verdict (net-positive across markets + time). ✅ is rare by design.</div>
+                <div style={{ color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 9, marginTop: 4 }}>*bt = backtest hypothesis; ranking uses the author's real graded record. Badge = our walk-forward verdict (net-positive across markets + time). ✅ is rare by design.</div>
               </div>
             )}
           </div>
 
           {!isActive && (
             <div style={{ marginTop: 16, padding: "8px 10px", borderRadius: 3, background: "#0a0e0a", border: "1px solid #1e2d1e" }}>
-              <span style={{ fontFamily: "monospace", fontSize: 10, color: "#4a7a5a", lineHeight: 1.6 }}>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#4a7a5a", lineHeight: 1.6 }}>
                 {config.mode === "PAPER"
                   ? <>🧪 Paper mode is fully simulated — <strong style={{ color: "#8aaa9a" }}>no key stored, no orders placed, no funds at risk</strong>. Activate to start building a paper track record against live prices.</>
                   : <>🔒 By activating, your order-only Orderly key is stored encrypted to let the agent trade on your behalf. It <strong style={{ color: "#8aaa9a" }}>cannot withdraw or transfer funds</strong>. Trading is risky — only deploy capital you can afford to lose. Deactivate anytime.</>}
@@ -1502,7 +1502,7 @@ export function AgentView() {
                   border: "1px solid #ff0000",
                   borderRadius: 4,
                   color: "#ff0000",
-                  fontFamily: "monospace",
+                  fontFamily: "var(--nx-font-mono)",
                   fontSize: 11,
                   padding: "8px 16px",
                   cursor: "pointer",
@@ -1517,7 +1517,7 @@ export function AgentView() {
 
           {!tradingKey && config.mode !== "PAPER" && (
             <div style={{ marginTop: 12, padding: 10, background: "#1a1a0a", border: "1px solid #ff880030", borderRadius: 3 }}>
-              <span style={{ color: "#ff8800", fontFamily: "monospace", fontSize: 11 }}>
+              <span style={{ color: "#ff8800", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>
                 ⚠ No Orderly trading key detected. Place at least one manual trade on Nexus first — the SDK generates your trading key on first trade. This key allows order placement only and cannot withdraw funds. <strong style={{ color: "#4a9fff" }}>Or try 🧪 PAPER mode — no key needed.</strong>
               </span>
             </div>
@@ -1532,7 +1532,7 @@ export function AgentView() {
               in minutes instead of waiting for real funding/OI confluence. */}
           {(import.meta as any).env?.DEV && isActive && config.mode === "PAPER" && (
             <div style={{ ...agentCardStyle, borderColor: "#1a3a5a", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <span style={{ fontFamily: "monospace", fontSize: 10, color: "#4a9fff" }}>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#4a9fff" }}>
                 ⚡ DEV — inject a synthetic PAPER signal (refused outside paper mode)
               </span>
               <button onClick={forceTestSignal} disabled={saving} style={{ ...navBtnStyle, fontSize: 10, padding: "6px 14px", color: "#4a9fff", borderColor: "#1a3a5a", opacity: saving ? 0.5 : 1 }}>
@@ -1550,33 +1550,33 @@ export function AgentView() {
                   gap: 12, padding: "10px 0", borderBottom: "1px solid #1e2d1e",
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-                    <span style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 13, fontWeight: 600 }}>
+                    <span style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>
                       {t.symbol.replace("PERP_", "").replace("_USDC", "")}
                     </span>
-                    <span style={{ color: t.direction === "LONG" ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontSize: 13, fontWeight: 600 }}>
+                    <span style={{ color: t.direction === "LONG" ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>
                       {t.direction}
                     </span>
-                    <span style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 11 }}>
+                    <span style={{ color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>
                       @ ${t.entryPrice?.toLocaleString()}
                     </span>
-                    <span style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 11 }}>
+                    <span style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>
                       conf {t.confidence}% · funding {(t.funding * 100).toFixed(4)}%
                     </span>
-                    <span style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 10 }}>
+                    <span style={{ color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
                       {formatAgentTime(Date.now() - t.generatedAt)} ago
                     </span>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => resolvePending(t.id, "deploy")} style={{
                       background: "#00ff8820", border: "1px solid #00ff88", borderRadius: 3,
-                      color: "#00ff88", fontFamily: "monospace", fontSize: 10, padding: "5px 12px",
+                      color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "5px 12px",
                       cursor: "pointer", letterSpacing: "0.05em", textTransform: "uppercase",
                     }}>
                       ✓ Reviewed
                     </button>
                     <button onClick={() => resolvePending(t.id, "dismiss")} style={{
                       background: "none", border: "1px solid #ff444450", borderRadius: 3,
-                      color: "#ff4444", fontFamily: "monospace", fontSize: 10, padding: "5px 12px",
+                      color: "#ff4444", fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "5px 12px",
                       cursor: "pointer", letterSpacing: "0.05em", textTransform: "uppercase",
                     }}>
                       ✕ Dismiss
@@ -1584,7 +1584,7 @@ export function AgentView() {
                   </div>
                 </div>
               ))}
-              <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 10, marginTop: 8 }}>
+              <div style={{ color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 10, marginTop: 8 }}>
                 ASSISTED mode generates these for manual review — the agent does not execute them. Place the trade yourself if you agree, then mark Reviewed.
               </div>
             </div>
@@ -1595,31 +1595,31 @@ export function AgentView() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12, marginTop: 8 }}>
               <div>
                 <div style={{ ...agentLabelStyle, fontSize: 9 }}>STATE</div>
-                <div style={{ color: isActive ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>
+                <div style={{ color: isActive ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>
                   {isActive ? (hasPosition ? "TRADING" : "WATCHING") : "INACTIVE"}
                 </div>
               </div>
               <div>
                 <div style={{ ...agentLabelStyle, fontSize: 9 }}>MODE</div>
-                <div style={{ color: config.mode === "AUTONOMOUS" ? "#ff8800" : config.mode === "PAPER" ? "#4a9fff" : "#00ff88", fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>
+                <div style={{ color: config.mode === "AUTONOMOUS" ? "#ff8800" : config.mode === "PAPER" ? "#4a9fff" : "#00ff88", fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>
                   {config.mode === "PAPER" ? "🧪 PAPER" : config.mode}
                 </div>
               </div>
               <div>
                 <div style={{ ...agentLabelStyle, fontSize: 9 }}>TRADES TODAY</div>
-                <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>
+                <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>
                   {agentState?.trades_today ?? 0} / {config.maxTradesPerDay}
                 </div>
               </div>
               <div>
                 <div style={{ ...agentLabelStyle, fontSize: 9 }}>DAILY P&L</div>
-                <div style={{ color: (agentState?.daily_pnl ?? 0) >= 0 ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>
+                <div style={{ color: (agentState?.daily_pnl ?? 0) >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>
                   ${(agentState?.daily_pnl ?? 0).toFixed(2)}
                 </div>
               </div>
               <div>
                 <div style={{ ...agentLabelStyle, fontSize: 9 }}>STRATEGY</div>
-                <div style={{ color: "#4a9fff", fontFamily: "monospace", fontSize: 13, fontWeight: 600 }}>
+                <div style={{ color: "#4a9fff", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>
                   {deriveStyle(config)} · {config.signalMode}{config.dcaEnabled ? " · DCA" : ""}
                 </div>
               </div>
@@ -1633,19 +1633,19 @@ export function AgentView() {
                 <div style={{ ...agentLabelStyle, color: standing.eligible ? "#00ff88" : "#fbbf24" }}>
                   ◆ LEADERBOARD STANDING
                 </div>
-                <span style={{ fontFamily: "monospace", fontSize: 11, color: standing.eligible ? "#00ff88" : "#fbbf24" }}>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: standing.eligible ? "#00ff88" : "#fbbf24" }}>
                   {standing.eligible ? "✓ RANKED ON TOP AGENTS" : `${standing.metCount} of ${standing.total} criteria met`}
                 </span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginTop: 12 }}>
                 {standing.criteria.map((c) => (
                   <div key={c.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ color: c.met ? "#00ff88" : "#ff6644", fontFamily: "monospace", fontSize: 13 }}>
+                    <span style={{ color: c.met ? "#00ff88" : "#ff6644", fontFamily: "var(--nx-font-mono)", fontSize: 13 }}>
                       {c.met ? "✓" : "✗"}
                     </span>
                     <div>
-                      <div style={{ color: c.met ? "#c0c0c0" : "#9a9a8a", fontFamily: "monospace", fontSize: 11 }}>{c.label}</div>
-                      <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 10 }}>
+                      <div style={{ color: c.met ? "#c0c0c0" : "#9a9a8a", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>{c.label}</div>
+                      <div style={{ color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
                         {c.key === "profitable"
                           ? `now: ${c.value >= 0 ? "+" : ""}$${c.value.toFixed(2)}`
                           : `${c.value} / ${c.target}`}
@@ -1654,7 +1654,7 @@ export function AgentView() {
                   </div>
                 ))}
               </div>
-              <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 10, marginTop: 10, lineHeight: 1.5 }}>
+              <div style={{ color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 10, marginTop: 10, lineHeight: 1.5 }}>
                 {standing.eligible
                   ? `Ranked — score ${standing.stats.score}/100 · ${standing.stats.winRate}% win · PF ${standing.stats.profitFactor} over ${standing.stats.trades} graded trades.`
                   : standing.criteria.find((c) => c.key === "profitable" && !c.met)
@@ -1678,23 +1678,23 @@ export function AgentView() {
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                       <span style={{ ...agentLabelStyle, fontSize: 9 }}>DAILY LOSS LIMIT</span>
-                      <span style={{ fontFamily: "monospace", fontSize: 10, color: barColor(lossPct) }}>${dailyLoss.toFixed(2)} / ${config.maxDailyLossUsdc}</span>
+                      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: barColor(lossPct) }}>${dailyLoss.toFixed(2)} / ${config.maxDailyLossUsdc}</span>
                     </div>
                     <div style={{ height: 6, background: "#0a0e0a", borderRadius: 3, overflow: "hidden" }}>
                       <div style={{ height: "100%", width: `${lossPct}%`, background: barColor(lossPct), transition: "width 0.3s" }} />
                     </div>
-                    <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", marginTop: 4 }}>auto-halts trading at limit</div>
+                    <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", marginTop: 4 }}>auto-halts trading at limit</div>
                   </div>
                   {/* Trades today */}
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                       <span style={{ ...agentLabelStyle, fontSize: 9 }}>TRADES TODAY</span>
-                      <span style={{ fontFamily: "monospace", fontSize: 10, color: barColor(tradesPct) }}>{agentState?.trades_today ?? 0} / {config.maxTradesPerDay}</span>
+                      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: barColor(tradesPct) }}>{agentState?.trades_today ?? 0} / {config.maxTradesPerDay}</span>
                     </div>
                     <div style={{ height: 6, background: "#0a0e0a", borderRadius: 3, overflow: "hidden" }}>
                       <div style={{ height: "100%", width: `${tradesPct}%`, background: barColor(tradesPct), transition: "width 0.3s" }} />
                     </div>
-                    <div style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a", marginTop: 4 }}>stops opening new trades at cap</div>
+                    <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", marginTop: 4 }}>stops opening new trades at cap</div>
                   </div>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginTop: 14, paddingTop: 12, borderTop: "1px solid #1a2e1a" }}>
@@ -1706,11 +1706,11 @@ export function AgentView() {
                   ].map(({ label, value }) => (
                     <div key={label}>
                       <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
-                      <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 14, fontWeight: 600 }}>{value}</div>
+                      <div style={{ color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: 600 }}>{value}</div>
                     </div>
                   ))}
                 </div>
-                <div style={{ marginTop: 12, fontFamily: "monospace", fontSize: 10, color: "#4a7a5a", lineHeight: 1.5 }}>
+                <div style={{ marginTop: 12, fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#4a7a5a", lineHeight: 1.5 }}>
                   🔒 Order-only key — the agent <strong style={{ color: "#8aaa9a" }}>cannot withdraw or transfer funds</strong>. Hit ⚡ KILL on the config tab to flatten and stop instantly.
                 </div>
               </div>
@@ -1728,36 +1728,36 @@ export function AgentView() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 12, marginTop: 8 }}>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>SYMBOL</div>
-                  <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 14, fontWeight: 600 }}>
+                  <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: 600 }}>
                     {agentState.current_position.symbol.replace("PERP_", "").replace("_USDC", "")}
                   </div>
                 </div>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>DIRECTION</div>
-                  <div style={{ color: agentState.current_position.direction === "LONG" ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontSize: 14, fontWeight: 600 }}>
+                  <div style={{ color: agentState.current_position.direction === "LONG" ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: 600 }}>
                     {agentState.current_position.direction}
                   </div>
                 </div>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>ENTRY</div>
-                  <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 14 }}>
+                  <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 14 }}>
                     ${agentState.current_position.entry_price.toLocaleString()}
                   </div>
                 </div>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>CURRENT</div>
-                  <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 14 }}>
+                  <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 14 }}>
                     ${agentState.current_position.current_price.toLocaleString()}
                   </div>
                 </div>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>P&L</div>
-                  <div style={{ color: agentState.current_position.pnl_percent >= 0 ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontSize: 14, fontWeight: 600 }}>
+                  <div style={{ color: agentState.current_position.pnl_percent >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: 600 }}>
                     {agentState.current_position.pnl_percent >= 0 ? "+" : ""}{agentState.current_position.pnl_percent.toFixed(3)}%
                   </div>
                 </div>
               </div>
-              <div style={{ marginTop: 8, color: "#4a7a5a", fontFamily: "monospace", fontSize: 10 }}>
+              <div style={{ marginTop: 8, color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
                 HELD FOR: {formatAgentTime(Date.now() - agentState.current_position.opened_at)} / {config.maxHoldHours}h max
               </div>
             </div>
@@ -1765,10 +1765,10 @@ export function AgentView() {
 
           {isActive && !hasPosition && (
             <div style={{ ...agentCardStyle, textAlign: "center", padding: 24 }}>
-              <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 12 }}>
+              <div style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
                 // SCANNING FOR SIGNALS ON {config.symbols.map(s => s.replace("PERP_", "").replace("_USDC", "")).join(", ")}
               </div>
-              <div style={{ color: "#2a4a2a", fontFamily: "monospace", fontSize: 10, marginTop: 6 }}>
+              <div style={{ color: "#2a4a2a", fontFamily: "var(--nx-font-mono)", fontSize: 10, marginTop: 6 }}>
                 Funding threshold: {config.fundingThreshold}% · Checking every 5 minutes
               </div>
             </div>
@@ -1780,25 +1780,25 @@ export function AgentView() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12, marginTop: 8 }}>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>SYMBOL</div>
-                  <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 13 }}>
+                  <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 13 }}>
                     {(agentState.last_signal.symbol || "").replace("PERP_", "").replace("_USDC", "")}
                   </div>
                 </div>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>DIRECTION</div>
-                  <div style={{ color: agentState.last_signal.direction === "LONG" ? "#00ff88" : agentState.last_signal.direction === "SHORT" ? "#ff4444" : "#4a7a5a", fontFamily: "monospace", fontSize: 13, fontWeight: 600 }}>
+                  <div style={{ color: agentState.last_signal.direction === "LONG" ? "#00ff88" : agentState.last_signal.direction === "SHORT" ? "#ff4444" : "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>
                     {agentState.last_signal.direction}
                   </div>
                 </div>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>FUNDING</div>
-                  <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 13 }}>
+                  <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 13 }}>
                     {(agentState.last_signal.funding * 100).toFixed(4)}%
                   </div>
                 </div>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>AGE</div>
-                  <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 13 }}>
+                  <div style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 13 }}>
                     {formatAgentTime(Date.now() - agentState.last_signal.timestamp)}
                   </div>
                 </div>
@@ -1812,7 +1812,7 @@ export function AgentView() {
               {config.symbols.map((sym) => (
                 <span key={sym} style={{
                   background: "#0d120d", border: "1px solid #1e2d1e", borderRadius: 3,
-                  padding: "3px 8px", fontFamily: "monospace", fontSize: 10, color: "#8aaa9a",
+                  padding: "3px 8px", fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#8aaa9a",
                 }}>
                   {sym.replace("PERP_", "").replace("_USDC", "")}
                 </span>
@@ -1834,7 +1834,7 @@ export function AgentView() {
               {isPaperHist && <span style={{ color: "#4a9fff", border: "1px solid #4a9fff40", borderRadius: 3, padding: "1px 6px", fontSize: 8 }}>🧪 PAPER</span>}
             </div>
             {histTrades.length === 0 ? (
-              <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 12, padding: 20, textAlign: "center" }}>
+              <div style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 12, padding: 20, textAlign: "center" }}>
                 {isPaperHist
                   ? "No paper trades yet. Activate in PAPER mode to start simulating."
                   : "No trades recorded yet. Agent will log trades here once active."}
@@ -1848,22 +1848,22 @@ export function AgentView() {
                 </div>
                 {histTrades.map((trade, i) => (
                   <div key={trade.id || i} style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr", gap: 8, minWidth: 480, padding: "8px 0", borderBottom: "1px solid #0d1117" }}>
-                    <span style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 12 }}>
+                    <span style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
                       {trade.symbol.replace("PERP_", "").replace("_USDC", "")}
                     </span>
-                    <span style={{ color: trade.direction === "LONG" ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontSize: 12 }}>
+                    <span style={{ color: trade.direction === "LONG" ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
                       {trade.direction}
                     </span>
-                    <span style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 12 }}>
+                    <span style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
                       ${trade.entry_price.toLocaleString()}
                     </span>
-                    <span style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 12 }}>
+                    <span style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
                       ${trade.exit_price.toLocaleString()}
                     </span>
-                    <span style={{ color: trade.pnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "monospace", fontSize: 12, fontWeight: 600 }}>
+                    <span style={{ color: trade.pnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600 }}>
                       {trade.pnl >= 0 ? "+" : ""}${trade.pnl.toFixed(2)}
                     </span>
-                    <span style={{ fontFamily: "monospace", fontSize: 10, color: trade.reason === "TP" ? "#00ff88" : trade.reason === "SL" ? "#ff4444" : trade.reason === "BE" ? "#4a9fff" : "#ff8800" }}>
+                    <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: trade.reason === "TP" ? "#00ff88" : trade.reason === "SL" ? "#ff4444" : trade.reason === "BE" ? "#4a9fff" : "#ff8800" }}>
                       {trade.reason}
                     </span>
                   </div>
@@ -1895,7 +1895,7 @@ export function AgentView() {
                   ].map(({ label, value, color }) => (
                     <div key={label}>
                       <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
-                      <div style={{ color, fontFamily: "monospace", fontSize: 16, fontWeight: 600 }}>{value}</div>
+                      <div style={{ color, fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>{value}</div>
                     </div>
                   ))}
                 </div>
@@ -1916,22 +1916,22 @@ export function AgentView() {
                 {lbLoading ? "…" : "↻ REFRESH"}
               </button>
             </div>
-            <div style={{ fontFamily: "monospace", fontSize: 10, color: "#3a5a4a", marginTop: 6, lineHeight: 1.5 }}>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#3a5a4a", marginTop: 6, lineHeight: 1.5 }}>
               Ranked by risk-adjusted score (win rate + profit factor, weighted by sample size) over <strong style={{ color: "#8aaa9a" }}>≥10 live trades spanning ≥3 days</strong>. Paper excluded. Copy any strategy to test it in PAPER first.
             </div>
             {ledgerInfo && (
               <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #1a2e1a", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <span style={{ fontFamily: "monospace", fontSize: 9, color: "#00ff88" }}>🔗 LEDGER SHA-256</span>
-                <code style={{ fontFamily: "monospace", fontSize: 9, color: "#8aaa9a", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 3, padding: "2px 6px" }}>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#00ff88" }}>🔗 LEDGER SHA-256</span>
+                <code style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#8aaa9a", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 3, padding: "2px 6px" }}>
                   {ledgerInfo.hash.slice(0, 10)}…{ledgerInfo.hash.slice(-8)}
                 </code>
-                <span style={{ fontFamily: "monospace", fontSize: 9, color: "#3a5a4a" }}>· {ledgerInfo.count} records ·</span>
-                <a href={`${AGENT_API}/agents/ledger`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "monospace", fontSize: 9, color: "#4a9fff", textDecoration: "none" }}>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a" }}>· {ledgerInfo.count} records ·</span>
+                <a href={`${AGENT_API}/agents/ledger`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#4a9fff", textDecoration: "none" }}>
                   verify ↗
                 </a>
                 {ledgerInfo.onChain?.verified && (
                   <a href={ledgerInfo.onChain.explorer || "#"} target="_blank" rel="noopener noreferrer"
-                    style={{ fontFamily: "monospace", fontSize: 9, color: "#00ff88", textDecoration: "none", border: "1px solid #1a4a2a", borderRadius: 3, padding: "2px 6px", background: "#0a1a0e" }}>
+                    style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#00ff88", textDecoration: "none", border: "1px solid #1a4a2a", borderRadius: 3, padding: "2px 6px", background: "#0a1a0e" }}>
                     ⛓ ANCHORED ON-CHAIN ↗
                   </a>
                 )}
@@ -1940,12 +1940,12 @@ export function AgentView() {
           </div>
 
           {lbLoading && (!leaderboard || leaderboard.length === 0) ? (
-            <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 12, padding: 24, textAlign: "center" }}>loading leaderboard…</div>
+            <div style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 12, padding: 24, textAlign: "center" }}>loading leaderboard…</div>
           ) : !leaderboard || leaderboard.length === 0 ? (
             <div style={{ ...agentCardStyle, textAlign: "center", padding: 28 }}>
               <div style={{ fontSize: 22, color: "#00ff88", marginBottom: 8 }}>◆</div>
-              <div style={{ color: "#fff", fontFamily: "monospace", fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>No ranked agents yet</div>
-              <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 11, lineHeight: 1.6 }}>
+              <div style={{ color: "#fff", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>No ranked agents yet</div>
+              <div style={{ color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 11, lineHeight: 1.6 }}>
                 Agents qualify after 10 live trades over 3+ days. Run yours live and claim rank #1 — your strategy becomes copyable by everyone.
               </div>
             </div>
@@ -1957,18 +1957,18 @@ export function AgentView() {
                 const medal = e.rank === 1 ? "#ffd700" : e.rank === 2 ? "#c0c0c0" : e.rank === 3 ? "#cd7f32" : "#3a5a4a";
                 return (
                   <div key={e.wallet} style={{ ...agentCardStyle, borderColor: isMe ? "#00ff88" : "#1a3a2a", display: "grid", gridTemplateColumns: "34px 1fr repeat(4, auto) 110px", gap: 12, minWidth: 520, alignItems: "center" }}>
-                    <div style={{ fontFamily: "monospace", fontSize: 18, fontWeight: 700, color: medal, textAlign: "center" }}>{e.rank}</div>
+                    <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: medal, textAlign: "center" }}>{e.rank}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                       {e.pfp
                         ? <img src={e.pfp} alt="" style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
                         : <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#0a1a0e", border: "1px solid #1a3a2a", flexShrink: 0 }} />}
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontFamily: "monospace", fontSize: 12, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {who}{isMe && <span style={{ color: "#00ff88", fontSize: 9 }}> (you)</span>}
                         </div>
                         <div style={{ display: "flex", gap: 3, marginTop: 2, flexWrap: "wrap" }}>
                           {(e.config?.symbols ?? []).slice(0, 4).map((s) => (
-                            <span key={s} style={{ fontSize: 8, color: "#4a9fff", fontFamily: "monospace", background: "#0a1a2a", border: "1px solid #0a2a3a", borderRadius: 2, padding: "1px 4px" }}>
+                            <span key={s} style={{ fontSize: 8, color: "#4a9fff", fontFamily: "var(--nx-font-mono)", background: "#0a1a2a", border: "1px solid #0a2a3a", borderRadius: 2, padding: "1px 4px" }}>
                               {s.replace("PERP_", "").replace("_USDC", "")}
                             </span>
                           ))}
@@ -1983,8 +1983,8 @@ export function AgentView() {
                     ].map(({ label, val, color }) => (
                       <div key={label} style={{ textAlign: "right" }}>
                         <div style={{ ...agentLabelStyle, fontSize: 8 }}>{label}</div>
-                        <div style={{ color, fontFamily: "monospace", fontSize: 13, fontWeight: 600 }}>{val}</div>
-                        {label === "SCORE" && <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "monospace" }}>{e.trades}t · {e.daysActive}d</div>}
+                        <div style={{ color, fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>{val}</div>
+                        {label === "SCORE" && <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{e.trades}t · {e.daysActive}d</div>}
                       </div>
                     ))}
                     <button
@@ -1994,7 +1994,7 @@ export function AgentView() {
                         background: e.config && !isMe ? "#00ff8815" : "#0a0e0a",
                         border: `1px solid ${e.config && !isMe ? "#00ff88" : "#1e2d1e"}`,
                         borderRadius: 4, color: e.config && !isMe ? "#00ff88" : "#3a5a4a",
-                        fontFamily: "monospace", fontSize: 10, padding: "7px 10px",
+                        fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "7px 10px",
                         cursor: e.config && !isMe ? "pointer" : "default", letterSpacing: "0.03em",
                       }}
                     >

@@ -34,7 +34,7 @@ export function NexusTierBadge({ address, tier, size = "sm" }: NexusTierBadgePro
         display: "inline-flex",
         alignItems: "center",
         gap: 4,
-        fontFamily: "monospace",
+        fontFamily: "var(--nx-font-mono)",
         fontSize,
         fontWeight: "bold",
         letterSpacing: "0.08em",

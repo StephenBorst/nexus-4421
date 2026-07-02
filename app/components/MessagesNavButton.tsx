@@ -110,7 +110,7 @@ export default function MessagesNavButton() {
             background: "#ff4444",
             boxShadow: "0 0 6px rgba(255,68,68,0.7)",
             color: "#fff",
-            fontFamily: "monospace",
+            fontFamily: "var(--nx-font-mono)",
             fontSize: 9,
             fontWeight: "bold",
             lineHeight: "15px",

@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@farcaster/miniapp-sdk": "^0.3.0",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
     "@orderly.network/affiliate": "^3.1.2",
     "@orderly.network/i18n": "^3.1.2",
     "@orderly.network/markets": "^3.1.2",
