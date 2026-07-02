@@ -69,3 +69,68 @@ html, body {
     min-height: 0 !important;
   }
 }
+
+/* ═══ Nexus design system — CSS layer (driven by app/config/theme.ts) ═══════════
+   The interaction states inline styles CAN'T express: hover, focus-visible, motion.
+   Migrate inline-styled controls to these classes to get premium feel + a11y focus
+   for free. Vars mirror C/RADIUS/MOTION in theme.ts — keep the two in sync. */
+:root {
+  --nx-canvas: #0a0e0a; --nx-surface: #111318; --nx-surface-alt: #0d120d; --nx-inset: #080c08;
+  --nx-border: #1e2d1e; --nx-border-strong: #2a3a2a; --nx-border-accent: #00ff8850;
+  --nx-bright: #e8f0ea; --nx-fog: #8aaa9a; --nx-muted: #4a7a5a; --nx-faint: #3a5a4a;
+  --nx-accent: #00ff88; --nx-neg: #ff4444; --nx-warn: #fbbf24; --nx-info: #4a9fff;
+  --nx-r-sm: 3px; --nx-r-md: 6px; --nx-r-lg: 8px;
+  --nx-dur: 170ms; --nx-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nx-card {
+  background: var(--nx-surface-alt);
+  border: 1px solid var(--nx-border);
+  border-radius: var(--nx-r-md);
+  transition: border-color var(--nx-dur) var(--nx-ease);
+}
+.nx-card-interactive { cursor: pointer; }
+.nx-card-interactive:hover { border-color: var(--nx-border-strong); }
+
+.nx-label {
+  font-family: monospace; font-size: 9px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--nx-muted);
+}
+
+.nx-btn {
+  font-family: monospace; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--nx-muted); background: none;
+  border: 1px solid var(--nx-border); border-radius: var(--nx-r-sm);
+  padding: 8px 16px; cursor: pointer;
+  transition: color var(--nx-dur) var(--nx-ease), border-color var(--nx-dur) var(--nx-ease),
+              background-color var(--nx-dur) var(--nx-ease), transform 90ms var(--nx-ease);
+}
+.nx-btn:hover { color: var(--nx-fog); border-color: var(--nx-border-strong); }
+.nx-btn:active { transform: scale(0.97); }
+.nx-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--nx-border-accent); }
+.nx-btn:disabled { opacity: 0.5; cursor: default; transform: none; }
+
+.nx-btn-primary {
+  color: var(--nx-accent); background: #00ff8814;
+  border-color: var(--nx-accent); font-weight: 600;
+}
+.nx-btn-primary:hover { background: #00ff8824; color: var(--nx-accent); border-color: var(--nx-accent); }
+
+.nx-badge {
+  font-family: monospace; font-size: 9px; letter-spacing: 0.05em;
+  border: 1px solid var(--nx-border); border-radius: var(--nx-r-sm); padding: 2px 6px;
+}
+
+.nx-input {
+  font-family: monospace; font-size: 12px; color: var(--nx-bright);
+  background: var(--nx-inset); border: 1px solid var(--nx-border);
+  border-radius: var(--nx-r-sm); padding: 8px 10px; outline: none; width: 100%;
+  box-sizing: border-box;
+  transition: border-color var(--nx-dur) var(--nx-ease), box-shadow var(--nx-dur) var(--nx-ease);
+}
+.nx-input:focus { border-color: var(--nx-border-accent); box-shadow: 0 0 0 2px #00ff8818; }
+.nx-input::placeholder { color: var(--nx-faint); }
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-card, .nx-btn, .nx-input { transition: none; }
+}

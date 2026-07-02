@@ -1,7 +1,9 @@
-# Nexus Lab — Design System
+# Nexus — Design System (app-wide)
 
 Cypherpunk-terminal identity (monospace + terminal green) with Linear's *discipline*.
-Source of truth: `tokens.ts`. Shared primitives built from it: `styles.ts`.
+Source of truth: **`app/config/theme.ts`** (promoted out of the Lab so Feed/Messages/mini/
+components share ONE system). `app/pages/lab/tokens.ts` now just re-exports it.
+Interaction states live in the **CSS layer** (`.nx-*` in `app/styles/index.css`).
 
 ## The 4 rules
 1. **One accent.** `C.accent` (#00ff88) is reserved for the primary CTA + genuinely
@@ -51,7 +53,25 @@ Helpers compose type + tone: `label` (micro/muted), `value` (value/bright),
 - **`btnGhost`** / **`navBtnStyle`** — quiet default for everything else.
 - **`agentBtnStyle(active)`** — toggle: active→primary, inactive→ghost.
 
-## Adoption
-Agent tab is the template (fully token-based). Other tabs inherit the calm via the
-shared primitives; migrate remaining ad-hoc inline sizes/colors to `TYPE`/`C`/`S`
-opportunistically when touching a file — don't do a big-bang repaint.
+## CSS interaction layer (`.nx-*` in `app/styles/index.css`)
+Inline styles can't express `:hover`, `:focus-visible`, or transitions — the reason
+the UI felt static. The `.nx-*` classes (driven by CSS vars that mirror the tokens)
+add motion + a11y focus for free. Prefer these for interactive controls:
+- `.nx-btn` / `.nx-btn-primary` — quiet default / the ONE rationed accent CTA (hover,
+  active scale, focus ring, disabled).
+- `.nx-card` (+ `.nx-card-interactive` for hover), `.nx-label`, `.nx-badge`, `.nx-input`
+  (focus ring). All respect `prefers-reduced-motion`.
+Keep the `:root` vars in `index.css` in sync with `C`/`RADIUS`/`MOTION` in `theme.ts`.
+
+## Palette drift — collapse to canonical
+Five near-identical muted greens existed. Canonical set is `text.faint`/`text.muted`/
+`text.fog`; migrate drift via `DRIFT_TO_CANONICAL` in `theme.ts`
+(`#3a6a4a→muted · #5a7a6a→fog · #5a8a6a→fog`).
+
+## Adoption / migration
+Foundation is app-wide (tokens + CSS layer). Audit (2026-07): only 1 file imported
+tokens; ~416 raw `#00ff88` app-wide; the "one accent" rule was violated 216× in the
+Lab alone. Migration is now **deliberate + batched, verified in preview** — NOT the old
+"opportunistic" drift (which stalled at 1 file) and NOT a blind mass-repaint. Per file:
+swap interactive controls to `.nx-*` classes; replace ad-hoc hex with `C`/drift map;
+ration the accent (green only for the primary CTA + genuine positives); eyeball in preview.
