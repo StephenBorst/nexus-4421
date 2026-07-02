@@ -26,9 +26,42 @@ export function makeFundingPctAt(rows) {
   };
 }
 
+// Build a NO-LOOKAHEAD OI-change lookup from the brain's recorded oi:hist series
+// ([{ t(ms), price, oi, funding }], hourly). At candle time t it returns the
+// FRACTIONAL OI change (decimal, e.g. 0.02 = +2%) from the previous recorded
+// sample to the sample at/before t — the hourly OI delta, matching the hourly
+// priceChange the engine already uses (both over the same bar). Returns null when
+// fewer than two samples exist at/before t (→ engine treats OI as absent, so
+// CONFLUENCE/OI_ONLY simply don't fire there — honest, no fabricated divergence).
+// This is what unlocks CONFLUENCE/OI_ONLY backtests once oi:hist has matured.
+export function makeOiChangeAt(rows) {
+  const sorted = [...(rows || [])].filter((r) => Number.isFinite(r?.oi) && r.oi > 0).sort((a, b) => a.t - b.t);
+  return (tsSec) => {
+    const cutoff = tsSec * 1000;
+    let prev = null, cur = null;
+    for (const r of sorted) {
+      if (r.t <= cutoff) { prev = cur; cur = r; } else break;
+    }
+    if (!cur || !prev || !(prev.oi > 0)) return null;
+    return (cur.oi - prev.oi) / prev.oi;
+  };
+}
+
+// Coverage summary of an oi:hist series — how many samples and how many days it
+// spans. The backtest maturity-gate uses this to decide whether CONFLUENCE/OI_ONLY
+// are testable yet (they need enough recorded OI history; funding+price come from
+// Orderly and are always rich).
+export function oiSeriesInfo(rows) {
+  const s = (rows || []).filter((r) => Number.isFinite(r?.oi) && r.oi > 0).sort((a, b) => a.t - b.t);
+  if (s.length < 2) return { samples: s.length, days: 0 };
+  return { samples: s.length, days: Math.round((s[s.length - 1].t - s[0].t) / 86400000) };
+}
+
 // candles: [{ t(sec), o, h, l, c }] ascending. fundingAt(tsSec) → funding rate
-// (decimal) at/before ts. config: an agent config. Returns aggregate + trade list.
-export function runBacktest(candles, fundingAt, config, fundingPctAt = null) {
+// (decimal) at/before ts. oiChangeAt(tsSec) → fractional OI change (or null) —
+// pass it to make CONFLUENCE/OI_ONLY testable; omit for funding/price-only modes.
+// config: an agent config. Returns aggregate + trade list.
+export function runBacktest(candles, fundingAt, config, fundingPctAt = null, oiChangeAt = null) {
   const trades = [];
   let pos = null;
   let lastExitIdx = -Infinity;
@@ -71,7 +104,10 @@ export function runBacktest(candles, fundingAt, config, fundingPctAt = null) {
     }
     if (!pos && (i - lastExitIdx) > cooldownBars) {
       const priceChange = (c.c - prev.c) / prev.c;
-      const raw = { priceChange, oiChange: 0, fundingRate: fundingAt(c.t) || 0, hasPrev: true };
+      // OI change from the recorded series when available (null → 0, so the OI
+      // rule / CONFLUENCE stays inert exactly where we have no history).
+      const oiChange = oiChangeAt ? (oiChangeAt(c.t) ?? 0) : 0;
+      const raw = { priceChange, oiChange, fundingRate: fundingAt(c.t) || 0, hasPrev: true };
       if (fundingPctAt && (config.fundingPercentileMin || 0) > 0) raw.fundingPct = fundingPctAt(c.t, raw.fundingRate);
       const sig = deriveSignal(raw, config);
       if (sig.direction && sig.direction !== "NONE" && (sig.confidence ?? 0) >= 50) pos = openTrade(sig.direction, c.c, c.t);
@@ -144,11 +180,15 @@ const DEFAULT_FEE_BPS = 3;
 // Sweep: fetch each symbol's data ONCE, then run a grid of backtestable configs
 // (mode × threshold × exit style) reusing that data, ranked by net P&L. This is the
 // terminal sweep, in-app. Bounded (~36 configs) to stay within a request's budget.
-export async function runSweep(base, { symbols, days }) {
+export async function runSweep(base, { symbols, days }, oiHistBySymbol = {}) {
   const data = {};
   for (const s of symbols) {
     const [candles, funding] = await Promise.all([fetchCandles(s, days), fetchFundingAt(s)]);
-    data[s] = { candles, fundingAt: funding.at, fundingPctAt: makeFundingPctAt(funding.rows) };
+    const oiRows = oiHistBySymbol[s];
+    data[s] = {
+      candles, fundingAt: funding.at, fundingPctAt: makeFundingPctAt(funding.rows),
+      oiChangeAt: oiRows && oiRows.length >= 2 ? makeOiChangeAt(oiRows) : null,
+    };
   }
   const EXITS = {
     "fixed tp1.5/sl0.75": { tpPercent: 1.5, slPercent: 0.75 },
@@ -156,23 +196,33 @@ export async function runSweep(base, { symbols, days }) {
     "trail 0.5": { tpPercent: 1.5, slPercent: 0.75, trailingStopPct: 0.5 },
   };
   const common = { leverage: base.leverage || 5, capitalPerTrade: base.capitalPerTrade || 50, maxHoldHours: base.maxHoldHours || 4, oiChangeThreshold: 0, feeBps: DEFAULT_FEE_BPS };
+  // Only fold the OI-driven modes (CONFLUENCE / OI_ONLY) into the grid when EVERY
+  // symbol has usable recorded OI — otherwise they'd contribute empty rows. The
+  // endpoint only passes oiHistBySymbol once it's judged mature, so this lights up
+  // the flagship CONFLUENCE in discovery exactly when the data can back it.
+  const oiReady = symbols.length > 0 && symbols.every((s) => data[s].oiChangeAt);
   const configs = [];
   for (const [exName, ex] of Object.entries(EXITS)) {
     for (const p of [0.3, 0.5, 0.8]) for (const mode of ["MOMENTUM", "MEAN_REVERSION"]) configs.push({ name: `${mode} · p${p} · ${exName}`, config: { ...common, ...ex, signalMode: mode, priceChangeThreshold: p } });
     for (const f of [0.005, 0.01, 0.02]) configs.push({ name: `FUNDING_ONLY · f${f} · ${exName}`, config: { ...common, ...ex, signalMode: "FUNDING_ONLY", fundingThreshold: f } });
     // The adaptive funding-PERCENTILE filter — the only net-positive family found.
     for (const pctMin of [90, 95]) configs.push({ name: `FUNDING · f0.01 · pct${pctMin} · ${exName}`, config: { ...common, ...ex, signalMode: "FUNDING_ONLY", fundingThreshold: 0.01, fundingPercentileMin: pctMin } });
+    if (oiReady) {
+      configs.push({ name: `CONFLUENCE · f0.01 · ${exName}`, config: { ...common, ...ex, signalMode: "CONFLUENCE", fundingThreshold: 0.01 } });
+      configs.push({ name: `OI_ONLY · ${exName}`, config: { ...common, ...ex, signalMode: "OI_ONLY" } });
+    }
   }
   const results = configs.map(({ name, config }) => {
     let net = 0, trades = 0, wins = 0;
     for (const s of symbols) {
-      const r = runBacktest(data[s].candles, data[s].fundingAt, config, data[s].fundingPctAt);
+      const r = runBacktest(data[s].candles, data[s].fundingAt, config, data[s].fundingPctAt, data[s].oiChangeAt);
       net += r.netUsd; trades += r.trades; wins += Math.round((r.winRate / 100) * r.trades);
     }
     // Include the strategy-defining params so the UI can one-click APPLY a winner.
     const applied = {
       signalMode: config.signalMode, priceChangeThreshold: config.priceChangeThreshold,
       fundingThreshold: config.fundingThreshold, fundingPercentileMin: config.fundingPercentileMin || 0,
+      oiChangeThreshold: config.oiChangeThreshold || 0,
       tpPercent: config.tpPercent, slPercent: config.slPercent,
       takeProfits: config.takeProfits || null, trailingStopPct: config.trailingStopPct || 0,
     };
@@ -182,12 +232,17 @@ export async function runSweep(base, { symbols, days }) {
 }
 
 // Orchestrator: run one config across symbols, return per-symbol + combined stats.
-export async function backtestConfig(config, { symbols, days }) {
+// oiHistBySymbol (optional) = { symbol: [{t(ms),price,oi,funding}] } from the brain's
+// recorded oi:hist — pass it to make CONFLUENCE/OI_ONLY testable (the endpoint reads
+// it from KV and gates on maturity first).
+export async function backtestConfig(config, { symbols, days }, oiHistBySymbol = {}) {
   const perSymbol = [];
   let net = 0, trades = 0, wins = 0;
   for (const symbol of symbols) {
     const [candles, funding] = await Promise.all([fetchCandles(symbol, days), fetchFundingAt(symbol)]);
-    const r = runBacktest(candles, funding.at, { feeBps: DEFAULT_FEE_BPS, ...config }, makeFundingPctAt(funding.rows));
+    const oiRows = oiHistBySymbol[symbol];
+    const oiChangeAt = oiRows && oiRows.length >= 2 ? makeOiChangeAt(oiRows) : null;
+    const r = runBacktest(candles, funding.at, { feeBps: DEFAULT_FEE_BPS, ...config }, makeFundingPctAt(funding.rows), oiChangeAt);
     perSymbol.push({ symbol, candles: candles.length, ...r });
     net += r.netUsd; trades += r.trades; wins += Math.round((r.winRate / 100) * r.trades);
   }

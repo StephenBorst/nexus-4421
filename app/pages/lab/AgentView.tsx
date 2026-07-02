@@ -1242,6 +1242,13 @@ export function AgentView() {
                         ⚠ {backtest.note}
                       </div>
                     )}
+                    {/* When OI-driven modes ARE testable, surface the OI-window caveat
+                        (funding+price span the full window; confluence only the recorded OI). */}
+                    {!backtest.untestable && backtest.note && (
+                      <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10, lineHeight: 1.5, marginBottom: 10, padding: "6px 8px", border: "1px solid #1e2d1e", borderRadius: 3 }}>
+                        ◆ {backtest.note}
+                      </div>
+                    )}
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12 }}>
                       {[
                         { label: "NET P&L (60d)", value: `${backtest.combined.netUsd >= 0 ? "+" : ""}$${backtest.combined.netUsd}`, color: backtest.combined.netUsd >= 0 ? "#00ff88" : "#ff4444" },

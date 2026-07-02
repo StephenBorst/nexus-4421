@@ -1,10 +1,21 @@
 // Fetch real Orderly history, sweep strategy configs, print a ranked table.
 // Run: node tools/backtest/run.mjs
-import { runBacktest, makeFundingPctAt } from "../../workers/nexus-lab-api/backtest.mjs";
+import { runBacktest, makeFundingPctAt, makeOiChangeAt, oiSeriesInfo } from "../../workers/nexus-lab-api/backtest.mjs";
 
 const API = "https://api-evm.orderly.org";
+// OI history lives only in our lab-api KV (Orderly has none) — pull the recorded
+// series so CONFLUENCE / OI_ONLY can be swept once it's matured (~mid-July 2026).
+const LAB_API = "https://og.nexustradinglabs.com";
 const SYMBOLS = ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC"];
 const DAYS = 60;
+
+async function fetchOiHist(symbol) {
+  try {
+    const r = await fetch(`${LAB_API}/agent/oi-history/${symbol}`);
+    const d = await r.json();
+    return Array.isArray(d?.points) ? d.points : [];
+  } catch { return []; }
+}
 
 async function fetchCandles(symbol) {
   const now = Math.floor(Date.now() / 1000);
@@ -65,7 +76,7 @@ const EXITS = {
 // is as honest as the user-facing backtest (round-trip cost is deducted per trade).
 const BASE = { leverage: 5, capitalPerTrade: 50, maxHoldHours: 4, oiChangeThreshold: 0, feeBps: 3 };
 
-function buildConfigs() {
+function buildConfigs(oiReady) {
   const cfgs = [];
   for (const [exName, ex] of Object.entries(EXITS)) {
     for (const pct of [0.3, 0.5, 0.8]) {
@@ -82,6 +93,11 @@ function buildConfigs() {
         cfgs.push({ name: `FUNDING f${f} pctMin${pctMin} ${exName}`, config: { ...BASE, ...ex, signalMode: "FUNDING_ONLY", fundingThreshold: f, fundingPercentileMin: pctMin } });
       }
     }
+    // ── The flagship, testable once recorded OI has matured (~mid-July 2026) ──
+    if (oiReady) {
+      cfgs.push({ name: `CONFLUENCE f0.01 ${exName}`, config: { ...BASE, ...ex, signalMode: "CONFLUENCE", fundingThreshold: 0.01 } });
+      cfgs.push({ name: `OI_ONLY ${exName}`, config: { ...BASE, ...ex, signalMode: "OI_ONLY" } });
+    }
   }
   return cfgs;
 }
@@ -91,15 +107,24 @@ async function main() {
   for (const s of SYMBOLS) {
     const candles = await fetchCandles(s);
     const { at, rows } = await fetchFunding(s);
-    data[s] = { candles, fundingAt: at, fundingPctAt: makeFundingPctAt(rows) };
-    console.error(`${s}: ${candles.length} candles, ${rows.length} funding rows`);
+    const oiRows = await fetchOiHist(s);
+    const info = oiSeriesInfo(oiRows);
+    data[s] = {
+      candles, fundingAt: at, fundingPctAt: makeFundingPctAt(rows),
+      oiChangeAt: oiRows.length >= 2 ? makeOiChangeAt(oiRows) : null, oiInfo: info,
+    };
+    console.error(`${s}: ${candles.length} candles, ${rows.length} funding rows, OI ${info.samples} samples / ${info.days}d`);
   }
+  // CONFLUENCE / OI_ONLY only enter the grid when EVERY symbol has enough recorded
+  // OI (≥14d and ≥200 samples), matching the lab-api maturity gate.
+  const oiReady = SYMBOLS.every((s) => data[s].oiInfo.days >= 14 && data[s].oiInfo.samples >= 200);
+  console.error(oiReady ? "OI mature → CONFLUENCE/OI_ONLY included" : "OI still maturing → funding/price modes only");
 
   const results = [];
-  for (const { name, config } of buildConfigs()) {
+  for (const { name, config } of buildConfigs(oiReady)) {
     let net = 0, trades = 0, wins = 0, pf = [];
     for (const s of SYMBOLS) {
-      const r = runBacktest(data[s].candles, data[s].fundingAt, config, data[s].fundingPctAt);
+      const r = runBacktest(data[s].candles, data[s].fundingAt, config, data[s].fundingPctAt, data[s].oiChangeAt);
       net += r.netUsd; trades += r.trades; wins += Math.round(r.winRate / 100 * r.trades);
       if (r.profitFactor) pf.push(r.profitFactor);
     }

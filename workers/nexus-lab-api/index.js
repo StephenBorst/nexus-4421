@@ -25,7 +25,7 @@ import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats } from "./logic.mjs";
 
-import { backtestConfig, runSweep } from "./backtest.mjs";
+import { backtestConfig, runSweep, oiSeriesInfo } from "./backtest.mjs";
 
 // URL-safe random token (hook secret / passphrase). Crypto-strong via Web Crypto.
 function randToken(bytes = 24) {
@@ -257,6 +257,29 @@ async function walletIsPro(address, env) {
     } catch { /* try next rpc */ }
   }
   return false; // RPC unreachable → fail closed (paywall stays shut)
+}
+
+// ── OI-history loader for backtests ───────────────────────────────────────────
+// CONFLUENCE / OI_ONLY need the brain's recorded oi:hist:{symbol} series (Orderly
+// has no OI history endpoint). This reads it for the given symbols and reports
+// whether coverage is deep enough to trust an OI backtest. Shared by the single
+// backtest + the sweep so the maturity gate can't drift. Until mature it no-ops
+// (oiMature:false) and callers stay honestly "untestable".
+const OI_BACKTEST_MIN_DAYS = 14, OI_BACKTEST_MIN_SAMPLES = 200;
+async function loadOiHistForBacktest(symbols, env) {
+  const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+  const oiHistBySymbol = {};
+  const infos = [];
+  for (const s of symbols) {
+    let rows = [];
+    try { const raw = await AGENT_KV.get(`oi:hist:${s}`); rows = raw ? JSON.parse(raw) : []; } catch { /* absent → thin */ }
+    oiHistBySymbol[s] = rows;
+    infos.push({ symbol: s, ...oiSeriesInfo(rows) });
+  }
+  const minDays = infos.length ? Math.min(...infos.map((i) => i.days)) : 0;
+  const minSamples = infos.length ? Math.min(...infos.map((i) => i.samples)) : 0;
+  const oiMature = minDays >= OI_BACKTEST_MIN_DAYS && minSamples >= OI_BACKTEST_MIN_SAMPLES;
+  return { oiHistBySymbol, oiMature, gate: { minDays, minSamples, perSymbol: infos } };
 }
 
 // ── Ph27: notification helpers ────────────────────────────────────────────────
@@ -3026,7 +3049,11 @@ document.getElementById("btn").addEventListener("click",go);
       const symbols = (Array.isArray(config?.symbols) && config.symbols.length ? config.symbols : ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC"]).slice(0, 3);
       const days = Math.min(90, Math.max(7, Number(body.days) || 60));
       try {
-        return json(await runSweep(config || {}, { symbols, days }), request);
+        // Fold CONFLUENCE / OI_ONLY into the discovery grid only once recorded OI is
+        // deep enough; until then the sweep stays funding/price-only (still honest).
+        const oi = await loadOiHistForBacktest(symbols, env);
+        const sweep = await runSweep(config || {}, { symbols, days }, oi.oiMature ? oi.oiHistBySymbol : {});
+        return json({ ...sweep, oiTested: oi.oiMature, oiCoverage: oi.gate }, request);
       } catch (e) {
         console.error("[sweep] error:", e);
         return json({ error: "sweep failed", detail: String(e.message || e) }, request, 500);
@@ -3047,12 +3074,23 @@ document.getElementById("btn").addEventListener("click",go);
       if (!(await walletIsPro(caller, env))) {
         return json({ error: "pro_backtest_locked", hint: "Strategy backtesting is a Nexus PRO feature — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
       }
-      const untestable = ["CONFLUENCE", "OI_ONLY"].includes(config.signalMode);
       const symbols = (Array.isArray(config.symbols) && config.symbols.length ? config.symbols : ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC"]).slice(0, 3);
       const days = Math.min(90, Math.max(7, Number(body.days) || 60));
+      // OI-dependent modes (CONFLUENCE / OI_ONLY) become testable once the brain's
+      // recorded oi:hist has matured — load it, gate on coverage, feed the engine
+      // only when deep enough; otherwise stay honestly "untestable".
+      const needsOi = ["CONFLUENCE", "OI_ONLY"].includes(config.signalMode);
+      const oi = needsOi ? await loadOiHistForBacktest(symbols, env) : null;
+      const untestable = needsOi && !oi.oiMature;
       try {
-        const result = await backtestConfig(config, { symbols, days });
-        return json({ ...result, untestable, note: untestable ? `${config.signalMode} relies on OI divergence, which has no historical series yet — results shown are entries+exits only. Test MOMENTUM / MEAN_REVERSION / FUNDING_ONLY for a full backtest.` : null }, request);
+        const result = await backtestConfig(config, { symbols, days }, oi?.oiMature ? oi.oiHistBySymbol : {});
+        return json({
+          ...result, untestable,
+          ...(oi?.oiMature ? { oiWindowDays: oi.gate.minDays } : {}),
+          note: untestable
+            ? `${config.signalMode} needs recorded OI history — still maturing (${oi.gate.minDays}/${OI_BACKTEST_MIN_DAYS}d, ${oi.gate.minSamples}/${OI_BACKTEST_MIN_SAMPLES} samples across symbols). Entries shown are funding/price-driven only; test MOMENTUM / MEAN_REVERSION / FUNDING_ONLY for a full backtest.`
+            : (needsOi ? `CONFLUENCE tested over the ${oi.gate.minDays}d of recorded OI history (funding+price span the full ${days}d).` : null),
+        }, request);
       } catch (e) {
         console.error("[backtest] error:", e);
         return json({ error: "backtest failed", detail: String(e.message || e) }, request, 500);

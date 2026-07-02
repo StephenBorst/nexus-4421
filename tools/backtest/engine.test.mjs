@@ -40,3 +40,39 @@ test("makeFundingPctAt: no lookahead — ranks vs only past funding rows", () =>
   // at t=1, only [0.01]; a below-history value → 0
   assert.equal(at(1, 0.005), 0);
 });
+
+import { makeOiChangeAt, oiSeriesInfo } from "../../workers/nexus-lab-api/backtest.mjs";
+test("makeOiChangeAt: no lookahead — fractional OI delta of the two samples at/before t", () => {
+  // hourly {t(ms), oi}. delta = (cur.oi - prev.oi)/prev.oi vs the sample before it.
+  const rows = [{ t: 3600_000, oi: 100 }, { t: 7200_000, oi: 110 }, { t: 10800_000, oi: 99 }];
+  const at = makeOiChangeAt(rows);
+  assert.equal(at(1000), null);   // cutoff 1.0M ms → no samples at/before → null
+  assert.equal(at(3600), null);   // cutoff 3.6M ms → only the first sample → null (need 2)
+  assert.equal(Math.round(at(7200) * 100) / 100, 0.1);   // prev 100 → cur 110 = +0.10
+  assert.equal(Math.round(at(10800) * 100) / 100, -0.1); // prev 110 → cur 99  = -0.10
+});
+
+test("oiSeriesInfo: samples + day-span coverage", () => {
+  assert.deepEqual(oiSeriesInfo([]), { samples: 0, days: 0 });
+  const day = 86400_000;
+  const rows = [{ t: 0, oi: 1 }, { t: day, oi: 1 }, { t: 3 * day, oi: 1 }];
+  assert.deepEqual(oiSeriesInfo(rows), { samples: 3, days: 3 });
+  // rows without a positive oi are ignored
+  assert.deepEqual(oiSeriesInfo([{ t: 0, oi: 0 }, { t: day, oi: NaN }]), { samples: 0, days: 0 });
+});
+
+test("runBacktest: CONFLUENCE fires only with an oiChangeAt that agrees with funding", () => {
+  // i=1 price falls (priceChange<0) while funding is deeply negative (→ funding says
+  // LONG) and OI is RISING (oiChange>0) → LONG divergence agrees → CONFLUENCE LONG.
+  // i=2 rips up past the 1% TP so the trade closes and is recorded. Without an
+  // oiChangeAt the OI rule is inert, funding≠oi, and CONFLUENCE never enters.
+  const closes = [100, 99, 100.5];
+  const candles = closes.map((c, i) => ({ t: 1_700_000_000 + i * 3600, o: c, h: c * 1.001, l: c * 0.999, c }));
+  const funding = () => -0.02; // ≤ -fundingThreshold(0.01) → funding says LONG
+  const cfg = { signalMode: "CONFLUENCE", fundingThreshold: 0.01, oiChangeThreshold: 0, tpPercent: 1, slPercent: 2, maxHoldHours: 8, leverage: 1, capitalPerTrade: 100 };
+  const oiRows = candles.map((c, i) => ({ t: c.t * 1000, oi: 100 + i * 10 })); // OI rising each bar
+  const withOi = runBacktest(candles, funding, cfg, null, makeOiChangeAt(oiRows));
+  const withoutOi = runBacktest(candles, funding, cfg, null, null);
+  assert.equal(withoutOi.trades, 0, "no OI series → CONFLUENCE inert");
+  assert.ok(withOi.trades > 0, `expected CONFLUENCE trades with agreeing OI, got ${withOi.trades}`);
+});
