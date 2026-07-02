@@ -6,7 +6,7 @@
 // Reuses the REAL deployed engine (runBacktest → deriveSignal/evaluateExit), fetches
 // live Orderly history, and auto-includes CONFLUENCE/OI_ONLY once recorded OI matures.
 // Run: node tools/backtest/validate.mjs
-import { runBacktest, makeFundingPctAt, makeOiChangeAt, oiSeriesInfo } from "../../workers/nexus-lab-api/backtest.mjs";
+import { runBacktest, makeFundingPctAt, makeOiChangeAt, oiSeriesInfo, foldsByEntry } from "../../workers/nexus-lab-api/backtest.mjs";
 
 const ORDERLY = "https://api-evm.orderly.org";
 const LAB_API = "https://og.nexustradinglabs.com";
@@ -58,20 +58,8 @@ const STRATEGIES = [
   { name: "CONFLUENCE f0.01 (OI-gated)", cfg: { signalMode: "CONFLUENCE", fundingThreshold: 0.01, tpPercent: 1.5, slPercent: 0.75, breakevenTriggerPct: 1.0 }, needsOi: true },
 ];
 
-// Rigorous walk-forward: run ONE backtest over the full series, then bucket each REAL
-// closed trade into the fold its ENTRY falls in (no boundary cutting / cooldown resets).
-// Returns per-fold net$ (fees applied here) + trade counts.
-function foldsByEntry(res, candles, config, folds) {
-  const t0 = candles[0].t, tN = candles[candles.length - 1].t, span = (tN - t0) / folds || 1;
-  const notional = (config.capitalPerTrade || 50) * (config.leverage || 1);
-  const feePct = ((config.feeBps || 0) / 100) * 2;
-  const net = new Array(folds).fill(0), cnt = new Array(folds).fill(0);
-  for (const t of res._trades || []) {
-    const k = Math.min(folds - 1, Math.max(0, Math.floor((t.entryT - t0) / span)));
-    net[k] += ((t.pnlPct - feePct) / 100) * notional; cnt[k]++;
-  }
-  return { net, cnt };
-}
+// Walk-forward bucketing lives in the engine (foldsByEntry) so this dev harness and
+// the in-app /agent/validate endpoint compute the verdict identically — no drift.
 
 async function main() {
   const data = {};

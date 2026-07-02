@@ -288,3 +288,58 @@ export async function backtestConfig(config, { symbols, days }, oiHistBySymbol =
     perSymbol,
   };
 }
+
+// Bucket a backtest's REAL closed trades into `folds` sequential windows by ENTRY time
+// (no boundary artifacts) and return per-fold net$ + counts. Fees applied here.
+export function foldsByEntry(res, candles, config, folds) {
+  const t0 = candles[0]?.t ?? 0, tN = candles[candles.length - 1]?.t ?? 0, span = (tN - t0) / folds || 1;
+  const notional = (config.capitalPerTrade || 50) * (config.leverage || 1);
+  const feePct = ((config.feeBps || 0) / 100) * 2;
+  const net = new Array(folds).fill(0), cnt = new Array(folds).fill(0);
+  for (const t of res._trades || []) {
+    const k = Math.min(folds - 1, Math.max(0, Math.floor((t.entryT - t0) / span)));
+    net[k] += ((t.pnlPct - feePct) / 100) * notional; cnt[k]++;
+  }
+  return { net: net.map((n) => Math.round(n * 100) / 100), cnt };
+}
+
+// Assign a robustness verdict from cross-market + cross-time consistency. An edge is
+// only ROBUST if it's net-positive on a majority of symbols AND in a majority of folds
+// — that's what separates a real edge from a single-window overfit.
+export function robustnessVerdict(posSymbols, totalSymbols, foldConsistencyPct) {
+  if (posSymbols >= Math.ceil(totalSymbols / 2) && foldConsistencyPct >= 55) return "ROBUST";
+  if (posSymbols >= 2 && foldConsistencyPct >= 45) return "FRAGILE";
+  return "NOT_ROBUST";
+}
+
+// Walk-forward validator (the honest layer over backtestConfig): runs ONE backtest per
+// symbol over `days`, buckets real trades into `folds`, and returns a cross-market +
+// cross-time verdict. oiHistBySymbol makes CONFLUENCE/OI_ONLY testable (endpoint gates
+// maturity). Kept lean on symbol count so it fits a Worker's subrequest budget.
+export async function walkForwardValidate(config, { symbols, days, folds = 4 }, oiHistBySymbol = {}) {
+  const cfg = { feeBps: DEFAULT_FEE_BPS, ...config };
+  const perSymbol = [];
+  let posSymbols = 0, foldPos = 0, foldTotal = 0, totNet = 0, totTrades = 0;
+  for (const symbol of symbols) {
+    const [candles, funding] = await Promise.all([fetchCandles(symbol, days), fetchFundingAt(symbol)]);
+    const oiRows = oiHistBySymbol[symbol];
+    const oiChangeAt = oiRows && oiRows.length >= 2 ? makeOiChangeAt(oiRows) : null;
+    const res = runBacktest(candles, funding.at, cfg, makeFundingPctAt(funding.rows), oiChangeAt);
+    const { net, cnt } = foldsByEntry(res, candles, cfg, folds);
+    const symNet = Math.round(net.reduce((a, b) => a + b, 0) * 100) / 100;
+    const symTrades = cnt.reduce((a, b) => a + b, 0);
+    const foldsPos = net.filter((n) => n > 0).length;
+    if (symNet > 0) posSymbols++;
+    for (const n of net) { foldTotal++; if (n > 0) foldPos++; }
+    totNet += symNet; totTrades += symTrades;
+    perSymbol.push({ symbol, net: symNet, trades: symTrades, foldsPositive: foldsPos, folds: net });
+  }
+  const foldConsistency = foldTotal ? Math.round((foldPos / foldTotal) * 100) : 0;
+  return {
+    days, folds, symbols,
+    verdict: robustnessVerdict(posSymbols, symbols.length, foldConsistency),
+    posSymbols, totalSymbols: symbols.length, foldConsistency,
+    totalNet: Math.round(totNet * 100) / 100, totalTrades: totTrades,
+    perSymbol,
+  };
+}

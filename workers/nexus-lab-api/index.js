@@ -25,7 +25,7 @@ import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats } from "./logic.mjs";
 
-import { backtestConfig, runSweep, oiSeriesInfo } from "./backtest.mjs";
+import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./backtest.mjs";
 
 // URL-safe random token (hook secret / passphrase). Crypto-strong via Web Crypto.
 function randToken(bytes = 24) {
@@ -3057,6 +3057,40 @@ document.getElementById("btn").addEventListener("click",go);
       } catch (e) {
         console.error("[sweep] error:", e);
         return json({ error: "sweep failed", detail: String(e.message || e) }, request, 500);
+      }
+    }
+
+    // ── POST /agent/validate — WALK-FORWARD robustness verdict (PRO) ─────────
+    // The honest layer over backtest: replays the config across a DIVERSE symbol
+    // universe AND multiple time folds, and returns ROBUST / FRAGILE / NOT_ROBUST.
+    // This is the "verify, don't trust" test — an edge that only works on one symbol
+    // in one window is NOT_ROBUST here, by design. PRO-gated (same as backtest).
+    if (parts[0] === "agent" && parts[1] === "validate" && request.method === "POST") {
+      let body; try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const { config, walletSig } = body || {};
+      if (!config || typeof config !== "object") return json({ error: "config required" }, request, 400);
+      const caller = typeof walletSig === "string" ? recoverEthAddress("nexus-trading-key-v1", walletSig) : null;
+      if (!caller) return json({ error: "walletSig_required", hint: "Validation requires walletSig = sign_message('nexus-trading-key-v1')." }, request, 401);
+      if (!(await walletIsPro(caller, env))) return json({ error: "pro_validate_locked", hint: "Walk-forward validation is a Nexus PRO feature — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
+      // Fixed diverse universe (cross-market breadth is the whole point) — capped so it
+      // fits a Worker's subrequest budget. Cross-time via folds.
+      const UNIVERSE = ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC", "PERP_BNB_USDC", "PERP_XRP_USDC", "PERP_LINK_USDC"];
+      const days = Math.min(90, Math.max(28, Number(body.days) || 60));
+      const folds = Math.min(6, Math.max(3, Number(body.folds) || 4));
+      const needsOi = ["CONFLUENCE", "OI_ONLY"].includes(config.signalMode);
+      const oi = needsOi ? await loadOiHistForBacktest(UNIVERSE, env) : null;
+      const untestable = needsOi && !oi.oiMature;
+      try {
+        const result = await walkForwardValidate(config, { symbols: UNIVERSE, days, folds }, oi?.oiMature ? oi.oiHistBySymbol : {});
+        return json({
+          ...result, untestable,
+          note: untestable
+            ? `${config.signalMode} needs recorded OI history to validate — still maturing (${oi.gate.minDays}/${OI_BACKTEST_MIN_DAYS}d). Validate MOMENTUM / MEAN_REVERSION / FUNDING_ONLY meanwhile.`
+            : null,
+        }, request);
+      } catch (e) {
+        console.error("[validate] error:", e);
+        return json({ error: "validate failed", detail: String(e.message || e) }, request, 500);
       }
     }
 

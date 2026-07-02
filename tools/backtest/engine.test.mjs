@@ -61,6 +61,22 @@ test("oiSeriesInfo: samples + day-span coverage", () => {
   assert.deepEqual(oiSeriesInfo([{ t: 0, oi: 0 }, { t: day, oi: NaN }]), { samples: 0, days: 0 });
 });
 
+import { foldsByEntry, robustnessVerdict } from "../../workers/nexus-lab-api/backtest.mjs";
+test("foldsByEntry: buckets real trades by entry time + applies fee", () => {
+  const candles = Array.from({ length: 5 }, (_, i) => ({ t: i * 100 })); // t0=0, tN=400, 2 folds → span 200
+  const res = { _trades: [{ entryT: 50, pnlPct: 2 }, { entryT: 250, pnlPct: -1 }] };
+  const cfg = { capitalPerTrade: 100, leverage: 1, feeBps: 0 };
+  const { net, cnt } = foldsByEntry(res, candles, cfg, 2);
+  assert.deepEqual(cnt, [1, 1]);
+  assert.deepEqual(net, [2, -1]); // (2%→$2) fold0, (-1%→-$1) fold1
+});
+
+test("robustnessVerdict: needs cross-market AND cross-time consistency", () => {
+  assert.equal(robustnessVerdict(5, 8, 60), "ROBUST");     // 5/8 symbols, 60% folds
+  assert.equal(robustnessVerdict(1, 8, 19), "NOT_ROBUST"); // the funding-fade reality
+  assert.equal(robustnessVerdict(3, 8, 50), "FRAGILE");    // some signal, not enough
+});
+
 import { atrPctAt } from "../../workers/nexus-lab-api/backtest.mjs";
 test("atrPctAt: no-lookahead rolling ATR% (null until enough prior candles)", () => {
   // constant 2-wide bars around a ~100 close → ATR ≈ 2, ATR% ≈ 2%.

@@ -219,6 +219,8 @@ export function AgentView() {
   const [backtesting, setBacktesting] = useState(false);
   const [sweep, setSweep] = useState<any | null>(null);
   const [sweeping, setSweeping] = useState(false);
+  const [validation, setValidation] = useState<any | null>(null);
+  const [validating, setValidating] = useState(false);
   const [strategies, setStrategies] = useState<any[]>([]);
   const [stratName, setStratName] = useState("");
   const [webhookEnabled, setWebhookEnabled] = useState(false);
@@ -342,6 +344,24 @@ export function AgentView() {
       setSweep(data);
     } catch (e: any) { setError(e.message); } finally { setSweeping(false); }
   }
+  // Walk-forward VALIDATE — the honest layer. Replays the config across a diverse
+  // symbol universe AND multiple time folds and returns ROBUST / FRAGILE / NOT_ROBUST.
+  // "Verify, don't trust" applied to your own strategy: an edge that only works on one
+  // symbol in one window fails here by design.
+  async function runValidation() {
+    if (!walletAddress) { setError("Connect wallet first"); return; }
+    setValidating(true); setError(null); setValidation(null);
+    try {
+      const walletSig = await getAgentSig(walletAddress);
+      const res = await fetch(`${AGENT_API}/agent/validate`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ config, walletSig }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.hint || data.error || "Validation failed");
+      setValidation(data);
+    } catch (e: any) { setError(e.message); } finally { setValidating(false); }
+  }
+
   // Apply a swept winner's strategy params into the editor (keeps the user's
   // symbols/leverage/capital/mode; swaps mode/threshold/exits). The bridge that
   // turns "here's what worked" into "now it's my config."
@@ -1220,8 +1240,11 @@ export function AgentView() {
                   <button onClick={runConfigBacktest} disabled={backtesting || sweeping} style={{ ...btnPrimary, fontSize: 10, padding: "6px 16px", opacity: (backtesting || sweeping) ? 0.5 : 1 }}>
                     {backtesting ? "RUNNING…" : "▶ TEST THIS CONFIG"}
                   </button>
-                  <button onClick={runConfigSweep} disabled={backtesting || sweeping} style={{ ...navBtnStyle, fontSize: 10, padding: "6px 16px", opacity: (backtesting || sweeping) ? 0.5 : 1 }}>
+                  <button onClick={runConfigSweep} disabled={backtesting || sweeping || validating} style={{ ...navBtnStyle, fontSize: 10, padding: "6px 16px", opacity: (backtesting || sweeping || validating) ? 0.5 : 1 }}>
                     {sweeping ? "SWEEPING…" : "⊞ SWEEP CONFIGS"}
+                  </button>
+                  <button onClick={runValidation} disabled={backtesting || sweeping || validating} title="Walk-forward across markets + time — the honest robustness test" style={{ ...navBtnStyle, fontSize: 10, padding: "6px 16px", color: "#fbbf24", borderColor: "#4a3a1a", opacity: (backtesting || sweeping || validating) ? 0.5 : 1 }}>
+                    {validating ? "VALIDATING…" : "✓ VALIDATE"}
                   </button>
                 </div>
               )}
@@ -1274,6 +1297,47 @@ export function AgentView() {
                     </div>
                   </div>
                 )}
+                {validation && (() => {
+                  const v = validation.verdict;
+                  const vc = v === "ROBUST" ? "#00ff88" : v === "FRAGILE" ? "#fbbf24" : "#ff4444";
+                  const vlabel = v === "ROBUST" ? "✅ ROBUST" : v === "FRAGILE" ? "🟨 FRAGILE" : "❌ NOT ROBUST";
+                  return (
+                    <div style={{ marginTop: 14 }}>
+                      <div style={{ ...agentLabelStyle, fontSize: 9, marginBottom: 6 }}>
+                        WALK-FORWARD — {validation.totalSymbols} symbols · {validation.folds} time folds · {validation.days}d · fees on
+                      </div>
+                      {validation.untestable ? (
+                        <div style={{ color: "#fbbf24", fontFamily: "monospace", fontSize: 10, lineHeight: 1.5, padding: "6px 8px", border: "1px solid #fbbf2430", borderRadius: 3 }}>⚠ {validation.note}</div>
+                      ) : (
+                        <>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 10px", border: `1px solid ${vc}44`, borderRadius: 4, background: `${vc}0c` }}>
+                            <span style={{ fontFamily: "monospace", fontSize: 14, fontWeight: 700, color: vc }}>{vlabel}</span>
+                            <span style={{ fontFamily: "monospace", fontSize: 10, color: "#8aaa9a" }}>
+                              net-positive on {validation.posSymbols}/{validation.totalSymbols} markets · {validation.foldConsistency}% of folds positive · net <span style={{ color: validation.totalNet >= 0 ? "#00ff88" : "#ff4444" }}>{validation.totalNet >= 0 ? "+" : ""}${validation.totalNet}</span>
+                            </span>
+                          </div>
+                          <div style={{ marginTop: 8, overflowX: "auto" }}>
+                            <div style={{ minWidth: 320 }}>
+                              {validation.perSymbol.map((s: any) => (
+                                <div key={s.symbol} style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "monospace", fontSize: 10, padding: "3px 0", borderTop: "1px solid #10160f" }}>
+                                  <span style={{ width: 46, color: "#c0c0c0" }}>{s.symbol.replace("PERP_", "").replace("_USDC", "")}</span>
+                                  <span style={{ width: 66, textAlign: "right", color: s.net >= 0 ? "#00ff88" : "#ff4444" }}>{s.net >= 0 ? "+" : ""}${s.net}</span>
+                                  <span style={{ width: 54, textAlign: "right", color: "#5a7a6a" }}>{s.foldsPositive}/{validation.folds}f</span>
+                                  <span style={{ display: "flex", gap: 2, marginLeft: 6 }}>
+                                    {s.folds.map((n: number, i: number) => <span key={i} title={`fold ${i + 1}: ${n >= 0 ? "+" : ""}$${n}`} style={{ width: 8, height: 12, borderRadius: 1, background: n > 0 ? "#00ff88" : n < 0 ? "#ff4444" : "#2a3a2a" }} />)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
+                            The honest test: an edge that only works on one market in one window is NOT robust. We hold our own presets to this — nothing wears "proven" until it passes. Past performance ≠ future results.
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
                 {sweep && (
                   <div style={{ marginTop: 14 }}>
                     <div style={{ ...agentLabelStyle, fontSize: 9, marginBottom: 6 }}>
