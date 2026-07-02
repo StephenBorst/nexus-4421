@@ -309,6 +309,16 @@ export default function MiniApp() {
   async function shareApp() {
     try { await sdk.actions.composeCast({ text: "trading on Nexus 🟢 verifiable track records, autonomous agents & one-tap perps — the terminal that makes you better.", embeds: [`${APP}/mini`] }); } catch { /* ignore */ }
   }
+  // Share the autonomous agent — honestly labeled PAPER (forward-test), on-brand.
+  async function shareAgent() {
+    const paper = agentStatus?.state?.paper_trades ?? [];
+    const net = paper.reduce((s, t) => s + (Number(t.pnl) || 0), 0);
+    const strat = agentStatus?.config?.signalMode ?? "funding-fade";
+    const text = paper.length > 0
+      ? `My Nexus agent is forward-testing a ${strat} strategy — ${net >= 0 ? "+" : ""}$${net.toFixed(2)} over ${paper.length} PAPER trade${paper.length === 1 ? "" : "s"} 🧪. Verifiable track record before a cent of real capital. verify, don't trust 🟢`
+      : `Deployed an autonomous ${strat} agent on Nexus — forward-testing in PAPER before real capital 🧪. Verifiable track records, not vibes 🟢`;
+    try { await sdk.actions.composeCast({ text, embeds: [`${APP}/mini`] }); } catch { /* ignore */ }
+  }
   async function shareThesis(t: Thesis) {
     try { await sdk.actions.composeCast({ text: `${tk(t.symbol)} ${t.direction} — ${t.displayName || shortAddr(t.wallet)}'s call on Nexus. graded on-chain, not vibes 🟢`, embeds: [`${APP}/feed/thesis/${t.wallet}/${t.id}`] }); } catch { /* ignore */ }
   }
@@ -860,7 +870,10 @@ export default function MiniApp() {
                   Running <span style={{ color: "#fff" }}>{agentStatus?.config?.signalMode ?? "FUNDING_ONLY"}</span> on {tk((agentStatus?.config?.symbols ?? ["PERP_BTC_USDC"])[0])}.
                   {paper.length > 0 && <> Paper: <span style={{ color: paperNet >= 0 ? green : red }}>{paperNet >= 0 ? "+" : ""}${paperNet.toFixed(2)}</span> over {paper.length} trade{paper.length === 1 ? "" : "s"}.</>}
                 </div>
-                <a href={`${APP}/lab?tab=agent`} style={{ fontSize: 10, color: green, textDecoration: "none", border: "1px solid #1a4a2a", borderRadius: 5, padding: "8px 0", textAlign: "center", fontFamily: mono, fontWeight: "bold", letterSpacing: "0.04em" }}>⚙ MANAGE IN TERMINAL ↗</a>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <a href={`${APP}/lab?tab=agent`} style={{ fontSize: 10, color: green, textDecoration: "none", border: "1px solid #1a4a2a", borderRadius: 5, padding: "8px 0", textAlign: "center", fontFamily: mono, fontWeight: "bold", letterSpacing: "0.04em" }}>⚙ MANAGE ↗</a>
+                  <button onClick={shareAgent} style={{ fontSize: 10, color: green, background: "#0a1a0a", border: "1px solid #1a4a2a", borderRadius: 5, padding: "8px 0", textAlign: "center", fontFamily: mono, fontWeight: "bold", letterSpacing: "0.04em", cursor: "pointer" }}>↗ SHARE AGENT</button>
+                </div>
               </>
             ) : (
               <>
