@@ -22,6 +22,14 @@ const ORDERLY_API = "https://api-evm.orderly.org";
 export default {
   async scheduled(event, env) {
     try {
+      // Core OI history is MARKET DATA, not a per-user artifact — record it every
+      // tick BEFORE any early return, so the CONFLUENCE backtest series keeps
+      // maturing even when zero agents are active (the "no active users" returns
+      // below used to strand it → history only grew while someone was trading).
+      // Idempotent within a tick: recordOiSnapshot's 55-min gate no-ops the repeat
+      // call for watchlist symbols further down.
+      await recordOiForSymbols(["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC"], env);
+
       const usersRaw = await env.NEXUS_AGENT.get("agent:users");
       if (!usersRaw) { console.log("[brain] no active users"); return; }
       const users = JSON.parse(usersRaw);
