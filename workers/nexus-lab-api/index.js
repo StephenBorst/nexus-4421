@@ -282,6 +282,35 @@ async function loadOiHistForBacktest(symbols, env) {
   return { oiHistBySymbol, oiMature, gate: { minDays, minSamples, perSymbol: infos } };
 }
 
+// Walk-forward validate a PUBLISHED strategy and stamp the verdict onto its record —
+// the community board's trust badge. Run in the background (ctx.waitUntil) at publish
+// so the toggle stays snappy. Server-computed (never client-supplied) since it's a
+// trust signal. CONFLUENCE/OI_ONLY stay "pending_oi" until recorded OI matures.
+const VALIDATE_UNIVERSE = ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC", "PERP_BNB_USDC", "PERP_XRP_USDC", "PERP_LINK_USDC"];
+async function revalidateStrategy(address, stratId, config, env) {
+  const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+  let validation;
+  try {
+    const needsOi = ["CONFLUENCE", "OI_ONLY"].includes(config.signalMode);
+    const oi = needsOi ? await loadOiHistForBacktest(VALIDATE_UNIVERSE, env) : null;
+    if (needsOi && !oi.oiMature) {
+      validation = { status: "pending_oi", note: `awaiting OI history (${oi.gate.minDays}/${OI_BACKTEST_MIN_DAYS}d)`, checkedAt: Date.now() };
+    } else {
+      const r = await walkForwardValidate(config, { symbols: VALIDATE_UNIVERSE, days: 60, folds: 4 }, oi?.oiMature ? oi.oiHistBySymbol : {});
+      validation = { status: "done", verdict: r.verdict, posSymbols: r.posSymbols, totalSymbols: r.totalSymbols, foldConsistency: r.foldConsistency, totalNet: r.totalNet, validatedAt: Date.now() };
+    }
+  } catch { validation = { status: "error", checkedAt: Date.now() }; }
+  // Re-read latest before patching so a concurrent save/publish isn't clobbered.
+  const key = `agent:strategies:${address}`;
+  const raw = await AGENT_KV.get(key);
+  if (!raw) return;
+  let list; try { list = JSON.parse(raw); } catch { return; }
+  const s = list.find((x) => x.id === stratId);
+  if (!s) return;
+  s.validation = validation;
+  await AGENT_KV.put(key, JSON.stringify(list));
+}
+
 // ── Ph27: notification helpers ────────────────────────────────────────────────
 async function appendNotification(env, wallet, notif) {
   const key = `notif:${wallet}`;
@@ -496,7 +525,7 @@ async function getOnChainWallets(env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     // Preflight
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: cors(request) });
@@ -3322,7 +3351,11 @@ document.getElementById("btn").addEventListener("click",go);
           if (!s) return json({ error: "not found" }, request, 404);
           s.public = !!b.public;
           s.publishedAt = s.public ? Date.now() : null;
+          // Publishing kicks off a background walk-forward → trust badge on the board.
+          if (s.public) s.validation = { status: "validating", requestedAt: Date.now() };
+          else s.validation = null;
           await AGENT_KV.put(key, JSON.stringify(list));
+          if (s.public && ctx?.waitUntil) ctx.waitUntil(revalidateStrategy(address, s.id, s.config, env));
           return json({ ok: true, strategies: list }, request);
         }
         if (request.method === "DELETE" && parts[3]) {
@@ -3825,7 +3858,7 @@ document.getElementById("btn").addEventListener("click",go);
           if (!s.public || !s.config) continue;
           const style = derive(s.config.maxHoldHours ?? 0);
           if (styleFilter && style !== styleFilter) continue;
-          collected.push({ owner, id: s.id, name: s.name, style, config: s.config, backtest: s.stats || null, publishedAt: s.publishedAt || s.createdAt });
+          collected.push({ owner, id: s.id, name: s.name, style, config: s.config, backtest: s.stats || null, validation: s.validation || null, publishedAt: s.publishedAt || s.createdAt });
         }
       }
       // Attach each author's GRADED standing — the trust signal we rank on.
@@ -3838,6 +3871,15 @@ document.getElementById("btn").addEventListener("click",go);
             if (res.ok) standings[o] = agentStanding(aggregateAgentTrades(await res.json())).stats;
           } catch { /* skip */ }
         }));
+      }
+      // Self-heal badges: (re)validate strategies that are missing a verdict, stuck
+      // "validating", or "pending_oi" — the latter auto-flips to a real verdict once OI
+      // matures (no re-publish needed). Bounded per request + idempotent to cap load.
+      if (ctx?.waitUntil) {
+        const stale = (v) => !v || v.status === "validating" || v.status === "error" ||
+          (v.status === "pending_oi" && Date.now() - (v.checkedAt || 0) > 6 * 3600 * 1000);
+        const needing = collected.filter((c) => stale(c.validation)).slice(0, 3);
+        for (const c of needing) ctx.waitUntil(revalidateStrategy(c.owner, c.id, c.config, env));
       }
       const items = collected
         .map((c) => ({ ...c, author: standings[c.owner] || null }))

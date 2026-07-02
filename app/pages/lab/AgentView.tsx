@@ -1432,8 +1432,18 @@ export function AgentView() {
                 {community.map((s) => (
                   <div key={s.owner + s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 3 }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 12, fontWeight: 600 }}>
+                      <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                         {s.name} <span style={{ color: "#4a9fff", fontSize: 9 }}>{s.style}</span>
+                        {(() => {
+                          const v = s.validation;
+                          if (!v) return null;
+                          if (v.status === "validating") return <span title="Walk-forward validation running" style={{ fontSize: 8, color: "#5a7a6a", border: "1px solid #1e2d1e", borderRadius: 3, padding: "1px 5px" }}>⏳ VALIDATING</span>;
+                          if (v.status === "pending_oi") return <span title="Awaiting OI history to validate the confluence signal" style={{ fontSize: 8, color: "#4a9fff", border: "1px solid #1a3a5a", borderRadius: 3, padding: "1px 5px" }}>⏳ OI PENDING</span>;
+                          if (v.status !== "done") return null;
+                          const vc = v.verdict === "ROBUST" ? "#00ff88" : v.verdict === "FRAGILE" ? "#fbbf24" : "#ff4444";
+                          const lbl = v.verdict === "ROBUST" ? "✅ ROBUST" : v.verdict === "FRAGILE" ? "🟨 FRAGILE" : "❌ NOT ROBUST";
+                          return <span title={`Walk-forward: net-positive on ${v.posSymbols}/${v.totalSymbols} markets, ${v.foldConsistency}% of folds`} style={{ fontSize: 8, color: vc, border: `1px solid ${vc}55`, borderRadius: 3, padding: "1px 5px" }}>{lbl}</span>;
+                        })()}
                       </div>
                       <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 9, marginTop: 2 }}>
                         by {s.owner.slice(0, 6)}…{s.owner.slice(-4)} · {s.config.signalMode} · {s.config.leverage}x
@@ -1446,7 +1456,7 @@ export function AgentView() {
                     <button onClick={() => copyStrategy(s)} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 14px", flexShrink: 0 }}>COPY</button>
                   </div>
                 ))}
-                <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 4 }}>*bt = backtest hypothesis; ranking uses the author's real graded record.</div>
+                <div style={{ color: "#3a5a4a", fontFamily: "monospace", fontSize: 9, marginTop: 4 }}>*bt = backtest hypothesis; ranking uses the author's real graded record. Badge = our walk-forward verdict (net-positive across markets + time). ✅ is rare by design.</div>
               </div>
             )}
           </div>

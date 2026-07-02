@@ -55,7 +55,19 @@ const STRATEGIES = [
   { name: "ProvenEdge (no breakeven)", cfg: { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01, fundingPercentileMin: 95, tpPercent: 1.5, slPercent: 0.75 } },
   { name: "ProvenEdge + ATR stops", cfg: { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01, fundingPercentileMin: 95, tpPercent: 1.5, slPercent: 0.75, breakevenTriggerPct: 1.0, volScaledStops: true, slAtrMult: 1.0 } },
   { name: "FUNDING pct90 (looser)", cfg: { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01, fundingPercentileMin: 90, tpPercent: 1.5, slPercent: 0.75, breakevenTriggerPct: 1.0 } },
-  { name: "CONFLUENCE f0.01 (OI-gated)", cfg: { signalMode: "CONFLUENCE", fundingThreshold: 0.01, tpPercent: 1.5, slPercent: 0.75, breakevenTriggerPct: 1.0 }, needsOi: true },
+  // ── CONFLUENCE grid — the flagship, auto-runs once OI matures (~mid-July 2026).
+  // See docs/confluence-validation-plan.md for the success criteria + decision tree.
+  ...(() => {
+    const grid = [];
+    for (const f of [0.005, 0.01, 0.02]) {
+      for (const oi of [0, 0.5, 1.0]) {
+        grid.push({ name: `CONFLUENCE f${f} oi${oi}`, cfg: { signalMode: "CONFLUENCE", fundingThreshold: f, oiChangeThreshold: oi, tpPercent: 1.5, slPercent: 0.75, breakevenTriggerPct: 1.0 }, needsOi: true });
+      }
+    }
+    // OI_ONLY control — does OI-divergence carry any edge by itself?
+    grid.push({ name: "OI_ONLY oi0.5 (control)", cfg: { signalMode: "OI_ONLY", oiChangeThreshold: 0.5, tpPercent: 1.5, slPercent: 0.75, breakevenTriggerPct: 1.0 }, needsOi: true });
+    return grid;
+  })(),
 ];
 
 // Walk-forward bucketing lives in the engine (foldsByEntry) so this dev harness and
