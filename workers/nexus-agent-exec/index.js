@@ -583,6 +583,16 @@ async function monitorPosition(address, state, config, env, cache) {
     const holdMs = Date.now() - pos.opened_at;
     const maxSO = Math.floor(Number(pos.dca.maxSafetyOrders) || 0);
 
+    // Breakeven on the BLENDED avg entry: once the averaged-in position recovers
+    // past the trigger, latch and protect it at (blended entry + buffer). This is
+    // the honest way breakeven coexists with DCA — it only acts AFTER you're in
+    // profit, never fighting the averaging-down thesis, and takes priority over a
+    // new safety order or TP so a recovered position can't round-trip to a loss.
+    pos.be_armed = breakevenArmed(pos, dcaPnl, config.breakevenTriggerPct);
+    if (pos.be_armed && dcaPnl <= (Number(config.breakevenBufferPct) || 0)) {
+      await closePosition(address, state, env, "BE", cache); return;
+    }
+
     if (dcaPnl >= (pos.dca.takeProfitPct || config.tpPercent)) {
       await closePosition(address, state, env, "TP", cache); return;
     }
