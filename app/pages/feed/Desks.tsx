@@ -68,10 +68,11 @@ export default function Desks({ walletAddress }: { walletAddress: string | null 
       {/* Create */}
       <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
         <input
+          className="nx-input"
           value={name} onChange={(e) => setName(e.target.value)} placeholder="name your desk…" maxLength={40}
-          style={{ flex: 1, minWidth: 0, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e5e7eb", fontFamily: "monospace", fontSize: 12, padding: "7px 9px" }}
+          style={{ flex: 1, minWidth: 0 }}
         />
-        <button onClick={create} disabled={busy || !name.trim()} style={{ flexShrink: 0, background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 4, padding: "7px 14px", fontFamily: "monospace", fontSize: 11, fontWeight: "bold", cursor: busy ? "wait" : "pointer", opacity: busy || !name.trim() ? 0.5 : 1 }}>+ CREATE</button>
+        <button className="nx-btn nx-btn-primary" onClick={create} disabled={busy || !name.trim()} style={{ flexShrink: 0 }}>+ CREATE</button>
       </div>
       {msg && <div style={{ fontFamily: "monospace", fontSize: 9, color: "#fbbf24", marginBottom: 8 }}>{msg}</div>}
 
@@ -84,7 +85,7 @@ export default function Desks({ walletAddress }: { walletAddress: string | null 
             <span style={{ fontFamily: "monospace", fontSize: 11, color: "#3a5a4a", flexShrink: 0, width: 22 }}>#{d.rank}</span>
             <span style={{ fontFamily: "monospace", fontSize: 12, fontWeight: "bold", color: "#fff", flexShrink: 0 }}>{d.name}</span>
             <span style={{ fontFamily: "monospace", fontSize: 9, color: "#4a7a5a", flexShrink: 0 }}>{d.members}👤</span>
-            <span style={{ fontFamily: "monospace", fontSize: 9, color: "#5a8a6a", flexShrink: 0 }}>{d.calls} calls · {d.hitRate}% · {d.totalR >= 0 ? "+" : ""}{d.totalR}R</span>
+            <span style={{ fontFamily: "monospace", fontSize: 9, color: "#8aaa9a", flexShrink: 0 }}>{d.calls} calls · {d.hitRate}% · {d.totalR >= 0 ? "+" : ""}{d.totalR}R</span>
             <span style={{ marginLeft: "auto", fontFamily: "monospace", fontSize: 13, fontWeight: "bold", color: d.score > 0 ? green : "#3a5a4a", flexShrink: 0 }}>{d.score || "—"}</span>
             {myDeskId === d.id
               ? <button onClick={() => leave(d.id)} disabled={busy} style={{ flexShrink: 0, background: "#1a0a0a", color: "#ff4444", border: "1px solid #4a1a1a55", borderRadius: 4, padding: "5px 9px", fontFamily: "monospace", fontSize: 9, fontWeight: "bold", cursor: "pointer" }}>LEAVE</button>

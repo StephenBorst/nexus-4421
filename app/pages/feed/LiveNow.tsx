@@ -73,7 +73,7 @@ export default function LiveNow() {
           const long = p.direction === "LONG";
           const pct = p.unrealized_pnl_pct;
           const up = pct != null && pct >= 0;
-          const pnlColor = pct == null ? "#5a8a6a" : up ? green : red;
+          const pnlColor = pct == null ? "#8aaa9a" : up ? green : red;
           return (
             <div
               key={`${p.wallet}-${p.symbol}-${i}`}

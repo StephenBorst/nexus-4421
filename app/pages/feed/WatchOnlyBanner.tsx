@@ -5,7 +5,6 @@
 // Dismissible (remembered), and the connect CTA defers to the app's own connect.
 import { useState } from "react";
 
-const green = "#00ff88";
 const DISMISS_KEY = "nexus_watch_dismissed";
 
 export default function WatchOnlyBanner() {
@@ -15,8 +14,8 @@ export default function WatchOnlyBanner() {
     <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#0a140e", border: "1px solid #1a3a2a", borderRadius: 6, padding: "9px 12px", marginBottom: 12, fontFamily: "monospace" }}>
       <span style={{ fontSize: 14 }}>👁</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 11, color: "#e5e7eb", fontWeight: "bold" }}>Watch-only — you&apos;re exploring without a wallet.</div>
-        <div style={{ fontSize: 9, color: "#5a8a6a", marginTop: 2 }}>Live positions, verified callers &amp; desks are open to everyone. Connect to trade, copy &amp; join a desk.</div>
+        <div style={{ fontSize: 11, color: "#e8f0ea", fontWeight: "bold" }}>Watch-only — you&apos;re exploring without a wallet.</div>
+        <div style={{ fontSize: 9, color: "#8aaa9a", marginTop: 2 }}>Live positions, verified callers &amp; desks are open to everyone. Connect to trade, copy &amp; join a desk.</div>
       </div>
       <button
         onClick={() => { setHidden(true); try { window.localStorage.setItem(DISMISS_KEY, "1"); } catch { /* ignore */ } }}
