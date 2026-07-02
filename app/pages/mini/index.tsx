@@ -15,6 +15,11 @@
 
 import { useEffect, useState } from "react";
 import sdk from "@farcaster/miniapp-sdk";
+import { STRATEGY_PRESETS } from "@/config/strategyPresets";
+
+// The flagship "Proven Edge" preset — single source of truth with the Lab, so the
+// mini-app one-tap deploy can never drift from the web preset.
+const PROVEN_EDGE = STRATEGY_PRESETS.find((p) => p.id === "proven-edge")?.config ?? {};
 
 const bg = "#0a0e0a";
 const green = "#00ff88";
@@ -37,6 +42,11 @@ type Mkt = { price: number; change: number; funding: number; high: number; low: 
 type Candle = { o: number; h: number; l: number; c: number };
 type PosRow = { symbol: string; position_qty: number; average_open_price: number; mark_price: number; unrealized_pnl: number };
 type Acct = { free: number; total: number };
+type PaperTrade = { pnl?: number };
+type AgentStatus = {
+  config?: { mode?: string; signalMode?: string; symbols?: string[] } | null;
+  state?: { active?: boolean; current_position?: unknown; paper_trades?: PaperTrade[] } | null;
+} | null;
 
 const STATUS_COLOR: Record<string, string> = {
   ACTIVE: "#4a9fff", HIT_TP: "#00ff88", STOPPED_OUT: "#ff4444", INVALIDATED: "#fbbf24", CLOSED: "#8aaa9a",
@@ -146,6 +156,11 @@ export default function MiniApp() {
   const [mktSearch, setMktSearch] = useState("");
   const [maxLev, setMaxLev] = useState(50);
   const [mmr, setMmr] = useState(0);
+  // Slim agent surface: view status + one-tap deploy the Proven Edge preset in PAPER
+  // (no funds, no key — reuses the same bankr/activate route the skill uses).
+  const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null);
+  const [agentBusy, setAgentBusy] = useState(false);
+  const [agentMsg, setAgentMsg] = useState<TradeMsg>(null);
 
   // A smart-contract wallet (code at the address) can't be registered with Orderly
   // via ECDSA ecrecover → "address and signature do not match". Detect on Base+Arbitrum.
@@ -167,6 +182,9 @@ export default function MiniApp() {
       setConnectedAddr(accts?.[0] ?? null);
     } catch { /* ignore */ }
   }
+
+  // Pull the agent's status whenever a wallet address is known (public read, no sig).
+  useEffect(() => { if (connectedAddr) loadAgent(connectedAddr); }, [connectedAddr]);
 
   useEffect(() => {
     (async () => {
@@ -346,6 +364,40 @@ export default function MiniApp() {
       setTradeMsg({ ok: false, text: (e as Error)?.message || "couldn't load account" });
     } finally {
       setStatusBusy(false);
+    }
+  }
+
+  // ── Agent: read status (public GET) + one-tap deploy Proven Edge in PAPER ──
+  async function loadAgent(addr: string) {
+    try {
+      const r = await fetch(`${API}/agent/${addr.toLowerCase()}`);
+      const d = await r.json();
+      setAgentStatus(d && (d.config || d.state) ? d : null);
+    } catch { /* fail-soft — card just shows the deploy CTA */ }
+  }
+
+  // Deploy the flagship preset risk-free (PAPER = simulated, no funds/key move).
+  // Reuses the exact route the Bankr skill uses; walletSig proves ownership.
+  async function deployPaperAgent() {
+    if (agentBusy) return;
+    setAgentBusy(true); setAgentMsg(null);
+    try {
+      const s = await ensureSig();
+      const r = await fetch(`${API}/agent/${s.addr.toLowerCase()}/bankr/activate`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "PAPER", config: PROVEN_EDGE, walletSig: s.sig }),
+      });
+      const d = await r.json();
+      if (r.ok && d.ok) {
+        setAgentMsg({ ok: true, text: "✓ Proven Edge deployed in PAPER — it now trades a simulated BTC funding-fade. Track it in the full terminal." });
+        await loadAgent(s.addr);
+      } else {
+        setAgentMsg({ ok: false, text: d.hint || d.error || "deploy failed" });
+      }
+    } catch (e) {
+      setAgentMsg({ ok: false, text: (e as Error)?.message || "deploy failed" });
+    } finally {
+      setAgentBusy(false);
     }
   }
 
@@ -789,6 +841,39 @@ export default function MiniApp() {
         <button onClick={buyNexus} disabled={buying} style={{ background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 5, padding: "10px 0", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: buying ? "wait" : "pointer", letterSpacing: "0.04em", opacity: buying ? 0.6 : 1 }}>{buying ? "OPENING…" : "🪙 BUY $NEXUS"}</button>
         <button onClick={shareApp} style={{ background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 5, padding: "10px 0", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: "pointer", letterSpacing: "0.04em" }}>↗ SHARE</button>
       </div>
+
+      {/* Autonomous agent — view status + one-tap deploy Proven Edge in PAPER */}
+      {connectedAddr && (() => {
+        const active = !!agentStatus?.state?.active;
+        const paper = agentStatus?.state?.paper_trades ?? [];
+        const paperNet = paper.reduce((sum, t) => sum + (Number(t.pnl) || 0), 0);
+        const mode = agentStatus?.config?.mode ?? "PAPER";
+        return (
+          <div style={{ ...card, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 9, color: "#3a6a4a", letterSpacing: "0.12em" }}>🤖 AUTONOMOUS AGENT</span>
+              {active && <span style={{ flexShrink: 0, fontSize: 8, color: mode === "AUTONOMOUS" ? "#ff8800" : mode === "ASSISTED" ? green : "#4a9fff", border: "1px solid #1e2d1e", borderRadius: 3, padding: "1px 6px", marginLeft: "auto" }}>{mode}</span>}
+            </div>
+            {active ? (
+              <>
+                <div style={{ fontSize: 11, color: "#8aaa9a", lineHeight: 1.5 }}>
+                  Running <span style={{ color: "#fff" }}>{agentStatus?.config?.signalMode ?? "FUNDING_ONLY"}</span> on {tk((agentStatus?.config?.symbols ?? ["PERP_BTC_USDC"])[0])}.
+                  {paper.length > 0 && <> Paper: <span style={{ color: paperNet >= 0 ? green : red }}>{paperNet >= 0 ? "+" : ""}${paperNet.toFixed(2)}</span> over {paper.length} trade{paper.length === 1 ? "" : "s"}.</>}
+                </div>
+                <a href={`${APP}/lab?tab=agent`} style={{ fontSize: 10, color: green, textDecoration: "none", border: "1px solid #1a4a2a", borderRadius: 5, padding: "8px 0", textAlign: "center", fontFamily: mono, fontWeight: "bold", letterSpacing: "0.04em" }}>⚙ MANAGE IN TERMINAL ↗</a>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 11, color: "#8aaa9a", lineHeight: 1.5 }}>
+                  Deploy the backtested <span style={{ color: green }}>Proven Edge</span> — a selective BTC funding-fade with a breakeven risk-free stop — <span style={{ color: "#fff" }}>risk-free in PAPER</span>. No funds, no key.
+                </div>
+                <button onClick={deployPaperAgent} disabled={agentBusy} style={{ background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 5, padding: "10px 0", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: agentBusy ? "wait" : "pointer", letterSpacing: "0.04em", opacity: agentBusy ? 0.6 : 1 }}>{agentBusy ? "DEPLOYING…" : "🧪 DEPLOY PROVEN EDGE (PAPER)"}</button>
+              </>
+            )}
+            {agentMsg && <div style={{ fontSize: 10, color: agentMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{agentMsg.text}</div>}
+          </div>
+        );
+      })()}
 
       {/* Live calls feed */}
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 2 }}>
