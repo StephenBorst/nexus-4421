@@ -701,7 +701,7 @@ export function AgentView() {
               starting config. Day/Swing are the agent's honest home (hourly data +
               1-min cron + funding edge); scalping/position are intentionally absent. */}
           <div style={agentCardStyle}>
-            <div style={agentLabelStyle}>// TRADING STYLE <span style={{ color: "#3a6a4a" }}>— pick your horizon to start</span></div>
+            <div style={agentLabelStyle}>// TRADING STYLE <span style={{ color: "#4a7a5a" }}>— pick your horizon to start</span></div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
               {(Object.keys(STYLE_PRESETS) as TradingStyle[]).map((k) => {
                 const p = STYLE_PRESETS[k];
@@ -717,7 +717,7 @@ export function AgentView() {
                     border: `1px solid ${active ? "#00ff88" : "#1e2d1e"}`, borderRadius: 6, padding: "10px 12px",
                   }}>
                     <div style={{ color: active ? "#00ff88" : "#c0c0c0", fontFamily: "monospace", fontSize: 13, fontWeight: 600 }}>{p.label}{active ? " ✓" : ""}</div>
-                    <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 10, marginTop: 3, lineHeight: 1.4 }}>{p.blurb}</div>
+                    <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 10, marginTop: 3, lineHeight: 1.4 }}>{p.blurb}</div>
                   </button>
                 );
               })}
@@ -730,7 +730,7 @@ export function AgentView() {
           {/* Quick-start preset templates. Loads into config for review; user still
               saves explicitly. PRO presets gated by isPro. */}
           <div style={agentCardStyle}>
-            <div style={agentLabelStyle}>// QUICK-START PRESETS <span style={{ color: "#3a6a4a" }}>— load a preset, review, save</span></div>
+            <div style={agentLabelStyle}>// QUICK-START PRESETS <span style={{ color: "#4a7a5a" }}>— load a preset, review, save</span></div>
             <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginTop: 10 }}>
               {STRATEGY_PRESETS.map((p) => {
                 const locked = !!p.pro && !isPro;
@@ -891,7 +891,7 @@ export function AgentView() {
                 ◆ Advanced strategies are Nexus PRO — hold $NEXUS or subscribe (see PRO in the Lab).
               </div>
             )}
-            <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 8, color: "#3a6a4a" }}>
+            <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 8, color: "#4a7a5a" }}>
               {({
                 CONFLUENCE: "Both funding + OI-divergence must agree. Fewest, highest-quality entries.",
                 FUNDING_ONLY: "Trades funding extremes alone. More entries, lower selectivity.",
@@ -908,7 +908,7 @@ export function AgentView() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
               <div>
                 <div style={agentLabelStyle}>// MARKET REGIME FILTER</div>
-                <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 6, color: "#3a6a4a", letterSpacing: 0 }}>
+                <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 6, color: "#4a7a5a", letterSpacing: 0 }}>
                   Skip NEW entries that fight a strong tape — RISK-ON gates shorts, RISK-OFF gates longs.
                   Never flips direction or touches open positions. Test in PAPER first. (See live regime in Market Intel.)
                 </div>
@@ -929,7 +929,7 @@ export function AgentView() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
               <div>
                 <div style={agentLabelStyle}>// VOLATILITY-SCALED STOPS</div>
-                <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 6, color: "#3a6a4a", letterSpacing: 0 }}>
+                <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 6, color: "#4a7a5a", letterSpacing: 0 }}>
                   Sizes TP/SL to each symbol&apos;s recent ATR instead of a flat % — so a high-vol coin (SOL) isn&apos;t
                   noise-stopped and a calm one isn&apos;t over-given. Keeps your R:R ratio. Test in PAPER first.
                 </div>
@@ -1003,7 +1003,7 @@ export function AgentView() {
                 </div>
               ))}
             </div>
-            <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 10, color: "#3a6a4a", lineHeight: 1.5 }}>
+            <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 10, color: "#4a7a5a", lineHeight: 1.5 }}>
               Entry params (mode, thresholds, symbols, leverage, capital) apply to your NEXT trade.
               <br />
               ⚡ TP / SL / max-hold apply LIVE — changing them adjusts an open position immediately.
@@ -1091,7 +1091,7 @@ export function AgentView() {
                   )}
                 </div>
 
-                <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 10, color: "#3a6a4a", lineHeight: 1.5 }}>
+                <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 10, color: "#4a7a5a", lineHeight: 1.5 }}>
                   {scaleOut
                     ? "Scale-out takes partial profit at TP1 and lets the runner ride to TP2 — each slice is graded on its own."
                     : "Single take-profit at the TAKE PROFIT % above. Turn on SCALE-OUT to bank partial profit early."}
@@ -1128,7 +1128,7 @@ export function AgentView() {
                   </button>
                 </div>
                 {!isPro ? (
-                  <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
+                  <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
                     Average into a position on adverse moves and take profit off the blended entry — a Nexus PRO feature. The whole ladder stays inside your CAPITAL / TRADE budget.
                   </div>
                 ) : on && (
@@ -1149,7 +1149,7 @@ export function AgentView() {
                         </div>
                       ))}
                     </div>
-                    <div style={{ color: "#3a6a4a", fontFamily: "monospace", fontSize: 10, marginTop: 10, lineHeight: 1.6 }}>
+                    <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10, marginTop: 10, lineHeight: 1.6 }}>
                       Base order ≈ ${(config.capitalPerTrade / units).toFixed(0)} of your ${config.capitalPerTrade} budget; up to {dca.maxSafetyOrders} safety orders average in if price moves ~{cumDev.toFixed(1)}% against you. TP is taken at {config.tpPercent}% off the blended average; the stop only cuts once all safety orders are spent. Daily-loss cap + kill switch still override.
                     </div>
                   </>
@@ -1165,12 +1165,12 @@ export function AgentView() {
               <span style={{ fontFamily: "monospace", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
             </div>
             {!isPro ? (
-              <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
+              <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
                 Route TradingView (or any external) alerts straight to your agent — it executes them through the same guardrails + trustless grading. A Nexus PRO feature: hold ARCHITECT-tier $NEXUS or subscribe.
               </div>
             ) : !webhookEnabled ? (
               <div style={{ marginTop: 10 }}>
-                <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 11, lineHeight: 1.5, marginBottom: 10 }}>
+                <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 11, lineHeight: 1.5, marginBottom: 10 }}>
                   Generate a private webhook URL. Point a TradingView alert (or any system) at it and your agent trades the signal in its current mode — {config.mode === "PAPER" ? "simulated in PAPER" : config.mode === "ASSISTED" ? "queued for review in ASSISTED" : "executed live in AUTONOMOUS"}.
                 </div>
                 <button onClick={() => manageWebhook("enable")} disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.5 : 1 }}>
@@ -1193,13 +1193,13 @@ export function AgentView() {
                       <code style={{ display: "block", color: "#c0c0c0", background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 3, padding: "8px", fontSize: 10, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
                         {`{ "action": "BUY", "symbol": "BTC", "passphrase": "${webhookInfo.passphrase}" }`}
                       </code>
-                      <div style={{ color: "#3a6a4a", fontFamily: "monospace", fontSize: 9, marginTop: 6, lineHeight: 1.5 }}>
+                      <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 9, marginTop: 6, lineHeight: 1.5 }}>
                         action = BUY (long) · SELL (short) · CLOSE (flatten). symbol = any perp (BTC, ETH, SOL…). Webhook signals bypass the cooldown; while a position is open, a new OPEN is ignored (no stacking).
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 11, lineHeight: 1.5 }}>
+                  <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 11, lineHeight: 1.5 }}>
                     Webhook is enabled, but the secret URL is only shown on this device when created. Rotate to reveal a fresh URL (this revokes the old one).
                   </div>
                 )}
@@ -1250,12 +1250,12 @@ export function AgentView() {
               )}
             </div>
             {!isPro ? (
-              <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
+              <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
                 Replay this exact config over 60 days of real BTC/ETH/SOL data — using the same engine the agent runs on — before risking a cent. A Nexus PRO feature.
               </div>
             ) : (
               <>
-                <div style={{ color: "#3a6a4a", fontFamily: "monospace", fontSize: 10, marginTop: 8, lineHeight: 1.5 }}>
+                <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10, marginTop: 8, lineHeight: 1.5 }}>
                   Replays your config on real Orderly history with the deployed signal + exit logic. Verify before you deploy capital.
                 </div>
                 {backtest && (
@@ -1286,7 +1286,7 @@ export function AgentView() {
                     </div>
                     <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
                       {backtest.perSymbol.map((s: any) => (
-                        <div key={s.symbol} style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 10, color: "#5a7a6a", borderTop: "1px solid #1e2d1e", paddingTop: 4 }}>
+                        <div key={s.symbol} style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 10, color: "#8aaa9a", borderTop: "1px solid #1e2d1e", paddingTop: 4 }}>
                           <span>{s.symbol.replace("PERP_", "").replace("_USDC", "")}</span>
                           <span>{s.trades} trades · {s.winRate}% win · PF {s.profitFactor} · <span style={{ color: s.netUsd >= 0 ? "#00ff88" : "#ff4444" }}>{s.netUsd >= 0 ? "+" : ""}${s.netUsd}</span></span>
                         </div>
@@ -1322,7 +1322,7 @@ export function AgentView() {
                                 <div key={s.symbol} style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "monospace", fontSize: 10, padding: "3px 0", borderTop: "1px solid #10160f" }}>
                                   <span style={{ width: 46, color: "#c0c0c0" }}>{s.symbol.replace("PERP_", "").replace("_USDC", "")}</span>
                                   <span style={{ width: 66, textAlign: "right", color: s.net >= 0 ? "#00ff88" : "#ff4444" }}>{s.net >= 0 ? "+" : ""}${s.net}</span>
-                                  <span style={{ width: 54, textAlign: "right", color: "#5a7a6a" }}>{s.foldsPositive}/{validation.folds}f</span>
+                                  <span style={{ width: 54, textAlign: "right", color: "#8aaa9a" }}>{s.foldsPositive}/{validation.folds}f</span>
                                   <span style={{ display: "flex", gap: 2, marginLeft: 6 }}>
                                     {s.folds.map((n: number, i: number) => <span key={i} title={`fold ${i + 1}: ${n >= 0 ? "+" : ""}$${n}`} style={{ width: 8, height: 12, borderRadius: 1, background: n > 0 ? "#00ff88" : n < 0 ? "#ff4444" : "#2a3a2a" }} />)}
                                   </span>
@@ -1372,7 +1372,7 @@ export function AgentView() {
           {/* ── STRATEGY LIBRARY — save / load composed configs (free) ── */}
           <div style={agentCardStyle}>
             <div style={agentLabelStyle}>// STRATEGY LIBRARY</div>
-            <div style={{ color: "#3a6a4a", fontFamily: "monospace", fontSize: 10, marginTop: 6, marginBottom: 10, lineHeight: 1.5 }}>
+            <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10, marginTop: 6, marginBottom: 10, lineHeight: 1.5 }}>
               Save the config above as a named strategy, then load it back anytime. Build → test → save your best.
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1393,14 +1393,14 @@ export function AgentView() {
                   <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 3 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ color: "#c0c0c0", fontFamily: "monospace", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
-                      <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 9, marginTop: 2 }}>
+                      <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 9, marginTop: 2 }}>
                         <span style={{ color: "#4a9fff" }}>{deriveStyle(s.config)}</span> · {s.config.signalMode} · {s.config.mode} · {s.config.leverage}x · TP{s.config.tpPercent}/SL{s.config.slPercent}
                         {s.config.dcaEnabled ? " · DCA" : ""}
                         {s.stats ? <span style={{ color: s.stats.netUsd >= 0 ? "#00ff88" : "#ff4444" }}>{`  ·  60d ${s.stats.netUsd >= 0 ? "+" : ""}$${s.stats.netUsd}`}</span> : ""}
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                      <button onClick={() => togglePublish(s)} title={s.public ? "Public — click to make private" : "Share to the community board"} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 10px", color: s.public ? "#00ff88" : "#5a7a6a", borderColor: s.public ? "#00ff8850" : "#1e2d1e" }}>{s.public ? "🌐 PUBLIC" : "SHARE"}</button>
+                      <button onClick={() => togglePublish(s)} title={s.public ? "Public — click to make private" : "Share to the community board"} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 10px", color: s.public ? "#00ff88" : "#8aaa9a", borderColor: s.public ? "#00ff8850" : "#1e2d1e" }}>{s.public ? "🌐 PUBLIC" : "SHARE"}</button>
                       <button onClick={() => loadStrategy(s)} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 12px" }}>LOAD</button>
                       <button onClick={() => deleteStrategy(s.id)} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 10px", color: "#ff4444", borderColor: "#ff444450" }}>✕</button>
                     </div>
@@ -1420,13 +1420,13 @@ export function AgentView() {
                 ))}
               </div>
             </div>
-            <div style={{ color: "#3a6a4a", fontFamily: "monospace", fontSize: 10, marginTop: 6, lineHeight: 1.5 }}>
+            <div style={{ color: "#4a7a5a", fontFamily: "monospace", fontSize: 10, marginTop: 6, lineHeight: 1.5 }}>
               Strategies shared by the community, ranked by the author's <strong style={{ color: "#8aaa9a" }}>graded live/paper record</strong> — not backtest (shown only as a hypothesis). Copy one to your editor and make it yours.
             </div>
             {community === null ? (
               <button onClick={() => loadCommunity("")} style={{ ...btnPrimary, fontSize: 10, padding: "6px 16px", marginTop: 10 }}>▤ BROWSE STRATEGIES</button>
             ) : community.length === 0 ? (
-              <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 11, marginTop: 10 }}>No public strategies{communityStyle ? ` for ${communityStyle}` : ""} yet — publish one from your library to seed the board.</div>
+              <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 11, marginTop: 10 }}>No public strategies{communityStyle ? ` for ${communityStyle}` : ""} yet — publish one from your library to seed the board.</div>
             ) : (
               <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
                 {community.map((s) => (
@@ -1437,7 +1437,7 @@ export function AgentView() {
                         {(() => {
                           const v = s.validation;
                           if (!v) return null;
-                          if (v.status === "validating") return <span title="Walk-forward validation running" style={{ fontSize: 8, color: "#5a7a6a", border: "1px solid #1e2d1e", borderRadius: 3, padding: "1px 5px" }}>⏳ VALIDATING</span>;
+                          if (v.status === "validating") return <span title="Walk-forward validation running" style={{ fontSize: 8, color: "#8aaa9a", border: "1px solid #1e2d1e", borderRadius: 3, padding: "1px 5px" }}>⏳ VALIDATING</span>;
                           if (v.status === "pending_oi") return <span title="Awaiting OI history to validate the confluence signal" style={{ fontSize: 8, color: "#4a9fff", border: "1px solid #1a3a5a", borderRadius: 3, padding: "1px 5px" }}>⏳ OI PENDING</span>;
                           if (v.status !== "done") return null;
                           const vc = v.verdict === "ROBUST" ? "#00ff88" : v.verdict === "FRAGILE" ? "#fbbf24" : "#ff4444";
@@ -1445,7 +1445,7 @@ export function AgentView() {
                           return <span title={`Walk-forward: net-positive on ${v.posSymbols}/${v.totalSymbols} markets, ${v.foldConsistency}% of folds`} style={{ fontSize: 8, color: vc, border: `1px solid ${vc}55`, borderRadius: 3, padding: "1px 5px" }}>{lbl}</span>;
                         })()}
                       </div>
-                      <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 9, marginTop: 2 }}>
+                      <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 9, marginTop: 2 }}>
                         by {s.owner.slice(0, 6)}…{s.owner.slice(-4)} · {s.config.signalMode} · {s.config.leverage}x
                         {s.author && s.author.trades > 0
                           ? <span style={{ color: s.author.netPnl >= 0 ? "#00ff88" : "#ff4444" }}>{`  ·  graded ${s.author.winRate}% win, ${s.author.netPnl >= 0 ? "+" : ""}$${s.author.netPnl} (${s.author.trades}t)`}</span>
@@ -1645,7 +1645,7 @@ export function AgentView() {
                     </span>
                     <div>
                       <div style={{ color: c.met ? "#c0c0c0" : "#9a9a8a", fontFamily: "monospace", fontSize: 11 }}>{c.label}</div>
-                      <div style={{ color: "#5a7a6a", fontFamily: "monospace", fontSize: 10 }}>
+                      <div style={{ color: "#8aaa9a", fontFamily: "monospace", fontSize: 10 }}>
                         {c.key === "profitable"
                           ? `now: ${c.value >= 0 ? "+" : ""}$${c.value.toFixed(2)}`
                           : `${c.value} / ${c.target}`}

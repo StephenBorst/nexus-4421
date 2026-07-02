@@ -18,7 +18,7 @@ export function LabWelcome() {
         <div style={{ fontFamily: "monospace", fontSize: 28, color: "#fff", fontWeight: "bold", marginBottom: 12, lineHeight: 1.25 }}>
           The trading terminal that<br />makes you a better trader.
         </div>
-        <div style={{ fontFamily: "monospace", fontSize: 13, color: "#5a7a6a", maxWidth: 580, margin: "0 auto", lineHeight: 1.6 }}>
+        <div style={{ fontFamily: "monospace", fontSize: 13, color: "#8aaa9a", maxWidth: 580, margin: "0 auto", lineHeight: 1.6 }}>
           Plan it, automate it, grade it. Most apps just let you trade — The Lab turns every
           position into a repeatable process. Connect your wallet to load your data and unlock every tool.
         </div>
@@ -28,7 +28,7 @@ export function LabWelcome() {
           <div key={f.title} style={{ ...cardStyle, padding: "16px 18px" }}>
             <div style={{ fontSize: 20, color: "#2f7a52", marginBottom: 8 }}>{f.icon}</div>
             <div style={{ fontFamily: "monospace", fontSize: 12, color: "#fff", fontWeight: "bold", letterSpacing: "0.08em", marginBottom: 6 }}>{f.title}</div>
-            <div style={{ fontFamily: "monospace", fontSize: 11, color: "#5a7a6a", lineHeight: 1.5 }}>{f.desc}</div>
+            <div style={{ fontFamily: "monospace", fontSize: 11, color: "#8aaa9a", lineHeight: 1.5 }}>{f.desc}</div>
           </div>
         ))}
       </div>

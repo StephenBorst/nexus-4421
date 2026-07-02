@@ -67,7 +67,7 @@ function snapQty(raw: number, baseTick: number, baseMin: number): number {
 }
 
 const card: React.CSSProperties = { background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 6, padding: 16 };
-const label: React.CSSProperties = { fontFamily: "monospace", fontSize: 9, letterSpacing: "0.1em", color: "#3a6a4a" };
+const label: React.CSSProperties = { fontFamily: "monospace", fontSize: 9, letterSpacing: "0.1em", color: "#4a7a5a" };
 const input: React.CSSProperties = { background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e5e7eb", fontFamily: "monospace", fontSize: 14, padding: "8px 10px", width: "100%", boxSizing: "border-box" };
 
 export function QuickTrade() {
@@ -132,13 +132,13 @@ export function QuickTrade() {
   }
 
   if (!connected) {
-    return <div style={{ textAlign: "center", padding: "48px 20px", fontFamily: "monospace", fontSize: 12, color: "#3a6a4a" }}>Connect a wallet to place quick trades.</div>;
+    return <div style={{ textAlign: "center", padding: "48px 20px", fontFamily: "monospace", fontSize: 12, color: "#4a7a5a" }}>Connect a wallet to place quick trades.</div>;
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 460, margin: "0 auto" }}>
       <div style={{ fontFamily: "monospace", fontSize: 12, color: "#8aaa9a" }}>
-        <span style={{ color: "#00ff88" }}>//</span> QUICK TRADE <span style={{ color: "#3a6a4a", fontSize: 9 }}>· one-tap market order</span>
+        <span style={{ color: "#00ff88" }}>//</span> QUICK TRADE <span style={{ color: "#4a7a5a", fontSize: 9 }}>· one-tap market order</span>
       </div>
 
       {/* Market selector */}
@@ -156,7 +156,7 @@ export function QuickTrade() {
             );
           })}
         </div>
-        <div style={{ ...label, marginTop: 10, color: "#5a8a6a" }}>
+        <div style={{ ...label, marginTop: 10, color: "#8aaa9a" }}>
           MARK: {markPrice ? `$${Number(markPrice).toLocaleString(undefined, { maximumFractionDigits: 4 })}` : "—"}
           {availableBalance != null && <span style={{ marginLeft: 14 }} title="Free collateral — USDC available to open positions (not locked as margin)">FREE: ${Number(availableBalance).toFixed(2)}</span>}
         </div>
@@ -174,7 +174,7 @@ export function QuickTrade() {
               onChange={(e) => setNotional(Math.max(0, parseFloat(e.target.value) || 0))} />
           </div>
           <div>
-            <div style={label}>LEVERAGE — {levClamped}x <span style={{ color: "#3a6a4a" }}>(max {cap}x)</span></div>
+            <div style={label}>LEVERAGE — {levClamped}x <span style={{ color: "#4a7a5a" }}>(max {cap}x)</span></div>
             <input style={{ marginTop: 14, width: "100%" }} type="range" min={1} max={cap} step={1} value={levClamped}
               onChange={(e) => setLev(parseInt(e.target.value, 10))} />
           </div>
@@ -198,7 +198,7 @@ export function QuickTrade() {
       {/* One-tap LONG / SHORT */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <button onClick={() => tap("BUY")} disabled={tooSmall || !!busy || isMutating} style={{
-          background: tooSmall ? "#0a1a0a" : "#00ff88", color: tooSmall ? "#3a6a4a" : "#04130c", border: "1px solid #00ff88",
+          background: tooSmall ? "#0a1a0a" : "#00ff88", color: tooSmall ? "#4a7a5a" : "#04130c", border: "1px solid #00ff88",
           borderRadius: 4, padding: "14px 0", cursor: tooSmall ? "not-allowed" : "pointer", fontFamily: "monospace",
           fontSize: 14, fontWeight: "bold", letterSpacing: "0.08em", opacity: busy === "SELL" ? 0.4 : 1,
         }}>{busy === "BUY" ? "PLACING…" : confirmSide === "BUY" ? "TAP TO CONFIRM ✓" : "↑ LONG"}</button>

@@ -279,7 +279,7 @@ export function TradeLogView({ dayKey, data, onBack, initialNote, onSaveNote }: 
         <div style={{ fontSize: 10, color: "#3a5a4a", letterSpacing: "0.08em", marginBottom: 8, fontFamily: "monospace" }}>&#9632; NOTES</div>
         <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add notes about this trading day..."
           style={{ width: "100%", background: "#080c08", border: "1px solid #1a2e1a", borderRadius: 3, color: "#00ff88", fontFamily: "monospace", fontSize: 12, padding: "10px 12px", resize: "none", height: 80, outline: "none" }} />
-        <button onClick={saveNote} style={{ ...navBtnStyle, marginTop: 8, color: saved ? "#00ff88" : "#3a6a4a" }}>
+        <button onClick={saveNote} style={{ ...navBtnStyle, marginTop: 8, color: saved ? "#00ff88" : "#4a7a5a" }}>
           &#9632; {saved ? "SAVED!" : "SAVE NOTE"}
         </button>
       </div>

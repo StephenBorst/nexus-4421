@@ -63,7 +63,7 @@ export function MarketRegime() {
   return (
     <div style={{ ...cardStyle, marginBottom: 14 }}>
       <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "monospace" }}>
-        &#9632; MARKET REGIME <span style={{ color: "#3a6a4a" }}>— live, computed</span>
+        &#9632; MARKET REGIME <span style={{ color: "#4a7a5a" }}>— live, computed</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 16, alignItems: "center" }}>
         <div style={{ textAlign: "center", minWidth: 120 }}>
@@ -89,7 +89,7 @@ export function MarketRegime() {
             </div>
           </div>
           <div style={{ fontSize: 11, color: "#6a8a7a", fontFamily: "monospace", lineHeight: 1.5, borderTop: "1px solid #1a2e1a", paddingTop: 8 }}>
-            <span style={{ color: "#3a6a4a" }}>▶ agent:</span> {regime.agentNote}
+            <span style={{ color: "#4a7a5a" }}>▶ agent:</span> {regime.agentNote}
           </div>
         </div>
       </div>
