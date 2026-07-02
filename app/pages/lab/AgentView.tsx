@@ -1672,7 +1672,7 @@ export function AgentView() {
             const barColor = (pct: number) => pct >= 90 ? "#ff4444" : pct >= 60 ? "#fbbf24" : "#00ff88";
             return (
               <div style={{ ...agentCardStyle, borderColor: lossPct >= 90 ? "#ff444460" : "#1a3a2a" }}>
-                <div style={{ ...agentLabelStyle, color: "#00ff88" }}>🛡 ACTIVE GUARDRAILS</div>
+                <div style={agentLabelStyle}>🛡 ACTIVE GUARDRAILS</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 10 }}>
                   {/* Daily loss limit */}
                   <div>
@@ -1811,8 +1811,8 @@ export function AgentView() {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
               {config.symbols.map((sym) => (
                 <span key={sym} style={{
-                  background: "#00ff8810", border: "1px solid #00ff8830", borderRadius: 3,
-                  padding: "3px 8px", fontFamily: "monospace", fontSize: 10, color: "#00ff88",
+                  background: "#0d120d", border: "1px solid #1e2d1e", borderRadius: 3,
+                  padding: "3px 8px", fontFamily: "monospace", fontSize: 10, color: "#8aaa9a",
                 }}>
                   {sym.replace("PERP_", "").replace("_USDC", "")}
                 </span>
