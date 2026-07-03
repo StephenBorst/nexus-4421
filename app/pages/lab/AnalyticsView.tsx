@@ -529,12 +529,12 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
         </div>
         <div style={cardStyle}>
           <div style={labelStyle}>TRADES</div>
-          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#a855f7" }}>{orders.length}</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#e8f0ea" }}>{orders.length}</div>
           <div style={{ fontSize: 10, color: "#3a5a4a", marginTop: 4, fontFamily: "var(--nx-font-mono)" }}>closed</div>
         </div>
         <div style={cardStyle}>
           <div style={labelStyle}>BALANCE</div>
-          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#fbbf24" }}>{collateral > 0 ? `$${collateral.toFixed(2)}` : "—"}</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#e8f0ea" }}>{collateral > 0 ? `$${collateral.toFixed(2)}` : "—"}</div>
           <div style={{ fontSize: 10, color: "#3a5a4a", marginTop: 4, fontFamily: "var(--nx-font-mono)" }}>usdc</div>
         </div>
       </div>
@@ -547,15 +547,17 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
         <div style={cardStyle}>
           <div style={{ fontSize: 10, color: "#4a9fff", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "var(--nx-font-mono)" }}>PERFORMANCE</div>
           {[
-            { label: "AVG WIN", value: orders.length ? `$${avgWin.toFixed(2)}` : "—" },
-            { label: "AVG LOSS", value: orders.length ? `$${avgLoss.toFixed(2)}` : "—" },
-            { label: "BEST TRADE", value: orders.length ? `$${bestTrade.toFixed(2)}` : "—" },
-            { label: "WORST TRADE", value: orders.length ? `$${Math.abs(worstTrade).toFixed(2)}` : "—" },
-            { label: "VOLUME", value: volume > 0 ? `$${volume.toFixed(0)}` : "—" },
+            // Tone by meaning: wins green, losses red, neutral bright — NOT all green
+            // (which mislabeled AVG LOSS / WORST TRADE as if they were positive).
+            { label: "AVG WIN", value: orders.length ? `$${avgWin.toFixed(2)}` : "—", tone: "pos" },
+            { label: "AVG LOSS", value: orders.length ? `$${avgLoss.toFixed(2)}` : "—", tone: "neg" },
+            { label: "BEST TRADE", value: orders.length ? `$${bestTrade.toFixed(2)}` : "—", tone: "pos" },
+            { label: "WORST TRADE", value: orders.length ? `$${Math.abs(worstTrade).toFixed(2)}` : "—", tone: "neg" },
+            { label: "VOLUME", value: volume > 0 ? `$${volume.toFixed(0)}` : "—", tone: "neutral" },
           ].map((r) => (
             <div key={r.label} style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 9, color: "#3a5a4a", letterSpacing: "0.08em", fontFamily: "var(--nx-font-mono)" }}>{r.label}</div>
-              <div style={{ fontSize: 18, color: "#00ff88", fontFamily: "var(--nx-font-mono)" }}>{r.value}</div>
+              <div style={{ fontSize: 18, color: r.tone === "pos" ? "#00ff88" : r.tone === "neg" ? "#ff4444" : "#e8f0ea", fontFamily: "var(--nx-font-mono)" }}>{r.value}</div>
             </div>
           ))}
         </div>

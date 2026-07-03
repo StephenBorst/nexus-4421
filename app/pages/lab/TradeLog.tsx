@@ -154,9 +154,9 @@ export function TradeLogAllView({
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8, marginBottom: 16 }}>
         {[
           { label: "TOTAL PNL",   value: `${totalPnl >= 0 ? "+" : ""}$${Math.abs(totalPnl).toFixed(2)}`, color: totalPnl >= 0 ? "#00ff88" : "#ff4444" },
-          { label: "TRADING DAYS", value: String(sortedDays.length),  color: "#4a9fff" },
+          { label: "TRADING DAYS", value: String(sortedDays.length),  color: "#e8f0ea" },
           { label: "WIN DAYS",    value: `${winDays} / ${sortedDays.length}`, color: "#00ff88" },
-          { label: "TOTAL TRADES", value: String(totalTrades),         color: "#a855f7" },
+          { label: "TOTAL TRADES", value: String(totalTrades),         color: "#e8f0ea" },
         ].map(r => (
           <div key={r.label} style={cardStyle}>
             <div style={labelStyle}>{r.label}</div>
@@ -222,7 +222,7 @@ export function TradeLogAllView({
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>TRADES</div>
-                <div style={{ fontSize: 14, fontFamily: "var(--nx-font-mono)", color: "#a855f7" }}>{g.trades}</div>
+                <div style={{ fontSize: 14, fontFamily: "var(--nx-font-mono)", color: "#8aaa9a" }}>{g.trades}</div>
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>WIN RATE</div>
