@@ -1,7 +1,7 @@
 // The Trading Agent tab: config / status / history / leaderboard, the agent
 // track-record panels, and the Orderly delegated-key readers.
 // Extracted from index.tsx (god-file split).
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { signWithInjected } from "@/utils/injectedWallet";
 import type { AgentConfig, AgentState, AgentTrade, AgentLeaderboardEntry, AgentPendingThesis } from "./types";
 import { DEFAULT_CONFIG } from "./types";
@@ -198,6 +198,11 @@ function formatAgentTime(ms: number): string {
 
 export function AgentView() {
   const [config, setConfig] = useState<AgentConfig>(DEFAULT_CONFIG);
+  // The config editor is a working copy: load the server config ONCE, then it's the
+  // user's to edit. Without this, the 10s status poll re-set config on every tick and
+  // silently reverted unsaved edits (worse on mobile, where editing is slower). Saving
+  // updates local + server together, so we never need to re-pull it mid-session.
+  const serverConfigLoadedRef = useRef(false);
   const [agentState, setAgentState] = useState<AgentState | null>(null);
   const [trades, setTrades] = useState<AgentTrade[]>([]);
   const [pending, setPending] = useState<AgentPendingThesis[]>([]);
@@ -243,7 +248,12 @@ export function AgentView() {
       const res = await fetch(`${AGENT_API}/agent/${walletAddress}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.config) setConfig(data.config);
+        // Load config from the server only on the FIRST fetch — after that the editor
+        // is the user's working copy (the poll must not clobber unsaved edits).
+        if (data.config && !serverConfigLoadedRef.current) {
+          setConfig(data.config);
+          serverConfigLoadedRef.current = true;
+        }
         // Cross-tab bridge: a prefill handed over from a thesis / signal / call
         // (deployToAgent) wins over the loaded config. Applied ONCE (key removed),
         // AFTER the server config so it can never be clobbered by the 10s refresh.
