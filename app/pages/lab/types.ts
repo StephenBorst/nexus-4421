@@ -124,6 +124,7 @@ export interface AgentTrade {
   exit_price: number;
   pnl: number;
   reason: string;
+  strategy?: string | null; // "DAY · FUNDING_ONLY" — stamped at entry (older trades: null)
   opened_at: string;
   closed_at: string;
 }

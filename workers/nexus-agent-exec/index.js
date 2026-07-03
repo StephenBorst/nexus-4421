@@ -453,6 +453,9 @@ async function enterPosition(address, state, config, signal, env, cache) {
     paper,
     tpPercent: effTp,
     slPercent: effSl,
+    // Strategy label stamped at ENTRY (config can change before close) so the trade
+    // record + History tab can show which strategy produced each trade.
+    strategy: `${(config.maxHoldHours ?? 0) <= 8 ? "DAY" : (config.maxHoldHours ?? 0) <= 120 ? "SWING" : "POSITION"} · ${config.signalMode || "CONFLUENCE"}${config.dcaEnabled ? " · DCA" : ""}`,
     // Multi-TP + trailing exit state (evaluateExit). remaining_qty shrinks as
     // levels scale out; tp_hits records filled levels; peak_pnl_pct ratchets the
     // trailing stop. Legacy positions without these fall back to single-TP/SL.
@@ -668,7 +671,7 @@ async function logAgentTrade(address, env, auditable) {
     body: JSON.stringify(payload),
   });
   // Core row = drop optional columns that may not be migrated yet.
-  const { entry_order_id, close_order_id, parent_id, exit_seq, ...core } = auditable;
+  const { entry_order_id, close_order_id, parent_id, exit_seq, strategy, ...core } = auditable;
   try {
     let res = await insert({ wallet_address: address, ...auditable });
     if (!res.ok) {
@@ -870,6 +873,7 @@ async function closePosition(address, state, env, reason, cache) {
     pnl: pnlUsdc,
     pnl_percent: pnlPct,
     reason,
+    strategy: pos.strategy ?? null,
     opened_at: new Date(pos.opened_at).toISOString(),
     closed_at: new Date().toISOString(),
   };

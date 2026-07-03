@@ -1851,13 +1851,13 @@ export function AgentView() {
               </div>
             ) : (
               <div style={{ marginTop: 8, overflowX: "auto" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr", gap: 8, minWidth: 480, padding: "6px 0", borderBottom: "1px solid #1e2d1e" }}>
-                  {["SYMBOL", "DIR", "ENTRY", "EXIT", "P&L", "REASON"].map((h) => (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr 1.3fr", gap: 8, minWidth: 580, padding: "6px 0", borderBottom: "1px solid #1e2d1e" }}>
+                  {["SYMBOL", "DIR", "ENTRY", "EXIT", "P&L", "REASON", "STRATEGY"].map((h) => (
                     <span key={h} style={{ ...agentLabelStyle, fontSize: 9, marginBottom: 0 }}>{h}</span>
                   ))}
                 </div>
                 {histTrades.map((trade, i) => (
-                  <div key={trade.id || i} style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr", gap: 8, minWidth: 480, padding: "8px 0", borderBottom: "1px solid #0d1117" }}>
+                  <div key={trade.id || i} style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr 1.3fr", gap: 8, minWidth: 580, padding: "8px 0", borderBottom: "1px solid #0d1117" }}>
                     <span style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
                       {trade.symbol.replace("PERP_", "").replace("_USDC", "")}
                     </span>
@@ -1875,6 +1875,9 @@ export function AgentView() {
                     </span>
                     <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: trade.reason === "TP" ? "#00ff88" : trade.reason === "SL" ? "#ff4444" : trade.reason === "BE" ? "#4a9fff" : "#ff8800" }}>
                       {trade.reason}
+                    </span>
+                    <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#4a7a5a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={trade.strategy ?? undefined}>
+                      {trade.strategy ?? "—"}
                     </span>
                   </div>
                 ))}
