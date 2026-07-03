@@ -362,7 +362,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
 
           {/* Worst Thesis */}
           <div style={cardStyle}>
-            <div style={{ fontSize: 10, color: "#ff4444", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; WORST THESIS</div>
+            <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; WORST THESIS</div>
             {worstThesis ? (
               <>
                 <div style={{ background: "#150a0a", border: "1px solid #3a1a1a", borderRadius: 4, padding: "10px 12px", marginBottom: 8 }}>
@@ -580,7 +580,7 @@ export function ThesisAnalyticsView() {
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(130px, 1fr))", gap: 8 }}>
         {/* Win streak */}
         <div style={cardStyle}>
-          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#fbbf24", letterSpacing: "0.1em", marginBottom: 14 }}>◆ WIN STREAK</div>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 14 }}>◆ WIN STREAK</div>
           <div style={{ marginBottom: 14 }}>
             <div style={labelStyle}>CURRENT STREAK</div>
             <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 28, fontWeight: "bold", color: streaks.current > 0 ? "#00ff88" : "#2a4a3a" }}>
@@ -612,7 +612,7 @@ export function ThesisAnalyticsView() {
 
         {/* Worst markets */}
         <div style={cardStyle}>
-          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#ff4444", letterSpacing: "0.1em", marginBottom: 10 }}>◆ WORST MARKETS</div>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 10 }}>◆ WORST MARKETS</div>
           {worstAssets.length === 0 ? (
             <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#2a4a3a" }}>no closed theses yet</div>
           ) : (
@@ -886,7 +886,7 @@ export function ThesisView() {
         {/* Form */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={cardStyle}>
-            <div style={{ fontSize: 10, color: "#fbbf24", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; INSTRUMENT</div>
+            <div style={{ fontSize: 10, color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; INSTRUMENT</div>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 160px", gap: 8 }}>
               <div>
                 <span style={fieldLabelStyle}>SYMBOL</span>
@@ -910,7 +910,7 @@ export function ThesisView() {
           </div>
 
           <div style={cardStyle}>
-            <div style={{ fontSize: 10, color: "#4a9fff", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; PRICE LEVELS</div>
+            <div style={{ fontSize: 10, color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; PRICE LEVELS</div>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: 8 }}>
               {[
                 { key: "entryPrice", label: "ENTRY", placeholder: "95000" },
@@ -932,7 +932,7 @@ export function ThesisView() {
           </div>
 
           <div style={cardStyle}>
-            <div style={{ fontSize: 10, color: "#a855f7", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; RISK + FUNDING</div>
+            <div style={{ fontSize: 10, color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; RISK + FUNDING</div>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr", gap: 8 }}>
               <div>
                 <span style={fieldLabelStyle}>ACCOUNT SIZE (USDC)</span>

@@ -202,7 +202,7 @@ function BreakdownRow({ orders }: { orders: ProcessedTrade[] }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginTop: 8 }}>
       <div style={cardStyle}>
-        <div style={{ fontSize: 10, color: "#fbbf24", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; HOLD TIME</div>
+        <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; HOLD TIME</div>
         {holdTime.map((b) => (
           <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <div style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", width: 40 }}>{b.label}</div>
@@ -221,7 +221,7 @@ function BreakdownRow({ orders }: { orders: ProcessedTrade[] }) {
       </div>
 
       <div style={cardStyle}>
-        <div style={{ fontSize: 10, color: "#4a9fff", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; WEEKDAY BREAKDOWN</div>
+        <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; WEEKDAY BREAKDOWN</div>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 80, marginBottom: 12 }}>
           {weekday.days.map((d) => (
             <div key={d.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
@@ -238,7 +238,7 @@ function BreakdownRow({ orders }: { orders: ProcessedTrade[] }) {
       </div>
 
       <div style={cardStyle}>
-        <div style={{ fontSize: 10, color: "#a855f7", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; LEVERAGE ANALYSIS</div>
+        <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; LEVERAGE ANALYSIS</div>
         {leverage.buckets.length === 0
           ? <div style={{ fontSize: 11, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)" }}>no leverage data available</div>
           : leverage.buckets.map((b) => (
@@ -280,7 +280,7 @@ function TopAssets({ orders }: { orders: ProcessedTrade[] }) {
 
   return (
     <div style={{ ...cardStyle, marginTop: 8 }}>
-      <div style={{ fontSize: 10, color: "#4a9fff", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; TOP ASSETS</div>
+      <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; TOP ASSETS</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(108px, 1fr))", gap: 8 }}>
         {assets.map(([sym, data]) => {
           const wr = Math.round((data.wins / data.trades) * 100);
@@ -356,7 +356,7 @@ function TimingAndRisk({ orders }: { orders: ProcessedTrade[] }) {
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8, marginTop: 8 }}>
       {/* Streaks */}
       <div style={cardStyle}>
-        <div style={{ fontSize: 10, color: "#fbbf24", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "var(--nx-font-mono)" }}>&#9632; STREAKS</div>
+        <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "var(--nx-font-mono)" }}>&#9632; STREAKS</div>
         <div style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>CURRENT</div>
           <div style={{ fontSize: 28, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: stats.current >= 0 ? "#00ff88" : "#ff4444" }}>
@@ -377,7 +377,7 @@ function TimingAndRisk({ orders }: { orders: ProcessedTrade[] }) {
 
       {/* Risk-adjusted (gated) */}
       <div style={cardStyle}>
-        <div style={{ fontSize: 10, color: "#a855f7", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "var(--nx-font-mono)" }}>&#9632; RISK-ADJUSTED</div>
+        <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "var(--nx-font-mono)" }}>&#9632; RISK-ADJUSTED</div>
         {gated ? (
           <div style={{ fontSize: 11, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", lineHeight: 1.7 }}>
             need <span style={{ color: "#fbbf24" }}>{RISK_SAMPLE_GATE - stats.n}</span> more closed trades<br />
@@ -401,7 +401,7 @@ function TimingAndRisk({ orders }: { orders: ProcessedTrade[] }) {
 
       {/* Peak hours + heatmap */}
       <div style={{ ...cardStyle, gridColumn: isMobile ? "auto" : "span 2" }}>
-        <div style={{ fontSize: 10, color: "#4a9fff", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; PEAK HOURS <span style={{ color: "#2a4a3a" }}>(local)</span></div>
+        <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; PEAK HOURS <span style={{ color: "#2a4a3a" }}>(local)</span></div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(24, 1fr)", gap: 2, marginBottom: 12 }}>
           {stats.hours.map((b) => {
             const wr = b.trades ? Math.round((b.wins / b.trades) * 100) : 0;
@@ -545,7 +545,7 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
           {orders.length ? <PnlChart points={cumulativePnl} /> : <EmptyState message="connect wallet + make trades to see curve" />}
         </div>
         <div style={cardStyle}>
-          <div style={{ fontSize: 10, color: "#4a9fff", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "var(--nx-font-mono)" }}>PERFORMANCE</div>
+          <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "var(--nx-font-mono)" }}>PERFORMANCE</div>
           {[
             // Tone by meaning: wins green, losses red, neutral bright — NOT all green
             // (which mislabeled AVG LOSS / WORST TRADE as if they were positive).
