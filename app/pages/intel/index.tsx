@@ -4,13 +4,13 @@ import { deployToAgent } from "@/utils/agentPrefill";
 
 // ─── Constants ────────────────────────────────────────────────
 const REFRESH_INTERVAL = 60; // seconds
-const TEAL   = "#38d2c7";
-const GREEN  = "#29e9a9";
-const RED    = "#f5618b";
-const YELLOW = "#ffd146";
-const DIM    = "rgba(255,255,255,0.38)";
-const MUTED  = "rgba(255,255,255,0.60)";
-const BRIGHT = "rgba(255,255,255,0.87)";
+const TEAL   = "#00ff88";
+const GREEN  = "#00ff88";
+const RED    = "#ff4444";
+const YELLOW = "#fbbf24";
+const DIM    = "#4a7a5a";
+const MUTED  = "#8aaa9a";
+const BRIGHT = "#e8f0ea";
 
 // ─── Types ────────────────────────────────────────────────────
 interface FearGreedData  { value: number; label: string }
@@ -206,7 +206,7 @@ function BarBlock({ value, total = 100, color = TEAL, len = 18 }: { value: numbe
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{
-      background: "#0c1014",
+      background: "#0d120d",
       border: "1px solid rgba(255,255,255,0.07)",
       borderRadius: "2px",
       padding: "14px 16px",
@@ -219,7 +219,7 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ color: TEAL, fontSize: "10px", letterSpacing: "0.12em", marginBottom: "12px", opacity: 0.9 }}>
+    <div style={{ color: DIM, fontSize: "10px", letterSpacing: "0.12em", marginBottom: "12px", opacity: 0.9 }}>
       {children}
     </div>
   );
@@ -367,7 +367,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
 
   // ── Styles ──────────────────────────────────────────────────
   const page: React.CSSProperties = {
-    background: embedded ? "transparent" : "#080b0d",
+    background: embedded ? "transparent" : "#080c08",
     minHeight: embedded ? undefined : "100dvh",
     padding: embedded ? (isMobile ? "8px 0" : "4px 0") : (isMobile ? "12px" : "16px 20px"),
     fontFamily: "'Courier New', Courier, monospace",
@@ -395,7 +395,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
           <span style={{ color: sigC, fontSize: "11px" }}>{sig}</span>
           <button onClick={() => deployToAgent({ symbols: [`PERP_${sym}_USDC`] }, `the ${sym} funding read`)}
             title={`Set the trading agent to watch ${sym} — the same funding/OI edge it trades on`}
-            style={{ marginLeft: "auto", background: "none", border: "1px solid #3a2a0a", color: "#ff8800", fontFamily: "var(--nx-font-mono)", fontSize: "9px", letterSpacing: "0.05em", padding: "3px 8px", borderRadius: "3px", cursor: "pointer" }}>
+            style={{ marginLeft: "auto", background: "none", border: "1px solid #3a2a0a", color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontSize: "9px", letterSpacing: "0.05em", padding: "3px 8px", borderRadius: "3px", cursor: "pointer" }}>
             ⚡ AGENT
           </button>
         </div>
