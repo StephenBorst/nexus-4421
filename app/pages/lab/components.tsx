@@ -1,23 +1,27 @@
 // Shared presentational primitives for The Lab.
 // Extracted from index.tsx (god-file split) — prop-driven presentational pieces.
-import { useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 // ─── PnL Chart ───────────────────────────────────────────
 // Cumulative-P&L equity curve. Measures its container so the line draws to the
 // FULL width (a fixed-viewBox svg stretched to 100% just letterboxes a ~500px
 // line in dead space). Gradient area fill + soft glow + zero baseline for depth.
 export function PnlChart({ points }: { points: number[] }) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [w, setW] = useState(720);
-  useLayoutEffect(() => {
-    const el = wrapRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver((entries) => {
-      const cw = entries[0]?.contentRect.width;
-      if (cw && cw > 0) setW(cw);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
+  const [w, setW] = useState(0);
+  const roRef = useRef<ResizeObserver | null>(null);
+  // Callback ref: fires the moment the chart div attaches (which only happens once
+  // data is present), so we measure the real container width deterministically. A
+  // plain effect + observer bailed here — it ran during the no-data render while the
+  // ref was still null and never re-attached, leaving the chart stuck at a default.
+  const measureRef = useCallback((node: HTMLDivElement | null) => {
+    roRef.current?.disconnect();
+    if (!node) return;
+    const read = () => { const cw = node.getBoundingClientRect().width; if (cw > 0) setW(cw); };
+    read();
+    if (typeof ResizeObserver !== "undefined") {
+      roRef.current = new ResizeObserver(read);
+      roRef.current.observe(node);
+    }
   }, []);
 
   if (points.length < 2) {
@@ -28,11 +32,12 @@ export function PnlChart({ points }: { points: number[] }) {
     );
   }
 
+  const cw = w || 720; // fallback width for the first paint, before the ref measures
   const h = 190, padY = 20, padX = 2;
   const min = Math.min(0, ...points);
   const max = Math.max(0, ...points) || 1;
   const range = max - min || 1;
-  const iw = Math.max(1, w - padX * 2);
+  const iw = Math.max(1, cw - padX * 2);
   const x = (i: number) => padX + (i / (points.length - 1)) * iw;
   const y = (v: number) => padY + (1 - (v - min) / range) * (h - padY * 2);
   const up = points[points.length - 1] >= 0;
@@ -49,8 +54,8 @@ export function PnlChart({ points }: { points: number[] }) {
   const gid = "nx-pnl-fill", fid = "nx-pnl-glow";
 
   return (
-    <div ref={wrapRef} style={{ width: "100%" }}>
-      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", overflow: "visible" }}>
+    <div ref={measureRef} style={{ width: "100%" }}>
+      <svg width={cw} height={h} viewBox={`0 0 ${cw} ${h}`} style={{ display: "block", overflow: "visible" }}>
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={stroke} stopOpacity="0.22" />
@@ -63,10 +68,10 @@ export function PnlChart({ points }: { points: number[] }) {
           </filter>
         </defs>
         {grid.map((gy, i) => (
-          <line key={i} x1={0} y1={gy} x2={w} y2={gy} stroke="#12201a" strokeWidth="1" />
+          <line key={i} x1={0} y1={gy} x2={cw} y2={gy} stroke="#12201a" strokeWidth="1" />
         ))}
         {showZero && (
-          <line x1={0} y1={zeroY} x2={w} y2={zeroY} stroke="#2a3a2a" strokeWidth="1" strokeDasharray="2 4" />
+          <line x1={0} y1={zeroY} x2={cw} y2={zeroY} stroke="#2a3a2a" strokeWidth="1" strokeDasharray="2 4" />
         )}
         <path d={areaPath} fill={`url(#${gid})`} />
         <path d={linePath} fill="none" stroke={stroke} strokeOpacity="0.92" strokeWidth="2.25" strokeLinejoin="round" strokeLinecap="round" filter={`url(#${fid})`} />
