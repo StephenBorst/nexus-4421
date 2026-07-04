@@ -168,7 +168,18 @@ export default function NexusAssistant() {
     if (typeof window === "undefined") return null;
     try {
       const raw = window.localStorage.getItem("nexus_ai_pos");
-      if (raw) { const p = JSON.parse(raw); if (typeof p?.x === "number" && typeof p?.y === "number") return p; }
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (typeof p?.x === "number" && typeof p?.y === "number") {
+          // Clamp a position saved on a wider screen back into the current
+          // viewport — otherwise a desktop-dragged bubble loads off-screen on mobile.
+          const w = 52, h = 52;
+          return {
+            x: Math.min(Math.max(0, p.x), Math.max(0, window.innerWidth - w)),
+            y: Math.min(Math.max(0, p.y), Math.max(0, window.innerHeight - h)),
+          };
+        }
+      }
     } catch { /* ignore */ }
     return null;
   };
@@ -214,6 +225,7 @@ export default function NexusAssistant() {
         return nx === p.x && ny === p.y ? p : { x: nx, y: ny };
       });
     };
+    clamp(); // clamp immediately too — mount/orientation change fires no resize event
     window.addEventListener("resize", clamp);
     return () => window.removeEventListener("resize", clamp);
   }, [pos]);
