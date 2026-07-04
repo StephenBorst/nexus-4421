@@ -73,6 +73,21 @@ html, body {
   }
 }
 
+/* Trade page order panel: on phones the order book + order entry render as a
+   two-column grid (oui-trading-orderBookAndEntry, oui-grid-cols-[4fr,6fr]). On a
+   large phone the 6fr order-entry column is narrower than the order form's min
+   width — ~231px on a 412px Galaxy S24 Ultra vs the ~268px "Buy / Long" button —
+   so the connected form overflows its column. Standard ~390px iPhones dodge it
+   (the SDK gives them a 1-column layout); large Androids / Pro Max land in the
+   2-column zone. Collapse the grid to one full-width column below 500px so the
+   order book and form stack and the form gets full width. Tablets (500–767px)
+   keep the 2-column layout — there the 6fr column is wide enough. */
+@media (max-width: 500px) {
+  .oui-trading-orderBookAndEntry {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 /* ═══ Nexus design system — CSS layer (driven by app/config/theme.ts) ═══════════
    The interaction states inline styles CAN'T express: hover, focus-visible, motion.
    Migrate inline-styled controls to these classes to get premium feel + a11y focus
