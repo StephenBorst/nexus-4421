@@ -51,21 +51,17 @@ export function PnlChart({ points }: { points: number[] }) {
   const showZero = min < 0 && max > 0;
   const lastX = x(points.length - 1), lastY = y(points[points.length - 1]);
   const grid = [0.25, 0.5, 0.75].map((f) => padY + f * (h - padY * 2));
-  const gid = "nx-pnl-fill", fid = "nx-pnl-glow";
+  const gid = "nx-pnl-fill";
 
   return (
-    <div ref={measureRef} style={{ width: "100%" }}>
-      <svg width={cw} height={h} viewBox={`0 0 ${cw} ${h}`} style={{ display: "block", overflow: "hidden" }}>
+    <div ref={measureRef} style={{ width: "100%", overflow: "hidden" }}>
+      <svg width={cw} height={h} viewBox={`0 0 ${cw} ${h}`} style={{ display: "block", maxWidth: "100%", overflow: "hidden" }}>
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={stroke} stopOpacity="0.22" />
             <stop offset="55%" stopColor={stroke} stopOpacity="0.06" />
             <stop offset="100%" stopColor={stroke} stopOpacity="0" />
           </linearGradient>
-          <filter id={fid} x="-10%" y="-40%" width="120%" height="180%">
-            <feGaussianBlur stdDeviation="3" result="b" />
-            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
         </defs>
         {grid.map((gy, i) => (
           <line key={i} x1={0} y1={gy} x2={cw} y2={gy} stroke="#12201a" strokeWidth="1" />
@@ -74,7 +70,10 @@ export function PnlChart({ points }: { points: number[] }) {
           <line x1={0} y1={zeroY} x2={cw} y2={zeroY} stroke="#2a3a2a" strokeWidth="1" strokeDasharray="2 4" />
         )}
         <path d={areaPath} fill={`url(#${gid})`} />
-        <path d={linePath} fill="none" stroke={stroke} strokeOpacity="0.92" strokeWidth="2.25" strokeLinejoin="round" strokeLinecap="round" filter={`url(#${fid})`} />
+        {/* glow = a wider, faint underlay stroke (pure paint, NOT an svg filter —
+            older wallet-webview WebKit doesn't clip filter output to the box). */}
+        <path d={linePath} fill="none" stroke={stroke} strokeOpacity="0.18" strokeWidth="6" strokeLinejoin="round" strokeLinecap="round" />
+        <path d={linePath} fill="none" stroke={stroke} strokeOpacity="0.95" strokeWidth="2.25" strokeLinejoin="round" strokeLinecap="round" />
         <circle cx={lastX} cy={lastY} r="6" fill={stroke} fillOpacity="0.18" />
         <circle cx={lastX} cy={lastY} r="3.2" fill={stroke} />
         <circle cx={lastX} cy={lastY} r="3.2" fill="none" stroke="#0a0e0a" strokeWidth="1" />
