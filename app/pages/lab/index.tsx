@@ -104,7 +104,7 @@ export default function TheLabPage() {
   const connected = !!rootWalletAddress;
 
   return (
-    <div style={{ background: "#0a0e0a", minHeight: "100dvh", padding: 0 }}>
+    <div style={{ background: "#0a0e0a", minHeight: "100svh", padding: 0 }}>
       <style>{`@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px #00ff88}50%{opacity:0.4;box-shadow:0 0 2px #00ff88}}`}</style>
       {/* ── BRIEFING HEADER ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "6px 10px" : "6px 18px", background: "#05080a", borderBottom: "1px solid #0d1f0d", flexWrap: "wrap", gap: 4 }}>

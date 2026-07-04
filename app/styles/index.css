@@ -52,11 +52,14 @@ html, body {
   overscroll-behavior: none;
 }
 
-/* Fix mobile dead space: 100vh includes browser chrome; 100dvh sizes to the visible
-   viewport. Also hide the low-value scaffold footer on phones. */
+/* Fix mobile dead space: 100vh includes browser chrome (dead strip at the bottom),
+   and 100dvh RESIZES as the retractable toolbar shows/hides (jank + a transient dead
+   strip). 100svh = the small/stable viewport (toolbar-visible height) → the app never
+   gets forced taller than the always-visible area, so no bottom dead space. Also hide
+   the low-value scaffold footer on phones. */
 @media (max-width: 767px) {
   .oui-scaffold-root {
-    height: 100dvh !important;
+    height: 100svh !important;
   }
   .oui-scaffold-footer {
     display: none !important;

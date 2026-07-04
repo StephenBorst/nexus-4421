@@ -638,7 +638,7 @@ export default function MiniApp() {
     }
   }
 
-  const shell: React.CSSProperties = { background: bg, color: "#e8f0ea", minHeight: "100dvh", fontFamily: mono, padding: 14, display: "flex", flexDirection: "column", gap: 11 };
+  const shell: React.CSSProperties = { background: bg, color: "#e8f0ea", minHeight: "100svh", fontFamily: mono, padding: 14, display: "flex", flexDirection: "column", gap: 11 };
   const card: React.CSSProperties = { background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 6, padding: 12 };
   const mktChip = (active: boolean): React.CSSProperties => ({ background: active ? "#00ff8815" : "#0a0e0a", border: `1px solid ${active ? "#00ff8860" : "#1e2d1e"}`, borderRadius: 3, padding: "4px 11px", cursor: "pointer", color: active ? green : "#4a7a5a", fontFamily: mono, fontSize: 12 });
   const levPresets = [2, 5, 10, 25, 50, 100].filter((p) => p < maxLev).concat(maxLev); // per-market, incl. real MAX

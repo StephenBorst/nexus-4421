@@ -610,7 +610,7 @@ export default function TraderPage() {
   const showRepBadge = stats.closed > 0 || onChainRep !== null;
 
   return (
-    <div style={{ background: "#0a0e0a", minHeight: "100dvh" }}>
+    <div style={{ background: "#0a0e0a", minHeight: "100svh" }}>
       {/* Copy modal */}
       {copyTarget && walletAddress && (
         <CopyModal thesis={copyTarget} walletAddress={walletAddress} onClose={() => setCopyTarget(null)} />

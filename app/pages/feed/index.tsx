@@ -1320,7 +1320,7 @@ export default function FeedPage() {
   });
 
   return (
-    <div style={{ background: "#0a0e0a", minHeight: "100dvh", padding: 0 }}>
+    <div style={{ background: "#0a0e0a", minHeight: "100svh", padding: 0 }}>
       {/* Copy modal */}
       {copyTarget && walletAddress && (
         <CopyModal

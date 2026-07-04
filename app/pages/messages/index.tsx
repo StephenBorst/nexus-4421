@@ -68,7 +68,7 @@ async function resolvePeer(convo: Conversation, myInboxId: string | null): Promi
 const S = {
   page: {
     background: "#0a0e0a",
-    minHeight: "100dvh",
+    minHeight: "100svh",
     display: "flex",
     flexDirection: "column" as const,
   },
