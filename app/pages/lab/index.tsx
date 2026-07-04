@@ -107,7 +107,7 @@ export default function TheLabPage() {
     <div style={{ background: "#0a0e0a", minHeight: "100svh", padding: 0 }}>
       <style>{`@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px #00ff88}50%{opacity:0.4;box-shadow:0 0 2px #00ff88}}`}</style>
       {/* ── BRIEFING HEADER ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "6px 10px" : "6px 18px", background: "#05080a", borderBottom: "1px solid #0d1f0d", flexWrap: "wrap", gap: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "6px 10px" : "6px 18px", background: "#080c08", borderBottom: "1px solid #0d1f0d", flexWrap: "wrap", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#00ff88", letterSpacing: "0.25em", fontWeight: "bold", textShadow: "0 0 12px rgba(0,255,136,0.5)" }}>//</span>
           <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#fff", letterSpacing: "0.25em", fontWeight: "bold" }}>THE LAB</span>
