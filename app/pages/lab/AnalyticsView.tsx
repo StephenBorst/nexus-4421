@@ -508,6 +508,7 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
   const bestTrade = useMemo(() => Math.max(0, ...orders.map((o) => o.pnl)), [orders]);
   const worstTrade = useMemo(() => Math.min(0, ...orders.map((o) => o.pnl)), [orders]);
   const cumulativePnl = useMemo(() => { let r = 0; return [0, ...orders.map((o) => { r += o.pnl; return r; })]; }, [orders]);
+  const isMobile = useIsMobile();
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
@@ -539,7 +540,7 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 240px", gap: 8, marginBottom: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 240px", gap: 8, marginBottom: 8 }}>
         <div style={cardStyle}>
           <div style={labelStyle}>&#9632; P&amp;L OVER TIME</div>
           {orders.length ? <PnlChart points={cumulativePnl} /> : <EmptyState message="connect wallet + make trades to see curve" />}

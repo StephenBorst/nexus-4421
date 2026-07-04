@@ -39,7 +39,9 @@ export function PnlChart({ points }: { points: number[] }) {
   const stroke = up ? "#00ff88" : "#ff5555";
   const line = points.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
   const linePath = "M" + line.join(" L");
-  const areaPath = `${linePath} L${x(points.length - 1).toFixed(1)},${h} L${x(0).toFixed(1)},${h} Z`;
+  // Close the fill to the ZERO baseline (not the chart bottom) so a losing curve
+  // reads as a band below breakeven, not a giant block filling the whole panel.
+  const areaPath = `${linePath} L${x(points.length - 1).toFixed(1)},${y(0).toFixed(1)} L${x(0).toFixed(1)},${y(0).toFixed(1)} Z`;
   const zeroY = y(0);
   const showZero = min < 0 && max > 0;
   const lastX = x(points.length - 1), lastY = y(points[points.length - 1]);
