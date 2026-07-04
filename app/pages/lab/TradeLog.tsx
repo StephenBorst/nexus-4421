@@ -212,7 +212,7 @@ export function TradeLogAllView({
               {/* symbols */}
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {[...new Set(g.tradeList.map(t => t.symbol.replace("PERP_","").replace("_USDC","")))].map(s => (
-                  <span key={s} style={{ fontSize: 9, color: "#4a9fff", fontFamily: "var(--nx-font-mono)", background: "#0a1a2a", border: "1px solid #0a2a3a", borderRadius: 3, padding: "2px 6px" }}>{s}</span>
+                  <span key={s} style={{ fontSize: 9, color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", background: "#0d120d", border: "1px solid #1e2d1e", borderRadius: 3, padding: "2px 6px" }}>{s}</span>
                 ))}
               </div>
               {/* stats */}
