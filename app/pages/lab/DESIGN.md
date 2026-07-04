@@ -18,7 +18,7 @@ Interaction states live in the **CSS layer** (`.nx-*` in `app/styles/index.css`)
 | Token | Hex | Use |
 |-------|-----|-----|
 | `C.canvas` | `#0a0e0a` | page/inset background |
-| `C.surface` | `#111318` | raised card |
+| `C.surface` | `#111811` | raised card (green-tinted, matches the palette) |
 | `C.surfaceAlt` | `#0d120d` | secondary card |
 | `C.border` | `#1e2d1e` | hairline (structural) |
 | `C.text.bright` | `#e8f0ea` | primary values / headings |

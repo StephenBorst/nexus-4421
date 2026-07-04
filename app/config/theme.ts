@@ -37,7 +37,7 @@ export const MOTION = {
 // ── Color — surfaces stratified by luminance, ONE rationed accent ────────────
 export const C = {
   canvas: "#0a0e0a",
-  surface: "#111318",
+  surface: "#111811",
   surfaceAlt: "#0d120d",
   inset: "#080c08",
   border: "#1e2d1e",

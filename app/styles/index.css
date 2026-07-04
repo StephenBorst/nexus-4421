@@ -93,7 +93,7 @@ html, body {
    Migrate inline-styled controls to these classes to get premium feel + a11y focus
    for free. Vars mirror C/RADIUS/MOTION in theme.ts — keep the two in sync. */
 :root {
-  --nx-canvas: #0a0e0a; --nx-surface: #111318; --nx-surface-alt: #0d120d; --nx-inset: #080c08;
+  --nx-canvas: #0a0e0a; --nx-surface: #111811; --nx-surface-alt: #0d120d; --nx-inset: #080c08;
   --nx-border: #1e2d1e; --nx-border-strong: #2a3a2a; --nx-border-accent: #00ff8850;
   --nx-bright: #e8f0ea; --nx-fog: #8aaa9a; --nx-muted: #4a7a5a; --nx-faint: #3a5a4a;
   --nx-accent: #00ff88; --nx-neg: #ff4444; --nx-warn: #fbbf24; --nx-info: #4a9fff;
