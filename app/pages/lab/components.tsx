@@ -33,7 +33,7 @@ export function PnlChart({ points }: { points: number[] }) {
   }
 
   const cw = w || 720; // fallback width for the first paint, before the ref measures
-  const h = 190, padY = 20, padX = 2;
+  const h = 190, padY = 20, padX = 8;
   const min = Math.min(0, ...points);
   const max = Math.max(0, ...points) || 1;
   const range = max - min || 1;
@@ -55,7 +55,7 @@ export function PnlChart({ points }: { points: number[] }) {
 
   return (
     <div ref={measureRef} style={{ width: "100%" }}>
-      <svg width={cw} height={h} viewBox={`0 0 ${cw} ${h}`} style={{ display: "block", overflow: "visible" }}>
+      <svg width={cw} height={h} viewBox={`0 0 ${cw} ${h}`} style={{ display: "block", overflow: "hidden" }}>
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={stroke} stopOpacity="0.22" />
