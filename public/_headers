@@ -1,14 +1,12 @@
-# Cloudflare Pages cache rules — prevents stale-chunk errors after deploys.
-# HTML + runtime config must always be fresh so they reference the CURRENT chunk
-# hashes; hashed assets are content-addressed and safe to cache forever.
+# Cloudflare Pages cache rules — prevent stale app shells after deploys.
+# Every navigation route serves index.html via the SPA fallback (/, /lab, /feed,
+# /perp/*, /portfolio, …), so ALL of them — not just the literal /index.html — must
+# revalidate to pick up the CURRENT chunk hashes. Wallet in-app browsers (Zerion
+# etc.) cache aggressively, and a rule scoped to /index.html alone never matched
+# /lab, so the HTML went stale there. /* covers every route (incl. config.js, sw.js);
+# /assets/* is more specific and wins, keeping content-hashed assets cacheable forever.
 
-/index.html
-  Cache-Control: no-cache
-
-/config.js
-  Cache-Control: no-cache
-
-/sw.js
+/*
   Cache-Control: no-cache
 
 /assets/*
