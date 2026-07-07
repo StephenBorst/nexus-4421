@@ -19,55 +19,6 @@ import { CopiesView } from "./CopiesView";
 import { MarketIntelView } from "./MarketIntel";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
 
-// Viewport diagnostic (append ?vhdebug to the URL). Shows what the current engine
-// reports for each CSS viewport unit + the painted/scroll heights, and draws a
-// bottom-edge line for svh (red) / dvh (yellow) / lvh (green) so we can SEE which
-// unit reaches the wallet-webview's real bottom vs where the dead strip begins.
-function VhDebug() {
-  const [d, setD] = useState<Record<string, number>>({});
-  useEffect(() => {
-    const probe = (unit: string) => {
-      const el = document.createElement("div");
-      el.style.cssText = `position:fixed;top:0;left:-9999px;width:1px;height:${unit};`;
-      document.body.appendChild(el);
-      const h = el.getBoundingClientRect().height;
-      el.remove();
-      return Math.round(h);
-    };
-    const measure = () => setD({
-      innerHeight: window.innerHeight,
-      visualVP: Math.round(window.visualViewport?.height || 0),
-      clientH: document.documentElement.clientHeight,
-      docScrollH: document.documentElement.scrollHeight,
-      screenH: window.screen.height,
-      svh: probe("100svh"),
-      dvh: probe("100dvh"),
-      lvh: probe("100lvh"),
-      vh: probe("100vh"),
-    });
-    measure();
-    window.addEventListener("resize", measure);
-    const id = window.setInterval(measure, 800);
-    return () => { window.removeEventListener("resize", measure); window.clearInterval(id); };
-  }, []);
-  const bar = (unit: string, color: string, label: string) => (
-    <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: unit, background: `${color}14`, borderBottom: `2px solid ${color}`, zIndex: 999998, pointerEvents: "none" }}>
-      <span style={{ position: "absolute", bottom: 2, right: 6, color, fontFamily: "monospace", fontSize: 12, fontWeight: "bold", background: "#000", padding: "1px 4px" }}>↧ {label}</span>
-    </div>
-  );
-  return (
-    <>
-      {bar("100svh", "#ff4444", "svh")}
-      {bar("100dvh", "#fbbf24", "dvh")}
-      {bar("100lvh", "#00ff88", "lvh")}
-      <div style={{ position: "fixed", top: 8, left: 8, zIndex: 999999, background: "#000", border: "2px solid #00ff88", borderRadius: 6, padding: "8px 10px", fontFamily: "monospace", fontSize: 12, color: "#00ff88", lineHeight: 1.5, pointerEvents: "none" }}>
-        <div style={{ fontWeight: "bold", marginBottom: 3 }}>// VH DEBUG</div>
-        {Object.entries(d).map(([k, v]) => <div key={k}>{k}: <b style={{ color: "#fff" }}>{v}</b></div>)}
-      </div>
-    </>
-  );
-}
-
 export default function TheLabPage() {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>(() => (searchParams.get("tab") as TabId) || "intel");
@@ -155,7 +106,6 @@ export default function TheLabPage() {
 
   return (
     <div style={{ background: "#0a0e0a", minHeight: "100dvh", padding: 0 }}>
-      {searchParams.has("vhdebug") && <VhDebug />}
       <style>{`@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px #00ff88}50%{opacity:0.4;box-shadow:0 0 2px #00ff88}}`}</style>
       {/* ── BRIEFING HEADER ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "6px 10px" : "6px 18px", background: "#080c08", borderBottom: "1px solid #0d1f0d", flexWrap: "wrap", gap: 4 }}>
