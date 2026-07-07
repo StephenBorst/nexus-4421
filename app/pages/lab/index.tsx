@@ -19,6 +19,48 @@ import { CopiesView } from "./CopiesView";
 import { MarketIntelView } from "./MarketIntel";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
 
+// Diagnostic (append ?vhdebug). Dumps the REAL rendered height/overflow/scroll chain
+// so we can see how a wallet webview (Zerion) builds the layout vs a desktop preview.
+function VhDebug() {
+  const [rows, setRows] = useState<string[]>([]);
+  useEffect(() => {
+    const measure = () => {
+      const out: string[] = [];
+      out.push(`inner=${window.innerHeight} vis=${Math.round(window.visualViewport?.height || 0)} screen=${window.screen.height}`);
+      out.push(`docClientH=${document.documentElement.clientHeight} docScrollH=${document.documentElement.scrollHeight} scrollY=${Math.round(window.scrollY)}`);
+      const sels = ["html", "body", "#root", ".oui-scaffold-root", ".oui-scaffold-container", ".oui-scaffold-content"];
+      for (const sel of sels) {
+        const el = sel === "html" ? document.documentElement : sel === "body" ? document.body : document.querySelector(sel);
+        if (!el) { out.push(`${sel}: (none)`); continue; }
+        const cs = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        out.push(`${sel} h=${cs.height} mh=${cs.minHeight} ovY=${cs.overflowY} pos=${cs.position} rect=${Math.round(r.top)}>${Math.round(r.bottom)} sH=${el.scrollHeight}`);
+      }
+      let scroller = "none";
+      const all = Array.from(document.querySelectorAll("*"));
+      for (const el of all) {
+        const cs = getComputedStyle(el);
+        if ((cs.overflowY === "auto" || cs.overflowY === "scroll") && el.scrollHeight > el.clientHeight + 20) {
+          scroller = ((el.tagName.toLowerCase() + "." + (("" + el.className).split(" ").slice(0, 2).join("."))).slice(0, 44)) + ` sH=${el.scrollHeight} cH=${el.clientHeight}`;
+          break;
+        }
+      }
+      out.push(`SCROLLER: ${scroller}`);
+      setRows(out);
+    };
+    measure();
+    const id = window.setInterval(measure, 1000);
+    window.addEventListener("resize", measure);
+    return () => { window.clearInterval(id); window.removeEventListener("resize", measure); };
+  }, []);
+  return (
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 2147483647, background: "#000", border: "2px solid #00ff88", padding: 8, fontFamily: "monospace", fontSize: 11, color: "#00ff88", lineHeight: 1.45, pointerEvents: "none", wordBreak: "break-all" }}>
+      <b>// VH DEBUG 2</b>
+      {rows.map((r, i) => <div key={i} style={{ color: r.startsWith("SCROLLER") || r.startsWith("inner") ? "#fff" : "#00ff88" }}>{r}</div>)}
+    </div>
+  );
+}
+
 export default function TheLabPage() {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>(() => (searchParams.get("tab") as TabId) || "intel");
@@ -106,6 +148,7 @@ export default function TheLabPage() {
 
   return (
     <div style={{ background: "#0a0e0a", minHeight: "100dvh", padding: 0 }}>
+      {searchParams.has("vhdebug") && <VhDebug />}
       <style>{`@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px #00ff88}50%{opacity:0.4;box-shadow:0 0 2px #00ff88}}`}</style>
       {/* ── BRIEFING HEADER ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "6px 10px" : "6px 18px", background: "#080c08", borderBottom: "1px solid #0d1f0d", flexWrap: "wrap", gap: 4 }}>
