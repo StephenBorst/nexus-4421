@@ -64,11 +64,12 @@ html, body {
    (Lab + trade page) that scrolling works and layout is intact. Desktop keeps the SDK's
    fixed layout (scoped to phones). Also hide the scaffold footer. */
 @media (max-width: 767px) {
-  html, body, #root, .oui-scaffold-root {
-    height: auto !important;
-    min-height: 100dvh !important;
-    overflow-x: hidden !important;
-    overflow-y: visible !important;
+  /* NOTE: unlocking the shell to natural flow (height:auto) fixed nothing in Zerion
+     AND broke touch scrolling on real devices (scrolled fine in desktop preview but
+     not in the webview). Reverted to the SDK's fixed-viewport shell, which scrolls. */
+  .oui-scaffold-root {
+    height: 100svh !important;
+    height: 100dvh !important;
   }
   .oui-scaffold-footer {
     display: none !important;
