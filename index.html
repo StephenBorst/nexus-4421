@@ -4,9 +4,11 @@
     <meta charset="UTF-8" />
     <title>Nexus Trading Labs</title>
     <link rel="icon" type="image/webp" href="/favicon.webp" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <!-- Tint mobile browser chrome / safe-area insets to the app background so
-         there's no contrasting dark band above the (wallet) browser toolbar. -->
+    <!-- NO viewport-fit=cover: in wallet in-app webviews (Zerion) it extends the
+         layout under the system UI and leaves a dead strip below the viewport that no
+         CSS height can reach (verified: every viewport unit caps at 684 while screen
+         is 892). OpenSea omits it and fills the frame cleanly — match that. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0a0e0a" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="msapplication-TileColor" content="#000000" />
@@ -15,7 +17,7 @@
     </style>
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <link rel="apple-touch-icon" href="/favicon.webp" />
     <meta property="og:title" content="Nexus Trading Labs" />
     <meta property="og:description" content="Non-custodial Perpetual DEX on Arbitrum. Trade crypto, RWAs, and equities on-chain." />
