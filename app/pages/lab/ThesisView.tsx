@@ -9,7 +9,7 @@ import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePr
 import { useIsMobile } from "./useIsMobile";
 import type { ThesisTrade, ThesisStatus } from "./types";
 import { cardStyle, labelStyle, navBtnStyle, inputStyle, fieldLabelStyle, STATUS_CONFIG, CLOSED_STATUSES } from "./styles";
-import { deployToAgent, thesisToAgentConfig } from "@/utils/agentPrefill";
+import { deployToAgent, thesisToAgentConfig, thesisAgentNotice } from "@/utils/agentPrefill";
 import { formatPnl } from "./helpers";
 import { PnlChart, EmptyState } from "./components";
 
@@ -158,10 +158,14 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
                 </button>
               );
             })()}
-            <button onClick={() => deployToAgent(thesisToAgentConfig(t), `your ${t.symbol.replace("PERP_", "").replace("_USDC", "")} thesis`)}
-              title="Set up the agent to trade this symbol with this thesis's TP/SL"
+            <button onClick={() => deployToAgent(
+                thesisToAgentConfig(t),
+                `your ${t.symbol.replace("PERP_", "").replace("_USDC", "")} thesis`,
+                thesisAgentNotice(t),
+              )}
+              title="Prefill the agent to trade this symbol on funding/OI signals, using this thesis's TP/SL and leverage as risk bounds. The agent is signal-driven — it may enter either direction."
               style={{ ...navBtnStyle, fontSize: 10, color: "#ff8800", borderColor: "#3a2a0a", minHeight: 36, padding: "6px 12px" }}>
-              ⚡ AGENT
+              ⚡ AUTOMATE
             </button>
             <button onClick={() => onRemove(t.id)} style={{ ...navBtnStyle, fontSize: 10, color: "#ff4444", borderColor: "#2a1a1a", minHeight: 36, padding: "6px 12px" }}>REMOVE</button>
           </div>

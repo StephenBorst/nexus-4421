@@ -210,6 +210,9 @@ export function AgentView() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  // Persistent (until dismissed) expectation banner, set when a prefill arrives from
+  // a source whose semantics differ from the agent's (e.g. a directional thesis).
+  const [prefillNotice, setPrefillNotice] = useState<string | null>(null);
   const [tab, setTab] = useState<"config" | "status" | "history" | "leaderboard">("config");
   const [leaderboard, setLeaderboard] = useState<AgentLeaderboardEntry[] | null>(null);
   const [lbLoading, setLbLoading] = useState(false);
@@ -267,6 +270,8 @@ export function AgentView() {
               setTab("config");
               setSuccess(`Config prefilled${p.source ? ` from ${p.source}` : ""} — review, then Save or Backtest.`);
               setTimeout(() => setSuccess(null), 5000);
+              // Persistent expectation (e.g. thesis → signal-bot direction mismatch).
+              if (p.notice) setPrefillNotice(p.notice);
             }
           }
         } catch { /* ignore */ }
@@ -701,6 +706,13 @@ export function AgentView() {
       {success && (
         <div style={{ ...agentCardStyle, borderColor: "#00ff88", background: "#0a1a0a", marginBottom: 12 }}>
           <span style={{ color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>✓ {success}</span>
+        </div>
+      )}
+      {prefillNotice && (
+        <div style={{ ...agentCardStyle, borderColor: "#fbbf24", background: "#1a1400", marginBottom: 12, display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <span style={{ color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontSize: 13, flexShrink: 0 }}>⚠</span>
+          <span style={{ color: "#e8d59a", fontFamily: "var(--nx-font-mono)", fontSize: 12, lineHeight: 1.5, flex: 1 }}>{prefillNotice}</span>
+          <span onClick={() => setPrefillNotice(null)} title="Dismiss" style={{ cursor: "pointer", color: "#fbbf24", flexShrink: 0 }}>✕</span>
         </div>
       )}
 
