@@ -52,16 +52,23 @@ html, body {
   overscroll-behavior: none;
 }
 
-/* Mobile viewport height. History: 100vh includes browser chrome → dead strip at the
-   bottom in mobile BROWSERS; svh (small viewport) fixed that. But wallet in-app
-   WEBVIEWS (Zerion etc.) paint TALLER than the small viewport, so svh stops short and
-   leaves a dead black strip at the bottom there. 100dvh (dynamic viewport) tracks the
-   actually-painted area → fills the webview AND avoids the browser dead-strip; svh is
-   kept as a fallback for engines too old for dvh. Also hide the scaffold footer on phones. */
+/* Wallet-webview dead space — the real fix. The Orderly SDK app-shell locks
+   html/body/#root/scaffold-root to a fixed viewport height (100vh) with body
+   overflow:hidden (a "fixed viewport, inner scroll" shell). In wallet in-app webviews
+   (Zerion) a fixed-viewport-height page makes the webview reserve app-chrome and leaves
+   a dead strip below the viewport that NO CSS height can reach (every viewport unit
+   caps at 684 while screen is 892). Our landing page — natural document flow, no height
+   cap — fills the frame cleanly in the SAME webview, proving it's the fixed-height shell,
+   not the webview. So on phones, unlock the shell to natural flow: height:auto +
+   min-height so short pages still fill, and let the document scroll. Verified in preview
+   (Lab + trade page) that scrolling works and layout is intact. Desktop keeps the SDK's
+   fixed layout (scoped to phones). Also hide the scaffold footer. */
 @media (max-width: 767px) {
-  .oui-scaffold-root {
-    height: 100svh !important;
-    height: 100dvh !important;
+  html, body, #root, .oui-scaffold-root {
+    height: auto !important;
+    min-height: 100dvh !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
   }
   .oui-scaffold-footer {
     display: none !important;
