@@ -64,12 +64,18 @@ html, body {
    (Lab + trade page) that scrolling works and layout is intact. Desktop keeps the SDK's
    fixed layout (scoped to phones). Also hide the scaffold footer. */
 @media (max-width: 767px) {
-  /* NOTE: unlocking the shell to natural flow (height:auto) fixed nothing in Zerion
-     AND broke touch scrolling on real devices (scrolled fine in desktop preview but
-     not in the webview). Reverted to the SDK's fixed-viewport shell, which scrolls. */
-  .oui-scaffold-root {
-    height: 100svh !important;
-    height: 100dvh !important;
+  /* Wallet-webview dead strip — root cause found via on-device DOM dump: the SDK locks
+     html/body/#root/scaffold-root to height:100vh (=684, the viewport) while content
+     overflows (overflow-y:visible) and the DOCUMENT scrolls. Our landing page leaves
+     those at natural height and has NO strip in the same webview — so the fixed
+     viewport-height is what makes Zerion reserve the bottom chrome. Drop the fixed
+     height (natural flow) so the shell grows with content like the landing.
+     ⚠️ Do NOT add overflow-x:hidden here: pairing it with overflow-y:visible forces
+     overflow-y to compute as AUTO (nested scrollers) which broke touch scrolling last
+     time. Leaving overflow untouched keeps the single document scroll intact. */
+  html, body, #root, .oui-scaffold-root {
+    height: auto !important;
+    min-height: 100dvh !important;
   }
   .oui-scaffold-footer {
     display: none !important;
