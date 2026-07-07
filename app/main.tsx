@@ -254,15 +254,16 @@ loadRuntimeConfig().then(() => {
   );
 });
 
+// The service worker is intentionally NOT registered anymore — its stale app-shell
+// and out-of-sync chunk caches caused "Failed to fetch dynamically imported module"
+// crashes in wallet in-app webviews (Zerion) after every deploy. HTTP caching
+// (immutable /assets + no-cache HTML from _headers) covers us without it. Proactively
+// unregister any worker a returning client still has installed, and clear its caches.
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register(withBasePath('/sw.js'))
-      .then((registration) => {
-        console.log('SW registered:', registration);
-      })
-      .catch((error) => {
-        console.log('SW registration failed:', error);
-      });
-  });
+  navigator.serviceWorker.getRegistrations()
+    .then((regs) => regs.forEach((r) => r.unregister()))
+    .catch(() => { /* ignore */ });
+  if (typeof caches !== 'undefined') {
+    caches.keys().then((keys) => keys.forEach((k) => caches.delete(k))).catch(() => { /* ignore */ });
+  }
 }
