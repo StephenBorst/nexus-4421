@@ -19,9 +19,10 @@
     <style>
       html, body { margin: 0; background: #0a0e0a; }
     </style>
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <!-- NO web-app-capable metas: they declare the site as an installable STANDALONE
+         app, which makes wallet in-app webviews (Zerion) reserve app-chrome and leave a
+         dead strip below the viewport. Our landing page ships none of these and fills
+         the frame cleanly in the same webview — match it exactly. -->
     <link rel="apple-touch-icon" href="/favicon.webp" />
     <meta property="og:title" content="Nexus Trading Labs" />
     <meta property="og:description" content="Non-custodial Perpetual DEX on Arbitrum. Trade crypto, RWAs, and equities on-chain." />
