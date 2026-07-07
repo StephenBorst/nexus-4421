@@ -52,14 +52,16 @@ html, body {
   overscroll-behavior: none;
 }
 
-/* Fix mobile dead space: 100vh includes browser chrome (dead strip at the bottom),
-   and 100dvh RESIZES as the retractable toolbar shows/hides (jank + a transient dead
-   strip). 100svh = the small/stable viewport (toolbar-visible height) → the app never
-   gets forced taller than the always-visible area, so no bottom dead space. Also hide
-   the low-value scaffold footer on phones. */
+/* Mobile viewport height. History: 100vh includes browser chrome → dead strip at the
+   bottom in mobile BROWSERS; svh (small viewport) fixed that. But wallet in-app
+   WEBVIEWS (Zerion etc.) paint TALLER than the small viewport, so svh stops short and
+   leaves a dead black strip at the bottom there. 100dvh (dynamic viewport) tracks the
+   actually-painted area → fills the webview AND avoids the browser dead-strip; svh is
+   kept as a fallback for engines too old for dvh. Also hide the scaffold footer on phones. */
 @media (max-width: 767px) {
   .oui-scaffold-root {
     height: 100svh !important;
+    height: 100dvh !important;
   }
   .oui-scaffold-footer {
     display: none !important;
