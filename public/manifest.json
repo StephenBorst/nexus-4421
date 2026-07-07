@@ -4,7 +4,7 @@
   "description": "A powerful decentralized perpetual trading platform.",
   "start_url": "/",
   "scope": "/",
-  "display": "standalone",
+  "display": "browser",
   "background_color": "#0a0e0a",
   "theme_color": "#0a0e0a",
   "orientation": "any",
