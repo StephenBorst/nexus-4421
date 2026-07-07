@@ -15,10 +15,23 @@ jobs:
 
       - name: Add swap space
         run: |
-          sudo fallocate -l 4G /mnt/swapfile
-          sudo chmod 600 /mnt/swapfile
-          sudo mkswap /mnt/swapfile
-          sudo swapon /mnt/swapfile
+          # GitHub runners now ship an active /mnt/swapfile, so `fallocate` on it fails
+          # with "Text file busy". Skip if we already have enough swap; otherwise create
+          # our own under a unique name. Never fail the build over swap setup.
+          set +e
+          CUR=$(free -m | awk '/Swap/{print $2}')
+          echo "Existing swap: ${CUR}MB"
+          if [ "${CUR:-0}" -ge 4000 ]; then
+            echo "Swap already >= 4G — skipping."
+          else
+            sudo fallocate -l 4G /mnt/nexus-swapfile \
+              && sudo chmod 600 /mnt/nexus-swapfile \
+              && sudo mkswap /mnt/nexus-swapfile \
+              && sudo swapon /mnt/nexus-swapfile
+            echo "swap setup exit: $? (non-fatal)"
+          fi
+          free -m
+          exit 0
 
       - uses: actions/setup-node@v4
         with:
