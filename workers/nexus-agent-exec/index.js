@@ -87,6 +87,21 @@ async function publishAgentClose(address, env, feedId, { reason, pnlUsdc, exitPr
   await env.NEXUS_AGENT.put(`agent:feed:${address}`, JSON.stringify(list));
 }
 
+// Fire a Telegram DM to the agent's owner if they've linked a chat (tg:chat:{addr},
+// written by lab-api's /tg/webhook). Fire-and-forget + fully fail-soft — a notify
+// failure must NEVER touch the trade lifecycle. No-ops unless TELEGRAM_TOKEN is set.
+async function notifyTelegram(address, env, text) {
+  if (!env.TELEGRAM_TOKEN) return;
+  try {
+    const chatId = await env.NEXUS_AGENT.get(`tg:chat:${address}`);
+    if (!chatId) return;
+    await fetch(`https://api.telegram.org/bot${env.TELEGRAM_TOKEN}/sendMessage`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true }),
+    });
+  } catch (e) { console.error(`[exec] ${address.slice(0, 10)} tg notify failed:`, e.message); }
+}
+
 // ── Decrypt the trading key stored at rest (AES-256-GCM, "v1:<iv>:<ct>") ──────
 // Legacy plaintext keys (no "v1:" prefix) are passed through for backward compat
 // until the user re-activates and the key is re-stored encrypted.
@@ -577,6 +592,11 @@ async function enterPosition(address, state, config, signal, env, cache) {
   await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
 
   console.log(`[exec] ${address.slice(0, 10)} ${paper ? "PAPER " : ""}ENTER ${signal.direction} ${symbol} @ ${markPrice} qty=${qty}`);
+
+  const tkEnter = symbol.replace("PERP_", "").replace("_USDC", "");
+  await notifyTelegram(address, env,
+    `${paper ? "📝 <b>[PAPER]</b> " : "🟢 "}<b>OPEN ${signal.direction} ${tkEnter}</b> @ $${markPrice}\n` +
+    `TP ${effTp}% · SL ${effSl}% · ${effLeverage}x${directive ? " · directive" : ` · ${config.signalMode || "CONFLUENCE"}`}`);
 }
 
 // ATR as a % of price from recent 1h candles (public /tv/history). Used to scale
@@ -1011,4 +1031,10 @@ async function closePosition(address, state, env, reason, cache) {
 
   await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
   console.log(`[exec] ${address.slice(0, 10)} ${paper ? "PAPER " : ""}CLOSE ${pos.direction} ${pos.symbol} reason=${reason} pnl=$${pnlUsdc.toFixed(4)}`);
+
+  const tkClose = pos.symbol.replace("PERP_", "").replace("_USDC", "");
+  const sign = pnlUsdc >= 0 ? "+" : "";
+  await notifyTelegram(address, env,
+    `${paper ? "📝 <b>[PAPER]</b> " : (pnlUsdc >= 0 ? "✅ " : "🔴 ")}<b>CLOSE ${pos.direction} ${tkClose}</b> · ${reason}\n` +
+    `P&L ${sign}$${pnlUsdc.toFixed(2)} (${sign}${pnlPct.toFixed(2)}%)`);
 }

@@ -538,6 +538,46 @@ export default {
     const url = new URL(request.url);
     const parts = url.pathname.split("/").filter(Boolean);
 
+    // ── POST /tg/webhook — Telegram bot updates (link a chat ↔ wallet) ──────────
+    // The bot deep-link t.me/nexustradinglabs_bot?start=<wallet> sends "/start <wallet>".
+    // We map chat_id ↔ wallet in KV so the exec can DM the owner on agent trades. Public
+    // (Telegram calls it); nothing sensitive is exposed. Reply needs TELEGRAM_TOKEN, but
+    // the mapping is stored even without it (degrades to no confirmation message).
+    if (parts[0] === "tg" && parts[1] === "webhook" && request.method === "POST") {
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+      let upd = null;
+      try { upd = await request.json(); } catch { /* ignore malformed */ }
+      const msg = upd?.message || upd?.edited_message;
+      const chatId = msg?.chat?.id;
+      const text = String(msg?.text || "").trim();
+      const reply = async (t) => {
+        if (!env.TELEGRAM_TOKEN || !chatId) return;
+        try {
+          await fetch(`https://api.telegram.org/bot${env.TELEGRAM_TOKEN}/sendMessage`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: chatId, text: t, parse_mode: "HTML", disable_web_page_preview: true }),
+          });
+        } catch { /* fail-soft */ }
+      };
+      if (chatId && text.startsWith("/start")) {
+        const arg = text.split(/\s+/)[1] || "";
+        const addr = /^0x[a-fA-F0-9]{40}$/.test(arg) ? arg.toLowerCase() : null;
+        if (addr) {
+          await AGENT_KV.put(`tg:chat:${addr}`, String(chatId));
+          await AGENT_KV.put(`tg:wallet:${chatId}`, addr);
+          await reply(`✅ Linked to <code>${addr.slice(0, 6)}…${addr.slice(-4)}</code>. You'll get a message whenever your Nexus agent opens or closes a trade. Send /stop to unlink.`);
+        } else {
+          await reply("👋 To get Nexus agent trade alerts, open the Agent tab on Nexus Trading Labs and tap “Link Telegram”.");
+        }
+      } else if (chatId && text.startsWith("/stop")) {
+        const addr = await AGENT_KV.get(`tg:wallet:${chatId}`);
+        if (addr) await AGENT_KV.delete(`tg:chat:${addr}`);
+        await AGENT_KV.delete(`tg:wallet:${chatId}`);
+        await reply("🔕 Unlinked. Send /start to re-enable agent trade alerts.");
+      }
+      return new Response("ok"); // Telegram only needs a 200
+    }
+
     // ── Ph16/21: /og/trader/:wallet(.png)? → OG image ─────
     // SVG endpoint: Discord, Telegram, iMessage, most crawlers
     // PNG endpoint (.png suffix): Twitter/X (requires raster image)
@@ -3292,7 +3332,9 @@ document.getElementById("btn").addEventListener("click",go);
         // Non-secret webhook status only (the token is NEVER returned on the public GET).
         let webhook = null;
         if (whMetaRaw) { try { webhook = { enabled: !!JSON.parse(whMetaRaw).enabled }; } catch { /* ignore */ } }
-        return json({ config, state, trades, pending, webhook, directive }, request);
+        // Whether this wallet has linked a Telegram chat for agent trade alerts.
+        const tgLinked = !!(await AGENT_KV.get(`tg:chat:${address}`));
+        return json({ config, state, trades, pending, webhook, directive, tgLinked }, request);
       }
 
       // POST /agent/:address/webhook/(enable|rotate|disable) — manage the signal

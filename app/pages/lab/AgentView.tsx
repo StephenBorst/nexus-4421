@@ -228,6 +228,7 @@ export function AgentView() {
   const [directiveEntry, setDirectiveEntry] = useState<"MARKET" | "LIMIT">("MARKET");
   const [directiveLimitPrice, setDirectiveLimitPrice] = useState("");
   const [directiveBusy, setDirectiveBusy] = useState(false);
+  const [tgLinked, setTgLinked] = useState(false);
   const [tab, setTab] = useState<"config" | "status" | "history" | "leaderboard">("config");
   const [leaderboard, setLeaderboard] = useState<AgentLeaderboardEntry[] | null>(null);
   const [lbLoading, setLbLoading] = useState(false);
@@ -358,6 +359,7 @@ export function AgentView() {
         if (data.trades) setTrades(data.trades);
         if (data.pending) setPending(data.pending);
         setActiveDirective(data.directive || null);
+        setTgLinked(!!data.tgLinked);
         setWebhookEnabled(!!data.webhook?.enabled);
       }
     } catch (e) {
@@ -793,6 +795,25 @@ export function AgentView() {
           <span style={{ color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontSize: 13, flexShrink: 0 }}>⚠</span>
           <span style={{ color: "#e8d59a", fontFamily: "var(--nx-font-mono)", fontSize: 12, lineHeight: 1.5, flex: 1 }}>{prefillNotice}</span>
           <span onClick={() => setPrefillNotice(null)} title="Dismiss" style={{ cursor: "pointer", color: "#fbbf24", flexShrink: 0 }}>✕</span>
+        </div>
+      )}
+
+      {/* ── Telegram trade alerts — passive updates without opening the app ── */}
+      {walletAddress && (
+        <div style={{ ...agentCardStyle, marginBottom: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", color: tgLinked ? "#00ff88" : "#8aaa9a", flexShrink: 0 }}>
+            {tgLinked ? "✓ TELEGRAM LINKED" : "🔔 TELEGRAM ALERTS"}
+          </span>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#4a7a5a", lineHeight: 1.4, flex: 1, minWidth: 150 }}>
+            {tgLinked
+              ? "You get a DM whenever your agent opens or closes a trade."
+              : "Get a DM whenever your agent opens or closes a trade — no need to watch the app."}
+          </span>
+          <a href={`https://t.me/nexustradinglabs_bot?start=${walletAddress.toLowerCase()}`} target="_blank" rel="noopener noreferrer"
+            style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, fontWeight: "bold", letterSpacing: "0.05em", textDecoration: "none",
+              color: "#29b6f6", border: "1px solid #12324a", background: "#08131c", borderRadius: 3, padding: "7px 14px", flexShrink: 0 }}>
+            {tgLinked ? "MANAGE ↗" : "LINK TELEGRAM ↗"}
+          </a>
         </div>
       )}
 

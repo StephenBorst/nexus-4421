@@ -674,6 +674,7 @@ export function ThesisView() {
 
   const [deployed, setDeployed] = useState(false);
   const [filter, setFilter] = useState<ThesisStatus | "ALL">("ALL");
+  const [markBusy, setMarkBusy] = useState(false);
 
   // Consume a thesis draft handed off by the AI assistant (draft_thesis tool):
   // pre-fill the form once, then clear the draft so it doesn't re-apply.
@@ -710,6 +711,38 @@ export function ThesisView() {
     && Number.isFinite(calc.positionSize) && calc.positionSize > 0
     && Number.isFinite(calc.riskReward) && calc.riskReward > 0;
   const set = (field: string, value: string) => setForm((f) => ({ ...f, [field]: value }));
+
+  // ── Guided-entry helpers (kill the blank-form friction) ──────────────────
+  const roundPrice = (n: number) => Number(n.toFixed(n < 1 ? 6 : n < 100 ? 4 : 2));
+  // Fill entry from the live mark price so the plan is anchored to reality.
+  const fillEntryFromMark = async () => {
+    if (!form.symbol) return;
+    setMarkBusy(true);
+    try {
+      const sym = `PERP_${form.symbol.toUpperCase()}_USDC`;
+      const r = await fetch(`https://api-evm.orderly.org/v1/public/futures/${sym}`);
+      const d = await r.json();
+      const mark = parseFloat(d?.data?.mark_price);
+      if (mark > 0) set("entryPrice", String(roundPrice(mark)));
+    } catch { /* fail-soft */ }
+    finally { setMarkBusy(false); }
+  };
+  // Stop = pct adverse from entry (direction-aware).
+  const applyStopPct = (pct: number) => {
+    const e = parseFloat(form.entryPrice);
+    if (!(e > 0)) return;
+    const stop = form.direction === "LONG" ? e * (1 - pct / 100) : e * (1 + pct / 100);
+    set("stopLoss", String(roundPrice(stop)));
+  };
+  // TP1 = R multiple of the entry→stop risk (reinforces R:R thinking).
+  const applyTpR = (mult: number) => {
+    const e = parseFloat(form.entryPrice);
+    const s = parseFloat(form.stopLoss);
+    if (!(e > 0) || !(s > 0)) return;
+    const risk = Math.abs(e - s);
+    const tp = form.direction === "LONG" ? e + mult * risk : e - mult * risk;
+    set("takeProfit1", String(roundPrice(tp)));
+  };
 
   const persist = (updated: ThesisTrade[]) => saveTheses(updated);
 
@@ -944,6 +977,42 @@ export function ThesisView() {
                   />
                 </div>
               ))}
+            </div>
+            {/* Guided quick-fill: anchor entry to the live mark, then snap stop/target */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginTop: 10 }}>
+              {(() => {
+                const chip = (extra?: React.CSSProperties): React.CSSProperties => ({
+                  fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 9px", borderRadius: 3,
+                  border: "1px solid #1a2e1a", background: "#0a0e0a", color: "#4a7a5a", cursor: "pointer", ...extra,
+                });
+                const hasEntry = parseFloat(form.entryPrice) > 0;
+                const hasStop = parseFloat(form.stopLoss) > 0;
+                return (
+                  <>
+                    <button onClick={fillEntryFromMark} disabled={!form.symbol || markBusy}
+                      title="Fill entry with the current mark price"
+                      style={chip({ color: form.symbol ? "#4a9fff" : "#2a4a3a", borderColor: "#12324a", cursor: form.symbol ? "pointer" : "not-allowed" })}>
+                      {markBusy ? "…" : "⟳ ENTRY = MARK"}
+                    </button>
+                    <span style={{ fontSize: 8, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", marginLeft: 4 }}>STOP</span>
+                    {[1, 2, 5].map((p) => (
+                      <button key={p} onClick={() => applyStopPct(p)} disabled={!hasEntry}
+                        title={`Stop ${p}% ${form.direction === "LONG" ? "below" : "above"} entry`}
+                        style={chip({ color: hasEntry ? "#ff7a7a" : "#3a2a2a", borderColor: "#2a1a1a", cursor: hasEntry ? "pointer" : "not-allowed" })}>
+                        −{p}%
+                      </button>
+                    ))}
+                    <span style={{ fontSize: 8, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", marginLeft: 4 }}>TP</span>
+                    {[1, 2, 3].map((r) => (
+                      <button key={r} onClick={() => applyTpR(r)} disabled={!hasEntry || !hasStop}
+                        title={`Target at ${r}× the entry→stop risk`}
+                        style={chip({ color: hasEntry && hasStop ? "#00ff88" : "#2a4a3a", borderColor: "#1a2a1a", cursor: hasEntry && hasStop ? "pointer" : "not-allowed" })}>
+                        {r}R
+                      </button>
+                    ))}
+                  </>
+                );
+              })()}
             </div>
           </div>
 
