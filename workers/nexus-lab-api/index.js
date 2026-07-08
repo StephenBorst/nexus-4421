@@ -570,10 +570,26 @@ export default {
           await reply("👋 To get Nexus agent trade alerts, open the Agent tab on Nexus Trading Labs and tap “Link Telegram”.");
         }
       } else if (chatId && text.startsWith("/stop")) {
-        const addr = await AGENT_KV.get(`tg:wallet:${chatId}`);
-        if (addr) await AGENT_KV.delete(`tg:chat:${addr}`);
-        await AGENT_KV.delete(`tg:wallet:${chatId}`);
-        await reply("🔕 Unlinked. Send /start to re-enable agent trade alerts.");
+        const stopArg = text.split(/\s+/)[1] || "";
+        const stopAddr = /^0x[a-fA-F0-9]{40}$/.test(stopArg) ? stopArg.toLowerCase() : null;
+        if (stopAddr) {
+          // Unlink the SPECIFIED wallet — but only if it's actually linked to THIS chat.
+          const linkedChat = await AGENT_KV.get(`tg:chat:${stopAddr}`);
+          if (String(linkedChat) === String(chatId)) {
+            await AGENT_KV.delete(`tg:chat:${stopAddr}`);
+            const cur = await AGENT_KV.get(`tg:wallet:${chatId}`);
+            if (cur === stopAddr) await AGENT_KV.delete(`tg:wallet:${chatId}`);
+            await reply(`🔕 Unlinked <code>${stopAddr.slice(0, 6)}…${stopAddr.slice(-4)}</code>. Send /start to re-enable.`);
+          } else {
+            await reply("That wallet isn't linked to this chat.");
+          }
+        } else {
+          // No arg → unlink the most-recently linked wallet for this chat.
+          const addr = await AGENT_KV.get(`tg:wallet:${chatId}`);
+          if (addr) await AGENT_KV.delete(`tg:chat:${addr}`);
+          await AGENT_KV.delete(`tg:wallet:${chatId}`);
+          await reply("🔕 Unlinked. Send /start (or /start &lt;wallet&gt;) to re-enable agent trade alerts.");
+        }
       }
       return new Response("ok"); // Telegram only needs a 200
     }
