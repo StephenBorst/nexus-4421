@@ -11,7 +11,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { useNexusTier, TIER_META, TIER_THRESHOLDS } from "@/hooks/useNexusTier";
 import {
   PRO_FEATURES, PRO_MONTHLY_USDC, NEXUS_PAY_DISCOUNT_PCT, PRO_HOLDER_TIER,
-  PAYMENTS_LIVE, nexusDiscountedPrice, SUBSCRIPTION_RECEIVER, NEXUS_BASE_TOKEN,
+  PAYMENTS_LIVE, nexusDiscountedPrice, SUBSCRIPTION_RECEIVER, NEXUS_BASE_TOKEN, TIER_NAME,
 } from "@/config/subscription";
 import { NexusTierBadge } from "@/components/NexusTierBadge";
 import { BuyNexusButton } from "@/components/BuyNexusButton";
@@ -75,7 +75,7 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
       const d = await r.json();
       if (r.ok && d.ok) {
         setSubStatus("ok");
-        setSubMsg("PRO activated for 30 days. Reloading…");
+        setSubMsg(`${TIER_NAME} activated for 30 days. Reloading…`);
         setTimeout(() => window.location.reload(), 1800);
       } else {
         setSubStatus("err");
@@ -98,7 +98,7 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
   if (isPro) {
     return (
       <div style={{ ...card, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <span style={{ fontFamily: mono, fontSize: 12, fontWeight: "bold", color: "#00ff88", letterSpacing: "0.08em" }}>◆ NEXUS PRO · ACTIVE</span>
+        <span style={{ fontFamily: mono, fontSize: 12, fontWeight: "bold", color: "#00ff88", letterSpacing: "0.08em" }}>◆ {TIER_NAME.toUpperCase()} · ACTIVE</span>
         <NexusTierBadge tier={tier} size="md" />
         <span style={{ fontFamily: mono, fontSize: 10, color: "#8aaa9a", marginLeft: "auto" }}>
           {via === "holder" ? "unlocked via $NEXUS holdings" : "subscription active"}
@@ -110,8 +110,8 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
   return (
     <div style={{ ...card }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        <span style={{ fontFamily: mono, fontSize: 13, fontWeight: "bold", color: "#00ff88", letterSpacing: "0.1em" }}>◆ NEXUS PRO</span>
-        <span style={{ fontFamily: mono, fontSize: 10, color: "#8aaa9a" }}>unlock the full terminal</span>
+        <span style={{ fontFamily: mono, fontSize: 13, fontWeight: "bold", color: "#00ff88", letterSpacing: "0.1em" }}>◆ {TIER_NAME.toUpperCase()}</span>
+        <span style={{ fontFamily: mono, fontSize: 10, color: "#8aaa9a" }}>the operator tier — unlock the full terminal</span>
         <button
           onClick={dismiss}
           style={{
@@ -181,7 +181,7 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
                 style={{ fontFamily: mono, fontSize: 9, color: "#fff", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 3, padding: "6px 8px", outline: "none" }} />
               <button onClick={verifyPayment} disabled={subStatus === "verifying" || subStatus === "ok"}
                 style={{ fontFamily: mono, fontSize: 10, color: "#04130c", background: subStatus === "ok" ? "#1a4a2a" : "#00ff88", border: "none", borderRadius: 3, padding: "7px 10px", cursor: subStatus === "verifying" ? "default" : "pointer", fontWeight: "bold", opacity: subStatus === "verifying" ? 0.6 : 1 }}>
-                {subStatus === "verifying" ? "VERIFYING…" : subStatus === "ok" ? "✓ ACTIVATED" : "ACTIVATE PRO"}
+                {subStatus === "verifying" ? "VERIFYING…" : subStatus === "ok" ? "✓ ACTIVATED" : `ACTIVATE ${TIER_NAME.toUpperCase()}`}
               </button>
               {subMsg && <div style={{ fontFamily: mono, fontSize: 8.5, color: subStatus === "ok" ? "#00ff88" : "#ff6a6a", lineHeight: 1.4 }}>{subMsg}</div>}
             </div>
@@ -190,7 +190,7 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
       </div>
 
       <div style={{ fontFamily: mono, fontSize: 8, color: "#2a4a3a", marginTop: 10, lineHeight: 1.4 }}>
-        PRO is a software subscription. $NEXUS pays for it (consumptive use) or unlocks it by holdings (access) — no revenue share, no yield.
+        {TIER_NAME} is a software subscription. $NEXUS pays for it (consumptive use) or unlocks it by holdings (access) — no revenue share, no yield.
       </div>
     </div>
   );

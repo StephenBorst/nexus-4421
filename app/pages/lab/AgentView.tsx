@@ -1013,7 +1013,7 @@ export function AgentView() {
               {STRATEGY_PRESETS.map((p) => {
                 const locked = !!p.pro && !isPro;
                 return (
-                  <button key={p.id} title={locked ? "Advanced strategy — Nexus PRO" : p.blurb}
+                  <button key={p.id} title={locked ? "Advanced strategy — Emerald tier" : p.blurb}
                     onClick={() => {
                       if (locked) { setProNote(true); return; }
                       setProNote(false);
@@ -1152,7 +1152,7 @@ export function AgentView() {
                 const sel = (config.signalMode ?? "CONFLUENCE") === v;
                 const locked = isProStrategy(v) && !isPro;
                 return (
-                  <button key={v} title={locked ? "Advanced strategy — Nexus PRO" : hint}
+                  <button key={v} title={locked ? "Advanced strategy — Emerald tier" : hint}
                     onClick={() => { if (locked) { setProNote(true); return; } setProNote(false); setConfig({ ...config, signalMode: v }); }}
                     style={{
                     background: sel ? "#00ff8815" : "#0a0e0a",
@@ -1166,7 +1166,7 @@ export function AgentView() {
             </div>
             {proNote && (
               <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 6, color: "#5fd6a0" }}>
-                ◆ Advanced strategies are Nexus PRO — hold $NEXUS or subscribe (see PRO in the Lab).
+                ◆ Advanced strategies are Emerald tier — hold $NEXUS or subscribe (see Emerald in the Lab).
               </div>
             )}
             <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 8, color: "#4a7a5a" }}>
@@ -1394,7 +1394,7 @@ export function AgentView() {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div style={agentLabelStyle}>// DCA / SAFETY ORDERS</div>
-                    <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
+                    <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ EMERALD</span>
                   </div>
                   <button onClick={isPro ? toggle : undefined} disabled={!isPro} style={{
                     fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "4px 12px", borderRadius: 3, cursor: isPro ? "pointer" : "not-allowed",
@@ -1407,7 +1407,7 @@ export function AgentView() {
                 </div>
                 {!isPro ? (
                   <div style={{ color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
-                    Average into a position on adverse moves and take profit off the blended entry — a Nexus PRO feature. The whole ladder stays inside your CAPITAL / TRADE budget.
+                    Average into a position on adverse moves and take profit off the blended entry — an Emerald-tier feature. The whole ladder stays inside your CAPITAL / TRADE budget.
                   </div>
                 ) : on && (
                   <>
@@ -1440,11 +1440,11 @@ export function AgentView() {
           <div style={agentCardStyle}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
               <div style={agentLabelStyle}>// SIGNAL WEBHOOK</div>
-              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ EMERALD</span>
             </div>
             {!isPro ? (
               <div style={{ color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
-                Route TradingView (or any external) alerts straight to your agent — it executes them through the same guardrails + trustless grading. A Nexus PRO feature: hold ARCHITECT-tier $NEXUS or subscribe.
+                Route TradingView (or any external) alerts straight to your agent — it executes them through the same guardrails + trustless grading. An Emerald-tier feature: hold ARCHITECT-tier $NEXUS or subscribe.
               </div>
             ) : !webhookEnabled ? (
               <div style={{ marginTop: 10 }}>
@@ -1511,7 +1511,7 @@ export function AgentView() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <div style={agentLabelStyle}>// BACKTEST</div>
-                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ EMERALD</span>
               </div>
               {isPro && (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1529,7 +1529,7 @@ export function AgentView() {
             </div>
             {!isPro ? (
               <div style={{ color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
-                Replay this exact config over 60 days of real BTC/ETH/SOL data — using the same engine the agent runs on — before risking a cent. A Nexus PRO feature.
+                Replay this exact config over 60 days of real BTC/ETH/SOL data — using the same engine the agent runs on — before risking a cent. An Emerald-tier feature.
               </div>
             ) : (
               <>

@@ -8,6 +8,8 @@
  * line clean. The browser calls these directly (same BYOK, no Nexus server).
  */
 
+import { deployDirectiveFromThesis } from "@/utils/agentPrefill";
+
 const ORDERLY_API = "https://api-evm.orderly.org";
 const AGENT_API = "https://og.nexustradinglabs.com";
 
@@ -264,6 +266,55 @@ TOOLS.push(
       try { window.localStorage.setItem(THESIS_DRAFT_KEY, JSON.stringify(draft)); } catch { /* ignore */ }
       ctx.navigate?.(`/lab?tab=thesis`);
       return JSON.stringify({ drafted: draft, note: "Opened the Thesis Engine pre-filled. The user reviews risk/size and saves or executes — no order was placed." });
+    },
+  },
+  {
+    name: "draft_directive",
+    description:
+      "Hand the user's autonomous agent an EXACT directional trade to review and arm (the ▶ TRADE flow). Unlike draft_thesis (just a plan) or the signal bot (which picks its OWN direction), a directive makes the agent enter the user's specified direction and manage the exit for them (scale-out, trailing stop, breakeven, timeout), then stop — one-shot. This DRAFTS it and opens the Agent review panel; it NEVER arms or places anything — the user picks PAPER or live, reviews, and signs. Use when the user wants to AUTOMATE a specific trade (e.g. 'run my BTC long on the agent', 'automate this exact setup'). Only one directive is active at a time — check get_agent_directive first if unsure.",
+    input_schema: {
+      type: "object",
+      properties: {
+        symbol: { type: "string", description: "Ticker like BTC, ETH, SOL." },
+        direction: { type: "string", enum: ["LONG", "SHORT"] },
+        entryPrice: { type: "number", description: "Planned entry (also the trigger if the user later chooses a resting LIMIT entry)." },
+        stopLoss: { type: "number" },
+        takeProfit1: { type: "number" },
+        takeProfit2: { type: "number", description: "Optional second target — becomes the runner leg of a scale-out ladder." },
+        leverage: { type: "number", description: "Optional; defaults to the agent's configured leverage." },
+      },
+      required: ["symbol", "direction", "entryPrice", "stopLoss", "takeProfit1"],
+    },
+    run: async (args, ctx) => {
+      const dir = String(args.direction ?? "").toUpperCase();
+      if (dir !== "LONG" && dir !== "SHORT") return JSON.stringify({ error: "direction must be LONG or SHORT" });
+      const entry = Number(args.entryPrice), stop = Number(args.stopLoss), tp = Number(args.takeProfit1);
+      if (![entry, stop, tp].every((n) => Number.isFinite(n) && n > 0)) return JSON.stringify({ error: "entry/stop/takeProfit must be positive numbers" });
+      // Direction-side sanity (mirrors the exec guard) so we never draft a contradiction.
+      if (dir === "LONG" && !(stop < entry && tp > entry)) return JSON.stringify({ error: "for a LONG: need stop < entry < takeProfit1" });
+      if (dir === "SHORT" && !(stop > entry && tp < entry)) return JSON.stringify({ error: "for a SHORT: need takeProfit1 < entry < stop" });
+      const tp2 = Number(args.takeProfit2), lev = Number(args.leverage);
+      deployDirectiveFromThesis({
+        symbol: shortTicker(String(args.symbol ?? "")),
+        direction: dir as "LONG" | "SHORT",
+        entryPrice: entry, stopLoss: stop, takeProfit1: tp,
+        takeProfit2: Number.isFinite(tp2) && tp2 > 0 ? tp2 : undefined,
+        leverage: Number.isFinite(lev) && lev > 0 ? lev : undefined,
+      }, ctx.navigate);
+      return JSON.stringify({ drafted: { symbol: shortTicker(String(args.symbol ?? "")), direction: dir, entry, stop, takeProfit1: tp }, note: "Opened the Agent DIRECTIVE panel pre-filled. The user picks PAPER/live, reviews the levels, and arms it — nothing was placed or armed." });
+    },
+  },
+  {
+    name: "get_agent_directive",
+    description:
+      "Get the connected user's current directional DIRECTIVE (the exact one-shot trade the agent is running or waiting to run): status (ARMED = waiting to fill, LIVE = position open), direction, entry type (MARKET/LIMIT) + trigger price, stop, and targets. Also returns whether Telegram alerts are linked. Use for 'what is my agent set to trade', or before drafting a new directive (only one is active at a time).",
+    input_schema: { type: "object", properties: {} },
+    run: async (_args, ctx) => {
+      if (!ctx.wallet) return JSON.stringify({ error: "wallet not connected" });
+      const res = await fetch(`${AGENT_API}/agent/${ctx.wallet}`);
+      if (!res.ok) return JSON.stringify({ error: `agent fetch failed (${res.status})` });
+      const d = await res.json();
+      return JSON.stringify({ directive: d?.directive ?? null, telegram_linked: !!d?.tgLinked });
     },
   }
 );
