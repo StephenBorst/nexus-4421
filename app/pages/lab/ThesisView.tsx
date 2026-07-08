@@ -1,6 +1,7 @@
 // Thesis Engine tab: the thesis calculator, thesis cards, and the thesis
 // analytics (accuracy/streaks/equity). Extracted from index.tsx (god-file split).
 import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
 import { useAccount, useMutation } from "@orderly.network/hooks";
 import { useLabStorage } from "@/hooks/useLabStorage";
@@ -53,6 +54,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
 }) {
   const [actualInput, setActualInput] = useState(t.actualPnl !== null ? String(t.actualPnl) : "");
   const [inputVisible, setInputVisible] = useState(false);
+  const navigate = useNavigate();
   const cfg = STATUS_CONFIG[t.status] ?? STATUS_CONFIG.ACTIVE;
   const isClosed = CLOSED_STATUSES.includes(t.status);
 
@@ -162,6 +164,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
                 thesisToAgentConfig(t),
                 `your ${t.symbol.replace("PERP_", "").replace("_USDC", "")} thesis`,
                 thesisAgentNotice(t),
+                navigate,
               )}
               title="Prefill the agent to trade this symbol on funding/OI signals, using this thesis's TP/SL and leverage as risk bounds. The agent is signal-driven — it may enter either direction."
               style={{ ...navBtnStyle, fontSize: 10, color: "#ff8800", borderColor: "#3a2a0a", minHeight: 36, padding: "6px 12px" }}>
@@ -171,7 +174,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
                 id: t.id, symbol: t.symbol, direction: t.direction,
                 entryPrice: t.entryPrice, stopLoss: t.stopLoss, takeProfit1: t.takeProfit1,
                 takeProfit2: t.takeProfit2, leverage: t.leverage,
-              })}
+              }, navigate)}
               title="Hand the agent THIS exact trade: it enters your direction and manages to your stop/targets with the agent's full exit engine (scale-out, trailing, breakeven, timeout). One-shot."
               style={{ ...navBtnStyle, fontSize: 10, color: "#00ff88", borderColor: "#1a4a2a", minHeight: 36, padding: "6px 12px" }}>
               ▶ TRADE
@@ -312,7 +315,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
         <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 16, fontFamily: "var(--nx-font-mono)" }}>
           <span style={{ color: "#3a5a4a" }}>&#9632;</span> ACCURACY BREAKDOWN
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(108px, 1fr))", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
           <div style={{ background: "#0a150a", border: "1px solid #1a4a2a", borderRadius: 4, padding: "10px 12px" }}>
             <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>HIT TP</div>
             <div style={{ fontSize: 28, color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{hits}</div>
@@ -334,7 +337,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
           </div>
           <div style={{ background: "#0a0e0a", border: `1px solid ${totalActualPnl >= 0 ? "#1a4a2a" : "#4a1a1a"}`, borderRadius: 4, padding: "10px 12px" }}>
             <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>TOTAL ACTUAL P&amp;L</div>
-            <div style={{ fontSize: 22, color: totalActualPnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>
+            <div style={{ fontSize: 18, color: totalActualPnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {withPnl.length > 0 ? formatPnl(totalActualPnl) : "—"}
             </div>
             {withPnl.length > 0 && (

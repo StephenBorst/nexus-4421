@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { usePrivateQuery, useAccount } from "@orderly.network/hooks";
 import { deployToAgent } from "@/utils/agentPrefill";
 
@@ -241,6 +242,7 @@ function useIsMobile(bp = 768) {
 // ─── Main component ───────────────────────────────────────────
 export default function IntelPage({ embedded = false }: { embedded?: boolean }) {
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
 
   const [fearGreed,  setFearGreed]  = useState<FearGreedData | null>(null);
   const [globalData, setGlobalData] = useState<GlobalData    | null>(null);
@@ -393,7 +395,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
           <span style={{ color: BRIGHT, fontWeight: 700, width: "40px" }}>{sym}</span>
           <span style={{ color: sigC, fontSize: "11px" }}>{sig}</span>
-          <button onClick={() => deployToAgent({ symbols: [`PERP_${sym}_USDC`] }, `the ${sym} funding read`)}
+          <button onClick={() => deployToAgent({ symbols: [`PERP_${sym}_USDC`] }, `the ${sym} funding read`, undefined, navigate)}
             title={`Set the trading agent to watch ${sym} — the same funding/OI edge it trades on`}
             style={{ marginLeft: "auto", background: "none", border: "1px solid #3a2a0a", color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontSize: "9px", letterSpacing: "0.05em", padding: "3px 8px", borderRadius: "3px", cursor: "pointer" }}>
             ⚡ AGENT

@@ -26,13 +26,17 @@ export type AgentPrefill = {
 // Write the prefill and navigate to the Agent tab. `source` is shown in a toast so
 // the user knows where the config came from ("from your BTC thesis"). `notice`, if
 // given, is surfaced as a persistent banner explaining any semantic mismatch.
-export function deployToAgent(config: Partial<AgentConfig>, source?: string, notice?: string) {
+// Pass `navigate` (react-router's useNavigate) so the jump is CLIENT-SIDE — a full
+// reload re-mounts OrderlyProvider and forces the wallet-reconnect/deposit intro,
+// which is jarring mid-flow. Falls back to a hard nav only if navigate is absent.
+export function deployToAgent(config: Partial<AgentConfig>, source?: string, notice?: string, navigate?: (to: string) => void) {
   try {
     const payload: AgentPrefill = { config, source, notice, ts: Date.now() };
     window.localStorage.setItem(AGENT_PREFILL_KEY, JSON.stringify(payload));
   } catch { /* ignore quota/availability */ }
-  // Full navigation keeps this robust from any route (Lab tabs or the Feed).
-  window.location.assign("/lab?tab=agent");
+  const to = "/lab?tab=agent";
+  if (navigate) navigate(to);
+  else window.location.assign(to);
 }
 
 // Derive an agent config from a thesis. IMPORTANT: the agent is a funding/OI
@@ -91,10 +95,11 @@ export type DirectiveDraft = {
 };
 
 // Build a directive draft from a thesis and jump to the Agent tab to review + arm it.
+// Pass `navigate` (useNavigate) for a client-side jump — see deployToAgent above.
 export function deployDirectiveFromThesis(t: {
   id?: string; symbol: string; direction: "LONG" | "SHORT";
   entryPrice: number; stopLoss: number; takeProfit1: number; takeProfit2?: number; leverage?: number;
-}): void {
+}, navigate?: (to: string) => void): void {
   const draft: DirectiveDraft = {
     symbol: toPerpSymbol(t.symbol),
     direction: t.direction,
@@ -109,5 +114,7 @@ export function deployDirectiveFromThesis(t: {
   };
   try { window.localStorage.setItem(DIRECTIVE_PREFILL_KEY, JSON.stringify({ draft, ts: Date.now() })); }
   catch { /* ignore quota/availability */ }
-  window.location.assign("/lab?tab=agent");
+  const to = "/lab?tab=agent";
+  if (navigate) navigate(to);
+  else window.location.assign(to);
 }

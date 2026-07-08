@@ -8,7 +8,7 @@
  * funds, not paper, so no blind-fire.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useOrderEntry, useLeverage, useCollateral, useAccount, usePositionStream, usePositionClose } from "@orderly.network/hooks";
 import { OrderSide, OrderType } from "@orderly.network/types";
 import { MiniPriceChart } from "@/components/MiniPriceChart";
@@ -76,6 +76,19 @@ export function QuickTrade() {
 
   const [symbol, setSymbol] = useState(SYMBOLS[0]);
   const [notional, setNotional] = useState(100);
+  // Full tradable market list (all ~106 Orderly perps) for the search picker —
+  // same source as the Farcaster mini app. Fetched once, fail-soft.
+  const [allMarkets, setAllMarkets] = useState<string[]>([]);
+  const [mktSearch, setMktSearch] = useState("");
+  useEffect(() => {
+    fetch("https://api-evm.orderly.org/v1/public/info")
+      .then((r) => r.json())
+      .then((d) => {
+        const rows = (d?.data?.rows ?? []).filter((m: { status?: string }) => m.status === "ACTIVE");
+        setAllMarkets(rows.map((m: { symbol: string }) => m.symbol).sort((a: string, b: string) => tk(a).localeCompare(tk(b))));
+      })
+      .catch(() => setAllMarkets([]));
+  }, []);
   const { curLeverage, maxLeverage, update: updateLeverage } = useLeverage();
   const [lev, setLev] = useState<number>(5);
   const { availableBalance } = useCollateral();
@@ -145,7 +158,8 @@ export function QuickTrade() {
       <div style={card}>
         <div style={label}>MARKET</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-          {SYMBOLS.map((s) => {
+          {/* Popular quick-chips + the active market if it's outside the popular set */}
+          {(SYMBOLS.includes(symbol) ? SYMBOLS : [symbol, ...SYMBOLS]).map((s) => {
             const sel = s === symbol;
             return (
               <button key={s} onClick={() => { setSymbol(s); setMsg(null); }} style={{
@@ -156,6 +170,31 @@ export function QuickTrade() {
             );
           })}
         </div>
+        {/* Search across ALL markets (mirrors the mini app picker) */}
+        <input
+          value={mktSearch}
+          onChange={(e) => setMktSearch(e.target.value.toUpperCase())}
+          placeholder={allMarkets.length ? `🔍 search ${allMarkets.length} markets…` : "loading markets…"}
+          style={{ ...input, marginTop: 8, fontSize: 12 }}
+        />
+        {mktSearch && allMarkets.length > 0 && (() => {
+          const hits = allMarkets.filter((s) => tk(s).includes(mktSearch));
+          return (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, maxHeight: 128, overflowY: "auto" }}>
+              {hits.slice(0, 48).map((s) => {
+                const sel = s === symbol;
+                return (
+                  <button key={s} onClick={() => { setSymbol(s); setMktSearch(""); setMsg(null); }} style={{
+                    background: sel ? "#00ff8815" : "#0a0e0a", border: `1px solid ${sel ? "#00ff8860" : "#1e2d1e"}`,
+                    borderRadius: 3, padding: "5px 12px", cursor: "pointer", color: sel ? "#00ff88" : "#4a7a5a",
+                    fontFamily: "var(--nx-font-mono)", fontSize: 12,
+                  }}>{tk(s)}</button>
+                );
+              })}
+              {hits.length === 0 && <span style={{ ...label, color: "#3a6a4a" }}>no market matches &ldquo;{mktSearch}&rdquo;</span>}
+            </div>
+          );
+        })()}
         <div style={{ ...label, marginTop: 10, color: "#8aaa9a" }}>
           MARK: {markPrice ? `$${Number(markPrice).toLocaleString(undefined, { maximumFractionDigits: 4 })}` : "—"}
           {availableBalance != null && <span style={{ marginLeft: 14 }} title="Free collateral — USDC available to open positions (not locked as margin)">FREE: ${Number(availableBalance).toFixed(2)}</span>}

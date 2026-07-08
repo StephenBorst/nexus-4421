@@ -792,7 +792,7 @@ export default function TraderPage() {
                             <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, color: "#c0c0c0" }}>{s.name} <span style={{ color: "#4a9fff", fontSize: 9 }}>{deriveStyle(s.config)}</span></div>
                             <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#5a7a6a", marginTop: 2 }}>{s.config.signalMode} · {s.config.leverage}x · TP{s.config.tpPercent}/SL{s.config.slPercent}</div>
                           </div>
-                          <button onClick={() => deployToAgent(s.config, `${displayName ?? shortAddr}'s "${s.name}"`)} style={{ background: "none", border: "1px solid #1a4a2a", color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 14px", borderRadius: 3, cursor: "pointer", flexShrink: 0 }}>COPY →</button>
+                          <button onClick={() => deployToAgent(s.config, `${displayName ?? shortAddr}'s "${s.name}"`, undefined, navigate)} style={{ background: "none", border: "1px solid #1a4a2a", color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 14px", borderRadius: 3, cursor: "pointer", flexShrink: 0 }}>COPY →</button>
                         </div>
                       ))}
                     </div>
