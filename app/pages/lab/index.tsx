@@ -27,6 +27,17 @@ export default function TheLabPage() {
     const t = searchParams.get("tab") as TabId | null;
     if (t) setActiveTab(t);
   }, [searchParams]);
+  // Programmatic tab switches (deployToAgent / deployDirectiveFromThesis) fire this
+  // event so they work even when the URL's ?tab= is stale (tab clicks use local
+  // state, not the URL) — a plain navigate would no-op in that case.
+  useEffect(() => {
+    const onTab = (e: Event) => {
+      const t = (e as CustomEvent).detail?.tab as TabId | undefined;
+      if (t) setActiveTab(t);
+    };
+    window.addEventListener("nexus:lab-tab", onTab);
+    return () => window.removeEventListener("nexus:lab-tab", onTab);
+  }, []);
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const today = new Date();

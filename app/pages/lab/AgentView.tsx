@@ -20,6 +20,9 @@ type ActiveDirective = {
 };
 
 const AGENT_API = "https://og.nexustradinglabs.com";
+// The Telegram bot username for the alerts deep-link. ⚠️ Must match the bot whose
+// token is set as TELEGRAM_TOKEN on the workers. Change here if it differs.
+const TG_BOT = "nexustradinglabs_bot";
 
 /**
  * Number input that holds its own text state so you can clear/edit freely
@@ -229,6 +232,7 @@ export function AgentView() {
   const [directiveLimitPrice, setDirectiveLimitPrice] = useState("");
   const [directiveBusy, setDirectiveBusy] = useState(false);
   const [tgLinked, setTgLinked] = useState(false);
+  const [tgCopied, setTgCopied] = useState(false);
   const [tab, setTab] = useState<"config" | "status" | "history" | "leaderboard">("config");
   const [leaderboard, setLeaderboard] = useState<AgentLeaderboardEntry[] | null>(null);
   const [lbLoading, setLbLoading] = useState(false);
@@ -800,20 +804,38 @@ export function AgentView() {
 
       {/* ── Telegram trade alerts — passive updates without opening the app ── */}
       {walletAddress && (
-        <div style={{ ...agentCardStyle, marginBottom: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", color: tgLinked ? "#00ff88" : "#8aaa9a", flexShrink: 0 }}>
-            {tgLinked ? "✓ TELEGRAM LINKED" : "🔔 TELEGRAM ALERTS"}
-          </span>
-          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#4a7a5a", lineHeight: 1.4, flex: 1, minWidth: 150 }}>
-            {tgLinked
-              ? "You get a DM whenever your agent opens or closes a trade."
-              : "Get a DM whenever your agent opens or closes a trade — no need to watch the app."}
-          </span>
-          <a href={`https://t.me/nexustradinglabs_bot?start=${walletAddress.toLowerCase()}`} target="_blank" rel="noopener noreferrer"
-            style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, fontWeight: "bold", letterSpacing: "0.05em", textDecoration: "none",
-              color: "#29b6f6", border: "1px solid #12324a", background: "#08131c", borderRadius: 3, padding: "7px 14px", flexShrink: 0 }}>
-            {tgLinked ? "MANAGE ↗" : "LINK TELEGRAM ↗"}
-          </a>
+        <div style={{ ...agentCardStyle, marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", color: tgLinked ? "#00ff88" : "#8aaa9a", flexShrink: 0 }}>
+              {tgLinked ? "✓ TELEGRAM LINKED" : "🔔 TELEGRAM ALERTS"}
+            </span>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#4a7a5a", lineHeight: 1.4, flex: 1, minWidth: 150 }}>
+              {tgLinked
+                ? "You get a DM whenever your agent opens or closes a trade."
+                : "Get a DM whenever your agent opens or closes a trade — no need to watch the app."}
+            </span>
+            <a href={`https://t.me/${TG_BOT}?start=${walletAddress.toLowerCase()}`} target="_blank" rel="noopener noreferrer"
+              style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, fontWeight: "bold", letterSpacing: "0.05em", textDecoration: "none",
+                color: "#29b6f6", border: "1px solid #12324a", background: "#08131c", borderRadius: 3, padding: "7px 14px", flexShrink: 0 }}>
+              {tgLinked ? "MANAGE ↗" : "LINK TELEGRAM ↗"}
+            </a>
+          </div>
+          {!tgLinked && (
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #12241a", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", lineHeight: 1.4, flex: 1, minWidth: 150 }}>
+                Link not opening Telegram? Some in-app browsers block it. Open <b style={{ color: "#5a8a6a" }}>@{TG_BOT}</b> in Telegram and send this:
+              </span>
+              <button
+                onClick={() => {
+                  const cmd = `/start ${walletAddress.toLowerCase()}`;
+                  navigator.clipboard?.writeText(cmd).then(() => { setTgCopied(true); setTimeout(() => setTgCopied(false), 2000); }).catch(() => {});
+                }}
+                style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: "bold", color: tgCopied ? "#00ff88" : "#8aaa9a",
+                  border: `1px solid ${tgCopied ? "#1a4a2a" : "#1e2d1e"}`, background: "#0a0e0a", borderRadius: 3, padding: "6px 12px", cursor: "pointer", flexShrink: 0 }}>
+                {tgCopied ? "COPIED ✓" : "COPY /start CMD"}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

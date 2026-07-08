@@ -34,6 +34,16 @@ export function deployToAgent(config: Partial<AgentConfig>, source?: string, not
     const payload: AgentPrefill = { config, source, notice, ts: Date.now() };
     window.localStorage.setItem(AGENT_PREFILL_KEY, JSON.stringify(payload));
   } catch { /* ignore quota/availability */ }
+  goAgentTab(navigate);
+}
+
+// Switch to the Lab's Agent tab. A client-side navigate is a NO-OP when the URL is
+// already ?tab=agent (tab clicks change local state, not the URL — so it desyncs),
+// which silently strands the user on the current tab. So we ALSO fire an event the
+// Lab listens for to force the switch same-route; navigate still handles the
+// cross-route case (mounting the Lab, which reads ?tab= on mount).
+function goAgentTab(navigate?: (to: string) => void) {
+  try { window.dispatchEvent(new CustomEvent("nexus:lab-tab", { detail: { tab: "agent" } })); } catch { /* ignore */ }
   const to = "/lab?tab=agent";
   if (navigate) navigate(to);
   else window.location.assign(to);
@@ -114,7 +124,5 @@ export function deployDirectiveFromThesis(t: {
   };
   try { window.localStorage.setItem(DIRECTIVE_PREFILL_KEY, JSON.stringify({ draft, ts: Date.now() })); }
   catch { /* ignore quota/availability */ }
-  const to = "/lab?tab=agent";
-  if (navigate) navigate(to);
-  else window.location.assign(to);
+  goAgentTab(navigate);
 }

@@ -335,15 +335,19 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
               <div style={{ height: 3, background: "#4a9fff", borderRadius: 2, width: `${winRate}%` }} />
             </div>
           </div>
-          <div style={{ background: "#0a0e0a", border: `1px solid ${totalActualPnl >= 0 ? "#1a4a2a" : "#4a1a1a"}`, borderRadius: 4, padding: "10px 12px" }}>
+        </div>
+        {/* TOTAL P&L — its own full-width row so the number matches the count tiles'
+            size (congruent, easy on the eye) without ever overflowing a narrow tile. */}
+        <div style={{ background: "#0a0e0a", border: `1px solid ${totalActualPnl >= 0 ? "#1a4a2a" : "#4a1a1a"}`, borderRadius: 4, padding: "10px 14px", marginTop: 8, display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div>
             <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>TOTAL ACTUAL P&amp;L</div>
-            <div style={{ fontSize: 18, color: totalActualPnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <div style={{ fontSize: 28, color: totalActualPnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontWeight: "bold", whiteSpace: "nowrap" }}>
               {withPnl.length > 0 ? formatPnl(totalActualPnl) : "—"}
             </div>
-            {withPnl.length > 0 && (
-              <div style={{ fontSize: 9, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", marginTop: 4 }}>{withPnl.length} logged</div>
-            )}
           </div>
+          {withPnl.length > 0 && (
+            <div style={{ fontSize: 9, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)" }}>{withPnl.length} logged</div>
+          )}
         </div>
       </div>
 
