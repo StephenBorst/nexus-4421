@@ -982,7 +982,7 @@ export default {
         if (!/^0x[a-f0-9]{40}$/.test(addr) || !ts || !sig) return json({ error: "auth required" }, request, 401);
         if (Math.abs(Date.now() - ts) > 30 * 60 * 1000) return json({ error: "auth expired — re-sign" }, request, 401);
         if (recoverEthAddress(aiAccessMessage(addr, ts), sig) !== addr) return json({ error: "bad signature" }, request, 401);
-        if (!(await walletIsPro(addr, env))) return json({ error: "pro_required", hint: "Hosted NEXUS AI is a PRO benefit — subscribe or hold ARCHITECT $NEXUS." }, request, 402);
+        if (!(await walletIsPro(addr, env))) return json({ error: "pro_required", hint: "Hosted NEXUS AI is an Emerald benefit — subscribe or hold ARCHITECT $NEXUS." }, request, 402);
 
         // Per-MODEL daily spend cap. The PRO user picks a model (Haiku/Sonnet/Opus);
         // each tier has its OWN cap so our spend scales with model cost — stronger
@@ -3133,7 +3133,7 @@ document.getElementById("btn").addEventListener("click",go);
       const { config, walletSig } = body || {};
       const caller = typeof walletSig === "string" ? recoverEthAddress("nexus-trading-key-v1", walletSig) : null;
       if (!caller) return json({ error: "walletSig_required", hint: "Backtesting requires walletSig = sign_message('nexus-trading-key-v1')." }, request, 401);
-      if (!(await walletIsPro(caller, env))) return json({ error: "pro_backtest_locked", hint: "Strategy backtesting is a Nexus PRO feature — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
+      if (!(await walletIsPro(caller, env))) return json({ error: "pro_backtest_locked", hint: "Strategy backtesting is an Emerald feature — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
       const symbols = (Array.isArray(config?.symbols) && config.symbols.length ? config.symbols : ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC"]).slice(0, 3);
       const days = Math.min(90, Math.max(7, Number(body.days) || 60));
       try {
@@ -3159,7 +3159,7 @@ document.getElementById("btn").addEventListener("click",go);
       if (!config || typeof config !== "object") return json({ error: "config required" }, request, 400);
       const caller = typeof walletSig === "string" ? recoverEthAddress("nexus-trading-key-v1", walletSig) : null;
       if (!caller) return json({ error: "walletSig_required", hint: "Validation requires walletSig = sign_message('nexus-trading-key-v1')." }, request, 401);
-      if (!(await walletIsPro(caller, env))) return json({ error: "pro_validate_locked", hint: "Walk-forward validation is a Nexus PRO feature — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
+      if (!(await walletIsPro(caller, env))) return json({ error: "pro_validate_locked", hint: "Walk-forward validation is an Emerald feature — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
       // Fixed diverse universe (cross-market breadth is the whole point) — capped so it
       // fits a Worker's subrequest budget. Cross-time via folds.
       const UNIVERSE = ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC", "PERP_BNB_USDC", "PERP_XRP_USDC", "PERP_LINK_USDC"];
@@ -3194,7 +3194,7 @@ document.getElementById("btn").addEventListener("click",go);
       const caller = typeof walletSig === "string" ? recoverEthAddress("nexus-trading-key-v1", walletSig) : null;
       if (!caller) return json({ error: "walletSig_required", hint: "Backtesting requires walletSig = sign_message('nexus-trading-key-v1')." }, request, 401);
       if (!(await walletIsPro(caller, env))) {
-        return json({ error: "pro_backtest_locked", hint: "Strategy backtesting is a Nexus PRO feature — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
+        return json({ error: "pro_backtest_locked", hint: "Strategy backtesting is an Emerald feature — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
       }
       const symbols = (Array.isArray(config.symbols) && config.symbols.length ? config.symbols : ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC"]).slice(0, 3);
       const days = Math.min(90, Math.max(7, Number(body.days) || 60));
@@ -3372,7 +3372,7 @@ document.getElementById("btn").addEventListener("click",go);
 
         // enable / rotate both require PRO and produce a new token.
         if (!(await walletIsPro(address, env))) {
-          return json({ error: "pro_webhook_locked", hint: "The signal webhook is a Nexus PRO feature — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
+          return json({ error: "pro_webhook_locked", hint: "The signal webhook is an Emerald feature — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
         }
         if (prev?.token) await AGENT_KV.delete(`agent:webhook:${prev.token}`); // revoke old on rotate
         const token = randToken(24);
@@ -3504,10 +3504,10 @@ document.getElementById("btn").addEventListener("click",go);
         const isPaper = config?.mode === "PAPER";
         if (!config || (!isPaper && !tradingKey)) return json({ error: "config and tradingKey required" }, request, 400);
         if (config.signalMode && PRO_STRATEGIES.includes(config.signalMode) && !(await walletIsPro(address, env))) {
-          return json({ error: "pro_strategy_locked", strategy: config.signalMode, hint: "MOMENTUM and MEAN_REVERSION require Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe. Free: CONFLUENCE, FUNDING_ONLY, OI_ONLY." }, request, 402);
+          return json({ error: "pro_strategy_locked", strategy: config.signalMode, hint: "MOMENTUM and MEAN_REVERSION require Emerald — hold ARCHITECT-tier $NEXUS or subscribe. Free: CONFLUENCE, FUNDING_ONLY, OI_ONLY." }, request, 402);
         }
         if (config.dcaEnabled && !(await walletIsPro(address, env))) {
-          return json({ error: "pro_dca_locked", hint: "DCA / safety-order mode requires Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
+          return json({ error: "pro_dca_locked", hint: "DCA / safety-order mode requires Emerald — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
         }
         await AGENT_KV.put(`agent:config:${address}`, JSON.stringify(config));
         if (!isPaper) {
@@ -3533,10 +3533,10 @@ document.getElementById("btn").addEventListener("click",go);
         const { config } = body;
         if (!config) return json({ error: "config required" }, request, 400);
         if (config.signalMode && PRO_STRATEGIES.includes(config.signalMode) && !(await walletIsPro(address, env))) {
-          return json({ error: "pro_strategy_locked", strategy: config.signalMode, hint: "MOMENTUM and MEAN_REVERSION require Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe. Free: CONFLUENCE, FUNDING_ONLY, OI_ONLY." }, request, 402);
+          return json({ error: "pro_strategy_locked", strategy: config.signalMode, hint: "MOMENTUM and MEAN_REVERSION require Emerald — hold ARCHITECT-tier $NEXUS or subscribe. Free: CONFLUENCE, FUNDING_ONLY, OI_ONLY." }, request, 402);
         }
         if (config.dcaEnabled && !(await walletIsPro(address, env))) {
-          return json({ error: "pro_dca_locked", hint: "DCA / safety-order mode requires Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
+          return json({ error: "pro_dca_locked", hint: "DCA / safety-order mode requires Emerald — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
         }
         await AGENT_KV.put(`agent:config:${address}`, JSON.stringify(config));
         return json({ ok: true }, request);
@@ -3717,10 +3717,10 @@ document.getElementById("btn").addEventListener("click",go);
 
         // PRO strategy gate — reject before doing any key/crypto work.
         if (config.signalMode && PRO_STRATEGIES.includes(config.signalMode) && !(await walletIsPro(address, env))) {
-          return json({ error: "pro_strategy_locked", strategy: config.signalMode, hint: "MOMENTUM and MEAN_REVERSION require Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe. Free strategies: CONFLUENCE, FUNDING_ONLY, OI_ONLY." }, request, 402);
+          return json({ error: "pro_strategy_locked", strategy: config.signalMode, hint: "MOMENTUM and MEAN_REVERSION require Emerald — hold ARCHITECT-tier $NEXUS or subscribe. Free strategies: CONFLUENCE, FUNDING_ONLY, OI_ONLY." }, request, 402);
         }
         if (config.dcaEnabled && !(await walletIsPro(address, env))) {
-          return json({ error: "pro_dca_locked", hint: "DCA / safety-order mode requires Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
+          return json({ error: "pro_dca_locked", hint: "DCA / safety-order mode requires Emerald — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
         }
 
         // Live modes need the delegated key. Derive it from the wallet signature
