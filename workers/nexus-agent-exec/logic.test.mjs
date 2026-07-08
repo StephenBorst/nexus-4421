@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-agent-exec/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice, breakevenArmed } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice, breakevenArmed, directiveExpired, directiveShouldFill, directiveLevels } from "./logic.mjs";
 
 // ─── snapQty ───────────────────────────────────────────────
 test("snapQty: snaps cleanly to base_tick (no float artifacts)", () => {
@@ -294,4 +294,61 @@ test("blendAvg: weighted average of two fills", () => {
 test("dcaTakeProfitPrice: TP off avg, direction-aware", () => {
   assert.equal(dcaTakeProfitPrice(100, 2, "LONG"), 102);
   assert.equal(dcaTakeProfitPrice(100, 2, "SHORT"), 98);
+});
+
+// ─── Directional directives ────────────────────────────────
+test("directiveExpired: only past validUntil", () => {
+  assert.equal(directiveExpired({ validUntil: 100 }, 99), false);
+  assert.equal(directiveExpired({ validUntil: 100 }, 101), true);
+  assert.equal(directiveExpired({}, 999), false); // no expiry set
+});
+
+test("directiveShouldFill: MARKET always fills at a valid price", () => {
+  assert.equal(directiveShouldFill({ entryType: "MARKET", direction: "LONG" }, 95000), true);
+  assert.equal(directiveShouldFill({ direction: "LONG" }, 95000), true); // default MARKET
+  assert.equal(directiveShouldFill({ entryType: "MARKET" }, 0), false);  // bad price
+});
+
+test("directiveShouldFill: LIMIT LONG fills at/just-above entry, not past maxChase", () => {
+  const d = { entryType: "LIMIT", direction: "LONG", entryPrice: 95000, entryTolerancePct: 0.1, maxChasePct: 1 };
+  assert.equal(directiveShouldFill(d, 95000), true);           // at entry
+  assert.equal(directiveShouldFill(d, 95090), true);           // within +0.1% tolerance
+  assert.equal(directiveShouldFill(d, 95200), false);          // too far above (missed)
+  assert.equal(directiveShouldFill(d, 94500), true);           // below entry (better) within chase
+  assert.equal(directiveShouldFill(d, 93000), false);          // gapped >1% below → refuse
+});
+
+test("directiveShouldFill: LIMIT SHORT mirrors LONG", () => {
+  const d = { entryType: "LIMIT", direction: "SHORT", entryPrice: 95000, entryTolerancePct: 0.1, maxChasePct: 1 };
+  assert.equal(directiveShouldFill(d, 95000), true);
+  assert.equal(directiveShouldFill(d, 94910), true);           // within -0.1% tolerance
+  assert.equal(directiveShouldFill(d, 95500), true);           // above entry (better) within chase
+  assert.equal(directiveShouldFill(d, 97000), false);          // gapped >1% above → refuse
+});
+
+test("directiveLevels: LONG converts prices to % off fill + builds TP ladder", () => {
+  const r = directiveLevels({ direction: "LONG", stopLoss: 93000, takeProfit1: 98000, takeProfit2: 102000, tp1SizePct: 60 }, 95000);
+  assert.ok(!r.error);
+  assert.equal(r.slPercent, 2.11);   // |93000-95000|/95000
+  assert.equal(r.tpPercent, 3.16);   // |98000-95000|/95000
+  assert.deepEqual(r.takeProfits, [{ pct: 3.16, sizePct: 60 }, { pct: 7.37, sizePct: 40 }]);
+});
+
+test("directiveLevels: single TP when tp2 absent (100% size)", () => {
+  const r = directiveLevels({ direction: "LONG", stopLoss: 93000, takeProfit1: 98000 }, 95000);
+  assert.deepEqual(r.takeProfits, [{ pct: 3.16, sizePct: 100 }]);
+});
+
+test("directiveLevels: rejects inverted levels", () => {
+  // LONG with stop ABOVE entry is self-contradicting.
+  assert.match(directiveLevels({ direction: "LONG", stopLoss: 96000, takeProfit1: 98000 }, 95000).error, /inverted/);
+  // SHORT with TP above entry is wrong.
+  assert.match(directiveLevels({ direction: "SHORT", stopLoss: 96000, takeProfit1: 98000 }, 95000).error, /inverted/);
+});
+
+test("directiveLevels: SHORT direction-side correct", () => {
+  const r = directiveLevels({ direction: "SHORT", stopLoss: 97000, takeProfit1: 92000 }, 95000);
+  assert.ok(!r.error);
+  assert.equal(r.slPercent, 2.11);
+  assert.equal(r.tpPercent, 3.16);
 });

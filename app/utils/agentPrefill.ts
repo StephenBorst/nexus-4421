@@ -7,6 +7,12 @@ import type { AgentConfig } from "@/pages/lab/types";
 
 export const AGENT_PREFILL_KEY = "nexus_agent_prefill";
 
+// Theses store a bare ticker ("BTC"); the agent/exec key everything by the Orderly
+// perp symbol ("PERP_BTC_USDC"). Normalize at the handoff so signals/orders match.
+export function toPerpSymbol(s: string): string {
+  return s.startsWith("PERP_") ? s : `PERP_${s.toUpperCase()}_USDC`;
+}
+
 export type AgentPrefill = {
   config: Partial<AgentConfig>;
   source?: string;
@@ -43,7 +49,7 @@ export function thesisToAgentConfig(t: {
   takeProfit1?: number;
   leverage?: number;
 }): Partial<AgentConfig> {
-  const cfg: Partial<AgentConfig> = { symbols: [t.symbol] };
+  const cfg: Partial<AgentConfig> = { symbols: [toPerpSymbol(t.symbol)] };
   const e = t.entryPrice;
   if (e && e > 0) {
     if (t.takeProfit1 && t.takeProfit1 > 0) cfg.tpPercent = Math.round((Math.abs(t.takeProfit1 - e) / e) * 10000) / 100;
@@ -60,4 +66,45 @@ export function thesisAgentNotice(t: { symbol: string; direction?: string }): st
   const tk = t.symbol.replace("PERP_", "").replace("_USDC", "");
   const dir = t.direction ? `${t.direction} ` : "";
   return `The agent trades ${tk} on funding/OI signals — it won't just place your ${dir}thesis as-is. It may enter EITHER direction when a signal fires, using your thesis TP/SL and leverage as risk bounds. Review the config below, then Save or Backtest before activating.`;
+}
+
+// ─── Directional directive bridge ("▶ TRADE managed") ────────────────────────
+// The counterpart to the signal-watch handoff: this hands the agent the user's
+// EXACT directional trade (direction honored verbatim). Writes a draft the Agent
+// tab reviews → the user picks PAPER/AUTONOMOUS, signs, and POSTs /agent/:a/directive.
+export const DIRECTIVE_PREFILL_KEY = "nexus_directive_prefill";
+
+export type DirectiveDraft = {
+  symbol: string;
+  direction: "LONG" | "SHORT";
+  entryPrice: number;
+  stopLoss: number;
+  takeProfit1: number;
+  takeProfit2?: number;
+  tp1SizePct?: number;
+  leverage?: number;
+  thesisId?: string;
+  source?: string;
+};
+
+// Build a directive draft from a thesis and jump to the Agent tab to review + arm it.
+export function deployDirectiveFromThesis(t: {
+  id?: string; symbol: string; direction: "LONG" | "SHORT";
+  entryPrice: number; stopLoss: number; takeProfit1: number; takeProfit2?: number; leverage?: number;
+}): void {
+  const draft: DirectiveDraft = {
+    symbol: toPerpSymbol(t.symbol),
+    direction: t.direction,
+    entryPrice: t.entryPrice,
+    stopLoss: t.stopLoss,
+    takeProfit1: t.takeProfit1,
+    takeProfit2: t.takeProfit2 && t.takeProfit2 > 0 ? t.takeProfit2 : undefined,
+    tp1SizePct: t.takeProfit2 && t.takeProfit2 > 0 ? 50 : undefined,
+    leverage: t.leverage && t.leverage > 0 ? Math.round(t.leverage) : undefined,
+    thesisId: t.id,
+    source: "THESIS",
+  };
+  try { window.localStorage.setItem(DIRECTIVE_PREFILL_KEY, JSON.stringify({ draft, ts: Date.now() })); }
+  catch { /* ignore quota/availability */ }
+  window.location.assign("/lab?tab=agent");
 }

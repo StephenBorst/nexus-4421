@@ -10,7 +10,14 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { isProStrategy } from "@/config/subscription";
 import { STRATEGY_PRESETS } from "@/config/strategyPresets";
 import { STYLE_PRESETS, deriveStyle, type TradingStyle } from "@/config/agentStyles";
-import { AGENT_PREFILL_KEY, type AgentPrefill } from "@/utils/agentPrefill";
+import { AGENT_PREFILL_KEY, DIRECTIVE_PREFILL_KEY, type AgentPrefill, type DirectiveDraft } from "@/utils/agentPrefill";
+
+// The directional directive as returned by GET /agent/:address (read-only mirror).
+type ActiveDirective = {
+  id: string; symbol: string; direction: "LONG" | "SHORT"; status: string;
+  entryPrice: number; stopLoss: number; takeProfit1: number; takeProfit2?: number;
+  tp1SizePct?: number; leverage?: number; validUntil?: number; filledPrice?: number; result?: string;
+};
 
 const AGENT_API = "https://og.nexustradinglabs.com";
 
@@ -213,6 +220,12 @@ export function AgentView() {
   // Persistent (until dismissed) expectation banner, set when a prefill arrives from
   // a source whose semantics differ from the agent's (e.g. a directional thesis).
   const [prefillNotice, setPrefillNotice] = useState<string | null>(null);
+  // Directional directive ("▶ TRADE managed"): a draft awaiting review/arm, and/or
+  // the currently armed/live directive read from the server.
+  const [activeDirective, setActiveDirective] = useState<ActiveDirective | null>(null);
+  const [directiveDraft, setDirectiveDraft] = useState<DirectiveDraft | null>(null);
+  const [directiveMode, setDirectiveMode] = useState<"PAPER" | "AUTONOMOUS">("PAPER");
+  const [directiveBusy, setDirectiveBusy] = useState(false);
   const [tab, setTab] = useState<"config" | "status" | "history" | "leaderboard">("config");
   const [leaderboard, setLeaderboard] = useState<AgentLeaderboardEntry[] | null>(null);
   const [lbLoading, setLbLoading] = useState(false);
@@ -243,6 +256,64 @@ export function AgentView() {
     const interval = setInterval(fetchAgentData, 10000);
     return () => clearInterval(interval);
   }, [walletAddress]);
+
+  // Consume a directive draft handed over from a thesis (▶ TRADE managed). Read once
+  // on mount + when returning to the tab, then cleared so it doesn't re-apply.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(DIRECTIVE_PREFILL_KEY);
+      if (raw) {
+        window.localStorage.removeItem(DIRECTIVE_PREFILL_KEY);
+        const p = JSON.parse(raw);
+        if (p?.draft?.symbol) {
+          setDirectiveDraft(p.draft);
+          setDirectiveMode("PAPER"); // default risk-free; user opts into GO LIVE
+          setTab("status");
+        }
+      }
+    } catch { /* ignore malformed draft */ }
+  }, []);
+
+  async function armDirective() {
+    if (!walletAddress || !directiveDraft) return;
+    setDirectiveBusy(true); setError(null);
+    try {
+      const walletSig = await getAgentSig(walletAddress);
+      const payload: Record<string, unknown> = { directive: directiveDraft, mode: directiveMode, walletSig };
+      if (directiveMode === "AUTONOMOUS") payload.confirm = "GO LIVE";
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}/directive`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.hint || data.error || "Could not arm directive"); return; }
+      setActiveDirective(data.directive || null);
+      setDirectiveDraft(null);
+      setSuccess(directiveMode === "AUTONOMOUS"
+        ? "Directive armed — LIVE market order fires within ~1 min, then managed to your levels."
+        : "Directive armed in PAPER — simulated fill within ~1 min.");
+      setTimeout(() => setSuccess(null), 6000);
+      fetchAgentData();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Signing/submit failed");
+    } finally { setDirectiveBusy(false); }
+  }
+
+  async function cancelDirective() {
+    if (!walletAddress) return;
+    setDirectiveBusy(true); setError(null);
+    try {
+      const walletSig = await getAgentSig(walletAddress);
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}/directive`, {
+        method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ walletSig }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.hint || data.error || "Could not cancel directive"); return; }
+      setActiveDirective(null);
+      setSuccess("Directive cancelled."); setTimeout(() => setSuccess(null), 3000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Cancel failed");
+    } finally { setDirectiveBusy(false); }
+  }
 
 
   async function fetchAgentData() {
@@ -278,6 +349,7 @@ export function AgentView() {
         if (data.state) setAgentState(data.state);
         if (data.trades) setTrades(data.trades);
         if (data.pending) setPending(data.pending);
+        setActiveDirective(data.directive || null);
         setWebhookEnabled(!!data.webhook?.enabled);
       }
     } catch (e) {
@@ -715,6 +787,111 @@ export function AgentView() {
           <span onClick={() => setPrefillNotice(null)} title="Dismiss" style={{ cursor: "pointer", color: "#fbbf24", flexShrink: 0 }}>✕</span>
         </div>
       )}
+
+      {/* ── DIRECTIVE: review a draft from a thesis, then arm it ─────────── */}
+      {directiveDraft && (() => {
+        const tk = directiveDraft.symbol.replace("PERP_", "").replace("_USDC", "");
+        const isLong = directiveDraft.direction === "LONG";
+        const rr = Math.abs(directiveDraft.entryPrice - directiveDraft.stopLoss) > 0
+          ? Math.abs(directiveDraft.takeProfit1 - directiveDraft.entryPrice) / Math.abs(directiveDraft.entryPrice - directiveDraft.stopLoss)
+          : 0;
+        const live = directiveMode === "AUTONOMOUS";
+        const num = (n?: number) => (n && n > 0 ? `$${n.toLocaleString(undefined, { maximumFractionDigits: n < 10 ? 4 : 2 })}` : "—");
+        return (
+          <div style={{ ...agentCardStyle, borderColor: "#00ff88", background: "#071207", marginBottom: 12 }}>
+            <div style={agentLabelStyle}>// ▶ TRADE THIS THESIS <span style={{ color: "#4a7a5a" }}>— one-shot, managed by the agent</span></div>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 12, marginTop: 10, marginBottom: 10, fontFamily: "var(--nx-font-mono)" }}>
+              <span style={{ fontSize: 18, color: "#fff", fontWeight: "bold" }}>{tk}</span>
+              <span style={{ fontSize: 13, color: isLong ? "#00ff88" : "#ff4444", fontWeight: "bold" }}>{isLong ? "↑ LONG" : "↓ SHORT"}</span>
+              {directiveDraft.leverage ? <span style={{ fontSize: 12, color: "#8aaa9a" }}>{directiveDraft.leverage}x</span> : null}
+              <span style={{ fontSize: 12, color: rr >= 2 ? "#00ff88" : "#fbbf24" }}>R:R 1:{rr.toFixed(2)}</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(88px, 1fr))", gap: 8, marginBottom: 12 }}>
+              {[
+                { label: "ENTRY", val: num(directiveDraft.entryPrice), color: "#8aaa9a" },
+                { label: "STOP", val: num(directiveDraft.stopLoss), color: "#ff4444" },
+                { label: "TP1", val: num(directiveDraft.takeProfit1), color: "#00ff88" },
+                ...(directiveDraft.takeProfit2 ? [{ label: "TP2", val: num(directiveDraft.takeProfit2), color: "#00ff88" }] : []),
+              ].map(({ label, val, color }) => (
+                <div key={label} style={{ background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 4, padding: "6px 10px" }}>
+                  <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
+                  <div style={{ fontSize: 13, color, fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{val}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: "#5fd6a0", fontFamily: "var(--nx-font-mono)", lineHeight: 1.5, marginBottom: 12 }}>
+              The agent enters {isLong ? "LONG" : "SHORT"} {tk} and manages to your stop/targets (scale-out, trailing, breakeven, timeout). It stops after this one trade.
+            </div>
+            {/* Mode toggle */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+              {(["PAPER", "AUTONOMOUS"] as const).map((m) => (
+                <button key={m} onClick={() => setDirectiveMode(m)} style={{
+                  flex: 1, padding: "8px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11, cursor: "pointer", borderRadius: 3,
+                  border: `1px solid ${directiveMode === m ? (m === "PAPER" ? "#4a9fff" : "#ff6600") : "#1a2e1a"}`,
+                  background: directiveMode === m ? (m === "PAPER" ? "#0a1420" : "#1a0800") : "#080c08",
+                  color: directiveMode === m ? (m === "PAPER" ? "#4a9fff" : "#ff6600") : "#3a5a4a",
+                }}>{m === "PAPER" ? "PAPER (simulated)" : "AUTONOMOUS (real $)"}</button>
+              ))}
+            </div>
+            {live && (
+              <div style={{ fontSize: 10, color: "#ff8800", fontFamily: "var(--nx-font-mono)", lineHeight: 1.5, marginBottom: 10 }}>
+                ⚠ REAL FUNDS. This places a live market order on your next tick (~1 min) via your order-only key (cannot withdraw). Confirming = &quot;GO LIVE&quot;.
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => setDirectiveDraft(null)} disabled={directiveBusy} style={{
+                flex: 1, padding: "9px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11, cursor: "pointer", borderRadius: 3,
+                border: "1px solid #2a2a2a", background: "#0a0a0a", color: "#3a5a4a",
+              }}>DISMISS</button>
+              <button onClick={armDirective} disabled={directiveBusy} style={{
+                flex: 2, padding: "9px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", letterSpacing: "0.06em",
+                cursor: directiveBusy ? "wait" : "pointer", borderRadius: 3,
+                border: `1px solid ${live ? "#ff6600" : "#1a4a2a"}`, background: live ? "#1a0800" : "#0a2a0a",
+                color: live ? "#ff6600" : "#00ff88",
+              }}>{directiveBusy ? "ARMING…" : live ? "▶ ARM LIVE — GO LIVE" : "▶ ARM (PAPER)"}</button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── DIRECTIVE: currently armed / live ────────────────────────────── */}
+      {!directiveDraft && activeDirective && (activeDirective.status === "ARMED" || activeDirective.status === "LIVE") && (() => {
+        const tk = activeDirective.symbol.replace("PERP_", "").replace("_USDC", "");
+        const isLong = activeDirective.direction === "LONG";
+        const armed = activeDirective.status === "ARMED";
+        const num = (n?: number) => (n && n > 0 ? `$${n.toLocaleString(undefined, { maximumFractionDigits: n < 10 ? 4 : 2 })}` : "—");
+        return (
+          <div style={{ ...agentCardStyle, borderColor: armed ? "#4a9fff" : "#00ff88", background: armed ? "#08111c" : "#071207", marginBottom: 12 }}>
+            <div style={agentLabelStyle}>
+              // DIRECTIVE <span style={{ color: armed ? "#4a9fff" : "#00ff88" }}>{armed ? "◷ ARMED" : "● LIVE"}</span>
+              <span style={{ color: "#4a7a5a" }}> — {armed ? "waiting to fill (next tick ~1 min)" : "position open, managed by the agent"}</span>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 12, marginTop: 10, marginBottom: 10, fontFamily: "var(--nx-font-mono)" }}>
+              <span style={{ fontSize: 16, color: "#fff", fontWeight: "bold" }}>{tk}</span>
+              <span style={{ fontSize: 12, color: isLong ? "#00ff88" : "#ff4444", fontWeight: "bold" }}>{isLong ? "↑ LONG" : "↓ SHORT"}</span>
+              {activeDirective.leverage ? <span style={{ fontSize: 11, color: "#8aaa9a" }}>{activeDirective.leverage}x</span> : null}
+              {activeDirective.filledPrice ? <span style={{ fontSize: 11, color: "#5fd6a0" }}>filled {num(activeDirective.filledPrice)}</span> : null}
+            </div>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#8aaa9a", marginBottom: armed ? 12 : 0 }}>
+              <span>entry {num(activeDirective.entryPrice)}</span>
+              <span style={{ color: "#ff4444" }}>stop {num(activeDirective.stopLoss)}</span>
+              <span style={{ color: "#00ff88" }}>tp1 {num(activeDirective.takeProfit1)}</span>
+              {activeDirective.takeProfit2 ? <span style={{ color: "#00ff88" }}>tp2 {num(activeDirective.takeProfit2)}</span> : null}
+            </div>
+            {armed && (
+              <button onClick={cancelDirective} disabled={directiveBusy} style={{
+                padding: "7px 16px", fontFamily: "var(--nx-font-mono)", fontSize: 10, cursor: directiveBusy ? "wait" : "pointer",
+                borderRadius: 3, border: "1px solid #4a1a1a", background: "#150a0a", color: "#ff6666",
+              }}>{directiveBusy ? "…" : "CANCEL DIRECTIVE"}</button>
+            )}
+            {!armed && (
+              <div style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginTop: 8 }}>
+                To stop early, use the KILL switch below (closes the position).
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ─── CONFIG TAB ──────────────────────────────────── */}
       {tab === "config" && (

@@ -9,7 +9,7 @@ import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePr
 import { useIsMobile } from "./useIsMobile";
 import type { ThesisTrade, ThesisStatus } from "./types";
 import { cardStyle, labelStyle, navBtnStyle, inputStyle, fieldLabelStyle, STATUS_CONFIG, CLOSED_STATUSES } from "./styles";
-import { deployToAgent, thesisToAgentConfig, thesisAgentNotice } from "@/utils/agentPrefill";
+import { deployToAgent, thesisToAgentConfig, thesisAgentNotice, deployDirectiveFromThesis } from "@/utils/agentPrefill";
 import { formatPnl } from "./helpers";
 import { PnlChart, EmptyState } from "./components";
 
@@ -166,6 +166,15 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
               title="Prefill the agent to trade this symbol on funding/OI signals, using this thesis's TP/SL and leverage as risk bounds. The agent is signal-driven — it may enter either direction."
               style={{ ...navBtnStyle, fontSize: 10, color: "#ff8800", borderColor: "#3a2a0a", minHeight: 36, padding: "6px 12px" }}>
               ⚡ AUTOMATE
+            </button>
+            <button onClick={() => deployDirectiveFromThesis({
+                id: t.id, symbol: t.symbol, direction: t.direction,
+                entryPrice: t.entryPrice, stopLoss: t.stopLoss, takeProfit1: t.takeProfit1,
+                takeProfit2: t.takeProfit2, leverage: t.leverage,
+              })}
+              title="Hand the agent THIS exact trade: it enters your direction and manages to your stop/targets with the agent's full exit engine (scale-out, trailing, breakeven, timeout). One-shot."
+              style={{ ...navBtnStyle, fontSize: 10, color: "#00ff88", borderColor: "#1a4a2a", minHeight: 36, padding: "6px 12px" }}>
+              ▶ TRADE
             </button>
             <button onClick={() => onRemove(t.id)} style={{ ...navBtnStyle, fontSize: 10, color: "#ff4444", borderColor: "#2a1a1a", minHeight: 36, padding: "6px 12px" }}>REMOVE</button>
           </div>

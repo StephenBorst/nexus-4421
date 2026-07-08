@@ -26,6 +26,9 @@ import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats } from "./logic.mjs";
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./backtest.mjs";
+// Directive level validation lives with the exec's money-path logic (single source);
+// wrangler bundles the cross-dir import (same as backtest.mjs).
+import { directiveLevels } from "../nexus-agent-exec/logic.mjs";
 
 // URL-safe random token (hook secret / passphrase). Crypto-strong via Web Crypto.
 function randToken(bytes = 24) {
@@ -3255,16 +3258,20 @@ document.getElementById("btn").addEventListener("click",go);
 
       // GET /agent/:address
       if (request.method === "GET" && !parts[2]) {
-        const [configRaw, stateRaw, pendingRaw, signalRaw, whMetaRaw] = await Promise.all([
+        const [configRaw, stateRaw, pendingRaw, signalRaw, whMetaRaw, directiveRaw] = await Promise.all([
           AGENT_KV.get(`agent:config:${address}`),
           AGENT_KV.get(`agent:state:${address}`),
           AGENT_KV.get(`agent:pending:${address}`),
           AGENT_KV.get(`agent:signal:${address}`),
           AGENT_KV.get(`agent:webhook_meta:${address}`),
+          AGENT_KV.get(`agent:directive:${address}`),
         ]);
         const config = configRaw ? JSON.parse(configRaw) : null;
         const state = stateRaw ? JSON.parse(stateRaw) : null;
         const pending = pendingRaw ? JSON.parse(pendingRaw) : [];
+        // Current directional directive (read-only) so the UI can render/cancel it.
+        let directive = null;
+        if (directiveRaw) { try { directive = JSON.parse(directiveRaw); } catch { /* ignore */ } }
         // last_signal is owned by the brain via agent:signal — merge it into the
         // state response (read-only) so the brain never has to write agent:state.
         if (state && signalRaw) {
@@ -3285,7 +3292,7 @@ document.getElementById("btn").addEventListener("click",go);
         // Non-secret webhook status only (the token is NEVER returned on the public GET).
         let webhook = null;
         if (whMetaRaw) { try { webhook = { enabled: !!JSON.parse(whMetaRaw).enabled }; } catch { /* ignore */ } }
-        return json({ config, state, trades, pending, webhook }, request);
+        return json({ config, state, trades, pending, webhook, directive }, request);
       }
 
       // POST /agent/:address/webhook/(enable|rotate|disable) — manage the signal
@@ -3516,6 +3523,112 @@ document.getElementById("btn").addEventListener("click",go);
           await AGENT_KV.put("agent:users", JSON.stringify(users));
         }
         return json({ ok: true, message: "Kill switch activated" }, request);
+      }
+
+      // ── POST /agent/:address/directive — arm a directional "trade my thesis"
+      // one-shot managed order (docs/directional-agent-spec.md). The direction is
+      // honored VERBATIM (unlike the signal bot). PAPER simulates; AUTONOMOUS places
+      // a real market order and requires confirm:"GO LIVE". Owner-authed. Phase 1 =
+      // MARKET entries only.
+      if (request.method === "POST" && parts[2] === "directive") {
+        let body;
+        try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        const denied = requireOwner(body?.walletSig); if (denied) return denied;
+
+        const mode = body?.mode === "AUTONOMOUS" ? "AUTONOMOUS" : "PAPER";
+        if (mode === "AUTONOMOUS" && body?.confirm !== "GO LIVE") {
+          return json({ error: "confirm_required", hint: 'A live directive places a real market order — pass confirm:"GO LIVE". The order-only key cannot withdraw.' }, request, 409);
+        }
+        if (mode === "AUTONOMOUS") {
+          const deniedV2 = await requireOwnerV2(env, request, { action: "agent.activate", wallet: address, nonce: body?.nonce, v2Sig: body?.v2Sig });
+          if (deniedV2) return deniedV2;
+        }
+
+        const d = body?.directive || {};
+        const symbol = typeof d.symbol === "string" ? d.symbol : null;
+        const direction = d.direction === "SHORT" ? "SHORT" : d.direction === "LONG" ? "LONG" : null;
+        if (!symbol || !direction) return json({ error: "directive needs symbol + direction (LONG|SHORT)" }, request, 400);
+        // Phase 1 = MARKET entries only. LIMIT/triggered entries are Phase 2.
+        const entryType = String(d.entryType || "MARKET").toUpperCase();
+        if (entryType !== "MARKET") return json({ error: "limit_entry_unsupported", hint: "Triggered/limit-price entries are coming soon — use entryType:MARKET for now." }, request, 400);
+        // A planned entry price is required so the levels can be validated for
+        // direction-side sanity (the exec re-validates against the actual fill).
+        if (!(Number(d.entryPrice) > 0)) return json({ error: "entryPrice required", hint: "Provide the planned entry price so stop/target sides can be validated." }, request, 400);
+        const lv = directiveLevels({ ...d, direction }, Number(d.entryPrice));
+        if (lv.error) return json({ error: "invalid_levels", hint: lv.error }, request, 400);
+
+        // One active directive per wallet.
+        const existingRaw = await AGENT_KV.get(`agent:directive:${address}`);
+        if (existingRaw) {
+          try {
+            const ex = JSON.parse(existingRaw);
+            if (ex.status === "ARMED" || ex.status === "LIVE") return json({ error: "directive_active", hint: "A directive is already armed/live — cancel it (DELETE) or kill the position first." }, request, 409);
+          } catch { /* corrupt → overwrite below */ }
+        }
+
+        // AUTONOMOUS needs the order-only key — derive from walletSig (like activate).
+        if (mode === "AUTONOMOUS") {
+          const haveKey = await AGENT_KV.get(`agent:key:${address}`);
+          if (!haveKey) {
+            const recRaw = await env.LAB_STORE.get("user:" + address);
+            if (!recRaw) return json({ error: "wallet_not_registered", hint: "Register your Orderly account first, then retry." }, request, 401);
+            const rec = JSON.parse(recRaw);
+            if (!rec.accountId) return json({ error: "wallet_not_registered", hint: "No Orderly account on file." }, request, 401);
+            const secret = await agentSecretFromWalletSig(body.walletSig);
+            const encryptedKey = await encryptSecret(secret, env);
+            await AGENT_KV.put(`agent:key:${address}`, JSON.stringify({ tradingKey: encryptedKey, accountId: rec.accountId, registeredAt: Date.now(), enc: "v1" }));
+          }
+        }
+
+        // Ensure a config exists + set the execution mode so the exec dispatches it.
+        const cfgRaw = await AGENT_KV.get(`agent:config:${address}`);
+        const baseCfg = cfgRaw ? JSON.parse(cfgRaw) : { symbols: [symbol], leverage: 5, capitalPerTrade: 30, tpPercent: 1.5, slPercent: 0.75, maxHoldHours: 4, maxTradesPerDay: 4, maxDailyLossUsdc: 5, fundingThreshold: 0.01, signalMode: "FUNDING_ONLY" };
+        baseCfg.mode = mode;
+        await AGENT_KV.put(`agent:config:${address}`, JSON.stringify(baseCfg));
+
+        // Build + store the ARMED directive.
+        const now = Date.now();
+        const MAX_HORIZON = 7 * 24 * 3600 * 1000;
+        const validUntil = Math.min(now + MAX_HORIZON, Number(d.validUntil) || (now + 24 * 3600 * 1000));
+        const directive = {
+          id: `dir_${now}`,
+          symbol, direction, source: d.source || "THESIS", thesisId: d.thesisId || null,
+          entryType: "MARKET", entryPrice: Number(d.entryPrice) || 0,
+          stopLoss: Number(d.stopLoss), takeProfit1: Number(d.takeProfit1),
+          takeProfit2: Number(d.takeProfit2) || 0, tp1SizePct: Number(d.tp1SizePct) || 50,
+          leverage: Number(d.leverage) > 0 ? Number(d.leverage) : 0,
+          capitalPerTrade: Number(d.capitalPerTrade) > 0 ? Number(d.capitalPerTrade) : 0,
+          resumeSignals: !!d.resumeSignals,
+          status: "ARMED", validUntil, createdAt: now,
+        };
+        await AGENT_KV.put(`agent:directive:${address}`, JSON.stringify(directive));
+        await AGENT_KV.delete(`agent:kill:${address}`); // clear a stale kill so it can fill
+
+        // Activate + register so the exec picks it up next tick.
+        const stRaw = await AGENT_KV.get(`agent:state:${address}`);
+        const state = stRaw ? JSON.parse(stRaw) : { active: true, daily_pnl: 0, trades_today: 0, last_reset: now, current_position: null, last_signal: null };
+        state.active = true;
+        await AGENT_KV.put(`agent:state:${address}`, JSON.stringify(state));
+        const usersRaw2 = await AGENT_KV.get("agent:users");
+        const users2 = usersRaw2 ? JSON.parse(usersRaw2) : [];
+        if (!users2.includes(address)) { users2.push(address); await AGENT_KV.put("agent:users", JSON.stringify(users2)); }
+
+        return json({ ok: true, mode, directive, note: mode === "AUTONOMOUS"
+          ? "Live: the agent places a real market order next tick (~1 min), then manages to your TP/SL."
+          : "Paper: simulated — watch the managed lifecycle risk-free." }, request);
+      }
+
+      // DELETE /agent/:address/directive — cancel an ARMED directive (no-op on LIVE;
+      // use /kill to stop a live one).
+      if (request.method === "DELETE" && parts[2] === "directive") {
+        const dbody = await request.json().catch(() => ({}));
+        const denied = requireOwner(dbody.walletSig); if (denied) return denied;
+        const raw = await AGENT_KV.get(`agent:directive:${address}`);
+        if (!raw) return json({ ok: true, cancelled: false }, request);
+        let ex = null; try { ex = JSON.parse(raw); } catch { /* ignore */ }
+        if (ex && ex.status === "LIVE") return json({ error: "directive_live", hint: "This directive already has an open position — use /agent/:address/kill to close it." }, request, 409);
+        await AGENT_KV.delete(`agent:directive:${address}`);
+        return json({ ok: true, cancelled: true }, request);
       }
 
       // ── POST /agent/:address/bankr/activate — deploy the agent from a Bankr chat ──

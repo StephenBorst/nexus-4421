@@ -13,7 +13,7 @@
 
 import * as ed from "@noble/ed25519";
 import bs58 from "bs58";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice, breakevenArmed } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice, breakevenArmed, directiveExpired, directiveShouldFill, directiveLevels } from "./logic.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const COOLDOWN_MS = 15 * 60 * 1000; // 15 min between trades
@@ -239,6 +239,7 @@ async function processUser(address, env, cache) {
     state.current_position = null;
     await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
     await env.NEXUS_AGENT.delete(`agent:kill:${address}`); // consume the flag
+    await env.NEXUS_AGENT.delete(`agent:directive:${address}`); // kill cancels any armed directive
     console.log(`[exec] ${address.slice(0, 10)} KILLED`);
     return;
   }
@@ -293,6 +294,42 @@ async function processUser(address, env, cache) {
     } catch { /* ignore malformed intent */ }
   }
 
+  // ── DIRECTIVE INTENT (the user's exact directional trade — one-shot) ────────
+  // A directive is honored VERBATIM (direction is the user's, not the brain's).
+  // ARMED + flat + fill-gate passes → becomes THIS entry's signal, carrying its own
+  // sizing/levels via signal.directive (enterPosition reads them). Priority over the
+  // brain, bypasses cooldown, retired on close. Only read when flat + no webhook, so
+  // it adds no subrequest for holding users. See docs/directional-agent-spec.md.
+  let directiveSignal = null;
+  if (!whSignal && !state.current_position) {
+    const dirRaw = await env.NEXUS_AGENT.get(`agent:directive:${address}`);
+    if (dirRaw) {
+      let dir = null;
+      try { dir = JSON.parse(dirRaw); } catch { /* ignore malformed */ }
+      if (dir && dir.status === "ARMED") {
+        if (directiveExpired(dir, now)) {
+          dir.status = "DONE"; dir.result = "expired";
+          await env.NEXUS_AGENT.put(`agent:directive:${address}`, JSON.stringify(dir), { expirationTtl: 3600 });
+          console.log(`[exec] ${address.slice(0, 10)} directive expired unfilled`);
+        } else {
+          // MARKET fills immediately; LIMIT (Phase 2) only inside the entry band.
+          let fillOk = true;
+          if ((dir.entryType || "MARKET") !== "MARKET") {
+            try { fillOk = directiveShouldFill(dir, await getMarkPrice(dir.symbol, env, cache)); }
+            catch { fillOk = false; }
+          }
+          if (fillOk) {
+            directiveSignal = {
+              symbol: dir.symbol, direction: dir.direction, confidence: 100,
+              price: Number(dir.entryPrice) || 0, funding: 0, source: "DIRECTIVE",
+              timestamp: now, directive: dir,
+            };
+          }
+        }
+      }
+    }
+  }
+
   // ── HOLDING POSITION ──────────────────────────────────
   // (after the webhook CLOSE check above so an external CLOSE can flatten.) An OPEN
   // that arrives while already in a position is dropped — we don't stack entries.
@@ -302,8 +339,8 @@ async function processUser(address, env, cache) {
   }
 
   // ── NO POSITION — CHECK FOR SIGNAL ────────────────────
-  // Prefer the user's webhook signal; otherwise read the brain's.
-  let signal = whSignal;
+  // Prefer the user's own intent (webhook, then directive); otherwise the brain's.
+  let signal = whSignal || directiveSignal;
   if (!signal) {
     const signalRaw = await env.NEXUS_AGENT.get(`agent:signal:${address}`);
     if (!signalRaw) return;
@@ -313,8 +350,10 @@ async function processUser(address, env, cache) {
     if (signal.confidence < 50) return;
   }
 
-  // Cooldown check — webhook signals are explicit user intent, so they bypass it.
-  if (signal.source !== "WEBHOOK" && state.last_trade_time && now - state.last_trade_time < COOLDOWN_MS) return;
+  // Cooldown check — user-authored intents (webhook / directive) are explicit, so
+  // they bypass it; only the brain's own signals are cooldown-gated.
+  const userAuthored = signal.source === "WEBHOOK" || signal.source === "DIRECTIVE";
+  if (!userAuthored && state.last_trade_time && now - state.last_trade_time < COOLDOWN_MS) return;
 
   // Mode check
   if (config.mode === "ASSISTED") {
@@ -363,6 +402,11 @@ async function enterPosition(address, state, config, signal, env, cache) {
   // TP/SL/timeout management, daily limits) runs identically so results are
   // realistic — they're just recorded to a separate paper ledger in state.
   const paper = config.mode === "PAPER";
+  // A directive is the user's exact directional trade — it overrides sizing/levels
+  // for THIS entry (the user supplies the edge). null for normal signal entries.
+  const directive = signal.directive || null;
+  const effLeverage = (directive && directive.leverage > 0) ? directive.leverage : config.leverage;
+  const effCapital = (directive && directive.capitalPerTrade > 0) ? directive.capitalPerTrade : config.capitalPerTrade;
 
   const symbol = signal.symbol;
   const side = signal.direction === "SHORT" ? "SELL" : "BUY";
@@ -379,14 +423,29 @@ async function enterPosition(address, state, config, signal, env, cache) {
   const minNotional = info.min_notional || 0;
 
   // DCA mode reserves the rest of capitalPerTrade for safety orders, so the BASE
-  // order is only a fraction of it (the ladder sums back to capitalPerTrade).
-  const dca = config.dcaEnabled ? config.dca : null;
-  const baseMargin = dca ? dcaUnitMargin(config.capitalPerTrade, dca) : config.capitalPerTrade;
+  // order is only a fraction of it (the ladder sums back to capitalPerTrade). DCA is
+  // disabled for directives — a directive is one managed trade, not an averaging ladder.
+  const dca = (config.dcaEnabled && !directive) ? config.dca : null;
+  const baseMargin = dca ? dcaUnitMargin(effCapital, dca) : effCapital;
+
+  // Resolve a directive's %-levels off the CURRENT mark BEFORE placing any order. If
+  // they're inverted at fill time (e.g. price already blew past the stop), refuse the
+  // entry and retire the directive — never enter a self-contradicting trade.
+  let directiveLv = null;
+  if (directive) {
+    directiveLv = directiveLevels(directive, markPrice);
+    if (directiveLv.error) {
+      directive.status = "DONE"; directive.result = `rejected: ${directiveLv.error}`;
+      await env.NEXUS_AGENT.put(`agent:directive:${address}`, JSON.stringify(directive), { expirationTtl: 3600 });
+      console.error(`[exec] ${address.slice(0, 10)} directive rejected at fill: ${directiveLv.error}`);
+      return;
+    }
+  }
 
   // Calculate qty, snapped to base_tick (tested in logic.mjs — guards the
   // -1104 step-size float artifact + base_min / min_notional constraints).
   const snap = snapQty({
-    capitalPerTrade: baseMargin, leverage: config.leverage,
+    capitalPerTrade: baseMargin, leverage: effLeverage,
     markPrice, baseTick, baseMin, minNotional,
   });
   if (!snap.ok) {
@@ -404,7 +463,7 @@ async function enterPosition(address, state, config, signal, env, cache) {
 
     // Set leverage
     await orderlyRequest(keyData, "POST", "/v1/client/leverage", {
-      symbol, leverage: config.leverage,
+      symbol, leverage: effLeverage,
     });
 
     // Place market order
@@ -428,17 +487,24 @@ async function enterPosition(address, state, config, signal, env, cache) {
   // monitor exits on THESE levels, not the flat config %. Computed for paper too,
   // so PAPER validates the exact behavior before anyone goes live with it.
   let effTp = config.tpPercent, effSl = config.slPercent;
-  if (config.volScaledStops) {
-    const atrPct = await fetchAtrPct(symbol, env);
-    const lv = volScaledLevels(atrPct, config);
-    effTp = lv.tpPercent; effSl = lv.slPercent;
-    console.log(`[exec] ${address.slice(0, 10)} volScaledStops atr%=${atrPct == null ? "n/a" : atrPct.toFixed(2)} → tp=${effTp} sl=${effSl}`);
+  let takeProfits;
+  if (directive) {
+    // Directive: honor the user's explicit levels (converted off the fill above).
+    // Skip volatility-scaling — the user gave concrete prices, not a % to scale.
+    effTp = directiveLv.tpPercent; effSl = directiveLv.slPercent;
+    takeProfits = normTakeProfits({ takeProfits: directiveLv.takeProfits, tpPercent: effTp }, config);
+  } else {
+    if (config.volScaledStops) {
+      const atrPct = await fetchAtrPct(symbol, env);
+      const lv = volScaledLevels(atrPct, config);
+      effTp = lv.tpPercent; effSl = lv.slPercent;
+      console.log(`[exec] ${address.slice(0, 10)} volScaledStops atr%=${atrPct == null ? "n/a" : atrPct.toFixed(2)} → tp=${effTp} sl=${effSl}`);
+    }
+    // Resolve the take-profit ladder for this entry. Explicit config.takeProfits
+    // (multi-level scale-out) wins; otherwise a single 100%-size level from the
+    // effective tpPercent — so legacy/simple configs behave exactly as before.
+    takeProfits = normTakeProfits({ takeProfits: config.takeProfits, tpPercent: effTp }, config);
   }
-
-  // Resolve the take-profit ladder for this entry. Explicit config.takeProfits
-  // (multi-level scale-out) wins; otherwise a single 100%-size level from the
-  // effective tpPercent — so legacy/simple configs behave exactly as before.
-  const takeProfits = normTakeProfits({ takeProfits: config.takeProfits, tpPercent: effTp }, config);
 
   // Update state
   state.current_position = {
@@ -455,7 +521,11 @@ async function enterPosition(address, state, config, signal, env, cache) {
     slPercent: effSl,
     // Strategy label stamped at ENTRY (config can change before close) so the trade
     // record + History tab can show which strategy produced each trade.
-    strategy: `${(config.maxHoldHours ?? 0) <= 8 ? "DAY" : (config.maxHoldHours ?? 0) <= 120 ? "SWING" : "POSITION"} · ${config.signalMode || "CONFLUENCE"}${config.dcaEnabled ? " · DCA" : ""}`,
+    strategy: directive
+      ? `DIRECTIVE · ${signal.direction}`
+      : `${(config.maxHoldHours ?? 0) <= 8 ? "DAY" : (config.maxHoldHours ?? 0) <= 120 ? "SWING" : "POSITION"} · ${config.signalMode || "CONFLUENCE"}${config.dcaEnabled ? " · DCA" : ""}`,
+    // Back-link to the source directive so the one-shot close can retire it.
+    ...(directive ? { directive_id: directive.id } : {}),
     // Multi-TP + trailing exit state (evaluateExit). remaining_qty shrinks as
     // levels scale out; tp_hits records filled levels; peak_pnl_pct ratchets the
     // trailing stop. Legacy positions without these fall back to single-TP/SL.
@@ -482,12 +552,23 @@ async function enterPosition(address, state, config, signal, env, cache) {
   state.last_trade_time = Date.now();
   state.trades_today = (state.trades_today || 0) + 1;
 
+  // Mark the directive LIVE (a position is now open for it) so the UI/API reflect it
+  // and a second directive can't arm on top. Retired to DONE by closePosition.
+  if (directive) {
+    directive.status = "LIVE";
+    directive.filledPrice = markPrice;
+    directive.filledAt = Date.now();
+    await env.NEXUS_AGENT.put(`agent:directive:${address}`, JSON.stringify(directive));
+  }
+
   // Publish to the public feed (real trades only by default). Store the feed id
   // on the position so the close path can resolve it. Best-effort — a feed write
   // failure must never block the actual trade lifecycle.
   if (PUBLISH_AGENT_FEED && (!paper || PUBLISH_PAPER_TO_FEED)) {
     try {
-      state.current_position.feed_id = await publishAgentEntry(address, env, { config, signal, markPrice, qty });
+      // Feed card should reflect the levels/leverage actually used (directive overrides).
+      const feedConfig = directive ? { ...config, leverage: effLeverage, tpPercent: effTp, slPercent: effSl } : config;
+      state.current_position.feed_id = await publishAgentEntry(address, env, { config: feedConfig, signal, markPrice, qty });
     } catch (e) {
       console.error(`[exec] ${address.slice(0, 10)} agent feed publish failed:`, e.message);
     }
@@ -895,6 +976,25 @@ async function closePosition(address, state, env, reason, cache) {
     if (state.paper_trades.length > 50) state.paper_trades.pop(); // keep last 50
   } else {
     await logAgentTrade(address, env, auditable);
+  }
+
+  // One-shot directive: retire it on close so it can never re-enter. By default a
+  // directive means "make THIS trade" — so the agent goes idle afterward rather than
+  // silently drifting into brain-signal trades the user never asked for. A user who
+  // wants the signal bot to keep running sets resumeSignals on the directive.
+  if (pos.directive_id) {
+    try {
+      const dRaw = await env.NEXUS_AGENT.get(`agent:directive:${address}`);
+      if (dRaw) {
+        const d = JSON.parse(dRaw);
+        d.status = "DONE"; d.result = reason; d.closedAt = Date.now();
+        await env.NEXUS_AGENT.put(`agent:directive:${address}`, JSON.stringify(d), { expirationTtl: 24 * 3600 });
+        if (!d.resumeSignals) {
+          state.active = false;
+          console.log(`[exec] ${address.slice(0, 10)} directive done (${reason}) → agent idle`);
+        }
+      }
+    } catch { /* best-effort — never block the close */ }
   }
 
   // Resolve the published feed thesis (if this trade was published on entry).

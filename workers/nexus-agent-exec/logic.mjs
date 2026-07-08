@@ -266,3 +266,76 @@ export function volScaledLevels(atrPct, config) {
     tpPercent: Math.round(slPercent * rr * 100) / 100,
   };
 }
+
+// ─── Directional directives ("trade my exact thesis") ────────────────────────
+// A directive is a user-authored, direction-EXPLICIT, one-shot managed order (see
+// docs/directional-agent-spec.md). Unlike the signal bot, the direction is honored
+// verbatim — the user supplies the edge; the agent supplies the execution rigor.
+// These three pure functions are the decision points the exec's directive block +
+// enterPosition override will call. Kept here so tests cover the real behavior.
+
+/** An ARMED directive past its validUntil should never fill (no stale entries). */
+export function directiveExpired(directive, now) {
+  return !!directive?.validUntil && now > Number(directive.validUntil);
+}
+
+/**
+ * Should an ARMED directive fill at the current mark?
+ *  - MARKET: fills immediately (next tick).
+ *  - LIMIT: fills only when the mark is inside a sane band around the planned entry.
+ *    LONG fills at/just-above entry (tolerance) but NOT if price gapped too far below
+ *    (maxChase — a crash through the level may mean the thesis is invalidated); SHORT
+ *    mirrors. maxChasePct ≤ 0 / unset = no chase bound (any favorable price fills).
+ */
+export function directiveShouldFill(directive, markPrice) {
+  if (!(markPrice > 0)) return false;
+  if ((directive?.entryType || "MARKET") === "MARKET") return true;
+  const entry = Number(directive.entryPrice);
+  if (!(entry > 0)) return false;
+  const tol = (Number(directive.entryTolerancePct) || 0) / 100;
+  const chase = Number(directive.maxChasePct) > 0 ? Number(directive.maxChasePct) / 100 : Infinity;
+  if (directive.direction === "LONG") {
+    const upper = entry * (1 + tol);
+    const lower = Number.isFinite(chase) ? entry * (1 - chase) : 0;
+    return markPrice <= upper && markPrice >= lower;
+  }
+  if (directive.direction === "SHORT") {
+    const lower = entry * (1 - tol);
+    const upper = Number.isFinite(chase) ? entry * (1 + chase) : Infinity;
+    return markPrice >= lower && markPrice <= upper;
+  }
+  return false;
+}
+
+/**
+ * Convert a directive's ABSOLUTE price levels into the agent's %-based TP/SL + TP
+ * ladder, measured off the ACTUAL fill price (a market fill can differ from plan).
+ * Guards direction-side sanity: LONG needs sl < entry < tp1; SHORT needs tp1 < entry
+ * < sl. Returns { error } on a self-contradicting directive so the exec refuses it
+ * rather than entering a nonsensical trade. tp2 (if on the correct side) adds a
+ * runner leg; tp1SizePct scales out at TP1 (fractions of original sum to 100).
+ * @returns {{ tpPercent:number, slPercent:number, takeProfits:{pct:number,sizePct:number}[] } | { error:string }}
+ */
+export function directiveLevels(directive, fillPrice) {
+  const entry = Number(fillPrice);
+  const sl = Number(directive?.stopLoss);
+  const tp1 = Number(directive?.takeProfit1);
+  const tp2 = Number(directive?.takeProfit2);
+  const dir = directive?.direction;
+  if (!(entry > 0) || !(sl > 0) || !(tp1 > 0)) return { error: "missing entry/stop/tp1" };
+  if (dir === "LONG" && !(sl < entry && tp1 > entry)) return { error: "levels inverted for LONG" };
+  if (dir === "SHORT" && !(sl > entry && tp1 < entry)) return { error: "levels inverted for SHORT" };
+  if (dir !== "LONG" && dir !== "SHORT") return { error: "bad direction" };
+  const pct = (a, b) => Math.round((Math.abs(a - b) / b) * 10000) / 100;
+  const slPercent = pct(sl, entry);
+  const tp1Percent = pct(tp1, entry);
+  let takeProfits;
+  const tp2OnSide = tp2 > 0 && ((dir === "LONG" && tp2 > tp1) || (dir === "SHORT" && tp2 < tp1));
+  if (tp2OnSide) {
+    const size1 = Math.min(99, Math.max(1, Number(directive.tp1SizePct) || 50));
+    takeProfits = [{ pct: tp1Percent, sizePct: size1 }, { pct: pct(tp2, entry), sizePct: 100 - size1 }];
+  } else {
+    takeProfits = [{ pct: tp1Percent, sizePct: 100 }];
+  }
+  return { tpPercent: tp1Percent, slPercent, takeProfits };
+}
