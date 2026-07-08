@@ -15,7 +15,7 @@ import { AGENT_PREFILL_KEY, DIRECTIVE_PREFILL_KEY, type AgentPrefill, type Direc
 // The directional directive as returned by GET /agent/:address (read-only mirror).
 type ActiveDirective = {
   id: string; symbol: string; direction: "LONG" | "SHORT"; status: string;
-  entryPrice: number; stopLoss: number; takeProfit1: number; takeProfit2?: number;
+  entryType?: "MARKET" | "LIMIT"; entryPrice: number; stopLoss: number; takeProfit1: number; takeProfit2?: number;
   tp1SizePct?: number; leverage?: number; validUntil?: number; filledPrice?: number; result?: string;
 };
 
@@ -225,6 +225,8 @@ export function AgentView() {
   const [activeDirective, setActiveDirective] = useState<ActiveDirective | null>(null);
   const [directiveDraft, setDirectiveDraft] = useState<DirectiveDraft | null>(null);
   const [directiveMode, setDirectiveMode] = useState<"PAPER" | "AUTONOMOUS">("PAPER");
+  const [directiveEntry, setDirectiveEntry] = useState<"MARKET" | "LIMIT">("MARKET");
+  const [directiveLimitPrice, setDirectiveLimitPrice] = useState("");
   const [directiveBusy, setDirectiveBusy] = useState(false);
   const [tab, setTab] = useState<"config" | "status" | "history" | "leaderboard">("config");
   const [leaderboard, setLeaderboard] = useState<AgentLeaderboardEntry[] | null>(null);
@@ -268,6 +270,8 @@ export function AgentView() {
         if (p?.draft?.symbol) {
           setDirectiveDraft(p.draft);
           setDirectiveMode("PAPER"); // default risk-free; user opts into GO LIVE
+          setDirectiveEntry("MARKET"); // default fill-now; user can switch to a resting limit
+          setDirectiveLimitPrice(p.draft.entryPrice ? String(p.draft.entryPrice) : "");
           setTab("status");
         }
       }
@@ -279,7 +283,11 @@ export function AgentView() {
     setDirectiveBusy(true); setError(null);
     try {
       const walletSig = await getAgentSig(walletAddress);
-      const payload: Record<string, unknown> = { directive: directiveDraft, mode: directiveMode, walletSig };
+      // Fold the entry-type choice into the directive: MARKET fills now; LIMIT waits
+      // for the given trigger price (defaults to the thesis entry).
+      const dir: DirectiveDraft = { ...directiveDraft, entryType: directiveEntry };
+      if (directiveEntry === "LIMIT") dir.entryPrice = parseFloat(directiveLimitPrice) || directiveDraft.entryPrice;
+      const payload: Record<string, unknown> = { directive: dir, mode: directiveMode, walletSig };
       if (directiveMode === "AUTONOMOUS") payload.confirm = "GO LIVE";
       const res = await fetch(`${AGENT_API}/agent/${walletAddress}/directive`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
@@ -822,6 +830,32 @@ export function AgentView() {
             <div style={{ fontSize: 11, color: "#5fd6a0", fontFamily: "var(--nx-font-mono)", lineHeight: 1.5, marginBottom: 12 }}>
               The agent enters {isLong ? "LONG" : "SHORT"} {tk} and manages to your stop/targets (scale-out, trailing, breakeven, timeout). It stops after this one trade.
             </div>
+            {/* Entry type: fill now (MARKET) vs wait for a price (LIMIT) */}
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em", marginBottom: 6 }}>ENTRY</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {(["MARKET", "LIMIT"] as const).map((et) => (
+                  <button key={et} onClick={() => setDirectiveEntry(et)} style={{
+                    flex: 1, padding: "7px 0", fontFamily: "var(--nx-font-mono)", fontSize: 10, cursor: "pointer", borderRadius: 3,
+                    border: `1px solid ${directiveEntry === et ? "#00ff88" : "#1a2e1a"}`,
+                    background: directiveEntry === et ? "#0a2a0a" : "#080c08",
+                    color: directiveEntry === et ? "#00ff88" : "#3a5a4a",
+                  }}>{et === "MARKET" ? "MARKET (fill now)" : "LIMIT (wait for price)"}</button>
+                ))}
+              </div>
+              {directiveEntry === "LIMIT" && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", flexShrink: 0 }}>trigger&nbsp;$</span>
+                    <input value={directiveLimitPrice} onChange={(e) => setDirectiveLimitPrice(e.target.value)} type="number"
+                      style={{ flex: 1, minWidth: 0, background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 3, color: "#fff", fontFamily: "var(--nx-font-mono)", fontSize: 13, padding: "7px 10px" }} />
+                  </div>
+                  <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginTop: 4, lineHeight: 1.4 }}>
+                    Waits until {tk} reaches this price (±0.15%), then enters + manages. Won&apos;t chase if it gaps &gt;1% through.
+                  </div>
+                </div>
+              )}
+            </div>
             {/* Mode toggle */}
             <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
               {(["PAPER", "AUTONOMOUS"] as const).map((m) => (
@@ -864,7 +898,9 @@ export function AgentView() {
           <div style={{ ...agentCardStyle, borderColor: armed ? "#4a9fff" : "#00ff88", background: armed ? "#08111c" : "#071207", marginBottom: 12 }}>
             <div style={agentLabelStyle}>
               // DIRECTIVE <span style={{ color: armed ? "#4a9fff" : "#00ff88" }}>{armed ? "◷ ARMED" : "● LIVE"}</span>
-              <span style={{ color: "#4a7a5a" }}> — {armed ? "waiting to fill (next tick ~1 min)" : "position open, managed by the agent"}</span>
+              <span style={{ color: "#4a7a5a" }}> — {armed
+                ? (activeDirective.entryType === "LIMIT" ? `waiting for ${num(activeDirective.entryPrice)}` : "waiting to fill (next tick ~1 min)")
+                : "position open, managed by the agent"}</span>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 12, marginTop: 10, marginBottom: 10, fontFamily: "var(--nx-font-mono)" }}>
               <span style={{ fontSize: 16, color: "#fff", fontWeight: "bold" }}>{tk}</span>

@@ -77,7 +77,10 @@ export const DIRECTIVE_PREFILL_KEY = "nexus_directive_prefill";
 export type DirectiveDraft = {
   symbol: string;
   direction: "LONG" | "SHORT";
+  entryType?: "MARKET" | "LIMIT"; // MARKET fills now; LIMIT waits for entryPrice
   entryPrice: number;
+  entryTolerancePct?: number;
+  maxChasePct?: number;
   stopLoss: number;
   takeProfit1: number;
   takeProfit2?: number;

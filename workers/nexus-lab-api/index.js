@@ -3548,12 +3548,11 @@ document.getElementById("btn").addEventListener("click",go);
         const symbol = typeof d.symbol === "string" ? d.symbol : null;
         const direction = d.direction === "SHORT" ? "SHORT" : d.direction === "LONG" ? "LONG" : null;
         if (!symbol || !direction) return json({ error: "directive needs symbol + direction (LONG|SHORT)" }, request, 400);
-        // Phase 1 = MARKET entries only. LIMIT/triggered entries are Phase 2.
-        const entryType = String(d.entryType || "MARKET").toUpperCase();
-        if (entryType !== "MARKET") return json({ error: "limit_entry_unsupported", hint: "Triggered/limit-price entries are coming soon — use entryType:MARKET for now." }, request, 400);
-        // A planned entry price is required so the levels can be validated for
-        // direction-side sanity (the exec re-validates against the actual fill).
-        if (!(Number(d.entryPrice) > 0)) return json({ error: "entryPrice required", hint: "Provide the planned entry price so stop/target sides can be validated." }, request, 400);
+        // MARKET fills next tick; LIMIT waits until mark reaches entryPrice (± tolerance,
+        // within maxChase). Both require a planned entryPrice — MARKET uses it only to
+        // validate level sides; LIMIT uses it as the trigger.
+        const entryType = String(d.entryType || "MARKET").toUpperCase() === "LIMIT" ? "LIMIT" : "MARKET";
+        if (!(Number(d.entryPrice) > 0)) return json({ error: "entryPrice required", hint: "Provide the entry price (MARKET: to validate stop/target sides; LIMIT: the fill trigger)." }, request, 400);
         const lv = directiveLevels({ ...d, direction }, Number(d.entryPrice));
         if (lv.error) return json({ error: "invalid_levels", hint: lv.error }, request, 400);
 
@@ -3593,7 +3592,9 @@ document.getElementById("btn").addEventListener("click",go);
         const directive = {
           id: `dir_${now}`,
           symbol, direction, source: d.source || "THESIS", thesisId: d.thesisId || null,
-          entryType: "MARKET", entryPrice: Number(d.entryPrice) || 0,
+          entryType, entryPrice: Number(d.entryPrice) || 0,
+          entryTolerancePct: entryType === "LIMIT" ? (Number(d.entryTolerancePct) > 0 ? Number(d.entryTolerancePct) : 0.15) : 0,
+          maxChasePct: entryType === "LIMIT" ? (Number(d.maxChasePct) > 0 ? Number(d.maxChasePct) : 1.0) : 0,
           stopLoss: Number(d.stopLoss), takeProfit1: Number(d.takeProfit1),
           takeProfit2: Number(d.takeProfit2) || 0, tp1SizePct: Number(d.tp1SizePct) || 50,
           leverage: Number(d.leverage) > 0 ? Number(d.leverage) : 0,
@@ -3613,9 +3614,11 @@ document.getElementById("btn").addEventListener("click",go);
         const users2 = usersRaw2 ? JSON.parse(usersRaw2) : [];
         if (!users2.includes(address)) { users2.push(address); await AGENT_KV.put("agent:users", JSON.stringify(users2)); }
 
+        const tkShort = symbol.replace("PERP_", "").replace("_USDC", "");
+        const fillNote = entryType === "LIMIT" ? `waits until ${tkShort} reaches $${Number(d.entryPrice)}` : "fills next tick (~1 min)";
         return json({ ok: true, mode, directive, note: mode === "AUTONOMOUS"
-          ? "Live: the agent places a real market order next tick (~1 min), then manages to your TP/SL."
-          : "Paper: simulated — watch the managed lifecycle risk-free." }, request);
+          ? `Live: the agent ${fillNote} with a real order, then manages to your TP/SL.`
+          : `Paper: simulated — ${fillNote}.` }, request);
       }
 
       // DELETE /agent/:address/directive — cancel an ARMED directive (no-op on LIVE;
