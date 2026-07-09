@@ -104,7 +104,7 @@ function StatBox({ label, value, sub, color }: { label: string; value: string; s
       textAlign: "center",
     }}>
       <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#3a5a4a", letterSpacing: "0.08em", marginBottom: 4 }}>{label}</div>
-      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 20, fontWeight: "bold", color: color ?? "#8aaa9a" }}>{value}</div>
+      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 17, fontWeight: "bold", color: color ?? "#8aaa9a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
       {sub && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", marginTop: 2 }}>{sub}</div>}
     </div>
   );
@@ -547,8 +547,11 @@ export default function TraderPage() {
     return { wins, losses, active, invalidated, closed, winRate, avgRR, bestTrade, totalPnl, hasPnl };
   }, [theses]);
 
-  const displayName = theses[0]?.displayName ?? null;
-  const pfp = theses[0]?.pfp ?? null;
+  // Pull each identity field from the first thesis that actually has it — a wallet's
+  // theses can carry different snapshots, so keying both off theses[0] left us showing
+  // a name with a mismatched / missing picture.
+  const displayName = theses.find((t) => t.displayName)?.displayName ?? null;
+  const pfp = theses.find((t) => t.pfp)?.pfp ?? null;
   const shortAddr = wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : "";
 
   function copyLink() {
@@ -767,7 +770,7 @@ export default function TraderPage() {
                     <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", letterSpacing: "0.08em", marginBottom: 10 }}>AUTONOMOUS AGENT — GRADED RECORD</div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(80px,1fr))", gap: 12 }}>
                       {[
-                        { l: "NET P&L", v: `${agentRec.netUsd >= 0 ? "+" : ""}$${agentRec.netUsd}`, c: agentRec.netUsd >= 0 ? "#00ff88" : "#ff4444" },
+                        { l: "NET P&L", v: `${agentRec.netPnl >= 0 ? "+" : ""}$${agentRec.netPnl}`, c: agentRec.netPnl >= 0 ? "#00ff88" : "#ff4444" },
                         { l: "WIN RATE", v: `${agentRec.winRate}%`, c: "#c0c0c0" },
                         { l: "TRADES", v: String(agentRec.trades), c: "#c0c0c0" },
                         { l: "SCORE", v: `${agentRec.score}`, c: "#4a9fff" },

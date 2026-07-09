@@ -110,7 +110,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
         </div>
         <div style={{ display: "flex", flexDirection: isMobile ? "row" : "column", alignItems: isMobile ? "center" : "flex-end", justifyContent: isMobile ? "space-between" : "flex-start", gap: 6, flexShrink: 0 }}>
           {!isMobile && <div style={{ fontSize: 9, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)" }}>{new Date(t.createdAt).toLocaleDateString()}</div>}
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
             {t.status === "ACTIVE" && walletAddress && (
               <a
                 href={`https://t.me/nexustradinglabs_bot?start=${walletAddress.toLowerCase()}`}
@@ -408,8 +408,9 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
             )}
           </div>
 
-          {/* Cumulative Thesis P&L Chart */}
-          <div style={cardStyle}>
+          {/* Cumulative Thesis P&L Chart — spans the full row so the curve stretches
+              across the frame (mirrors the P&L accuracy breakdown), not a half tile. */}
+          <div style={{ ...cardStyle, gridColumn: "1 / -1" }}>
             <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 4, fontFamily: "var(--nx-font-mono)" }}>&#9632; THESIS P&amp;L</div>
             <PnlChart points={cumulativePoints} />
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>

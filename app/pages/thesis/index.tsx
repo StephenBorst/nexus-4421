@@ -11,6 +11,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
+import { useIsMobile } from "@/pages/lab/useIsMobile";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 const OG_BASE  = "https://og.nexustradinglabs.com";
@@ -99,6 +100,7 @@ function Avatar({ pfp, displayName, size = 40 }: { pfp: string | null; displayNa
 export default function ThesisPage() {
   const { wallet, id } = useParams<{ wallet: string; id: string }>();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const [thesis, setThesis] = useState<FeedThesis | null>(null);
   const [loading, setLoading] = useState(true);
@@ -312,7 +314,7 @@ export default function ThesisPage() {
           </div>
 
           {/* Key levels */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "10px 16px", marginBottom: 16, padding: 14, background: "#080c08", borderRadius: 4, border: "1px solid #1a2e1a" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(3, minmax(0, 1fr))" : "repeat(5, minmax(0, 1fr))", gap: "10px 16px", marginBottom: 16, padding: 14, background: "#080c08", borderRadius: 4, border: "1px solid #1a2e1a" }}>
             {[
               { label: "ENTRY", val: `$${thesis.entryPrice.toFixed(2)}`,   color: "#8aaa9a" },
               { label: "STOP",  val: `$${thesis.stopLoss.toFixed(2)}`,      color: "#ff4444" },
@@ -322,7 +324,7 @@ export default function ThesisPage() {
             ].map(({ label, val, color }) => (
               <div key={label}>
                 <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
-                <div style={{ fontSize: 14, color, fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{val}</div>
+                <div style={{ fontSize: 14, color, fontFamily: "var(--nx-font-mono)", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{val}</div>
               </div>
             ))}
           </div>
@@ -333,7 +335,7 @@ export default function ThesisPage() {
             const toSL = distancePct(markPrice, thesis.stopLoss);
             const toTP = distancePct(markPrice, thesis.takeProfit1);
             return (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "10px 16px", marginBottom: 16, padding: 14, background: "#080c08", borderRadius: 4, border: "1px solid #1a3a5a" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(4, minmax(0, 1fr))", gap: "10px 16px", marginBottom: 16, padding: 14, background: "#080c08", borderRadius: 4, border: "1px solid #1a3a5a" }}>
                 {[
                   { label: "MARK",       val: `$${markPrice.toFixed(markPrice < 10 ? 4 : 2)}`, color: "#fff" },
                   { label: "UNREALIZED", val: `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)`, color: pnl >= 0 ? "#00ff88" : "#ff4444" },
