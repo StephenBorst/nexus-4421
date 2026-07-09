@@ -18,6 +18,33 @@ import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, agentThesisLeve
 const ORDERLY_API = "https://api-evm.orderly.org";
 const COOLDOWN_MS = 15 * 60 * 1000; // 15 min between trades
 
+// Orderly sits behind Cloudflare bot-management, which intermittently serves an
+// HTML 403 challenge to our header-light Worker fetches (breaks position reads /
+// mark price → reconcile + adoption fail). Sending realistic browser headers clears
+// the challenge; a bounded retry rides out a transient one within a tick.
+const BROWSER_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+  "Accept": "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+};
+
+// Public (unauthed) Orderly GET → parsed JSON, with browser headers + retry on the
+// 403 bot-challenge. Throws with the real status/body so logs name the failure.
+async function orderlyPublicGet(url, tries = 3) {
+  let lastErr;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const res = await fetch(url, { headers: BROWSER_HEADERS });
+    const text = await res.text();
+    try { return JSON.parse(text); }
+    catch {
+      lastErr = new Error(`orderly GET ${url} non-JSON (HTTP ${res.status}): ${text.slice(0, 80)}`);
+      if (res.status === 403 && attempt < tries - 1) { await new Promise((r) => setTimeout(r, 300 * (attempt + 1))); continue; }
+      throw lastErr;
+    }
+  }
+  throw lastErr;
+}
+
 // ── Agent → public Feed bridge ────────────────────────────────────────────────
 // Surfaces the bot's real autonomous trades on the public feed so it has a live
 // heartbeat instead of looking abandoned (cold-start fix). Records are written
@@ -144,18 +171,9 @@ async function decryptTradingKey(stored, env) {
 //   - The orderly-key header is the PUBLIC key (ed25519: prefix), derived from
 //     the private key — NOT a slice of the secret.
 async function orderlyRequest(keyData, method, path, body = null) {
-  const timestamp = Date.now().toString();
   const bodyStr = body ? JSON.stringify(body) : "";
   const secret = keyData.tradingKey.replace(/^ed25519:/, "");
   const privKey = bs58.decode(secret);
-
-  const message = `${timestamp}${method}${path}${bodyStr}`;
-  const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
-  const signature = btoa(String.fromCharCode(...sig))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-
   const pubKeyBytes = await ed.getPublicKeyAsync(privKey);
   const orderlyKey = `ed25519:${bs58.encode(pubKeyBytes)}`;
 
@@ -165,24 +183,44 @@ async function orderlyRequest(keyData, method, path, body = null) {
     ? "application/x-www-form-urlencoded"
     : "application/json";
 
-  const res = await fetch(`${ORDERLY_API}${path}`, {
-    method,
-    headers: {
-      "Content-Type": contentType,
-      "orderly-timestamp": timestamp,
-      "orderly-account-id": keyData.accountId,
-      "orderly-key": orderlyKey,
-      "orderly-signature": signature,
-    },
-    body: body ? bodyStr : undefined,
-  });
+  // Retry the Cloudflare 403 bot-challenge a couple of times, RE-SIGNING each attempt
+  // (the signature is bound to a fresh timestamp — a reused stale one is rejected).
+  // Browser headers clear the challenge; the retry rides out a transient one.
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const timestamp = Date.now().toString();
+    const message = `${timestamp}${method}${path}${bodyStr}`;
+    const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
+    const signature = btoa(String.fromCharCode(...sig))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
 
-  // Orderly normally returns JSON; a Cloudflare challenge / outage to the worker
-  // IP returns an HTML page, which res.json() would surface as the opaque
-  // "Unexpected token '<'". Parse defensively so logs name the real failure.
-  const text = await res.text();
-  try { return JSON.parse(text); }
-  catch { throw new Error(`orderly ${method} ${path} non-JSON (HTTP ${res.status}): ${text.slice(0, 80)}`); }
+    const res = await fetch(`${ORDERLY_API}${path}`, {
+      method,
+      headers: {
+        ...BROWSER_HEADERS,
+        "Content-Type": contentType,
+        "orderly-timestamp": timestamp,
+        "orderly-account-id": keyData.accountId,
+        "orderly-key": orderlyKey,
+        "orderly-signature": signature,
+      },
+      body: body ? bodyStr : undefined,
+    });
+
+    // Orderly normally returns JSON; a Cloudflare challenge / outage to the worker
+    // IP returns an HTML page, which res.json() would surface as the opaque
+    // "Unexpected token '<'". Parse defensively so logs name the real failure.
+    const text = await res.text();
+    try { return JSON.parse(text); }
+    catch {
+      lastErr = new Error(`orderly ${method} ${path} non-JSON (HTTP ${res.status}): ${text.slice(0, 80)}`);
+      if (res.status === 403 && attempt < 2) { await new Promise((r) => setTimeout(r, 300 * (attempt + 1))); continue; }
+      throw lastErr;
+    }
+  }
+  throw lastErr;
 }
 
 // Per-invocation mark-price cache. The public futures price is identical for
@@ -192,11 +230,7 @@ async function orderlyRequest(keyData, method, path, body = null) {
 function getMarkPrice(symbol, env, cache) {
   if (!cache.has(symbol)) {
     cache.set(symbol, (async () => {
-      const res = await fetch(`${ORDERLY_API}/v1/public/futures/${symbol}`);
-      const text = await res.text();
-      let data;
-      try { data = JSON.parse(text); }
-      catch { throw new Error(`futures ${symbol} non-JSON (HTTP ${res.status}): ${text.slice(0, 80)}`); }
+      const data = await orderlyPublicGet(`${ORDERLY_API}/v1/public/futures/${symbol}`);
       return parseFloat(data.data.mark_price);
     })());
   }
@@ -295,7 +329,7 @@ async function adoptOrphanPosition(address, state, config, env, cache) {
   // Step/min constraints for future reduce-only slices (mirrors enterPosition).
   let baseTick = 0.001, baseMin = baseTick, minNotional = 0;
   try {
-    const infoData = await (await fetch(`${ORDERLY_API}/v1/public/info/${live.symbol}`)).json();
+    const infoData = await orderlyPublicGet(`${ORDERLY_API}/v1/public/info/${live.symbol}`);
     const info = infoData.data || {};
     baseTick = info.base_tick || baseTick; baseMin = info.base_min || baseTick; minNotional = info.min_notional || 0;
   } catch { /* fall back to defaults */ }
@@ -526,8 +560,7 @@ async function enterPosition(address, state, config, signal, env, cache) {
   const markPrice = await getMarkPrice(symbol, env, cache);
 
   // Fetch symbol info for step size + min order constraints
-  const infoRes = await fetch(`${ORDERLY_API}/v1/public/info/${symbol}`);
-  const infoData = await infoRes.json();
+  const infoData = await orderlyPublicGet(`${ORDERLY_API}/v1/public/info/${symbol}`);
   const info = infoData.data || {};
   const baseTick = info.base_tick || 0.001;
   const baseMin = info.base_min || baseTick;
@@ -701,8 +734,7 @@ async function fetchAtrPct(symbol, env, periods = 14) {
   try {
     const now = Math.floor(Date.now() / 1000);
     const from = now - (periods + 5) * 3600;
-    const r = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${symbol}&resolution=60&from=${from}&to=${now}`);
-    const d = await r.json();
+    const d = await orderlyPublicGet(`${ORDERLY_API}/tv/history?symbol=${symbol}&resolution=60&from=${from}&to=${now}`);
     if (!d || d.s !== "ok" || !Array.isArray(d.t) || d.t.length < 3) return null;
     const { h: H, l: L, c: C, t } = d;
     const n = t.length;
