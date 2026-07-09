@@ -955,6 +955,10 @@ async function closePosition(address, state, env, reason, cache) {
   if (!pos) return;
   const paper = !!pos.paper;
   let closeOrderId = null;
+  // Paper positions never touched the exchange, so the close is always "confirmed".
+  // For real positions this only flips true once Orderly ACCEPTS the reduce-only
+  // close — otherwise we must NOT mark the trade closed (see the guard below).
+  let closeConfirmed = paper;
   // After multi-TP scale-outs only the runner remains — close THAT, not the
   // original size (legacy positions have no remaining_qty → fall back to qty).
   const closeQty = pos.remaining_qty ?? pos.qty;
@@ -963,9 +967,12 @@ async function closePosition(address, state, env, reason, cache) {
   // touched the exchange, so there's nothing to close — skip straight to P&L.
   if (!paper) {
     const keyRaw = await env.NEXUS_AGENT.get(`agent:key:${address}`);
-    // If key was deleted (kill switch), we still try to close with cached data
-    // but may fail — that's acceptable, position will auto-liquidate or user closes manually
-    if (keyRaw) {
+    if (!keyRaw) {
+      // Key was deleted (kill switch): we can't place a close. Clear the record
+      // anyway — the position auto-liquidates or the user closes it manually.
+      closeConfirmed = true;
+      console.warn(`[exec] ${address.slice(0, 10)} no key — cannot place close (reason=${reason}); clearing record`);
+    } else {
       const keyData = JSON.parse(keyRaw);
       keyData.tradingKey = await decryptTradingKey(keyData.tradingKey, env);
       const closeSide = pos.direction === "LONG" ? "SELL" : "BUY";
@@ -979,11 +986,30 @@ async function closePosition(address, state, env, reason, cache) {
           reduce_only: true,
           broker_id: "nexus_trading",
         });
-        closeOrderId = closeOrder?.data?.order_id ?? null;
+        // Orderly returns { success:false, code, message } on a REJECT without
+        // throwing — treating that as closed abandons a still-open position (the
+        // "ghost": marked closed in KV/History while live on the exchange). Only
+        // confirm on an accepted order.
+        if (closeOrder?.success === false) {
+          console.error(`[exec] ${address.slice(0, 10)} close order REJECTED:`, JSON.stringify(closeOrder).slice(0, 200));
+        } else {
+          closeOrderId = closeOrder?.data?.order_id ?? null;
+          closeConfirmed = true;
+        }
       } catch (e) {
         console.error(`[exec] ${address.slice(0, 10)} close order failed:`, e.message);
       }
     }
+  }
+
+  // If a real close was attempted but the exchange never confirmed it, DO NOT clear
+  // state or log a close — the position is still open. Keep it so the next tick
+  // retries; the reconcile self-heal clears it only once the exchange truly shows
+  // flat. This is what prevents the unmanaged ghost the user hit (agent shows flat
+  // while a live position sits on Orderly unmanaged).
+  if (!closeConfirmed) {
+    console.warn(`[exec] ${address.slice(0, 10)} close NOT confirmed (reason=${reason}) — keeping position open for retry next tick`);
+    return;
   }
 
   // Fetch final price
