@@ -269,19 +269,24 @@ async function adoptOrphanPosition(address, state, config, env, cache) {
 
   const keyRaw = await env.NEXUS_AGENT.get(`agent:key:${address}`);
   if (!keyRaw) return false;
-  let rows;
+  const symbols = config.symbols || [];
+  let live = null;
   try {
     const keyData = JSON.parse(keyRaw);
     keyData.tradingKey = await decryptTradingKey(keyData.tradingKey, env);
-    const res = await orderlyRequest(keyData, "GET", "/v1/positions");
-    rows = res?.data?.rows || [];
+    // Probe each configured symbol with the SAME singular endpoint the reconcile
+    // self-heal uses (proven to work with the order-only key) — the plural
+    // /v1/positions returned nothing here. Stop at the first live one (the agent
+    // manages one position at a time).
+    for (const sym of symbols) {
+      const res = await orderlyRequest(keyData, "GET", `/v1/position/${sym}`);
+      const p = res?.data;
+      if (p && Math.abs(parseFloat(p.position_qty) || 0) > 1e-9) { live = { symbol: sym, ...p }; break; }
+    }
   } catch (e) {
     console.error(`[exec] ${address.slice(0, 10)} orphan check failed:`, e.message);
     return false;
   }
-
-  const symbols = config.symbols || [];
-  const live = rows.find((r) => symbols.includes(r.symbol) && Math.abs(parseFloat(r.position_qty) || 0) > 1e-9);
   if (!live) return false;
 
   const signedQty = parseFloat(live.position_qty);
