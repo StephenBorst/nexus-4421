@@ -259,14 +259,11 @@ export default {
 // TP/SL/timeout instead of letting it sit unmanaged. AUTONOMOUS-only (the only mode
 // that places real orders) and rate-limited so flat agents don't poll positions every
 // tick. Returns true if a position was adopted (caller manages it next tick).
-const ORPHAN_CHECK_MS = 5 * 60 * 1000;
 async function adoptOrphanPosition(address, state, config, env, cache) {
   const now = Date.now();
-  if (now - (state.last_orphan_check || 0) < ORPHAN_CHECK_MS) return false;
-  state.last_orphan_check = now;
-  // Persist the stamp so subsequent ticks skip the (authed) positions fetch.
-  await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
-
+  // Probed every flat tick — a ghost is urgent (an unmanaged live position), so we
+  // don't defer it. Cost is 1 authed GET per configured symbol until one hits; at
+  // scale (hundreds of flat agents) this is the lever to time-shard, not now.
   const keyRaw = await env.NEXUS_AGENT.get(`agent:key:${address}`);
   if (!keyRaw) return false;
   const symbols = config.symbols || [];
