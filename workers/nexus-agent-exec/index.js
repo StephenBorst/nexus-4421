@@ -72,6 +72,23 @@ async function publishAgentEntry(address, env, { config, signal, markPrice, qty 
   return record.id;
 }
 
+// Self-heal stray ACTIVE feed cards. When the agent is flat, NO published entry
+// should still read ACTIVE — closePosition/reconcile normally resolve them, but a
+// pre-fix orphan (state cleared without resolving the feed) can strand one as a
+// zombie the user sees trading on the feed while the agent is idle. Called on the
+// flat path: flip any lingering ACTIVE entries to CLOSED. One KV read; writes only
+// when something actually changed (the common case is a no-op).
+async function reconcileStaleFeed(address, env) {
+  const raw = await env.NEXUS_AGENT.get(`agent:feed:${address}`);
+  if (!raw) return;
+  const list = JSON.parse(raw);
+  let changed = false;
+  for (const item of list) {
+    if (item.status === "ACTIVE") { item.status = "CLOSED"; item.closedAt = Date.now(); changed = true; }
+  }
+  if (changed) await env.NEXUS_AGENT.put(`agent:feed:${address}`, JSON.stringify(list));
+}
+
 // Resolve a published agent thesis when its position closes.
 async function publishAgentClose(address, env, feedId, { reason, pnlUsdc, exitPrice }) {
   if (!feedId) return;
@@ -352,6 +369,9 @@ async function processUser(address, env, cache) {
     await monitorPosition(address, state, config, env, cache);
     return;
   }
+
+  // Flat: make sure no published feed card is still stuck ACTIVE (zombie cleanup).
+  if (PUBLISH_AGENT_FEED) await reconcileStaleFeed(address, env);
 
   // ── NO POSITION — CHECK FOR SIGNAL ────────────────────
   // Prefer the user's own intent (webhook, then directive); otherwise the brain's.
@@ -641,6 +661,22 @@ async function monitorPosition(address, state, config, env, cache) {
       const liveQty = Math.abs(parseFloat(posRes?.data?.position_qty ?? 0));
       if (Number.isFinite(liveQty) && liveQty < 1e-9) {
         console.log(`[exec] ${address.slice(0, 10)} position flat on exchange (manual close?) — clearing stale record`);
+        // Resolve the published feed card too — otherwise clearing state alone strands
+        // it ACTIVE forever (the "zombie" agent position the user sees on the feed while
+        // the agent is actually flat). Best-effort exit = current mark; the exchange
+        // closed this outside our monitor so we don't have the true fill. NOT written to
+        // agent_trades — the graded ledger only records closes we execute + can verify,
+        // never a reconstructed fill, so the leaderboard stays trustless.
+        if (pos.feed_id) {
+          try {
+            let estExit = pos.current_price;
+            try { estExit = await getMarkPrice(pos.symbol, env, cache); } catch { /* keep cached */ }
+            const { pnlUsdc } = computePnl(pos.direction, pos.avg_entry ?? pos.entry_price, estExit, pos.remaining_qty ?? pos.qty);
+            await publishAgentClose(address, env, pos.feed_id, { reason: "CLOSED", pnlUsdc, exitPrice: estExit });
+          } catch (e) {
+            console.error(`[exec] ${address.slice(0, 10)} feed resolve on reconcile failed:`, e.message);
+          }
+        }
         state.current_position = null;
         state.last_trade_time = Date.now(); // respect cooldown before any re-entry
         await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
