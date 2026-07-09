@@ -251,6 +251,75 @@ export default {
   },
 };
 
+// Recover an untracked live position (a "ghost"): the agent is flat in KV but a real
+// position exists on the exchange — e.g. a reconcile misfire or a rare KV-write miss
+// after entry. Because Orderly nets all exposure per symbol into ONE position, any
+// live position on a CONFIGURED symbol is the agent's to manage (the product rule is
+// that the user stays flat while the agent runs). Re-attach it so the monitor resumes
+// TP/SL/timeout instead of letting it sit unmanaged. AUTONOMOUS-only (the only mode
+// that places real orders) and rate-limited so flat agents don't poll positions every
+// tick. Returns true if a position was adopted (caller manages it next tick).
+const ORPHAN_CHECK_MS = 5 * 60 * 1000;
+async function adoptOrphanPosition(address, state, config, env, cache) {
+  const now = Date.now();
+  if (now - (state.last_orphan_check || 0) < ORPHAN_CHECK_MS) return false;
+  state.last_orphan_check = now;
+  // Persist the stamp so subsequent ticks skip the (authed) positions fetch.
+  await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
+
+  const keyRaw = await env.NEXUS_AGENT.get(`agent:key:${address}`);
+  if (!keyRaw) return false;
+  let rows;
+  try {
+    const keyData = JSON.parse(keyRaw);
+    keyData.tradingKey = await decryptTradingKey(keyData.tradingKey, env);
+    const res = await orderlyRequest(keyData, "GET", "/v1/positions");
+    rows = res?.data?.rows || [];
+  } catch (e) {
+    console.error(`[exec] ${address.slice(0, 10)} orphan check failed:`, e.message);
+    return false;
+  }
+
+  const symbols = config.symbols || [];
+  const live = rows.find((r) => symbols.includes(r.symbol) && Math.abs(parseFloat(r.position_qty) || 0) > 1e-9);
+  if (!live) return false;
+
+  const signedQty = parseFloat(live.position_qty);
+  const qty = Math.abs(signedQty);
+  const direction = signedQty > 0 ? "LONG" : "SHORT";
+  const entry = parseFloat(live.average_open_price) || parseFloat(live.mark_price) || 0;
+  if (!(entry > 0)) return false;
+
+  // Step/min constraints for future reduce-only slices (mirrors enterPosition).
+  let baseTick = 0.001, baseMin = baseTick, minNotional = 0;
+  try {
+    const infoData = await (await fetch(`${ORDERLY_API}/v1/public/info/${live.symbol}`)).json();
+    const info = infoData.data || {};
+    baseTick = info.base_tick || baseTick; baseMin = info.base_min || baseTick; minNotional = info.min_notional || 0;
+  } catch { /* fall back to defaults */ }
+
+  // opened_at = now: we don't have the true open time, so the max-hold clock restarts
+  // from adoption (conservative — never force-closes on adoption). TP/SL are computed
+  // off the REAL average entry, so profit/loss exits are accurate immediately.
+  state.current_position = {
+    symbol: live.symbol, direction, entry_price: entry,
+    current_price: parseFloat(live.mark_price) || entry, pnl_percent: 0,
+    qty, opened_at: now, order_id: null, paper: false,
+    tpPercent: config.tpPercent, slPercent: config.slPercent,
+    strategy: `${(config.maxHoldHours ?? 0) <= 8 ? "DAY" : (config.maxHoldHours ?? 0) <= 120 ? "SWING" : "POSITION"} · ${config.signalMode || "CONFLUENCE"} · adopted`,
+    takeProfits: normTakeProfits({ takeProfits: config.takeProfits, tpPercent: config.tpPercent }, config),
+    remaining_qty: qty, tp_hits: [], peak_pnl_pct: 0,
+    base_tick: baseTick, base_min: baseMin, min_notional: minNotional,
+    adopted: true,
+  };
+  await env.NEXUS_AGENT.put(`agent:state:${address}`, JSON.stringify(state));
+  console.log(`[exec] ${address.slice(0, 10)} ADOPTED untracked ${direction} ${live.symbol} qty=${qty} entry=${entry}`);
+  const tk = live.symbol.replace("PERP_", "").replace("_USDC", "");
+  await notifyTelegram(address, env,
+    `♻️ <b>Adopted untracked ${direction} ${tk}</b>\nA live position with no agent record was found on the exchange — resuming management (TP ${config.tpPercent}% / SL ${config.slPercent}%).`);
+  return true;
+}
+
 async function processUser(address, env, cache) {
   const [stateRaw, killRaw] = await Promise.all([
     env.NEXUS_AGENT.get(`agent:state:${address}`),
@@ -369,6 +438,11 @@ async function processUser(address, env, cache) {
     await monitorPosition(address, state, config, env, cache);
     return;
   }
+
+  // Flat: recover any untracked live position (ghost) before doing anything else —
+  // if the exchange holds a position the agent lost track of, re-adopt + manage it
+  // next tick rather than opening a new one on top. AUTONOMOUS-only, rate-limited.
+  if (config.mode === "AUTONOMOUS" && await adoptOrphanPosition(address, state, config, env, cache)) return;
 
   // Flat: make sure no published feed card is still stuck ACTIVE (zombie cleanup).
   if (PUBLISH_AGENT_FEED) await reconcileStaleFeed(address, env);
