@@ -19,6 +19,30 @@ import { deriveSignal, computeRegime } from "./logic.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 
+// Orderly sits behind Cloudflare bot-management, which intermittently serves an HTML
+// 403 challenge to header-light Worker fetches — which would starve the brain of the
+// market data it needs to emit signals. Realistic browser headers clear it; a bounded
+// retry rides out a transient one. (Mirrors the same fix in nexus-agent-exec.)
+const BROWSER_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+  "Accept": "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+};
+async function orderlyPublicGet(url, tries = 3) {
+  let lastErr;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const res = await fetch(url, { headers: BROWSER_HEADERS });
+    const text = await res.text();
+    try { return JSON.parse(text); }
+    catch {
+      lastErr = new Error(`orderly GET ${url} non-JSON (HTTP ${res.status}): ${text.slice(0, 80)}`);
+      if (res.status === 403 && attempt < tries - 1) { await new Promise((r) => setTimeout(r, 300 * (attempt + 1))); continue; }
+      throw lastErr;
+    }
+  }
+  throw lastErr;
+}
+
 export default {
   async scheduled(event, env) {
     try {
@@ -75,8 +99,8 @@ export default {
       let regime = null;
       if (Object.values(userConfigs).some(({ config }) => config.respectRegime)) {
         try {
-          const res = await fetch(`${ORDERLY_API}/v1/public/futures`);
-          if (res.ok) { const j = await res.json(); regime = computeRegime(j?.data?.rows || []); }
+          const j = await orderlyPublicGet(`${ORDERLY_API}/v1/public/futures`);
+          regime = computeRegime(j?.data?.rows || []);
           console.log(`[brain] regime: ${regime ? `${regime.label} (${regime.score})` : "n/a"}`);
         } catch (e) { console.error("[brain] regime fetch error:", e.message); }
       }
@@ -121,9 +145,7 @@ export default {
 // No strategy interpretation here — deriveSignal() applies each user's mode +
 // thresholds. `market:prev:{symbol}` is stored so price/OI deltas are real.
 async function evaluateSymbol(symbol, env, computeFundingPct = false) {
-  const res = await fetch(`${ORDERLY_API}/v1/public/futures/${symbol}`);
-  if (!res.ok) throw new Error(`API ${res.status}`);
-  const json = await res.json();
+  const json = await orderlyPublicGet(`${ORDERLY_API}/v1/public/futures/${symbol}`);
   const d = json.data;
 
   const markPrice = parseFloat(d.mark_price);
@@ -137,8 +159,7 @@ async function evaluateSymbol(symbol, env, computeFundingPct = false) {
     try {
       const rates = [];
       for (let page = 1; page <= 2; page++) {
-        const fr = await fetch(`${ORDERLY_API}/v1/public/funding_rate_history?symbol=${symbol}&page=${page}&size=100`);
-        const fd = await fr.json();
+        const fd = await orderlyPublicGet(`${ORDERLY_API}/v1/public/funding_rate_history?symbol=${symbol}&page=${page}&size=100`);
         const rows = fd?.data?.rows || [];
         rates.push(...rows.map((x) => Number(x.funding_rate)).filter(Number.isFinite));
         if (rows.length < 100) break;
@@ -172,9 +193,7 @@ async function evaluateSymbol(symbol, env, computeFundingPct = false) {
 async function recordOiForSymbols(symbols, env) {
   for (const symbol of symbols) {
     try {
-      const res = await fetch(`${ORDERLY_API}/v1/public/futures/${symbol}`);
-      if (!res.ok) continue;
-      const d = (await res.json()).data;
+      const d = (await orderlyPublicGet(`${ORDERLY_API}/v1/public/futures/${symbol}`)).data;
       await recordOiSnapshot(symbol, env, {
         price: parseFloat(d.mark_price), oi: parseFloat(d.open_interest) || 0, funding: parseFloat(d.last_funding_rate) || 0,
       });
