@@ -265,6 +265,14 @@ TOOLS.push(
       };
       try { window.localStorage.setItem(THESIS_DRAFT_KEY, JSON.stringify(draft)); } catch { /* ignore */ }
       ctx.navigate?.(`/lab?tab=thesis`);
+      // Fire events so it works even when the Lab is already open on the Thesis tab
+      // (a re-navigate to the same URL is a no-op → the mount-only reader never ran).
+      // nexus:lab-tab switches the tab via local state; nexus:thesis-draft tells an
+      // already-mounted ThesisView to re-read + prefill the draft.
+      try {
+        window.dispatchEvent(new CustomEvent("nexus:lab-tab", { detail: { tab: "thesis" } }));
+        window.dispatchEvent(new CustomEvent("nexus:thesis-draft"));
+      } catch { /* non-browser / SSR — ignore */ }
       return JSON.stringify({ drafted: draft, note: "Opened the Thesis Engine pre-filled. The user reviews risk/size and saves or executes — no order was placed." });
     },
   },

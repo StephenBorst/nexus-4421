@@ -682,23 +682,32 @@ export function ThesisView() {
   const [markBusy, setMarkBusy] = useState(false);
 
   // Consume a thesis draft handed off by the AI assistant (draft_thesis tool):
-  // pre-fill the form once, then clear the draft so it doesn't re-apply.
+  // pre-fill the form once, then clear the draft so it doesn't re-apply. Runs on
+  // mount (tab switched in from elsewhere) AND on the `nexus:thesis-draft` event —
+  // the event is what makes it work when this view is ALREADY mounted (user already
+  // on the Thesis tab), where a re-navigate to the same URL is a no-op and the mount
+  // effect never re-fires. That gap was the "not prefilling" bug.
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(THESIS_DRAFT_KEY);
-      if (!raw) return;
-      const d = JSON.parse(raw);
-      setForm((f) => ({
-        ...f,
-        symbol: d.symbol ?? f.symbol,
-        direction: d.direction === "SHORT" ? "SHORT" : "LONG",
-        entryPrice: d.entryPrice ?? f.entryPrice,
-        stopLoss: d.stopLoss ?? f.stopLoss,
-        takeProfit1: d.takeProfit1 ?? f.takeProfit1,
-        notes: d.notes ?? f.notes,
-      }));
-      window.localStorage.removeItem(THESIS_DRAFT_KEY);
-    } catch { /* ignore malformed draft */ }
+    const consume = () => {
+      try {
+        const raw = window.localStorage.getItem(THESIS_DRAFT_KEY);
+        if (!raw) return;
+        const d = JSON.parse(raw);
+        setForm((f) => ({
+          ...f,
+          symbol: d.symbol ?? f.symbol,
+          direction: d.direction === "SHORT" ? "SHORT" : "LONG",
+          entryPrice: d.entryPrice ?? f.entryPrice,
+          stopLoss: d.stopLoss ?? f.stopLoss,
+          takeProfit1: d.takeProfit1 ?? f.takeProfit1,
+          notes: d.notes ?? f.notes,
+        }));
+        window.localStorage.removeItem(THESIS_DRAFT_KEY);
+      } catch { /* ignore malformed draft */ }
+    };
+    consume();
+    window.addEventListener("nexus:thesis-draft", consume);
+    return () => window.removeEventListener("nexus:thesis-draft", consume);
   }, []);
 
   // ── Live execution ──────────────────────────────────────
