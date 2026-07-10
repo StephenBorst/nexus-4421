@@ -256,7 +256,7 @@ export function aggregateAgentTrades(rows) {
     if (closed) { first = Math.min(first, closed); last = Math.max(last, closed); }
   }
   const daysActive = first === Infinity ? 0 : Math.max(1, Math.round((last - first) / 86400000));
-  return { trades, wins, net, grossWin, grossLoss, daysActive };
+  return { trades, wins, net, grossWin, grossLoss, daysActive, firstTradeAt: first === Infinity ? 0 : first };
 }
 
 // Risk-adjusted 0–100 score: win rate + capped profit factor, shrunk by sample
@@ -292,6 +292,12 @@ export function agentStanding(a, cfg = AGENT_BOARD) {
       netPnl: Math.round(a.net * 100) / 100,
       profitFactor: Math.round(Math.min(profitFactor, 99) * 100) / 100,
       score,
+      // Full-lifetime averages so the LIVE track-record card reads the TRUE record
+      // (the /agent GET only ships the last 50 rows — computing avgWin/avgLoss from
+      // that truncated set undercounts once an agent passes 50 trades).
+      avgWin: a.wins ? Math.round((a.grossWin / a.wins) * 100) / 100 : 0,
+      avgLoss: (a.trades - a.wins) ? Math.round((a.grossLoss / (a.trades - a.wins)) * 100) / 100 : 0,
+      firstTradeAt: a.firstTradeAt || 0,
     },
   };
 }

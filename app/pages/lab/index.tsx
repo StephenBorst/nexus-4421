@@ -94,7 +94,10 @@ export default function TheLabPage() {
 
   // ── Open positions (for briefing header) ─────────────────
   const { data: posData } = usePrivateQuery("/v1/positions", { revalidateOnFocus: false });
-  const openPositions: any[] = (posData as any)?.rows ?? [];
+  // Orderly's /v1/positions returns a row for every symbol the account has state on —
+  // including CLOSED ones (position_qty 0) that linger until settled. Counting raw rows
+  // showed "OPEN 2" while actually flat, so keep only rows with real size.
+  const openPositions: any[] = ((posData as any)?.rows ?? []).filter((p: any) => Math.abs(parseFloat(p?.position_qty ?? 0)) > 1e-9);
   const openCount = openPositions.length;
   const unrealizedPnl = openPositions.reduce((s: number, p: any) => s + (p.unsettled_pnl ?? 0), 0);
 

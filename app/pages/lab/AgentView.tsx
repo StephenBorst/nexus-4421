@@ -64,22 +64,29 @@ const AVAILABLE_SYMBOLS = [
 ];
 
 // ─── Agent Track Record (shared by live + paper) ─────────
-function AgentTrackRecord({ title, accent, trades, paper, onReset }: {
+function AgentTrackRecord({ title, accent, trades, paper, onReset, summary }: {
   title: string;
   accent: string;
   trades: AgentTrade[];
   paper?: boolean;
   onReset?: () => void;
+  // Server-side FULL aggregate (all trades, not the last-50 the GET ships). When
+  // present it drives the headline numbers so a long-running agent's record isn't
+  // undercounted; falls back to computing from `trades` (paper has no server side).
+  summary?: { trades: number; winRate: number; netPnl: number; avgWin: number; avgLoss: number; firstTradeAt?: number } | null;
 }) {
-  const tr = trades.length;
-  const wins = trades.filter((t) => t.pnl > 0).length;
-  const wr = tr ? (wins / tr) * 100 : 0;
-  const net = trades.reduce((s, t) => s + t.pnl, 0);
+  const useSummary = !!summary && (summary.trades ?? 0) > 0;
+  const tr = useSummary ? summary!.trades : trades.length;
+  const wr = useSummary ? summary!.winRate : (trades.length ? (trades.filter((t) => t.pnl > 0).length / trades.length) * 100 : 0);
+  const net = useSummary ? summary!.netPnl : trades.reduce((s, t) => s + t.pnl, 0);
   const winsArr = trades.filter((t) => t.pnl > 0);
   const lossArr = trades.filter((t) => t.pnl <= 0);
-  const avgWin = winsArr.length ? winsArr.reduce((s, t) => s + t.pnl, 0) / winsArr.length : 0;
-  const avgLoss = lossArr.length ? lossArr.reduce((s, t) => s + Math.abs(t.pnl), 0) / lossArr.length : 0;
-  const since = tr ? new Date(Math.min(...trades.map((t) => new Date(t.opened_at).getTime() || Date.now()))).toLocaleDateString() : null;
+  const avgWin = useSummary ? summary!.avgWin : (winsArr.length ? winsArr.reduce((s, t) => s + t.pnl, 0) / winsArr.length : 0);
+  const avgLoss = useSummary ? summary!.avgLoss : (lossArr.length ? lossArr.reduce((s, t) => s + Math.abs(t.pnl), 0) / lossArr.length : 0);
+  const sinceMs = useSummary && summary!.firstTradeAt
+    ? summary!.firstTradeAt
+    : (trades.length ? Math.min(...trades.map((t) => new Date(t.opened_at).getTime() || Date.now())) : 0);
+  const since = sinceMs ? new Date(sinceMs).toLocaleDateString() : null;
 
   return (
     <div style={{ ...agentCardStyle, borderColor: tr > 0 ? (net >= 0 ? "#1a4a2a" : "#4a1a1a") : "#1e2d1e" }}>
@@ -197,7 +204,7 @@ type AgentStanding = {
   metCount: number;
   total: number;
   criteria: AgentStandingCriterion[];
-  stats: { trades: number; daysActive: number; winRate: number; netPnl: number; profitFactor: number; score: number } | null;
+  stats: { trades: number; daysActive: number; winRate: number; netPnl: number; profitFactor: number; score: number; avgWin: number; avgLoss: number; firstTradeAt: number } | null;
 };
 
 function formatAgentTime(ms: number): string {
@@ -1075,7 +1082,7 @@ export function AgentView() {
             );
           })()}
 
-          <AgentTrackRecord title="// LIVE TRACK RECORD" accent="#8aaa9a" trades={trades} />
+          <AgentTrackRecord title="// LIVE TRACK RECORD" accent="#8aaa9a" trades={trades} summary={standing?.stats ?? null} />
 
           {/* Onboarding + key-status panel */}
           <div style={{ ...agentCardStyle, borderColor: tradingKey ? "#1a3a2a" : "#4a3a00" }}>

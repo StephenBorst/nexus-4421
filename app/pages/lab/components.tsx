@@ -33,11 +33,13 @@ export function PnlChart({ points }: { points: number[] }) {
   }
 
   const cw = w || 720; // fallback width for the first paint, before the ref measures
-  const h = 190, padY = 20, padX = 8;
+  // Right gutter reserves room for the value-axis labels so the curve never draws
+  // under them; left padding keeps the first point off the edge.
+  const h = 190, padY = 22, padX = 8, gutter = 52;
   const min = Math.min(0, ...points);
   const max = Math.max(0, ...points) || 1;
   const range = max - min || 1;
-  const iw = Math.max(1, cw - padX * 2);
+  const iw = Math.max(1, cw - padX - gutter);
   const x = (i: number) => padX + (i / (points.length - 1)) * iw;
   const y = (v: number) => padY + (1 - (v - min) / range) * (h - padY * 2);
   const up = points[points.length - 1] >= 0;
@@ -49,9 +51,17 @@ export function PnlChart({ points }: { points: number[] }) {
   const areaPath = `${linePath} L${x(points.length - 1).toFixed(1)},${y(0).toFixed(1)} L${x(0).toFixed(1)},${y(0).toFixed(1)} Z`;
   const zeroY = y(0);
   const showZero = min < 0 && max > 0;
-  const lastX = x(points.length - 1), lastY = y(points[points.length - 1]);
+  const last = points[points.length - 1];
+  const lastX = x(points.length - 1), lastY = y(last);
   const grid = [0.25, 0.5, 0.75].map((f) => padY + f * (h - padY * 2));
   const gid = "nx-pnl-fill";
+  // Compact signed-currency formatter for the axis + final-value labels.
+  const fmt = (v: number) => {
+    const a = Math.abs(v);
+    const s = a >= 1000 ? `${(a / 1000).toFixed(1)}k` : a >= 100 ? a.toFixed(0) : a.toFixed(2);
+    return `${v >= 0 ? "+" : "-"}$${s}`;
+  };
+  const axisX = cw - gutter + 8;
 
   return (
     <div ref={measureRef} style={{ width: "100%", overflow: "hidden" }}>
@@ -64,10 +74,16 @@ export function PnlChart({ points }: { points: number[] }) {
           </linearGradient>
         </defs>
         {grid.map((gy, i) => (
-          <line key={i} x1={0} y1={gy} x2={cw} y2={gy} stroke="#12201a" strokeWidth="1" />
+          <line key={i} x1={0} y1={gy} x2={cw - gutter} y2={gy} stroke="#12201a" strokeWidth="1" />
         ))}
+        {/* Value axis: max (top), 0 baseline, min (bottom) — the numbers the curve was missing. */}
+        <text x={axisX} y={y(max) + 3} fill="#3a5a4a" fontSize="9" fontFamily="var(--nx-font-mono)" textAnchor="start">{fmt(max)}</text>
         {showZero && (
-          <line x1={0} y1={zeroY} x2={cw} y2={zeroY} stroke="#2a3a2a" strokeWidth="1" strokeDasharray="2 4" />
+          <text x={axisX} y={zeroY + 3} fill="#2a4a3a" fontSize="9" fontFamily="var(--nx-font-mono)" textAnchor="start">$0</text>
+        )}
+        <text x={axisX} y={y(min) + 3} fill="#3a5a4a" fontSize="9" fontFamily="var(--nx-font-mono)" textAnchor="start">{fmt(min)}</text>
+        {showZero && (
+          <line x1={0} y1={zeroY} x2={cw - gutter} y2={zeroY} stroke="#2a3a2a" strokeWidth="1" strokeDasharray="2 4" />
         )}
         <path d={areaPath} fill={`url(#${gid})`} />
         {/* glow = a wider, faint underlay stroke (pure paint, NOT an svg filter —
@@ -77,6 +93,8 @@ export function PnlChart({ points }: { points: number[] }) {
         <circle cx={lastX} cy={lastY} r="6" fill={stroke} fillOpacity="0.18" />
         <circle cx={lastX} cy={lastY} r="3.2" fill={stroke} />
         <circle cx={lastX} cy={lastY} r="3.2" fill="none" stroke="#0a0e0a" strokeWidth="1" />
+        {/* Final cumulative value, pinned to the end point (the headline number). */}
+        <text x={axisX} y={lastY + 3} fill={stroke} fontSize="11" fontWeight="700" fontFamily="var(--nx-font-mono)" textAnchor="start">{fmt(last)}</text>
       </svg>
     </div>
   );
