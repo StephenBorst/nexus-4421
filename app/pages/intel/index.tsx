@@ -71,40 +71,48 @@ async function fetchHyperliquid(): Promise<HLAsset[]> {
   const d = await r.json();
   if (!d.success || !d.data?.rows) return [];
 
-  return (d.data.rows as any[])
-    .map((row: any) => {
-      const sym     = row.symbol as string;          // "PERP_BTC_USDC"
-      const name    = sym.replace("PERP_", "").replace("_USDC", ""); // "BTC"
-      const markPx  = parseFloat(row.mark_price  || row.index_price || "0");
-      const oi      = parseFloat(row.open_interest || "0") * markPx; // base → USD
-      // 24h_amount is the USD notional; 24h_volume is BASE units. The old code used
-      // base volume against USD OI → the ratio was ~markPx too big, so EVERY symbol
-      // tripped "HIGH CONCENTRATION". Compare like-for-like in USD.
-      const volBase = parseFloat(row["24h_volume"] || "0");
-      const vol24h  = parseFloat(row["24h_amount"] || "0") || volBase * markPx; // USD
-      // Orderly last_funding_rate is the settled 8h rate as a decimal → × 100 for %
-      const funding = parseFloat(row.last_funding_rate || row.estimated_funding_rate || "0") * 100;
+  // Pass 1 — raw USD metrics per symbol.
+  // 24h_amount is USD notional; 24h_volume is BASE units. The old code divided USD OI
+  // by BASE volume → ratio ~markPx too big → EVERY symbol tripped HIGH CONCENTRATION.
+  const raw = (d.data.rows as any[]).map((row: any) => {
+    const sym     = row.symbol as string;
+    const name    = sym.replace("PERP_", "").replace("_USDC", "");
+    const markPx  = parseFloat(row.mark_price  || row.index_price || "0");
+    const oi      = parseFloat(row.open_interest || "0") * markPx;
+    const volBase = parseFloat(row["24h_volume"] || "0");
+    const vol24h  = parseFloat(row["24h_amount"] || "0") || volBase * markPx; // USD
+    const funding = parseFloat(row.last_funding_rate || row.estimated_funding_rate || "0") * 100;
+    const oiVol   = vol24h > 0 ? oi / vol24h : 0; // OI as a multiple of daily USD turnover
+    return { name, symbol: sym, funding, oi, volume: vol24h, markPx, oiVol };
+  });
 
-      const oiVol = vol24h > 0 ? oi / vol24h : 0; // OI as a multiple of daily USD volume
+  // A concentration signal is only meaningful on a LIVE market — thin/dead symbols
+  // (near-zero volume) produce absurd oiVol (100×–900×) that would dominate as junk.
+  const MIN_SIGNAL_VOL = 100_000;
+  // Confidence = PERCENTILE of oiVol within its signal band, so it spreads across the
+  // range instead of every top symbol pinning a single cap value (a flat linear map
+  // saturated → looked like a fixed % on every symbol).
+  const concVols = raw.filter((a) => a.oiVol > 1.5 && a.volume > MIN_SIGNAL_VOL).map((a) => a.oiVol).sort((x, y) => x - y);
+  const elevVols = raw.filter((a) => a.oiVol > 0.9 && a.oiVol <= 1.5 && a.volume > MIN_SIGNAL_VOL).map((a) => a.oiVol).sort((x, y) => x - y);
+  const pctRank = (arr: number[], v: number) => arr.length < 2 ? 0.5 : arr.filter((x) => x < v).length / (arr.length - 1);
+
+  return raw
+    .map((a) => {
       let signal = "NEUTRAL", confidence = 50;
-
-      if (funding > 0.08) {
+      if (a.funding > 0.08) {
         signal = "CROWDED LONGS";
-        confidence = Math.min(95, 72 + Math.floor(funding * 40));
-      } else if (funding < -0.03) {
+        confidence = Math.min(95, 72 + Math.floor(a.funding * 40));
+      } else if (a.funding < -0.03) {
         signal = "CROWDED SHORTS";
-        confidence = Math.min(95, 72 + Math.floor(Math.abs(funding) * 80));
-      } else if (oiVol > 1.5) {
-        // Confidence scales with HOW concentrated OI is vs daily turnover (real,
-        // per-symbol) instead of a flat 78% — sticky, illiquid OI is the signal.
+        confidence = Math.min(95, 72 + Math.floor(Math.abs(a.funding) * 80));
+      } else if (a.oiVol > 1.5 && a.volume > MIN_SIGNAL_VOL) {
         signal = "HIGH CONCENTRATION";
-        confidence = Math.min(92, 60 + Math.round((oiVol - 1.5) * 20));
-      } else if (oiVol > 0.9) {
+        confidence = 64 + Math.round(pctRank(concVols, a.oiVol) * 28); // 64–92, spread
+      } else if (a.oiVol > 0.9 && a.volume > MIN_SIGNAL_VOL) {
         signal = "ELEVATED OI";
-        confidence = Math.min(75, 55 + Math.round((oiVol - 0.9) * 30));
+        confidence = 54 + Math.round(pctRank(elevVols, a.oiVol) * 18); // 54–72, spread
       }
-
-      return { name, symbol: sym, funding, oi, volume: vol24h, markPx, signal, confidence };
+      return { name: a.name, symbol: a.symbol, funding: a.funding, oi: a.oi, volume: a.volume, markPx: a.markPx, signal, confidence };
     })
     .filter((a: HLAsset) => a.oi > 10_000)  // Orderly OI is smaller than HL — lower threshold
     .sort((a: HLAsset, b: HLAsset) => b.oi - a.oi)
