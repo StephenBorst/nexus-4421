@@ -30,6 +30,27 @@ import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./b
 // wrangler bundles the cross-dir import (same as backtest.mjs).
 import { directiveLevels } from "../nexus-agent-exec/logic.mjs";
 
+// Orderly sits behind Cloudflare bot-management, which intermittently serves an HTML
+// 403 challenge to header-light Worker fetches — which would break the mini-app money
+// path (register / key / trade / close / withdraw), /agents/live mark-price, and
+// backtest data reads. Rather than touch ~30 call sites in this money-path worker, wrap
+// the global fetch ONCE to attach realistic browser headers to Orderly requests only;
+// every non-Orderly fetch (Supabase, RPC, Anthropic) passes through untouched. Mirrors
+// the header fix in nexus-agent-exec / -brain.
+const ORDERLY_BROWSER_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+  "Accept": "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+};
+const _origFetch = globalThis.fetch.bind(globalThis);
+globalThis.fetch = (input, init = {}) => {
+  const url = typeof input === "string" ? input : (input && input.url) || "";
+  if (url.includes("api-evm.orderly.org")) {
+    init = { ...init, headers: { ...ORDERLY_BROWSER_HEADERS, ...(init.headers || {}) } };
+  }
+  return _origFetch(input, init);
+};
+
 // URL-safe random token (hook secret / passphrase). Crypto-strong via Web Crypto.
 function randToken(bytes = 24) {
   const a = crypto.getRandomValues(new Uint8Array(bytes));

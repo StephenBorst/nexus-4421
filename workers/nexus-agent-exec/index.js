@@ -477,7 +477,7 @@ async function processUser(address, env, cache) {
 
   // Flat: recover any untracked live position (ghost) before doing anything else —
   // if the exchange holds a position the agent lost track of, re-adopt + manage it
-  // next tick rather than opening a new one on top. AUTONOMOUS-only, rate-limited.
+  // next tick rather than opening a new one on top. AUTONOMOUS-only.
   if (config.mode === "AUTONOMOUS" && await adoptOrphanPosition(address, state, config, env, cache)) return;
 
   // Flat: make sure no published feed card is still stuck ACTIVE (zombie cleanup).
@@ -767,6 +767,14 @@ async function monitorPosition(address, state, config, env, cache) {
       keyData.tradingKey = await decryptTradingKey(keyData.tradingKey, env);
       const posRes = await orderlyRequest(keyData, "GET", `/v1/position/${pos.symbol}`);
       const liveQty = Math.abs(parseFloat(posRes?.data?.position_qty ?? 0));
+      // Grace window: a just-opened position may not have propagated to the position
+      // endpoint yet — a 0-qty read here would wrongly discard a REAL fill (→ ghost).
+      // Defer the reconcile-clear until the position has had time to settle; adoption
+      // self-heals anyway if we ever miss one.
+      if (Number.isFinite(liveQty) && liveQty < 1e-9 && Date.now() - pos.opened_at < 120000) {
+        console.log(`[exec] ${address.slice(0, 10)} exchange flat but position <2m old — deferring reconcile (fill may be propagating)`);
+        return;
+      }
       if (Number.isFinite(liveQty) && liveQty < 1e-9) {
         console.log(`[exec] ${address.slice(0, 10)} position flat on exchange (manual close?) — clearing stale record`);
         // Resolve the published feed card too — otherwise clearing state alone strands
