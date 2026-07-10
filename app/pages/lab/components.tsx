@@ -100,6 +100,57 @@ export function PnlChart({ points }: { points: number[] }) {
   );
 }
 
+// ─── Per-trade P&L bars ──────────────────────────────────
+// Companion to the cumulative curve: one bar per closed trade (green win / red
+// loss), heights scaled to the biggest |P&L| around a centered zero line. Shows
+// the DISTRIBUTION the equity line hides (a few big losses vs many small wins).
+export function PnlBars({ values }: { values: number[] }) {
+  const [w, setW] = useState(0);
+  const roRef = useRef<ResizeObserver | null>(null);
+  const measureRef = useCallback((node: HTMLDivElement | null) => {
+    roRef.current?.disconnect();
+    if (!node) return;
+    const read = () => { const cw = node.getBoundingClientRect().width; if (cw > 0) setW(cw); };
+    read();
+    if (typeof ResizeObserver !== "undefined") {
+      roRef.current = new ResizeObserver(read);
+      roRef.current.observe(node);
+    }
+  }, []);
+
+  if (values.length < 1) {
+    return (
+      <div style={{ height: 96, display: "flex", alignItems: "center", justifyContent: "center", color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>
+        no data yet
+      </div>
+    );
+  }
+
+  const cw = w || 720;
+  const h = 96, padY = 10;
+  const n = values.length;
+  const maxAbs = Math.max(1, ...values.map((v) => Math.abs(v)));
+  const gap = n > 80 ? 0.5 : n > 40 ? 1 : 2;
+  const bw = Math.max(1, (cw - (n - 1) * gap) / n);
+  const zeroY = h / 2;
+  const scale = (h / 2 - padY) / maxAbs;
+
+  return (
+    <div ref={measureRef} style={{ width: "100%", overflow: "hidden" }}>
+      <svg width={cw} height={h} viewBox={`0 0 ${cw} ${h}`} style={{ display: "block", maxWidth: "100%", overflow: "hidden" }}>
+        <line x1={0} y1={zeroY} x2={cw} y2={zeroY} stroke="#2a3a2a" strokeWidth="1" strokeDasharray="2 4" />
+        {values.map((v, i) => {
+          const x = i * (bw + gap);
+          const bh = Math.max(1, Math.abs(v) * scale);
+          const yy = v >= 0 ? zeroY - bh : zeroY;
+          const col = v >= 0 ? "#00ff88" : "#ff5555";
+          return <rect key={i} x={x.toFixed(1)} y={yy.toFixed(1)} width={bw.toFixed(1)} height={bh.toFixed(1)} fill={col} fillOpacity="0.8" />;
+        })}
+      </svg>
+    </div>
+  );
+}
+
 // ─── Empty State ─────────────────────────────────────────
 export function EmptyState({ message }: { message: string }) {
   return (

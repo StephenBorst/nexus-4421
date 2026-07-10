@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import type { ProcessedTrade } from "./types";
 import { cardStyle, labelStyle } from "./styles";
 import { formatPnl } from "./helpers";
-import { PnlChart, EmptyState } from "./components";
+import { PnlChart, PnlBars, EmptyState } from "./components";
 import { useIsMobile } from "./useIsMobile";
 
 // ─── Radar Chart ─────────────────────────────────────────
@@ -140,6 +140,7 @@ function TradingScoreSection({ orders, winRate }: { orders: ProcessedTrade[]; wi
 
 // ─── Breakdown Row ────────────────────────────────────────
 function BreakdownRow({ orders }: { orders: ProcessedTrade[] }) {
+  const isMobile = useIsMobile();
   const holdTime = useMemo(() => {
     const buckets = [
       { label: "<1h", maxMs: 3600000, pnl: 0, count: 0, wins: 0 },
@@ -200,7 +201,7 @@ function BreakdownRow({ orders }: { orders: ProcessedTrade[] }) {
   const maxDayTrades = Math.max(...weekday.days.map((d) => d.trades), 1);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginTop: 8 }}>
+    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(220px, 1fr))", gap: 8, marginTop: 8 }}>
       <div style={cardStyle}>
         <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; HOLD TIME</div>
         {holdTime.map((b) => (
@@ -563,6 +564,16 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
           ))}
         </div>
       </div>
+
+      {orders.length > 0 && (
+        <div style={{ ...cardStyle, marginBottom: 8 }}>
+          <div style={labelStyle}>&#9632; PER-TRADE P&amp;L</div>
+          <PnlBars values={orders.map((o) => o.pnl)} />
+          <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginTop: 4 }}>
+            <span style={{ color: "#00ff88" }}>■</span> win · <span style={{ color: "#ff5555" }}>■</span> loss · oldest → newest · {orders.length} trades
+          </div>
+        </div>
+      )}
 
       <TradingScoreSection orders={orders} winRate={winRate} />
       <BreakdownRow orders={orders} />
