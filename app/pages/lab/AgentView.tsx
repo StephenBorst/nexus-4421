@@ -2019,24 +2019,24 @@ export function AgentView() {
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>ENTRY</div>
                   <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 14 }}>
-                    ${agentState.current_position.entry_price.toLocaleString()}
+                    ${(agentState.current_position.entry_price ?? 0).toLocaleString()}
                   </div>
                 </div>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>CURRENT</div>
                   <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 14 }}>
-                    ${agentState.current_position.current_price.toLocaleString()}
+                    ${(agentState.current_position.current_price ?? agentState.current_position.entry_price ?? 0).toLocaleString()}
                   </div>
                 </div>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>P&L</div>
-                  <div style={{ color: agentState.current_position.pnl_percent >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: 600 }}>
-                    {agentState.current_position.pnl_percent >= 0 ? "+" : ""}{agentState.current_position.pnl_percent.toFixed(3)}%
+                  <div style={{ color: (agentState.current_position.pnl_percent ?? 0) >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: 600 }}>
+                    {(agentState.current_position.pnl_percent ?? 0) >= 0 ? "+" : ""}{(agentState.current_position.pnl_percent ?? 0).toFixed(3)}%
                   </div>
                 </div>
               </div>
               <div style={{ marginTop: 8, color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
-                HELD FOR: {formatAgentTime(Date.now() - agentState.current_position.opened_at)} / {config.maxHoldHours}h max
+                HELD FOR: {formatAgentTime(Date.now() - (agentState.current_position.opened_at ?? Date.now()))} / {config.maxHoldHours}h max
               </div>
             </div>
           )}
