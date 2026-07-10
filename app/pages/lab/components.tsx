@@ -104,7 +104,7 @@ export function PnlChart({ points }: { points: number[] }) {
 // Companion to the cumulative curve: one bar per closed trade (green win / red
 // loss), heights scaled to the biggest |P&L| around a centered zero line. Shows
 // the DISTRIBUTION the equity line hides (a few big losses vs many small wins).
-export function PnlBars({ values }: { values: number[] }) {
+export function PnlBars({ values, labels }: { values: number[]; labels?: string[] }) {
   const [w, setW] = useState(0);
   const roRef = useRef<ResizeObserver | null>(null);
   const measureRef = useCallback((node: HTMLDivElement | null) => {
@@ -144,7 +144,17 @@ export function PnlBars({ values }: { values: number[] }) {
           const bh = Math.max(1, Math.abs(v) * scale);
           const yy = v >= 0 ? zeroY - bh : zeroY;
           const col = v >= 0 ? "#00ff88" : "#ff5555";
-          return <rect key={i} x={x.toFixed(1)} y={yy.toFixed(1)} width={bw.toFixed(1)} height={bh.toFixed(1)} fill={col} fillOpacity="0.8" />;
+          const tip = labels?.[i] ?? `${v >= 0 ? "+" : "-"}$${Math.abs(v).toFixed(2)}`;
+          return (
+            <g key={i}>
+              {/* full-column transparent hit area so the tooltip triggers anywhere in
+                  the column, not just on a ~3px bar */}
+              <rect x={(x - gap / 2).toFixed(1)} y={0} width={(bw + gap).toFixed(1)} height={h} fill="transparent">
+                <title>{tip}</title>
+              </rect>
+              <rect x={x.toFixed(1)} y={yy.toFixed(1)} width={bw.toFixed(1)} height={bh.toFixed(1)} fill={col} fillOpacity="0.8" style={{ pointerEvents: "none" }} />
+            </g>
+          );
         })}
       </svg>
     </div>

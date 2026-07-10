@@ -568,7 +568,14 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
       {orders.length > 0 && (
         <div style={{ ...cardStyle, marginBottom: 8 }}>
           <div style={labelStyle}>&#9632; PER-TRADE P&amp;L</div>
-          <PnlBars values={orders.map((o) => o.pnl)} />
+          <PnlBars
+            values={orders.map((o) => o.pnl)}
+            labels={orders.map((o) => {
+              const sym = o.symbol.replace("PERP_", "").replace("_USDC", "");
+              const d = o.timestamp ? new Date(o.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+              return `${sym} ${o.direction}${d ? ` · ${d}` : ""} · ${o.pnl >= 0 ? "+" : "-"}$${Math.abs(o.pnl).toFixed(2)}`;
+            })}
+          />
           <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginTop: 4 }}>
             <span style={{ color: "#00ff88" }}>■</span> win · <span style={{ color: "#ff5555" }}>■</span> loss · oldest → newest · {orders.length} trades
           </div>

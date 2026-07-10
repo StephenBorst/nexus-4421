@@ -55,10 +55,13 @@ async function fetchMovers(): Promise<{ gainers: Mover[]; losers: Mover[] }> {
     fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=price_change_percentage_24h_asc&per_page=8&page=1&sparkline=false"),
   ]);
   const [gData, lData] = await Promise.all([gRes.json(), lRes.json()]);
+  // Stablecoins peg to $1 — they're noise in a movers list ("USDC -0.0%"), so drop them.
+  const STABLES = new Set(["USDT", "USDC", "DAI", "USDE", "FDUSD", "TUSD", "BUSD", "USDS", "PYUSD", "USDD", "GUSD", "FRAX", "LUSD"]);
   const toMover = (c: any): Mover => ({ symbol: c.symbol.toUpperCase(), change24h: c.price_change_percentage_24h ?? 0 });
+  const notStable = (c: any) => !STABLES.has(String(c.symbol || "").toUpperCase());
   return {
-    gainers: gData.filter((c: any) => c.price_change_percentage_24h > 0).slice(0, 6).map(toMover),
-    losers:  lData.filter((c: any) => c.price_change_percentage_24h < 0).slice(0, 6).map(toMover),
+    gainers: gData.filter((c: any) => c.price_change_percentage_24h > 0 && notStable(c)).slice(0, 6).map(toMover),
+    losers:  lData.filter((c: any) => c.price_change_percentage_24h < 0 && notStable(c)).slice(0, 6).map(toMover),
   };
 }
 
@@ -74,11 +77,15 @@ async function fetchHyperliquid(): Promise<HLAsset[]> {
       const name    = sym.replace("PERP_", "").replace("_USDC", ""); // "BTC"
       const markPx  = parseFloat(row.mark_price  || row.index_price || "0");
       const oi      = parseFloat(row.open_interest || "0") * markPx; // base → USD
-      const vol24h  = parseFloat(row["24h_volume"] || row["24h_amount"] || "0");
+      // 24h_amount is the USD notional; 24h_volume is BASE units. The old code used
+      // base volume against USD OI → the ratio was ~markPx too big, so EVERY symbol
+      // tripped "HIGH CONCENTRATION". Compare like-for-like in USD.
+      const volBase = parseFloat(row["24h_volume"] || "0");
+      const vol24h  = parseFloat(row["24h_amount"] || "0") || volBase * markPx; // USD
       // Orderly last_funding_rate is the settled 8h rate as a decimal → × 100 for %
       const funding = parseFloat(row.last_funding_rate || row.estimated_funding_rate || "0") * 100;
 
-      const oiVol = vol24h > 0 ? oi / vol24h : 0;
+      const oiVol = vol24h > 0 ? oi / vol24h : 0; // OI as a multiple of daily USD volume
       let signal = "NEUTRAL", confidence = 50;
 
       if (funding > 0.08) {
@@ -87,12 +94,14 @@ async function fetchHyperliquid(): Promise<HLAsset[]> {
       } else if (funding < -0.03) {
         signal = "CROWDED SHORTS";
         confidence = Math.min(95, 72 + Math.floor(Math.abs(funding) * 80));
-      } else if (oiVol > 3) {
+      } else if (oiVol > 1.5) {
+        // Confidence scales with HOW concentrated OI is vs daily turnover (real,
+        // per-symbol) instead of a flat 78% — sticky, illiquid OI is the signal.
         signal = "HIGH CONCENTRATION";
-        confidence = 78;
-      } else if (oiVol > 2) {
+        confidence = Math.min(92, 60 + Math.round((oiVol - 1.5) * 20));
+      } else if (oiVol > 0.9) {
         signal = "ELEVATED OI";
-        confidence = 65;
+        confidence = Math.min(75, 55 + Math.round((oiVol - 0.9) * 30));
       }
 
       return { name, symbol: sym, funding, oi, volume: vol24h, markPx, signal, confidence };
@@ -100,33 +109,6 @@ async function fetchHyperliquid(): Promise<HLAsset[]> {
     .filter((a: HLAsset) => a.oi > 10_000)  // Orderly OI is smaller than HL — lower threshold
     .sort((a: HLAsset, b: HLAsset) => b.oi - a.oi)
     .slice(0, 30);
-}
-
-async function fetchBinanceDeriv(sym: string): Promise<DerivAsset | null> {
-  try {
-    const [fRes, oiRes] = await Promise.all([
-      fetch(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${sym}USDT`),
-      fetch(`https://fapi.binance.com/fapi/v1/openInterest?symbol=${sym}USDT`),
-    ]);
-    if (!fRes.ok || !oiRes.ok) return null;
-    const [fd, oid] = await Promise.all([fRes.json(), oiRes.json()]);
-    const mark = parseFloat(fd.markPrice);
-    return {
-      funding: parseFloat(fd.lastFundingRate) * 100, // 8 h %
-      oi:      parseFloat(oid.openInterest)   * mark,
-    };
-  } catch { return null; }
-}
-
-async function fetchBinanceLS(sym: string): Promise<number | null> {
-  try {
-    const r = await fetch(
-      `https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=${sym}USDT&period=5m&limit=1`
-    );
-    if (!r.ok) return null;
-    const d = await r.json();
-    return parseFloat(d[0]?.longShortRatio);
-  } catch { return null; }
 }
 
 // ─── Regime score ─────────────────────────────────────────────
@@ -248,7 +230,6 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
   const [globalData, setGlobalData] = useState<GlobalData    | null>(null);
   const [movers,     setMovers]     = useState<{ gainers: Mover[]; losers: Mover[] } | null>(null);
   const [hlAssets,   setHlAssets]   = useState<HLAsset[]     | null>(null);
-  const [binance,    setBinance]    = useState<Record<string, DerivAsset>>({});
   const [lsRatios,   setLsRatios]   = useState<Record<string, number | null>>({});
   const [loading,    setLoading]    = useState(true);
   const [countdown,  setCountdown]  = useState(REFRESH_INTERVAL);
@@ -295,26 +276,16 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
       if (mv.status === "fulfilled") setMovers(mv.value);
       if (hl.status === "fulfilled") setHlAssets(hl.value);
 
-      // Binance (may fail due to CORS – graceful fallback to HL data)
-      const [btcD, ethD, solD, btcLS, ethLS, solLS] = await Promise.allSettled([
-        fetchBinanceDeriv("BTC"),
-        fetchBinanceDeriv("ETH"),
-        fetchBinanceDeriv("SOL"),
-        fetchBinanceLS("BTC"),
-        fetchBinanceLS("ETH"),
-        fetchBinanceLS("SOL"),
-      ]);
-      const bd: Record<string, DerivAsset> = {};
-      if (btcD.status === "fulfilled" && btcD.value) bd["BTC"] = btcD.value;
-      if (ethD.status === "fulfilled" && ethD.value) bd["ETH"] = ethD.value;
-      if (solD.status === "fulfilled" && solD.value) bd["SOL"] = solD.value;
-      setBinance(bd);
-
-      const ls: Record<string, number | null> = {};
-      ls["BTC"] = btcLS.status === "fulfilled" ? btcLS.value : null;
-      ls["ETH"] = ethLS.status === "fulfilled" ? ethLS.value : null;
-      ls["SOL"] = solLS.status === "fulfilled" ? solLS.value : null;
-      setLsRatios(ls);
+      // Real long/short ACCOUNT ratio via our OKX proxy (Binance 451s from most
+      // regions incl. the US; OKX is open + not geo-fenced). Funding/OI already come
+      // from Orderly (getDerivData), so we no longer need Binance for those either.
+      try {
+        const r = await fetch("https://og.nexustradinglabs.com/proxy/ls?symbols=BTC,ETH,SOL");
+        if (r.ok) {
+          const d = await r.json();
+          setLsRatios(d?.ls ?? {});
+        }
+      } catch { /* fail-soft — L/S renders "—" */ }
 
       setTimestamp(new Date().toLocaleTimeString());
       setCountdown(REFRESH_INTERVAL);
@@ -339,7 +310,6 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
   const regime = computeRegime(fearGreed, globalData, hlAssets);
 
   const getDerivData = (sym: string): DerivAsset | null => {
-    if (binance[sym]) return binance[sym];
     const a = hlAssets?.find(h => h.name === sym);
     return a ? { funding: a.funding, oi: a.oi } : null;
   };

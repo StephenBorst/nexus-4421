@@ -3244,6 +3244,30 @@ document.getElementById("btn").addEventListener("click",go);
     // "Is this extreme?" context. FUNDING percentile uses Orderly's months of
     // funding history (rich NOW); OI percentile uses our recorded oi:hist (matures
     // over weeks → `building` until it has enough samples). Public read-only.
+    // ── /proxy/ls?symbols=BTC,ETH,SOL — real long/short ACCOUNT ratio ──────────
+    // Market Intel needs a live L/S ratio + a real long/short liquidation lean.
+    // Binance's endpoint 451s from restricted regions (incl. our worker + most US
+    // users), so we source it from OKX's public rubik stats (no key, not geo-fenced)
+    // and proxy server-side to dodge CORS. Returns { BTC: 1.25, ... }; null when a
+    // symbol has no data. Fail-soft per symbol so one gap never blanks the rest.
+    if (parts[0] === "proxy" && parts[1] === "ls" && request.method === "GET") {
+      const syms = (url.searchParams.get("symbols") || "BTC,ETH,SOL")
+        .split(",").map((s) => s.trim().toUpperCase()).filter(Boolean).slice(0, 12);
+      const out = {};
+      await Promise.all(syms.map(async (sym) => {
+        out[sym] = null;
+        try {
+          const r = await fetch(`https://www.okx.com/api/v5/rubik/stat/contracts/long-short-account-ratio?ccy=${sym}&period=5m`);
+          if (!r.ok) return;
+          const d = await r.json();
+          const latest = d?.data?.[0]; // [ts, ratio], newest first
+          const v = latest ? parseFloat(latest[1]) : NaN;
+          if (Number.isFinite(v)) out[sym] = Math.round(v * 1000) / 1000;
+        } catch { /* leave null */ }
+      }));
+      return json({ ls: out, source: "okx", ts: Date.now() }, request);
+    }
+
     if (parts[0] === "signals" && parts[1] === "context" && parts[2] && request.method === "GET") {
       const symbol = parts[2];
       const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
