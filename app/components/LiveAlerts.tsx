@@ -82,7 +82,7 @@ export default function LiveAlerts() {
           style={{ textDecoration: "none", background: "#141416", border: `1px solid ${t.direction === "LONG" ? "#33333a" : "#4a1a1a"}`, borderRadius: 6, padding: "9px 11px", fontFamily: "var(--nx-font-mono)", display: "flex", alignItems: "center", gap: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.5)" }}
         >
           <span style={{ fontSize: 13 }}>🔔</span>
-          <span style={{ fontSize: 11, color: "#e8f0ea" }}>
+          <span style={{ fontSize: 11, color: "#f4f4f5" }}>
             <b style={{ color: "#fff" }}>{t.who}</b> opened{" "}
             <b style={{ color: t.direction === "LONG" ? green : red }}>{t.direction === "LONG" ? "↑" : "↓"} {t.direction} {tk(t.symbol)}</b>
           </span>

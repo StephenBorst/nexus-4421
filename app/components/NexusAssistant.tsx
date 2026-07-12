@@ -52,7 +52,7 @@ function inline(text: string): React.ReactNode {
   // Order matters: match **bold** before *italic*.
   return text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).map((p, i) => {
     if (p.startsWith("**") && p.endsWith("**")) return <b key={i} style={{ color: "#fff" }}>{p.slice(2, -2)}</b>;
-    if (p.startsWith("*") && p.endsWith("*")) return <i key={i} style={{ color: "#a8c8b8" }}>{p.slice(1, -1)}</i>;
+    if (p.startsWith("*") && p.endsWith("*")) return <i key={i} style={{ color: "#d4d4d8" }}>{p.slice(1, -1)}</i>;
     if (p.startsWith("`") && p.endsWith("`")) return <code key={i} style={{ color: "#ededf0", background: "#141416", padding: "0 3px", borderRadius: 2 }}>{p.slice(1, -1)}</code>;
     return p;
   });
@@ -578,7 +578,7 @@ export default function NexusAssistant() {
           </div>
 
           {/* Composer */}
-          <div style={{ borderTop: "1px solid #232327", padding: 10, display: "flex", gap: 8, alignItems: "flex-end", background: "#0a0e0a" }}>
+          <div style={{ borderTop: "1px solid #232327", padding: 10, display: "flex", gap: 8, alignItems: "flex-end", background: "#0a0a0b" }}>
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}

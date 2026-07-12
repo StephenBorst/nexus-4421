@@ -80,7 +80,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
     <div style={{
       ...cardStyle,
       border: `1px solid ${cfg.border}`,
-      background: isClosed ? "#0a0c0a" : "#141416",
+      background: isClosed ? "#0a0a0b" : "#141416",
       opacity: t.status === "INVALIDATED" ? 0.7 : 1,
     }}>
       {/* Top row */}

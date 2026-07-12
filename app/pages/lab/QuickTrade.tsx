@@ -68,7 +68,7 @@ function snapQty(raw: number, baseTick: number, baseMin: number): number {
 
 const card: React.CSSProperties = { background: "#141416", border: "1px solid #232327", borderRadius: 6, padding: 16 };
 const label: React.CSSProperties = { fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.1em", color: "#71717a" };
-const input: React.CSSProperties = { background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4, color: "#e8f0ea", fontFamily: "var(--nx-font-mono)", fontSize: 14, padding: "8px 10px", width: "100%", boxSizing: "border-box" };
+const input: React.CSSProperties = { background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4, color: "#f4f4f5", fontFamily: "var(--nx-font-mono)", fontSize: 14, padding: "8px 10px", width: "100%", boxSizing: "border-box" };
 
 export function QuickTrade() {
   const { state: accountState } = useAccount();
@@ -224,7 +224,7 @@ export function QuickTrade() {
             { l: "MARGIN", v: `$${margin.toFixed(2)}` },
             { l: "EST. QTY", v: qty > 0 ? `${qty} ${tk(symbol)}` : "—" },
           ].map(({ l, v }) => (
-            <div key={l}><div style={label}>{l}</div><div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, color: "#e8f0ea", fontWeight: 600 }}>{v}</div></div>
+            <div key={l}><div style={label}>{l}</div><div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, color: "#f4f4f5", fontWeight: 600 }}>{v}</div></div>
           ))}
         </div>
         {tooSmall && notional > 0 && (

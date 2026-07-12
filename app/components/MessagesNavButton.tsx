@@ -89,7 +89,7 @@ export default function MessagesNavButton() {
         justifyContent: "center",
         width: 28,
         height: 28,
-        color: "var(--oui-color-base-contrast-54, #b0b8b0)",
+        color: "var(--oui-color-base-contrast-54, #d4d4d8)",
         textDecoration: "none",
       }}
     >

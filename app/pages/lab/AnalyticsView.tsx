@@ -531,12 +531,12 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
         </div>
         <div style={cardStyle}>
           <div style={labelStyle}>TRADES</div>
-          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#e8f0ea" }}>{orders.length}</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#f4f4f5" }}>{orders.length}</div>
           <div style={{ fontSize: 10, color: "#52525b", marginTop: 4, fontFamily: "var(--nx-font-mono)" }}>closed</div>
         </div>
         <div style={cardStyle}>
           <div style={labelStyle}>BALANCE</div>
-          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#e8f0ea" }}>{collateral > 0 ? `$${collateral.toFixed(2)}` : "—"}</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#f4f4f5" }}>{collateral > 0 ? `$${collateral.toFixed(2)}` : "—"}</div>
           <div style={{ fontSize: 10, color: "#52525b", marginTop: 4, fontFamily: "var(--nx-font-mono)" }}>usdc</div>
         </div>
       </div>
@@ -559,7 +559,7 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
           ].map((r) => (
             <div key={r.label} style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 9, color: "#52525b", letterSpacing: "0.08em", fontFamily: "var(--nx-font-mono)" }}>{r.label}</div>
-              <div style={{ fontSize: 18, color: r.tone === "pos" ? "#3ecf8e" : r.tone === "neg" ? "#f7525f" : "#e8f0ea", fontFamily: "var(--nx-font-mono)" }}>{r.value}</div>
+              <div style={{ fontSize: 18, color: r.tone === "pos" ? "#3ecf8e" : r.tone === "neg" ? "#f7525f" : "#f4f4f5", fontFamily: "var(--nx-font-mono)" }}>{r.value}</div>
             </div>
           ))}
         </div>

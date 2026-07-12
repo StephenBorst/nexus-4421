@@ -11,7 +11,7 @@ const RED    = "#f7525f";
 const YELLOW = "#fbbf24";
 const DIM    = "#71717a";
 const MUTED  = "#a1a1aa";
-const BRIGHT = "#e8f0ea";
+const BRIGHT = "#f4f4f5";
 
 // ─── Types ────────────────────────────────────────────────────
 interface FearGreedData  { value: number; label: string }

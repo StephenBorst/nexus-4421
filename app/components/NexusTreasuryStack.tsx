@@ -46,7 +46,7 @@ export function NexusTreasuryStack({ compact = false }: { compact?: boolean }) {
     <div style={{
       display: "flex", alignItems: "center", gap: compact ? 12 : 20,
       padding: compact ? "8px 12px" : "12px 16px",
-      background: "#0d120d", border: "1px solid #232327", borderRadius: 4,
+      background: "#141416", border: "1px solid #232327", borderRadius: 4,
       fontFamily: "var(--nx-font-mono)",
     }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>

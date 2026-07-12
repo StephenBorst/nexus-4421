@@ -94,7 +94,7 @@ export default function AnalyzePage() {
   }, [trades]);
 
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px 80px", fontFamily: mono, color: "#e8f0ea" }}>
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px 80px", fontFamily: mono, color: "#f4f4f5" }}>
       <div style={{ marginBottom: 6, fontSize: 11, letterSpacing: "0.15em", color: GREEN }}>// WALLET X-RAY</div>
       <h1 style={{ fontSize: 26, fontWeight: 800, margin: "0 0 8px", letterSpacing: "-0.01em" }}>
         X-ray any trader. <span style={{ color: GREEN }}>Grade the tape.</span>
@@ -145,7 +145,7 @@ export default function AnalyzePage() {
           </div>
           <AnalyticsView orders={trades} totalPnl={totalPnl} winRate={winRate} collateral={0} />
           <div style={{ marginTop: 24, padding: "16px 18px", border: `1px solid #232327`, borderRadius: 8, background: "#141416", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ fontSize: 13, color: "#e8f0ea" }}>Like what you see? Build a track record nobody can fake.</div>
+            <div style={{ fontSize: 13, color: "#f4f4f5" }}>Like what you see? Build a track record nobody can fake.</div>
             <a href="/lab" style={{ background: GREEN, color: "#141416", textDecoration: "none", borderRadius: 6, padding: "10px 20px", fontFamily: mono, fontWeight: 700, fontSize: 12, letterSpacing: "0.06em" }}>OPEN THE LAB →</a>
           </div>
         </>

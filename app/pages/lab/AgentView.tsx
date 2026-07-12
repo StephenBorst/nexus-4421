@@ -1507,7 +1507,7 @@ export function AgentView() {
               ].map(({ label, value }) => (
                 <div key={label}>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
-                  <div style={{ color: "#e8f0ea", fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>{value}</div>
+                  <div style={{ color: "#f4f4f5", fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>{value}</div>
                 </div>
               ))}
             </div>
@@ -1604,7 +1604,7 @@ export function AgentView() {
                           <div style={{ marginTop: 8, overflowX: "auto" }}>
                             <div style={{ minWidth: 320 }}>
                               {validation.perSymbol.map((s: any) => (
-                                <div key={s.symbol} style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "3px 0", borderTop: "1px solid #10160f" }}>
+                                <div key={s.symbol} style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "3px 0", borderTop: "1px solid #141416" }}>
                                   <span style={{ width: 46, color: "#c0c0c0" }}>{s.symbol.replace("PERP_", "").replace("_USDC", "")}</span>
                                   <span style={{ width: 66, textAlign: "right", color: s.net >= 0 ? "#3ecf8e" : "#f7525f" }}>{s.net >= 0 ? "+" : ""}${s.net}</span>
                                   <span style={{ width: 54, textAlign: "right", color: "#a1a1aa" }}>{s.foldsPositive}/{validation.folds}f</span>
@@ -1634,8 +1634,8 @@ export function AgentView() {
                           <span>STRATEGY</span><span style={{ textAlign: "right" }}>NET$</span><span style={{ textAlign: "right" }}>WIN%</span><span style={{ textAlign: "right" }}>TRADES</span>
                         </div>
                         {sweep.results.slice(0, 12).map((r: any, i: number) => (
-                          <div key={i} onClick={() => r.config && applySweepConfig(r.config)} title="Apply this config to the editor above" style={{ display: "grid", gridTemplateColumns: "1fr 70px 52px 56px", gap: 6, fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "5px 4px", borderBottom: "1px solid #10160f", color: "#a1a1aa", cursor: r.config ? "pointer" : "default", borderRadius: 3 }}
-                            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "#0f1613"; }}
+                          <div key={i} onClick={() => r.config && applySweepConfig(r.config)} title="Apply this config to the editor above" style={{ display: "grid", gridTemplateColumns: "1fr 70px 52px 56px", gap: 6, fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "5px 4px", borderBottom: "1px solid #141416", color: "#a1a1aa", cursor: r.config ? "pointer" : "default", borderRadius: 3 }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "#141416"; }}
                             onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}>
                             <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{i === 0 ? "★ " : ""}{r.name}</span>
                             <span style={{ textAlign: "right", color: r.netUsd >= 0 ? "#3ecf8e" : "#f7525f", fontWeight: 600 }}>{r.netUsd >= 0 ? "+" : ""}{r.netUsd}</span>

@@ -46,7 +46,7 @@
    strip seamless instead: force the page background to the app dark everywhere, and
    stop overscroll from revealing a different color. (Verified via ?vhdebug on Zerion.) */
 html, body, #root {
-  background: #0a0e0a !important;
+  background: #0a0a0b !important;
 }
 html, body {
   overscroll-behavior: none;

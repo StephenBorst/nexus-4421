@@ -154,9 +154,9 @@ export function TradeLogAllView({
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8, marginBottom: 16 }}>
         {[
           { label: "TOTAL PNL",   value: `${totalPnl >= 0 ? "+" : ""}$${Math.abs(totalPnl).toFixed(2)}`, color: totalPnl >= 0 ? "#3ecf8e" : "#f7525f" },
-          { label: "TRADING DAYS", value: String(sortedDays.length),  color: "#e8f0ea" },
+          { label: "TRADING DAYS", value: String(sortedDays.length),  color: "#f4f4f5" },
           { label: "WIN DAYS",    value: `${winDays} / ${sortedDays.length}`, color: "#ededf0" },
-          { label: "TOTAL TRADES", value: String(totalTrades),         color: "#e8f0ea" },
+          { label: "TOTAL TRADES", value: String(totalTrades),         color: "#f4f4f5" },
         ].map(r => (
           <div key={r.label} style={cardStyle}>
             <div style={labelStyle}>{r.label}</div>
@@ -201,7 +201,7 @@ export function TradeLogAllView({
                 borderColor: g.pnl >= 0 ? "#232327" : "#3a1a1a",
                 transition: "background 0.15s",
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = "#101810")}
+              onMouseEnter={e => (e.currentTarget.style.background = "#141416")}
               onMouseLeave={e => (e.currentTarget.style.background = "#141416")}
             >
               {/* date */}
