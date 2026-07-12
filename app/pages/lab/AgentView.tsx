@@ -100,7 +100,7 @@ function AgentTrackRecord({ title, accent, trades, paper, onReset, summary }: {
         </div>
       </div>
       {tr === 0 ? (
-        <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 11, marginTop: 8, lineHeight: 1.6 }}>
+        <div style={{ color: "#71717a", fontFamily: "var(--nx-font-ui)", fontSize: 11, marginTop: 8, lineHeight: 1.6 }}>
           {paper
             ? <>No paper trades yet — switch to 🧪 PAPER and activate to build a simulated track record against live prices. Risk-free.</>
             : <>No live track record yet — this agent hasn't traded for you. Stats build here transparently from its first trade. <strong style={{ color: "#a1a1aa" }}>Start small.</strong></>}
@@ -121,7 +121,7 @@ function AgentTrackRecord({ title, accent, trades, paper, onReset, summary }: {
               </div>
             ))}
           </div>
-          <div style={{ marginTop: 10, fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", lineHeight: 1.5 }}>
+          <div style={{ marginTop: 10, fontFamily: "var(--nx-font-ui)", fontSize: 9, color: "#52525b", lineHeight: 1.5 }}>
             {paper
               ? "🧪 Simulated results — paper trades never touch the exchange. A great paper record is encouraging, not a guarantee."
               : "⚠ Past performance does not guarantee future results. Markets are risky — only deploy capital you can afford to lose, and start small."}
@@ -804,7 +804,7 @@ export function AgentView() {
       {prefillNotice && (
         <div style={{ ...agentCardStyle, borderColor: "#fbbf24", background: "#1a1400", marginBottom: 12, display: "flex", gap: 10, alignItems: "flex-start" }}>
           <span style={{ color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontSize: 13, flexShrink: 0 }}>⚠</span>
-          <span style={{ color: "#e8d59a", fontFamily: "var(--nx-font-mono)", fontSize: 12, lineHeight: 1.5, flex: 1 }}>{prefillNotice}</span>
+          <span style={{ color: "#e8d59a", fontFamily: "var(--nx-font-ui)", fontSize: 12, lineHeight: 1.5, flex: 1 }}>{prefillNotice}</span>
           <span onClick={() => setPrefillNotice(null)} title="Dismiss" style={{ cursor: "pointer", color: "#fbbf24", flexShrink: 0 }}>✕</span>
         </div>
       )}
@@ -877,7 +877,7 @@ export function AgentView() {
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 11, color: "#ededf0", fontFamily: "var(--nx-font-mono)", lineHeight: 1.5, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "#ededf0", fontFamily: "var(--nx-font-ui)", lineHeight: 1.5, marginBottom: 12 }}>
               The agent enters {isLong ? "LONG" : "SHORT"} {tk} and manages to your stop/targets (scale-out, trailing, breakeven, timeout). It stops after this one trade.
             </div>
             {/* Entry type: fill now (MARKET) vs wait for a price (LIMIT) */}
@@ -918,7 +918,7 @@ export function AgentView() {
               ))}
             </div>
             {live && (
-              <div style={{ fontSize: 10, color: "#ff8800", fontFamily: "var(--nx-font-mono)", lineHeight: 1.5, marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: "#ff8800", fontFamily: "var(--nx-font-ui)", lineHeight: 1.5, marginBottom: 10 }}>
                 ⚠ REAL FUNDS. This places a live market order on your next tick (~1 min) via your order-only key (cannot withdraw). Confirming = &quot;GO LIVE&quot;.
               </div>
             )}
@@ -1007,7 +1007,7 @@ export function AgentView() {
                 );
               })}
             </div>
-            <div style={{ color: "#52525b", fontFamily: "var(--nx-font-mono)", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
+            <div style={{ color: "#52525b", fontFamily: "var(--nx-font-ui)", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
               Nexus's agent lives in the day-to-swing middle. Scalping (seconds) needs sub-minute data the funding edge doesn't use; position trading is buy-and-hold — neither fits this tool, so we don't fake them.
             </div>
           </div>
@@ -1037,7 +1037,7 @@ export function AgentView() {
                       <span style={{ fontSize: 12, color: locked ? "#52525b" : "#fff", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{p.name}{locked ? " ◆" : ""}</span>
                     </div>
                     <div style={{ fontSize: 8, color: p.accent, fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em", marginBottom: 6 }}>{p.tag}</div>
-                    <div style={{ fontSize: 9.5, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", lineHeight: 1.5 }}>{p.blurb}</div>
+                    <div style={{ fontSize: 9.5, color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", lineHeight: 1.5 }}>{p.blurb}</div>
                   </button>
                 );
               })}
@@ -1060,7 +1060,7 @@ export function AgentView() {
             return (
               <div style={{ ...agentCardStyle, borderColor: "#33333a", background: "#1a1a1e" }}>
                 <div style={{ ...agentLabelStyle, color: "#ededf0" }}>🎓 READY TO GO LIVE?</div>
-                <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 12, lineHeight: 1.6, marginTop: 8 }}>
+                <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 12, lineHeight: 1.6, marginTop: 8 }}>
                   Your paper agent is proven — <strong style={{ color: "#ededf0" }}>+${net.toFixed(2)}</strong> over{" "}
                   <strong style={{ color: "#fff" }}>{pt.length}</strong> simulated trades ({wr}% win rate). Same strategy,
                   same guardrails — switch it to live to put it to work for real.

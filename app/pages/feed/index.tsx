@@ -352,7 +352,7 @@ function CopyModal({
         {/* Attribution preview */}
         <div style={{ marginBottom: 14, padding: 8, background: "#0f0f11", borderRadius: 3, border: "1px solid #232327" }}>
           <div style={labelStyle}>ATTRIBUTION (auto-added to notes)</div>
-          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#a1a1aa", lineHeight: 1.5 }}>
+          <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9, color: "#a1a1aa", lineHeight: 1.5 }}>
             📋 Copied from {traderName}
           </div>
         </div>
@@ -1048,7 +1048,7 @@ function FeedEmptyState({ variant }: { variant: "feed" | "ranks" }) {
       <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 20, color: "#fff", fontWeight: "bold", marginBottom: 8, letterSpacing: "0.02em" }}>
         {isRanks ? "The leaderboard is wide open." : "The signal starts here."}
       </div>
-      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#a1a1aa", lineHeight: 1.6, marginBottom: 26 }}>
+      <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 12, color: "#a1a1aa", lineHeight: 1.6, marginBottom: 26 }}>
         {isRanks
           ? "No traders ranked yet — rankings build as theses get published and closed out. Publish yours and claim rank #1."
           : "No public theses yet. Publish one from your Lab and it lands in the live feed — others can follow, copy, and grade it. Be the first signal."}
@@ -1058,7 +1058,7 @@ function FeedEmptyState({ variant }: { variant: "feed" | "ranks" }) {
           <div key={s.n} style={{ background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4, padding: "12px 14px" }}>
             <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#ededf0", marginBottom: 6 }}>{s.n}</div>
             <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#fff", fontWeight: "bold", marginBottom: 4 }}>{s.title}</div>
-            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#52525b", lineHeight: 1.5 }}>{s.desc}</div>
+            <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 10, color: "#52525b", lineHeight: 1.5 }}>{s.desc}</div>
           </div>
         ))}
       </div>
@@ -1092,7 +1092,7 @@ function ContributePrompt({ prominent = false }: { prominent?: boolean }) {
         <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: prominent ? 14 : 12, color: "#ededf0", fontWeight: "bold", marginBottom: 4 }}>
           {prominent ? "📡 Be the first verified caller on Nexus" : "📡 The feed's still early — claim your spot"}
         </div>
-        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: prominent ? 11 : 10, color: "#a1a1aa", lineHeight: 1.6 }}>
+        <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: prominent ? 11 : 10, color: "#a1a1aa", lineHeight: 1.6 }}>
           {prominent
             ? "Post a call (symbol · direction · entry/stop/target) — it's graded against public price on-chain, not self-reported. 5 graded calls = Verified Caller. Get in before the board fills up."
             : "Publish a thesis and it's graded against public price, on-chain. Early callers build rep fastest — get to 5 graded calls and you're a Verified Caller."}

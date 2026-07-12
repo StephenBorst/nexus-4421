@@ -1135,7 +1135,7 @@ export function ThesisView() {
                         <span style={{ fontSize: 10, color: color ?? "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{val}</span>
                       </div>
                     ))}
-                    <div style={{ fontSize: 9, color: "#f7525f", fontFamily: "var(--nx-font-mono)", marginTop: 10, marginBottom: 10, lineHeight: 1.5 }}>
+                    <div style={{ fontSize: 9, color: "#f7525f", fontFamily: "var(--nx-font-ui)", marginTop: 10, marginBottom: 10, lineHeight: 1.5 }}>
                       ⚠ REAL FUNDS. This places a live order on Orderly<br />
                       with your connected wallet. Cannot be undone.
                     </div>
