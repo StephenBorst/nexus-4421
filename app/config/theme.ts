@@ -2,8 +2,9 @@
 // Promoted out of app/pages/lab/tokens.ts so every surface (Lab, Feed, Messages,
 // mini app, components) draws from the same system instead of 400+ hardcoded hexes.
 // Borrows Linear's DISCIPLINE (rationed accent, 4px spacing scale, defined type
-// scale, hierarchy by weight/tone not color) while keeping the ownable cypherpunk-
-// terminal identity: monospace + terminal green. Full reference: app/DESIGN.md.
+// scale, hierarchy by weight/tone not color). Identity (2026-07): editorial neutral
+// black + bone text + ONE blue accent; green reserved for profit. Full reference:
+// app/DESIGN.md.
 //
 // THE RULES (why it should feel calm + intuitive, not busy):
 //  1. ONE accent. `C.accent` (green) is reserved for the primary CTA + genuinely
@@ -35,32 +36,35 @@ export const MOTION = {
 } as const;
 
 // ── Color — surfaces stratified by luminance, ONE rationed accent ────────────
+// Editorial-black direction (2026-07): neutral near-black canvas + bone text +
+// ONE blue accent (interaction/brand). Green is DEMOTED to a data role — profit
+// only (`pos`) — so up/down P&L is the only chroma on a given screen. Red = loss.
 export const C = {
-  canvas: "#0a0e0a",
-  surface: "#111811",
-  surfaceAlt: "#0d120d",
-  inset: "#080c08",
-  border: "#1e2d1e",
-  borderStrong: "#2a3a2a",
-  borderAccent: "#00ff8850",
+  canvas: "#0a0a0b",
+  surface: "#141416",
+  surfaceAlt: "#0f0f11",
+  inset: "#08080a",
+  border: "#232327",
+  borderStrong: "#33333a",
+  borderAccent: "#2b7fff50",
   text: {
-    bright: "#e8f0ea", // primary values / headings
-    fog: "#8aaa9a",    // secondary text
-    muted: "#4a7a5a",  // labels
-    faint: "#3a5a4a",  // hints / captions
+    bright: "#f4f4f5", // primary values / headings (bone)
+    fog: "#a1a1aa",    // secondary text
+    muted: "#71717a",  // labels
+    faint: "#52525b",  // hints / captions
   },
-  accent: "#00ff88",
-  pos: "#00ff88",
-  neg: "#ff4444",
+  accent: "#2b7fff", // voltage blue — CTA + interaction, not P&L
+  pos: "#3ecf8e",    // profit / up / live
+  neg: "#f7525f",    // loss / down
   warn: "#fbbf24",
-  info: "#4a9fff",
+  info: "#3b82f6",
 } as const;
 
 // Status tints (thesis/agent states) — surface + border + text, from the palette.
 export const STATUS_TINT = {
-  active:  { color: C.info, bg: "#0a1a2a", border: "#1a3a5a" },
-  pos:     { color: C.pos, bg: "#0a2a0a", border: "#1a4a2a" },
-  neg:     { color: C.neg, bg: "#2a0a0a", border: "#4a1a1a" },
+  active:  { color: C.info, bg: "#0e1726", border: "#1e2f4a" },
+  pos:     { color: C.pos, bg: "#0c1f18", border: "#1a3d31" },
+  neg:     { color: C.neg, bg: "#241012", border: "#4a1e22" },
   warn:    { color: C.warn, bg: "#2a1a00", border: "#4a3a00" },
 } as const;
 
