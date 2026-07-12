@@ -33,14 +33,15 @@
   --oui-line-height-normal: 1.35;
   --oui-line-height-loose: 1.5;
 
-  /* colors — accent unified to the Nexus brand green #00ff88 (was teal 38D2C7) */
-  --oui-color-primary: 0 255 136;
-  --oui-color-primary-light: 77 255 160;
-  --oui-color-primary-darken: 0 204 109;
+  /* colors — MONOCHROME direction: brand/CTA accent = bone/white (matches logo +
+     banner). Profit stays green on the success/trading-profit tokens below. */
+  --oui-color-primary: 237 237 240;
+  --oui-color-primary-light: 255 255 255;
+  --oui-color-primary-darken: 212 212 216;
   --oui-color-primary-contrast: 0 0 0;
 
-  --oui-color-link: 0 255 136;
-  --oui-color-link-light: 77 255 160;
+  --oui-color-link: 237 237 240;
+  --oui-color-link-light: 255 255 255;
 
   --oui-color-secondary: 255 255 255;
   --oui-color-tertiary: 218 218 218;
@@ -51,9 +52,9 @@
   --oui-color-danger-darken: 237 72 122;
   --oui-color-danger-contrast: 255 255 255;
 
-  --oui-color-success: 0 255 136;
-  --oui-color-success-light: 77 255 160;
-  --oui-color-success-darken: 0 204 109;
+  --oui-color-success: 62 207 142;
+  --oui-color-success-light: 110 220 170;
+  --oui-color-success-darken: 45 170 115;
   --oui-color-success-contrast: 0 0 0;
 
   --oui-color-warning: 255 209 70;
@@ -81,24 +82,24 @@
 
   --oui-color-trading-loss: 217 139 139;        /* red sell text */
   --oui-color-trading-loss-contrast: 255 255 255;
-  --oui-color-trading-profit: 0 255 136;         /* green buy text (Nexus green) */
+  --oui-color-trading-profit: 62 207 142;        /* profit green (refined) */
   --oui-color-trading-profit-contrast: 0 0 0;
 
-  /* gradients */
-  --oui-gradient-primary-start: 0 255 136;
-  --oui-gradient-primary-end: 77 255 160;
+  /* gradients — brand/primary = bone/white (monochrome); success stays green (profit) */
+  --oui-gradient-primary-start: 212 212 216;
+  --oui-gradient-primary-end: 255 255 255;
 
-  --oui-gradient-secondary-start: 12 40 28;
-  --oui-gradient-secondary-end: 0 255 136;
+  --oui-gradient-secondary-start: 20 20 22;
+  --oui-gradient-secondary-end: 42 42 48;
 
-  --oui-gradient-success-start: 0 60 36;
-  --oui-gradient-success-end: 0 255 136;
+  --oui-gradient-success-start: 10 46 34;
+  --oui-gradient-success-end: 62 207 142;
 
   --oui-gradient-danger-start: 153 24 76;
   --oui-gradient-danger-end: 245 97 139;
 
-  --oui-gradient-brand-start: 0 255 136;
-  --oui-gradient-brand-end: 0 255 136;
+  --oui-gradient-brand-start: 237 237 240;
+  --oui-gradient-brand-end: 255 255 255;
   --oui-gradient-brand-stop-start: 6.62%;
   --oui-gradient-brand-stop-end: 86.5%;
   --oui-gradient-brand-angle: 17.44deg;
