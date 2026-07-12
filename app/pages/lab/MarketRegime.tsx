@@ -62,13 +62,18 @@ export function MarketRegime() {
 
   return (
     <div style={{ ...cardStyle, marginBottom: 14 }}>
-      <div style={{ fontSize: 10, color: "#ededf0", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>
-        &#9632; MARKET REGIME <span style={{ color: "#71717a" }}>— live, computed</span>
+      {/* Editorial header — mono eyebrow + serif headline + amber rule (Noodles-style). */}
+      <div style={{ fontSize: 9, color: "#71717a", letterSpacing: "0.18em", fontFamily: "var(--nx-font-mono)", textTransform: "uppercase" }}>
+        Market Regime · Live
       </div>
+      <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 30, fontWeight: 400, color: regime.color, lineHeight: 1.15, marginTop: 6, textTransform: "capitalize" }}>
+        {regime.label.toLowerCase()}
+      </div>
+      <div style={{ height: 1, background: "linear-gradient(90deg, #fbbf24 0%, rgba(251,191,36,0) 55%)", margin: "12px 0 18px", maxWidth: 340 }} />
       <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 16, alignItems: "center" }}>
         <div style={{ textAlign: "center", minWidth: 120 }}>
           <div style={{ fontSize: 40, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: regime.color, lineHeight: 1 }}>{regime.score}</div>
-          <div style={{ fontSize: 12, fontFamily: "var(--nx-font-mono)", color: regime.color, letterSpacing: "0.1em", marginTop: 4 }}>{regime.label}</div>
+          <div style={{ fontSize: 9, fontFamily: "var(--nx-font-mono)", color: "#52525b", letterSpacing: "0.12em", marginTop: 4 }}>SCORE / 100</div>
           <div style={{ height: 4, background: "#232327", borderRadius: 2, marginTop: 8 }}>
             <div style={{ height: 4, background: regime.color, borderRadius: 2, width: `${regime.score}%` }} />
           </div>
@@ -88,7 +93,7 @@ export function MarketRegime() {
               <div style={{ fontSize: 16, color: "#fbbf24", fontFamily: "var(--nx-font-mono)" }}>{regime.fundSkew}% long</div>
             </div>
           </div>
-          <div style={{ fontSize: 11, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", lineHeight: 1.5, borderTop: "1px solid #232327", paddingTop: 8 }}>
+          <div style={{ fontSize: 11, color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", lineHeight: 1.5, borderTop: "1px solid #232327", paddingTop: 8 }}>
             <span style={{ color: "#71717a" }}>▶ agent:</span> {regime.agentNote}
           </div>
         </div>

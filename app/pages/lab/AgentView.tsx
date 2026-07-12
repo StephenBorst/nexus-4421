@@ -761,8 +761,9 @@ export function AgentView() {
       {/* ─── Header ──────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, rowGap: 10, marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, color: "#ededf0", fontWeight: 600 }}>
-            // NEXUS AGENT
+          <span style={{ display: "inline-block" }}>
+            <span style={{ display: "block", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 3 }}>Autonomous</span>
+            <span style={{ display: "block", fontFamily: "var(--nx-font-serif)", fontSize: 22, fontWeight: 700, color: "#f4f4f5", lineHeight: 1, letterSpacing: "-0.01em" }}>Nexus Agent</span>
           </span>
           <span style={{
             fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "3px 10px", borderRadius: 3,
@@ -1075,7 +1076,7 @@ export function AgentView() {
                     → GO AUTONOMOUS
                   </button>
                 </div>
-                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 10, lineHeight: 1.5 }}>
+                <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9, color: "#52525b", marginTop: 10, lineHeight: 1.5 }}>
                   Paper results don't guarantee live results — live trades face real fills, slippage, and funding. Start with size you can afford to lose.
                 </div>
               </div>
@@ -1087,7 +1088,7 @@ export function AgentView() {
           {/* Onboarding + key-status panel */}
           <div style={{ ...agentCardStyle, borderColor: tradingKey ? "#232327" : "#4a3a00" }}>
             <div style={agentLabelStyle}>// HOW THE AGENT WORKS</div>
-            <ol style={{ margin: "8px 0 0", paddingLeft: 18, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 11, lineHeight: 1.7 }}>
+            <ol style={{ margin: "8px 0 0", paddingLeft: 18, color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 11, lineHeight: 1.7 }}>
               <li>Place at least one manual trade on Nexus — this generates your Orderly trading key (order-only, <strong style={{ color: "#c0c0c0" }}>cannot withdraw funds</strong>).</li>
               <li>Pick your symbols, risk params, and mode below.</li>
               <li><strong style={{ color: "#c0c0c0" }}>ASSISTED</strong> = the agent surfaces signals for you to place yourself. <strong style={{ color: "#c0c0c0" }}>AUTONOMOUS</strong> = it trades within your risk limits.</li>
@@ -1413,7 +1414,7 @@ export function AgentView() {
                   </button>
                 </div>
                 {!isPro ? (
-                  <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
+                  <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
                     Average into a position on adverse moves and take profit off the blended entry — an Emerald-tier feature. The whole ladder stays inside your CAPITAL / TRADE budget.
                   </div>
                 ) : on && (
@@ -1434,7 +1435,7 @@ export function AgentView() {
                         </div>
                       ))}
                     </div>
-                    <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, marginTop: 10, lineHeight: 1.6 }}>
+                    <div style={{ color: "#71717a", fontFamily: "var(--nx-font-ui)", fontSize: 10, marginTop: 10, lineHeight: 1.6 }}>
                       Base order ≈ ${(config.capitalPerTrade / units).toFixed(0)} of your ${config.capitalPerTrade} budget; up to {dca.maxSafetyOrders} safety orders average in if price moves ~{cumDev.toFixed(1)}% against you. TP is taken at {config.tpPercent}% off the blended average; the stop only cuts once all safety orders are spent. Daily-loss cap + kill switch still override.
                     </div>
                   </>
@@ -1450,12 +1451,12 @@ export function AgentView() {
               <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ EMERALD</span>
             </div>
             {!isPro ? (
-              <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
+              <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
                 Route TradingView (or any external) alerts straight to your agent — it executes them through the same guardrails + trustless grading. An Emerald-tier feature: hold ARCHITECT-tier $NEXUS or subscribe.
               </div>
             ) : !webhookEnabled ? (
               <div style={{ marginTop: 10 }}>
-                <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 11, lineHeight: 1.5, marginBottom: 10 }}>
+                <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 11, lineHeight: 1.5, marginBottom: 10 }}>
                   Generate a private webhook URL. Point a TradingView alert (or any system) at it and your agent trades the signal in its current mode — {config.mode === "PAPER" ? "simulated in PAPER" : config.mode === "ASSISTED" ? "queued for review in ASSISTED" : "executed live in AUTONOMOUS"}.
                 </div>
                 <button onClick={() => manageWebhook("enable")} disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.5 : 1 }}>
@@ -1478,13 +1479,13 @@ export function AgentView() {
                       <code style={{ display: "block", color: "#c0c0c0", background: "#0a0a0b", border: "1px solid #232327", borderRadius: 3, padding: "8px", fontSize: 10, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
                         {`{ "action": "BUY", "symbol": "BTC", "passphrase": "${webhookInfo.passphrase}" }`}
                       </code>
-                      <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 9, marginTop: 6, lineHeight: 1.5 }}>
+                      <div style={{ color: "#71717a", fontFamily: "var(--nx-font-ui)", fontSize: 9, marginTop: 6, lineHeight: 1.5 }}>
                         action = BUY (long) · SELL (short) · CLOSE (flatten). symbol = any perp (BTC, ETH, SOL…). Webhook signals bypass the cooldown; while a position is open, a new OPEN is ignored (no stacking).
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 11, lineHeight: 1.5 }}>
+                  <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 11, lineHeight: 1.5 }}>
                     Webhook is enabled, but the secret URL is only shown on this device when created. Rotate to reveal a fresh URL (this revokes the old one).
                   </div>
                 )}
@@ -1535,25 +1536,25 @@ export function AgentView() {
               )}
             </div>
             {!isPro ? (
-              <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
+              <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
                 Replay this exact config over 60 days of real BTC/ETH/SOL data — using the same engine the agent runs on — before risking a cent. An Emerald-tier feature.
               </div>
             ) : (
               <>
-                <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, marginTop: 8, lineHeight: 1.5 }}>
+                <div style={{ color: "#71717a", fontFamily: "var(--nx-font-ui)", fontSize: 10, marginTop: 8, lineHeight: 1.5 }}>
                   Replays your config on real Orderly history with the deployed signal + exit logic. Verify before you deploy capital.
                 </div>
                 {backtest && (
                   <div style={{ marginTop: 12 }}>
                     {backtest.untestable && (
-                      <div style={{ color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontSize: 10, lineHeight: 1.5, marginBottom: 10, padding: "6px 8px", border: "1px solid #fbbf2430", borderRadius: 3 }}>
+                      <div style={{ color: "#fbbf24", fontFamily: "var(--nx-font-ui)", fontSize: 10, lineHeight: 1.5, marginBottom: 10, padding: "6px 8px", border: "1px solid #fbbf2430", borderRadius: 3 }}>
                         ⚠ {backtest.note}
                       </div>
                     )}
                     {/* When OI-driven modes ARE testable, surface the OI-window caveat
                         (funding+price span the full window; confluence only the recorded OI). */}
                     {!backtest.untestable && backtest.note && (
-                      <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, lineHeight: 1.5, marginBottom: 10, padding: "6px 8px", border: "1px solid #232327", borderRadius: 3 }}>
+                      <div style={{ color: "#71717a", fontFamily: "var(--nx-font-ui)", fontSize: 10, lineHeight: 1.5, marginBottom: 10, padding: "6px 8px", border: "1px solid #232327", borderRadius: 3 }}>
                         ◆ {backtest.note}
                       </div>
                     )}
@@ -1577,7 +1578,7 @@ export function AgentView() {
                         </div>
                       ))}
                     </div>
-                    <div style={{ color: "#52525b", fontFamily: "var(--nx-font-mono)", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
+                    <div style={{ color: "#52525b", fontFamily: "var(--nx-font-ui)", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
                       Past performance ≠ future results. Taker fees modeled (~3bps/side); funding RECEIVED while fading is not (a tailwind — live may run better). 60d hourly, ${(config.capitalPerTrade * config.leverage).toFixed(0)} notional/trade.
                     </div>
                   </div>
@@ -1592,7 +1593,7 @@ export function AgentView() {
                         WALK-FORWARD — {validation.totalSymbols} symbols · {validation.folds} time folds · {validation.days}d · fees on
                       </div>
                       {validation.untestable ? (
-                        <div style={{ color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontSize: 10, lineHeight: 1.5, padding: "6px 8px", border: "1px solid #fbbf2430", borderRadius: 3 }}>⚠ {validation.note}</div>
+                        <div style={{ color: "#fbbf24", fontFamily: "var(--nx-font-ui)", fontSize: 10, lineHeight: 1.5, padding: "6px 8px", border: "1px solid #fbbf2430", borderRadius: 3 }}>⚠ {validation.note}</div>
                       ) : (
                         <>
                           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 10px", border: `1px solid ${vc}44`, borderRadius: 4, background: `${vc}0c` }}>
@@ -1615,7 +1616,7 @@ export function AgentView() {
                               ))}
                             </div>
                           </div>
-                          <div style={{ color: "#52525b", fontFamily: "var(--nx-font-mono)", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
+                          <div style={{ color: "#52525b", fontFamily: "var(--nx-font-ui)", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
                             The honest test: an edge that only works on one market in one window is NOT robust. We hold our own presets to this — nothing wears "proven" until it passes. Past performance ≠ future results.
                           </div>
                         </>
@@ -1645,7 +1646,7 @@ export function AgentView() {
                         ))}
                       </div>
                     </div>
-                    <div style={{ color: "#52525b", fontFamily: "var(--nx-font-mono)", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
+                    <div style={{ color: "#52525b", fontFamily: "var(--nx-font-ui)", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
                       ↑ Click any row to apply that config to the editor. CONFLUENCE/OI aren't in the sweep (no OI history yet). Every config here was graded on real price — apply a winner, then paper-test before going live.
                     </div>
                   </div>
@@ -1657,7 +1658,7 @@ export function AgentView() {
           {/* ── STRATEGY LIBRARY — save / load composed configs (free) ── */}
           <div style={agentCardStyle}>
             <div style={agentLabelStyle}>// STRATEGY LIBRARY</div>
-            <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, marginTop: 6, marginBottom: 10, lineHeight: 1.5 }}>
+            <div style={{ color: "#71717a", fontFamily: "var(--nx-font-ui)", fontSize: 10, marginTop: 6, marginBottom: 10, lineHeight: 1.5 }}>
               Save the config above as a named strategy, then load it back anytime. Build → test → save your best.
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1705,7 +1706,7 @@ export function AgentView() {
                 ))}
               </div>
             </div>
-            <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, marginTop: 6, lineHeight: 1.5 }}>
+            <div style={{ color: "#71717a", fontFamily: "var(--nx-font-ui)", fontSize: 10, marginTop: 6, lineHeight: 1.5 }}>
               Strategies shared by the community, ranked by the author's <strong style={{ color: "#a1a1aa" }}>graded live/paper record</strong> — not backtest (shown only as a hypothesis). Copy one to your editor and make it yours.
             </div>
             {community === null ? (
@@ -1748,7 +1749,7 @@ export function AgentView() {
 
           {!isActive && (
             <div style={{ marginTop: 16, padding: "8px 10px", borderRadius: 3, background: "#0a0a0b", border: "1px solid #232327" }}>
-              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", lineHeight: 1.6 }}>
+              <span style={{ fontFamily: "var(--nx-font-ui)", fontSize: 10, color: "#71717a", lineHeight: 1.6 }}>
                 {config.mode === "PAPER"
                   ? <>🧪 Paper mode is fully simulated — <strong style={{ color: "#a1a1aa" }}>no key stored, no orders placed, no funds at risk</strong>. Activate to start building a paper track record against live prices.</>
                   : <>🔒 By activating, your order-only Orderly key is stored encrypted to let the agent trade on your behalf. It <strong style={{ color: "#a1a1aa" }}>cannot withdraw or transfer funds</strong>. Trading is risky — only deploy capital you can afford to lose. Deactivate anytime.</>}
@@ -1939,7 +1940,7 @@ export function AgentView() {
                   </div>
                 ))}
               </div>
-              <div style={{ color: "#52525b", fontFamily: "var(--nx-font-mono)", fontSize: 10, marginTop: 10, lineHeight: 1.5 }}>
+              <div style={{ color: "#52525b", fontFamily: "var(--nx-font-ui)", fontSize: 10, marginTop: 10, lineHeight: 1.5 }}>
                 {standing.eligible
                   ? `Ranked — score ${standing.stats.score}/100 · ${standing.stats.winRate}% win · PF ${standing.stats.profitFactor} over ${standing.stats.trades} graded trades.`
                   : standing.criteria.find((c) => c.key === "profitable" && !c.met)
@@ -1995,7 +1996,7 @@ export function AgentView() {
                     </div>
                   ))}
                 </div>
-                <div style={{ marginTop: 12, fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", lineHeight: 1.5 }}>
+                <div style={{ marginTop: 12, fontFamily: "var(--nx-font-ui)", fontSize: 10, color: "#71717a", lineHeight: 1.5 }}>
                   🔒 Order-only key — the agent <strong style={{ color: "#a1a1aa" }}>cannot withdraw or transfer funds</strong>. Hit ⚡ KILL on the config tab to flatten and stop instantly.
                 </div>
               </div>
@@ -2204,7 +2205,7 @@ export function AgentView() {
                 {lbLoading ? "…" : "↻ REFRESH"}
               </button>
             </div>
-            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#52525b", marginTop: 6, lineHeight: 1.5 }}>
+            <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 10, color: "#52525b", marginTop: 6, lineHeight: 1.5 }}>
               Ranked by risk-adjusted score (win rate + profit factor, weighted by sample size) over <strong style={{ color: "#a1a1aa" }}>≥10 live trades spanning ≥3 days</strong>. Paper excluded. Copy any strategy to test it in PAPER first.
             </div>
             {ledgerInfo && (
@@ -2233,7 +2234,7 @@ export function AgentView() {
             <div style={{ ...agentCardStyle, textAlign: "center", padding: 28 }}>
               <div style={{ fontSize: 22, color: "#ededf0", marginBottom: 8 }}>◆</div>
               <div style={{ color: "#fff", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>No ranked agents yet</div>
-              <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 11, lineHeight: 1.6 }}>
+              <div style={{ color: "#71717a", fontFamily: "var(--nx-font-ui)", fontSize: 11, lineHeight: 1.6 }}>
                 Agents qualify after 10 live trades over 3+ days. Run yours live and claim rank #1 — your strategy becomes copyable by everyone.
               </div>
             </div>

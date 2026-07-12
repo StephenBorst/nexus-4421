@@ -18,3 +18,19 @@
   font-weight: 700;
   font-style: normal;
 }
+
+/* Editorial serif — headline moments only (variable weight 400–700). OFL-licensed. */
+@font-face {
+  font-family: 'Libre Baskerville';
+  src: url('/fonts/LibreBaskerville/LibreBaskerville-Variable.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Libre Baskerville';
+  src: url('/fonts/LibreBaskerville/LibreBaskerville-Italic-Variable.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: italic;
+  font-display: swap;
+}

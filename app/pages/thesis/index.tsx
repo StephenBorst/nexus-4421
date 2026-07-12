@@ -360,7 +360,7 @@ export default function ThesisPage() {
 
           {/* Notes */}
           {thesis.notes && (
-            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#a1a1aa", borderTop: "1px solid #232327", paddingTop: 12, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+            <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 11, color: "#a1a1aa", borderTop: "1px solid #232327", paddingTop: 12, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
               {thesis.notes}
             </div>
           )}
