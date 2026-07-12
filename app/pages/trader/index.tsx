@@ -52,16 +52,16 @@ type FeedThesis = {
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  ACTIVE:      { label: "ACTIVE",      color: "#4a9fff", bg: "#0a1a2a", border: "#1a3a5a" },
-  HIT_TP:      { label: "HIT TP",      color: "#00ff88", bg: "#0a2a0a", border: "#1a4a2a" },
-  STOPPED_OUT: { label: "STOPPED OUT", color: "#ff4444", bg: "#2a0a0a", border: "#4a1a1a" },
+  ACTIVE:      { label: "ACTIVE",      color: "#d4d4d8", bg: "#1a1a1e", border: "#1a3a5a" },
+  HIT_TP:      { label: "HIT TP",      color: "#ededf0", bg: "#0c1f18", border: "#33333a" },
+  STOPPED_OUT: { label: "STOPPED OUT", color: "#f7525f", bg: "#2a0a0a", border: "#4a1a1a" },
   INVALIDATED: { label: "INVALIDATED", color: "#fbbf24", bg: "#2a1a00", border: "#4a3a00" },
-  CLOSED:      { label: "CLOSED",      color: "#8aaa9a", bg: "#12161a", border: "#2a3a4a" },
-  PENDING:     { label: "PENDING",     color: "#8aaa9a", bg: "#0d120d", border: "#2a4a3a" },
+  CLOSED:      { label: "CLOSED",      color: "#a1a1aa", bg: "#12161a", border: "#2a3a4a" },
+  PENDING:     { label: "PENDING",     color: "#a1a1aa", bg: "#141416", border: "#33333a" },
 };
 
 // Neutral fallback for any unrecognized / future status value so the row never crashes.
-const STATUS_FALLBACK = { label: "UNKNOWN", color: "#8aaa9a", bg: "#0d120d", border: "#2a4a3a" };
+const STATUS_FALLBACK = { label: "UNKNOWN", color: "#a1a1aa", bg: "#141416", border: "#33333a" };
 
 // ─── Avatar ──────────────────────────────────────────────────────────────────
 function WalletIcon() {
@@ -80,9 +80,9 @@ function Avatar({ pfp, displayName, size = 48 }: { pfp: string | null; displayNa
   return (
     <div style={{
       width: size, height: size, borderRadius: "50%",
-      border: "2px solid #1a3a1a", background: "#0d120d",
+      border: "2px solid #232327", background: "#141416",
       overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
-      color: "#3a5a4a", flexShrink: 0,
+      color: "#52525b", flexShrink: 0,
     }}>
       {pfp && !err ? (
         <img src={pfp} alt={displayName ?? ""} onError={() => setErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -97,15 +97,15 @@ function Avatar({ pfp, displayName, size = 48 }: { pfp: string | null; displayNa
 function StatBox({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
   return (
     <div style={{
-      background: "#0d120d",
-      border: "1px solid #1a2e1a",
+      background: "#141416",
+      border: "1px solid #232327",
       borderRadius: 4,
       padding: "12px 16px",
       textAlign: "center",
     }}>
-      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#3a5a4a", letterSpacing: "0.08em", marginBottom: 4 }}>{label}</div>
-      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 17, fontWeight: "bold", color: color ?? "#8aaa9a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
-      {sub && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", marginTop: 2 }}>{sub}</div>}
+      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#52525b", letterSpacing: "0.08em", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 17, fontWeight: "bold", color: color ?? "#a1a1aa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
+      {sub && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 2 }}>{sub}</div>}
     </div>
   );
 }
@@ -144,7 +144,7 @@ function ThesisRow({
 
   return (
     <div style={{
-      background: "#0d120d",
+      background: "#141416",
       border: `1px solid ${cfg.border}`,
       borderRadius: 4,
       overflow: "hidden",
@@ -160,14 +160,14 @@ function ThesisRow({
           <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 15, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
           <span style={{
             fontFamily: "var(--nx-font-mono)", fontSize: 10,
-            color: thesis.direction === "LONG" ? "#00ff88" : "#ff4444",
+            color: thesis.direction === "LONG" ? "#3ecf8e" : "#f7525f",
           }}>
             {thesis.direction === "LONG" ? "↑" : "↓"} {thesis.direction}
           </span>
           {(thesis.copyCount ?? 0) > 0 && (
             <span style={{
-              fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#5a8a6a",
-              background: "#0a1a0a", border: "1px solid #1a3a1a",
+              fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#a1a1aa",
+              background: "#1a1a1e", border: "1px solid #232327",
               borderRadius: 3, padding: "1px 5px",
             }}>
               📋 {thesis.copyCount}
@@ -178,14 +178,14 @@ function ThesisRow({
         {/* Levels */}
         <div style={{ display: "flex", gap: 16, flex: 1, flexWrap: "wrap" }}>
           {[
-            { label: "ENTRY", val: `$${thesis.entryPrice.toFixed(2)}`, color: "#8aaa9a" },
-            { label: "STOP",  val: `$${thesis.stopLoss.toFixed(2)}`,   color: "#ff4444" },
-            { label: "TP1",   val: `$${thesis.takeProfit1.toFixed(2)}`, color: "#00ff88" },
-            { label: "R:R",   val: `1:${thesis.riskReward.toFixed(2)}`, color: thesis.riskReward >= 2 ? "#00ff88" : "#fbbf24" },
-            { label: "SIZE",  val: `$${thesis.positionSize.toFixed(0)}`, color: "#8aaa9a" },
+            { label: "ENTRY", val: `$${thesis.entryPrice.toFixed(2)}`, color: "#a1a1aa" },
+            { label: "STOP",  val: `$${thesis.stopLoss.toFixed(2)}`,   color: "#f7525f" },
+            { label: "TP1",   val: `$${thesis.takeProfit1.toFixed(2)}`, color: "#ededf0" },
+            { label: "R:R",   val: `1:${thesis.riskReward.toFixed(2)}`, color: thesis.riskReward >= 2 ? "#ededf0" : "#fbbf24" },
+            { label: "SIZE",  val: `$${thesis.positionSize.toFixed(0)}`, color: "#a1a1aa" },
           ].map(({ label, val, color }) => (
             <div key={label}>
-              <div style={{ fontSize: 7, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
+              <div style={{ fontSize: 7, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
               <div style={{ fontSize: 11, color, fontFamily: "var(--nx-font-mono)" }}>{val}</div>
             </div>
           ))}
@@ -195,7 +195,7 @@ function ThesisRow({
         {pnlData && (
           <div style={{
             fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold",
-            color: pnlData.pnl >= 0 ? "#00ff88" : "#ff4444",
+            color: pnlData.pnl >= 0 ? "#3ecf8e" : "#f7525f",
           }}>
             {pnlData.pnl >= 0 ? "+" : ""}${pnlData.pnl.toFixed(2)}
             <span style={{ fontSize: 9, opacity: 0.7, marginLeft: 3 }}>({pnlData.pct >= 0 ? "+" : ""}{pnlData.pct.toFixed(2)}%)</span>
@@ -204,7 +204,7 @@ function ThesisRow({
 
         {/* Actual PnL (closed) */}
         {thesis.actualPnl !== null && thesis.status !== "ACTIVE" && (
-          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", color: thesis.actualPnl >= 0 ? "#00ff88" : "#ff4444" }}>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", color: thesis.actualPnl >= 0 ? "#3ecf8e" : "#f7525f" }}>
             {thesis.actualPnl >= 0 ? "+" : ""}${thesis.actualPnl.toFixed(2)}
           </div>
         )}
@@ -216,7 +216,7 @@ function ThesisRow({
             padding: "2px 7px", borderRadius: 3,
             background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color,
           }}>{cfg.label}</div>
-          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#2a4a3a" }}>{timeAgo}</div>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#33333a" }}>{timeAgo}</div>
         </div>
 
         {/* Copy button */}
@@ -224,17 +224,17 @@ function ThesisRow({
           <button
             onClick={(e) => { e.stopPropagation(); onCopy(thesis); }}
             style={{
-              background: "none", border: "1px solid #1a3a1a", borderRadius: 3,
-              color: "#3a6a4a", fontFamily: "var(--nx-font-mono)", fontSize: 9,
+              background: "none", border: "1px solid #232327", borderRadius: 3,
+              color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 9,
               padding: "3px 8px", cursor: "pointer",
             }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#00ff88";
-              (e.currentTarget as HTMLButtonElement).style.color = "#00ff88";
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "#ededf0";
+              (e.currentTarget as HTMLButtonElement).style.color = "#ededf0";
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a3a1a";
-              (e.currentTarget as HTMLButtonElement).style.color = "#3a6a4a";
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "#232327";
+              (e.currentTarget as HTMLButtonElement).style.color = "#71717a";
             }}
           >COPY</button>
         )}
@@ -243,10 +243,10 @@ function ThesisRow({
         <button
           onClick={(e) => { e.stopPropagation(); setCommentsOpen((o) => !o); }}
           style={{
-            background: commentsOpen ? "#0a1a0a" : "none",
-            border: `1px solid ${commentsOpen ? "#00ff88" : "#1a2e1a"}`,
+            background: commentsOpen ? "#1a1a1e" : "none",
+            border: `1px solid ${commentsOpen ? "#ededf0" : "#232327"}`,
             borderRadius: 3,
-            color: commentsOpen ? "#00ff88" : "#3a5a4a",
+            color: commentsOpen ? "#ededf0" : "#52525b",
             fontFamily: "var(--nx-font-mono)",
             fontSize: 9,
             padding: "3px 7px",
@@ -256,27 +256,27 @@ function ThesisRow({
         >
           💬 {commentCount}
         </button>
-        <div style={{ color: "#2a4a3a", fontSize: 10 }}>{expanded ? "▲" : "▼"}</div>
+        <div style={{ color: "#33333a", fontSize: 10 }}>{expanded ? "▲" : "▼"}</div>
       </div>
 
       {/* Expanded: full details + notes + live grid */}
       {expanded && (
-        <div style={{ borderTop: "1px solid #1a2e1a", padding: "12px 16px" }}>
+        <div style={{ borderTop: "1px solid #232327", padding: "12px 16px" }}>
           {/* Live price grid */}
           {thesis.status === "ACTIVE" && markPrice != null && (() => {
             const { pnl, pct } = calcUnrealizedPnl(thesis.direction, thesis.entryPrice, markPrice, thesis.positionSize);
             const toSL = distancePct(markPrice, thesis.stopLoss);
             const toTP = distancePct(markPrice, thesis.takeProfit1);
             return (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 12px", marginBottom: 12, padding: 10, background: "#080c08", borderRadius: 4, border: "1px solid #1a2e1a" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 12px", marginBottom: 12, padding: 10, background: "#0f0f11", borderRadius: 4, border: "1px solid #232327" }}>
                 {[
                   { label: "MARK", val: `$${markPrice.toFixed(markPrice < 10 ? 4 : 2)}`, color: "#fff" },
-                  { label: "UNREALIZED", val: `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)`, color: pnl >= 0 ? "#00ff88" : "#ff4444" },
-                  { label: "TO SL", val: `${toSL.toFixed(2)}%`, color: "#ff4444" },
-                  { label: "TO TP1", val: `${toTP.toFixed(2)}%`, color: "#00ff88" },
+                  { label: "UNREALIZED", val: `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)`, color: pnl >= 0 ? "#3ecf8e" : "#f7525f" },
+                  { label: "TO SL", val: `${toSL.toFixed(2)}%`, color: "#f7525f" },
+                  { label: "TO TP1", val: `${toTP.toFixed(2)}%`, color: "#ededf0" },
                 ].map(({ label, val, color }) => (
                   <div key={label}>
-                    <div style={{ fontSize: 7, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
+                    <div style={{ fontSize: 7, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
                     <div style={{ fontSize: 11, color, fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{val}</div>
                   </div>
                 ))}
@@ -287,7 +287,7 @@ function ThesisRow({
           {/* Notes */}
           {thesis.notes && (
             <div style={{
-              fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#5a8a6a",
+              fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#a1a1aa",
               lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
             }}>
               {thesis.notes}
@@ -355,8 +355,8 @@ function CopyModal({ thesis, walletAddress, onClose }: { thesis: FeedThesis; wal
   }, [accountSize, riskPct, fundingRate, thesis, hasValidationErr]);
 
   const inputStyle: React.CSSProperties = {
-    background: "#080c08", border: "1px solid #1a2e1a", borderRadius: 3,
-    color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontSize: 11,
+    background: "#0f0f11", border: "1px solid #232327", borderRadius: 3,
+    color: "#ededf0", fontFamily: "var(--nx-font-mono)", fontSize: 11,
     padding: "6px 8px", outline: "none", width: "100%", boxSizing: "border-box",
   };
 
@@ -402,31 +402,31 @@ function CopyModal({ thesis, walletAddress, onClose }: { thesis: FeedThesis; wal
       position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.75)",
       display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
     }}>
-      <div style={{ background: "#0d120d", border: "1px solid #1a3a1a", borderRadius: 6, padding: 20, width: "100%", maxWidth: 400, maxHeight: "90vh", overflowY: "auto" }}>
+      <div style={{ background: "#141416", border: "1px solid #232327", borderRadius: 6, padding: 20, width: "100%", maxWidth: 400, maxHeight: "90vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
           <div>
             <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 15, fontWeight: "bold", color: "#fff" }}>
-              {ticker} <span style={{ fontSize: 11, color: thesis.direction === "LONG" ? "#00ff88" : "#ff4444" }}>{thesis.direction}</span>
+              {ticker} <span style={{ fontSize: 11, color: thesis.direction === "LONG" ? "#3ecf8e" : "#f7525f" }}>{thesis.direction}</span>
             </div>
-            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", marginTop: 2 }}>📋 copying from {traderName}</div>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 2 }}>📋 copying from {traderName}</div>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#3a5a4a", cursor: "pointer", fontSize: 16 }}>✕</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#52525b", cursor: "pointer", fontSize: 16 }}>✕</button>
         </div>
 
         {/* Inputs */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 4 }}>
           <div>
-            <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginBottom: 4 }}>ACCOUNT SIZE ($)</div>
-            <input style={{ ...inputStyle, borderColor: accErr ? "#4a1a1a" : "#1a2e1a" }} type="number" placeholder="10000" value={accountSize} onChange={(e) => setAccountSize(e.target.value)} />
-            {accErr && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#ff4444", marginTop: 3 }}>{accErr}</div>}
+            <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 4 }}>ACCOUNT SIZE ($)</div>
+            <input style={{ ...inputStyle, borderColor: accErr ? "#4a1a1a" : "#232327" }} type="number" placeholder="10000" value={accountSize} onChange={(e) => setAccountSize(e.target.value)} />
+            {accErr && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#f7525f", marginTop: 3 }}>{accErr}</div>}
           </div>
           <div>
-            <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginBottom: 4 }}>RISK %</div>
-            <input style={{ ...inputStyle, borderColor: riskErr ? "#4a1a1a" : "#1a2e1a" }} type="number" placeholder="1.5" step="0.1" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} />
-            {riskErr && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#ff4444", marginTop: 3 }}>{riskErr}</div>}
+            <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 4 }}>RISK %</div>
+            <input style={{ ...inputStyle, borderColor: riskErr ? "#4a1a1a" : "#232327" }} type="number" placeholder="1.5" step="0.1" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} />
+            {riskErr && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#f7525f", marginTop: 3 }}>{riskErr}</div>}
           </div>
           <div>
-            <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginBottom: 4 }}>FUNDING %</div>
+            <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 4 }}>FUNDING %</div>
             <input style={inputStyle} type="number" placeholder="0.01" step="0.001" value={fundingRate} onChange={(e) => setFundingRate(e.target.value)} />
           </div>
         </div>
@@ -434,39 +434,39 @@ function CopyModal({ thesis, walletAddress, onClose }: { thesis: FeedThesis; wal
         {/* Calc output */}
         <div style={{ marginTop: 10, marginBottom: 12 }}>
           {calc ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px 10px", padding: 10, background: "#0a1a0a", borderRadius: 4, border: "1px solid #1a3a1a" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px 10px", padding: 10, background: "#1a1a1e", borderRadius: 4, border: "1px solid #232327" }}>
               <div>
-                <div style={{ fontSize: 7, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>YOUR SIZE</div>
-                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#00ff88", fontWeight: "bold" }}>${calc.positionSize.toFixed(0)}</div>
+                <div style={{ fontSize: 7, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>YOUR SIZE</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#ededf0", fontWeight: "bold" }}>${calc.positionSize.toFixed(0)}</div>
               </div>
               <div>
-                <div style={{ fontSize: 7, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>LEVERAGE</div>
-                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", color: calc.leverage > 25 ? "#ff4444" : calc.leverage > 10 ? "#fbbf24" : "#00ff88" }}>{calc.leverage.toFixed(1)}x</div>
+                <div style={{ fontSize: 7, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>LEVERAGE</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", color: calc.leverage > 25 ? "#f7525f" : calc.leverage > 10 ? "#fbbf24" : "#3ecf8e" }}>{calc.leverage.toFixed(1)}x</div>
               </div>
               <div>
-                <div style={{ fontSize: 7, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>R:R</div>
-                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", color: calc.riskReward >= 2 ? "#00ff88" : "#fbbf24" }}>1:{calc.riskReward.toFixed(2)}</div>
+                <div style={{ fontSize: 7, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>R:R</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", color: calc.riskReward >= 2 ? "#ededf0" : "#fbbf24" }}>1:{calc.riskReward.toFixed(2)}</div>
               </div>
               <div>
-                <div style={{ fontSize: 7, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>MAX LOSS</div>
-                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#ff4444", fontWeight: "bold" }}>${calc.riskAmount.toFixed(2)}</div>
+                <div style={{ fontSize: 7, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>MAX LOSS</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#f7525f", fontWeight: "bold" }}>${calc.riskAmount.toFixed(2)}</div>
               </div>
             </div>
           ) : (
-            <div style={{ padding: 10, background: "#080c08", borderRadius: 4, border: "1px solid #1a2e1a", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#2a4a3a", textAlign: "center" }}>
+            <div style={{ padding: 10, background: "#0f0f11", borderRadius: 4, border: "1px solid #232327", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#33333a", textAlign: "center" }}>
               enter account size + risk % to calculate
             </div>
           )}
         </div>
 
-        {err && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#ff4444", marginBottom: 10 }}>{err}</div>}
+        {err && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#f7525f", marginBottom: 10 }}>{err}</div>}
         <button
           onClick={handleSave}
           disabled={saving || saved || !calc || hasValidationErr}
           style={{
-            width: "100%", background: saved ? "#0a2a0a" : calc && !hasValidationErr ? "#0a1a0a" : "#080c08",
-            border: `1px solid ${saved ? "#00ff88" : calc && !hasValidationErr ? "#00ff88" : "#1a2e1a"}`,
-            color: saved ? "#00ff88" : calc && !hasValidationErr ? "#00ff88" : "#2a4a3a",
+            width: "100%", background: saved ? "#0c1f18" : calc && !hasValidationErr ? "#1a1a1e" : "#0f0f11",
+            border: `1px solid ${saved ? "#ededf0" : calc && !hasValidationErr ? "#ededf0" : "#232327"}`,
+            color: saved ? "#ededf0" : calc && !hasValidationErr ? "#ededf0" : "#33333a",
             fontFamily: "var(--nx-font-mono)", fontSize: 11, letterSpacing: "0.1em",
             padding: "10px 0", borderRadius: 4, cursor: calc && !saving && !saved && !hasValidationErr ? "pointer" : "default",
           }}
@@ -609,25 +609,25 @@ export default function TraderPage() {
   // Ph26: pre-compute rep display values to avoid IIFE pattern in JSX (TSC cascade errors)
   const repForDisplay = onChainRep ?? calcRepScore(stats.wins, stats.losses, stats.avgRR);
   const isOnChainRep = onChainRep !== null;
-  const repColor = repForDisplay >= 70 ? "#00ff88" : repForDisplay >= 40 ? "#fbbf24" : "#ff4444";
+  const repColor = repForDisplay >= 70 ? "#3ecf8e" : repForDisplay >= 40 ? "#fbbf24" : "#f7525f";
   const showRepBadge = stats.closed > 0 || onChainRep !== null;
 
   return (
-    <div style={{ background: "#0a0e0a", minHeight: "100svh" }}>
+    <div style={{ background: "#0a0a0b", minHeight: "100svh" }}>
       {/* Copy modal */}
       {copyTarget && walletAddress && (
         <CopyModal thesis={copyTarget} walletAddress={walletAddress} onClose={() => setCopyTarget(null)} />
       )}
 
       {/* Header */}
-      <div style={{ padding: "8px 16px", borderBottom: "1px solid #1a2e1a", background: "#080c08", display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ padding: "8px 16px", borderBottom: "1px solid #232327", background: "#0f0f11", display: "flex", alignItems: "center", gap: 10 }}>
         <button
           onClick={() => navigate("/feed")}
-          style={{ background: "none", border: "none", color: "#3a5a4a", cursor: "pointer", fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: 0 }}
+          style={{ background: "none", border: "none", color: "#52525b", cursor: "pointer", fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: 0 }}
         >
           ← FEED
         </button>
-        <div style={{ flex: 1, fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#2a4a3a", letterSpacing: "0.05em" }}>
+        <div style={{ flex: 1, fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#33333a", letterSpacing: "0.05em" }}>
           / TRADER
         </div>
         {/* DM button — only when viewing another trader */}
@@ -636,17 +636,17 @@ export default function TraderPage() {
             onClick={() => navigate(`/messages?dm=${wallet}`)}
             title="Send encrypted DM via XMTP"
             style={{
-              background: "none", border: "1px solid #1a2e1a", borderRadius: 3,
-              color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 9,
+              background: "none", border: "1px solid #232327", borderRadius: 3,
+              color: "#52525b", fontFamily: "var(--nx-font-mono)", fontSize: 9,
               padding: "4px 10px", cursor: "pointer", letterSpacing: "0.05em",
             }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#00ff88";
-              (e.currentTarget as HTMLButtonElement).style.color = "#00ff88";
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "#ededf0";
+              (e.currentTarget as HTMLButtonElement).style.color = "#ededf0";
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a2e1a";
-              (e.currentTarget as HTMLButtonElement).style.color = "#3a5a4a";
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "#232327";
+              (e.currentTarget as HTMLButtonElement).style.color = "#52525b";
             }}
           >
             ⬡ MSG
@@ -656,8 +656,8 @@ export default function TraderPage() {
         <button
           onClick={copyLink}
           style={{
-            background: "none", border: "1px solid #1a2e1a", borderRadius: 3,
-            color: copied ? "#00ff88" : "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 9,
+            background: "none", border: "1px solid #232327", borderRadius: 3,
+            color: copied ? "#ededf0" : "#52525b", fontFamily: "var(--nx-font-mono)", fontSize: 9,
             padding: "4px 10px", cursor: "pointer", letterSpacing: "0.05em",
           }}
         >
@@ -667,13 +667,13 @@ export default function TraderPage() {
 
       <div style={{ padding: 16, maxWidth: 860, margin: "0 auto" }}>
         {loading && (
-          <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#2a4a3a" }}>
+          <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#33333a" }}>
             loading trader profile...
           </div>
         )}
 
         {error && !loading && (
-          <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ff4444" }}>
+          <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#f7525f" }}>
             failed to load — check connection
           </div>
         )}
@@ -681,18 +681,18 @@ export default function TraderPage() {
         {!loading && !error && (
           <>
             {/* Trader identity */}
-            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, padding: "16px 20px", background: "#0d120d", border: "1px solid #1a3a1a", borderRadius: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, padding: "16px 20px", background: "#141416", border: "1px solid #232327", borderRadius: 6 }}>
               <Avatar pfp={pfp} displayName={displayName} size={56} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                   <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: "bold", color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
                     {displayName ?? shortAddr}
                   </span>
-                  {isOwn && <span style={{ color: "#00ff88", fontSize: 11, flexShrink: 0 }}>YOU</span>}
+                  {isOwn && <span style={{ color: "#ededf0", fontSize: 11, flexShrink: 0 }}>YOU</span>}
                   {wallet && <span style={{ flexShrink: 0 }}><NexusTierBadge address={wallet} /></span>}
                 </div>
-                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#3a5a4a", marginTop: 2 }}>{shortAddr}</div>
-                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#2a4a3a", marginTop: 4 }}>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#52525b", marginTop: 2 }}>{shortAddr}</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#33333a", marginTop: 4 }}>
                   {theses.length} public thesis{theses.length !== 1 ? "es" : ""}
                 </div>
               </div>
@@ -703,7 +703,7 @@ export default function TraderPage() {
                   padding: "8px 14px", border: `1px solid ${repColor}22`, borderRadius: 4,
                   background: `${repColor}08`, flexShrink: 0,
                 }}>
-                  <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: isOnChainRep ? "#00ff88" : "#3a5a4a", letterSpacing: "0.08em" }}>
+                  <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: isOnChainRep ? "#ededf0" : "#52525b", letterSpacing: "0.08em" }}>
                     {isOnChainRep ? "⛓REP" : "REP"}
                   </div>
                   <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 28, fontWeight: "bold", color: repColor, lineHeight: 1.1 }}>{repForDisplay}</div>
@@ -713,8 +713,8 @@ export default function TraderPage() {
 
             {theses.length === 0 ? (
               <div style={{ textAlign: "center", padding: "60px 0" }}>
-                <div style={{ fontSize: 20, color: "#2a4a3a", marginBottom: 8 }}>◆</div>
-                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#2a4a3a" }}>
+                <div style={{ fontSize: 20, color: "#33333a", marginBottom: 8 }}>◆</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#33333a" }}>
                   no public theses from this trader yet
                 </div>
               </div>
@@ -726,32 +726,32 @@ export default function TraderPage() {
                     label="WIN RATE"
                     value={stats.winRate !== null ? `${stats.winRate.toFixed(0)}%` : "—"}
                     sub={stats.closed > 0 ? `${stats.wins}W / ${stats.losses}L` : "no closed trades"}
-                    color={stats.winRate === null ? "#3a5a4a" : stats.winRate >= 60 ? "#00ff88" : stats.winRate >= 40 ? "#fbbf24" : "#ff4444"}
+                    color={stats.winRate === null ? "#52525b" : stats.winRate >= 60 ? "#3ecf8e" : stats.winRate >= 40 ? "#fbbf24" : "#f7525f"}
                   />
                   <StatBox
                     label="AVG R:R"
                     value={`1:${stats.avgRR.toFixed(2)}`}
                     sub="all theses"
-                    color={stats.avgRR >= 2 ? "#00ff88" : "#fbbf24"}
+                    color={stats.avgRR >= 2 ? "#ededf0" : "#fbbf24"}
                   />
                   <StatBox
                     label="ACTIVE"
                     value={String(stats.active)}
                     sub="live trades"
-                    color={stats.active > 0 ? "#4a9fff" : "#3a5a4a"}
+                    color={stats.active > 0 ? "#d4d4d8" : "#52525b"}
                   />
                   <StatBox
                     label="TOTAL"
                     value={String(theses.length)}
                     sub={`${stats.invalidated} invalidated`}
-                    color="#8aaa9a"
+                    color="#a1a1aa"
                   />
                   {stats.hasPnl && (
                     <StatBox
                       label="REALIZED P&L"
                       value={`${stats.totalPnl >= 0 ? "+" : ""}$${stats.totalPnl.toFixed(2)}`}
                       sub="closed trades"
-                      color={stats.totalPnl >= 0 ? "#00ff88" : "#ff4444"}
+                      color={stats.totalPnl >= 0 ? "#3ecf8e" : "#f7525f"}
                     />
                   )}
                   {stats.bestTrade && (
@@ -759,24 +759,24 @@ export default function TraderPage() {
                       label="BEST R:R"
                       value={`1:${stats.bestTrade.riskReward.toFixed(2)}`}
                       sub={stats.bestTrade.symbol.replace("PERP_", "").replace("_USDC", "")}
-                      color="#00ff88"
+                      color="#ededf0"
                     />
                   )}
                 </div>
 
                 {/* Hub: this trader's graded autonomous-agent record */}
                 {agentRec && (
-                  <div style={{ marginBottom: 16, border: "1px solid #1a2e1a", borderRadius: 6, padding: 14, background: "#0a0e0a" }}>
-                    <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", letterSpacing: "0.08em", marginBottom: 10 }}>AUTONOMOUS AGENT — GRADED RECORD</div>
+                  <div style={{ marginBottom: 16, border: "1px solid #232327", borderRadius: 6, padding: 14, background: "#0a0a0b" }}>
+                    <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", letterSpacing: "0.08em", marginBottom: 10 }}>AUTONOMOUS AGENT — GRADED RECORD</div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(80px,1fr))", gap: 12 }}>
                       {[
-                        { l: "NET P&L", v: `${agentRec.netPnl >= 0 ? "+" : ""}$${agentRec.netPnl}`, c: agentRec.netPnl >= 0 ? "#00ff88" : "#ff4444" },
+                        { l: "NET P&L", v: `${agentRec.netPnl >= 0 ? "+" : ""}$${agentRec.netPnl}`, c: agentRec.netPnl >= 0 ? "#3ecf8e" : "#f7525f" },
                         { l: "WIN RATE", v: `${agentRec.winRate}%`, c: "#c0c0c0" },
                         { l: "TRADES", v: String(agentRec.trades), c: "#c0c0c0" },
-                        { l: "SCORE", v: `${agentRec.score}`, c: "#4a9fff" },
+                        { l: "SCORE", v: `${agentRec.score}`, c: "#d4d4d8" },
                       ].map((x) => (
                         <div key={x.l}>
-                          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 3 }}>{x.l}</div>
+                          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", letterSpacing: "0.1em", marginBottom: 3 }}>{x.l}</div>
                           <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600, color: x.c }}>{x.v}</div>
                         </div>
                       ))}
@@ -787,15 +787,15 @@ export default function TraderPage() {
                 {/* Hub: this trader's published strategies — copyable to your own agent */}
                 {pubStrats.length > 0 && (
                   <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", letterSpacing: "0.08em", marginBottom: 10 }}>PUBLISHED STRATEGIES — copy to your agent</div>
+                    <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", letterSpacing: "0.08em", marginBottom: 10 }}>PUBLISHED STRATEGIES — copy to your agent</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {pubStrats.map((s) => (
-                        <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 3 }}>
+                        <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: "#0a0a0b", border: "1px solid #232327", borderRadius: 3 }}>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, color: "#c0c0c0" }}>{s.name} <span style={{ color: "#4a9fff", fontSize: 9 }}>{deriveStyle(s.config)}</span></div>
-                            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#5a7a6a", marginTop: 2 }}>{s.config.signalMode} · {s.config.leverage}x · TP{s.config.tpPercent}/SL{s.config.slPercent}</div>
+                            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, color: "#c0c0c0" }}>{s.name} <span style={{ color: "#d4d4d8", fontSize: 9 }}>{deriveStyle(s.config)}</span></div>
+                            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#a1a1aa", marginTop: 2 }}>{s.config.signalMode} · {s.config.leverage}x · TP{s.config.tpPercent}/SL{s.config.slPercent}</div>
                           </div>
-                          <button onClick={() => deployToAgent(s.config, `${displayName ?? shortAddr}'s "${s.name}"`, undefined, navigate)} style={{ background: "none", border: "1px solid #1a4a2a", color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 14px", borderRadius: 3, cursor: "pointer", flexShrink: 0 }}>COPY →</button>
+                          <button onClick={() => deployToAgent(s.config, `${displayName ?? shortAddr}'s "${s.name}"`, undefined, navigate)} style={{ background: "none", border: "1px solid #33333a", color: "#ededf0", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 14px", borderRadius: 3, cursor: "pointer", flexShrink: 0 }}>COPY →</button>
                         </div>
                       ))}
                     </div>
@@ -803,7 +803,7 @@ export default function TraderPage() {
                 )}
 
                 {/* Thesis list */}
-                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", letterSpacing: "0.08em", marginBottom: 10 }}>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", letterSpacing: "0.08em", marginBottom: 10 }}>
                   THESES — click to expand
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

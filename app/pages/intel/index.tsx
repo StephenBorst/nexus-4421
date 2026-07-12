@@ -5,12 +5,12 @@ import { deployToAgent } from "@/utils/agentPrefill";
 
 // ─── Constants ────────────────────────────────────────────────
 const REFRESH_INTERVAL = 60; // seconds
-const TEAL   = "#00ff88";
-const GREEN  = "#00ff88";
-const RED    = "#ff4444";
+const TEAL   = "#ededf0";
+const GREEN  = "#ededf0";
+const RED    = "#f7525f";
 const YELLOW = "#fbbf24";
-const DIM    = "#4a7a5a";
-const MUTED  = "#8aaa9a";
+const DIM    = "#71717a";
+const MUTED  = "#a1a1aa";
 const BRIGHT = "#e8f0ea";
 
 // ─── Types ────────────────────────────────────────────────────
@@ -197,7 +197,7 @@ function BarBlock({ value, total = 100, color = TEAL, len = 18 }: { value: numbe
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{
-      background: "#0d120d",
+      background: "#141416",
       border: "1px solid rgba(255,255,255,0.07)",
       borderRadius: "2px",
       padding: "14px 16px",
@@ -347,7 +347,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
 
   // ── Styles ──────────────────────────────────────────────────
   const page: React.CSSProperties = {
-    background: embedded ? "transparent" : "#080c08",
+    background: embedded ? "transparent" : "#0f0f11",
     minHeight: embedded ? undefined : "100svh",
     padding: embedded ? (isMobile ? "8px 0" : "4px 0") : (isMobile ? "12px" : "16px 20px"),
     fontFamily: "'Courier New', Courier, monospace",

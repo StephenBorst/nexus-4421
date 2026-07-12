@@ -21,9 +21,9 @@ import { STRATEGY_PRESETS } from "@/config/strategyPresets";
 // mini-app one-tap deploy can never drift from the web preset.
 const PROVEN_EDGE = STRATEGY_PRESETS.find((p) => p.id === "proven-edge")?.config ?? {};
 
-const bg = "#0a0e0a";
-const green = "#00ff88";
-const red = "#ff4444";
+const bg = "#0a0a0b";
+const green = "#ededf0";
+const red = "#f7525f";
 const mono = "var(--nx-font-mono)";
 const APP = "https://trade.nexustradinglabs.com";
 const API = "https://og.nexustradinglabs.com";
@@ -49,7 +49,7 @@ type AgentStatus = {
 } | null;
 
 const STATUS_COLOR: Record<string, string> = {
-  ACTIVE: "#4a9fff", HIT_TP: "#00ff88", STOPPED_OUT: "#ff4444", INVALIDATED: "#fbbf24", CLOSED: "#8aaa9a",
+  ACTIVE: "#d4d4d8", HIT_TP: "#3ecf8e", STOPPED_OUT: "#f7525f", INVALIDATED: "#fbbf24", CLOSED: "#a1a1aa",
 };
 const tk = (s: string) => s.replace("PERP_", "").replace("_USDC", "");
 const shortAddr = (w: string) => `${w.slice(0, 6)}…${w.slice(-4)}`;
@@ -70,11 +70,11 @@ const fundingIn = (ts: number) => {
 };
 
 // Dependency-free candlestick chart (TradingView UDF OHLC → SVG). Keeps the frame
-// light; mirrors the Lab's terminal aesthetic (mono + #00ff88 / #ff4444).
+// light; mirrors the Lab's terminal aesthetic (mono + #3ecf8e / #f7525f).
 function AssetChart({ data }: { data: Candle[] | null }) {
-  const box: React.CSSProperties = { width: "100%", height: 88, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4 };
+  const box: React.CSSProperties = { width: "100%", height: 88, background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 4 };
   if (!data || data.length < 2) {
-    return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#2a4a3a" }}>{data ? "no chart data" : "loading chart…"}</div>;
+    return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#33333a" }}>{data ? "no chart data" : "loading chart…"}</div>;
   }
   const W = 320, H = 88, P = 4;
   const min = Math.min(...data.map((d) => d.l)), max = Math.max(...data.map((d) => d.h)), range = max - min || 1;
@@ -87,7 +87,7 @@ function AssetChart({ data }: { data: Candle[] | null }) {
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={box}>
       {data.map((d, i) => {
         const up = d.c >= d.o;
-        const col = up ? "#00ff88" : "#ff4444";
+        const col = up ? "#3ecf8e" : "#f7525f";
         const cx = x(i);
         const yTop = Math.min(y(d.o), y(d.c));
         const bh = Math.max(0.8, Math.abs(y(d.c) - y(d.o)));
@@ -639,8 +639,8 @@ export default function MiniApp() {
   }
 
   const shell: React.CSSProperties = { background: bg, color: "#e8f0ea", minHeight: "100svh", fontFamily: mono, padding: 14, display: "flex", flexDirection: "column", gap: 11 };
-  const card: React.CSSProperties = { background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 6, padding: 12 };
-  const mktChip = (active: boolean): React.CSSProperties => ({ background: active ? "#00ff8815" : "#0a0e0a", border: `1px solid ${active ? "#00ff8860" : "#1e2d1e"}`, borderRadius: 3, padding: "4px 11px", cursor: "pointer", color: active ? green : "#4a7a5a", fontFamily: mono, fontSize: 12 });
+  const card: React.CSSProperties = { background: "#141416", border: "1px solid #232327", borderRadius: 6, padding: 12 };
+  const mktChip = (active: boolean): React.CSSProperties => ({ background: active ? "#ededf015" : "#0a0a0b", border: `1px solid ${active ? "#ededf060" : "#1e2d1e"}`, borderRadius: 3, padding: "4px 11px", cursor: "pointer", color: active ? green : "#71717a", fontFamily: mono, fontSize: 12 });
   const levPresets = [2, 5, 10, 25, 50, 100].filter((p) => p < maxLev).concat(maxLev); // per-market, incl. real MAX
   const liveCount = feed?.filter((t) => t.status === "ACTIVE").length ?? 0;
   const margin = notional / (lev || 1);
@@ -653,16 +653,16 @@ export default function MiniApp() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ color: green, fontWeight: "bold", letterSpacing: "0.25em" }}>//</span>
           <span style={{ color: "#fff", fontWeight: "bold", letterSpacing: "0.2em" }}>NEXUS</span>
-          <button onClick={saveApp} style={{ marginLeft: "auto", background: added ? "#0a2a0a" : "none", border: `1px solid ${added ? "#1a4a2a" : "#1a2e1a"}`, borderRadius: 3, color: added ? green : "#5a8a6a", fontFamily: mono, fontSize: 9, padding: "3px 9px", cursor: "pointer", letterSpacing: "0.06em" }}>{added ? "★ SAVED" : "★ SAVE"}</button>
+          <button onClick={saveApp} style={{ marginLeft: "auto", background: added ? "#0c1f18" : "none", border: `1px solid ${added ? "#33333a" : "#232327"}`, borderRadius: 3, color: added ? green : "#a1a1aa", fontFamily: mono, fontSize: 9, padding: "3px 9px", cursor: "pointer", letterSpacing: "0.06em" }}>{added ? "★ SAVED" : "★ SAVE"}</button>
         </div>
-        <div style={{ fontSize: 9, color: "#3a6a4a", marginTop: 4, letterSpacing: "0.05em" }}>the terminal that makes you a better trader</div>
+        <div style={{ fontSize: 9, color: "#71717a", marginTop: 4, letterSpacing: "0.05em" }}>the terminal that makes you a better trader</div>
         {addErr && <div style={{ fontSize: 9, color: "#fbbf24", marginTop: 6, lineHeight: 1.5, wordBreak: "break-word" }}>add failed: {addErr}</div>}
       </div>
 
-      {!booted && <div style={{ ...card, color: "#3a6a4a", fontSize: 12 }}>loading…</div>}
+      {!booted && <div style={{ ...card, color: "#71717a", fontSize: 12 }}>loading…</div>}
 
       {booted && inFrame === false && (
-        <div style={{ ...card, fontSize: 12, color: "#8aaa9a", lineHeight: 1.6 }}>
+        <div style={{ ...card, fontSize: 12, color: "#a1a1aa", lineHeight: 1.6 }}>
           Open this inside <b style={{ color: green }}>Warpcast</b> to use it.
           <div style={{ marginTop: 8 }}><a href={APP} style={{ color: green, textDecoration: "none" }}>→ open the full terminal</a></div>
         </div>
@@ -671,14 +671,14 @@ export default function MiniApp() {
       {/* Identity */}
       {booted && inFrame && user && (
         <div style={{ ...card, display: "flex", alignItems: "center", gap: 10, padding: "9px 12px" }}>
-          {user.pfpUrl && <img src={user.pfpUrl} alt="" style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid #1a3a1a" }} />}
+          {user.pfpUrl && <img src={user.pfpUrl} alt="" style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid #232327" }} />}
           <div style={{ fontSize: 12, color: "#fff", fontWeight: "bold" }}>{user.displayName || user.username || "you"}</div>
           <span style={{ marginLeft: "auto", fontSize: 9, color: green }}>● live</span>
         </div>
       )}
 
       {/* TRADE (hero) */}
-      <button onClick={() => { setTradeOpen((o) => !o); setTradeMsg(null); }} style={{ background: tradeOpen ? "#0a1a0a" : green, color: tradeOpen ? green : "#04130c", border: `1px solid ${green}`, borderRadius: 5, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: "pointer", letterSpacing: "0.06em" }}>
+      <button onClick={() => { setTradeOpen((o) => !o); setTradeMsg(null); }} style={{ background: tradeOpen ? "#1a1a1e" : green, color: tradeOpen ? green : "#141416", border: `1px solid ${green}`, borderRadius: 5, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: "pointer", letterSpacing: "0.06em" }}>
         ⚡ {tradeOpen ? "✕ HIDE PANEL" : "TRADE PERPS"}
       </button>
 
@@ -688,23 +688,23 @@ export default function MiniApp() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             {connectedAddr
               ? <span style={{ fontSize: 10, color: green }}>● {shortAddr(connectedAddr)}</span>
-              : <button onClick={connectWallet} style={{ background: "#0a1a0a", color: green, border: `1px solid ${green}`, borderRadius: 4, padding: "7px 14px", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: "pointer", letterSpacing: "0.05em" }}>CONNECT WALLET</button>}
-            <button onClick={enableTrading} disabled={enabling} style={{ marginLeft: "auto", background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 4, padding: "7px 12px", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: enabling ? "wait" : "pointer", letterSpacing: "0.05em", opacity: enabling ? 0.6 : 1 }}>{enabling ? "ENABLING…" : "◆ ENABLE TRADING"}</button>
+              : <button onClick={connectWallet} style={{ background: "#1a1a1e", color: green, border: `1px solid ${green}`, borderRadius: 4, padding: "7px 14px", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: "pointer", letterSpacing: "0.05em" }}>CONNECT WALLET</button>}
+            <button onClick={enableTrading} disabled={enabling} style={{ marginLeft: "auto", background: "#1a1a1e", color: green, border: "1px solid #33333a", borderRadius: 4, padding: "7px 12px", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: enabling ? "wait" : "pointer", letterSpacing: "0.05em", opacity: enabling ? 0.6 : 1 }}>{enabling ? "ENABLING…" : "◆ ENABLE TRADING"}</button>
           </div>
-          <div style={{ fontSize: 8, color: "#2a4a3a", marginTop: -4 }}>1. connect · 2. enable (one-time) · 3. fund · 4. trade</div>
+          <div style={{ fontSize: 8, color: "#33333a", marginTop: -4 }}>1. connect · 2. enable (one-time) · 3. fund · 4. trade</div>
 
           {/* Account status + open positions (read-back) */}
-          <div style={{ borderTop: "1px solid #1a2e1a", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ borderTop: "1px solid #232327", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 8, color: "#3a6a4a", letterSpacing: "0.1em" }}>📊 ACCOUNT</span>
-              {acct && <span style={{ fontSize: 10, color: "#5a8a6a" }}>free <b style={{ color: "#fff" }}>${acct.free.toFixed(2)}</b> · value <b style={{ color: "#fff" }}>${acct.total.toFixed(2)}</b></span>}
-              <button onClick={() => refreshStatus()} disabled={statusBusy} style={{ marginLeft: "auto", background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 4, padding: "5px 11px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: statusBusy ? "wait" : "pointer", letterSpacing: "0.05em", opacity: statusBusy ? 0.6 : 1 }}>{statusBusy ? "…" : acct ? "↻ REFRESH" : "↻ LOAD"}</button>
+              <span style={{ fontSize: 8, color: "#71717a", letterSpacing: "0.1em" }}>📊 ACCOUNT</span>
+              {acct && <span style={{ fontSize: 10, color: "#a1a1aa" }}>free <b style={{ color: "#fff" }}>${acct.free.toFixed(2)}</b> · value <b style={{ color: "#fff" }}>${acct.total.toFixed(2)}</b></span>}
+              <button onClick={() => refreshStatus()} disabled={statusBusy} style={{ marginLeft: "auto", background: "#1a1a1e", color: green, border: "1px solid #33333a", borderRadius: 4, padding: "5px 11px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: statusBusy ? "wait" : "pointer", letterSpacing: "0.05em", opacity: statusBusy ? 0.6 : 1 }}>{statusBusy ? "…" : acct ? "↻ REFRESH" : "↻ LOAD"}</button>
             </div>
-            <button onClick={toggleBroadcast} style={{ display: "flex", alignItems: "center", gap: 6, background: broadcast ? "#0a2a0a" : "#0a0e0a", border: `1px solid ${broadcast ? "#1a4a2a" : "#1e2d1e"}`, borderRadius: 4, padding: "6px 9px", fontFamily: mono, fontSize: 9, cursor: "pointer", color: broadcast ? green : "#5a8a6a", textAlign: "left" }}>
-              <span style={{ width: 7, height: 7, borderRadius: "50%", background: broadcast ? green : "#2a4a3a", boxShadow: broadcast ? `0 0 6px ${green}` : "none", flexShrink: 0 }} />
+            <button onClick={toggleBroadcast} style={{ display: "flex", alignItems: "center", gap: 6, background: broadcast ? "#0c1f18" : "#0a0a0b", border: `1px solid ${broadcast ? "#33333a" : "#1e2d1e"}`, borderRadius: 4, padding: "6px 9px", fontFamily: mono, fontSize: 9, cursor: "pointer", color: broadcast ? green : "#a1a1aa", textAlign: "left" }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: broadcast ? green : "#33333a", boxShadow: broadcast ? `0 0 6px ${green}` : "none", flexShrink: 0 }} />
               📡 {broadcast ? "BROADCASTING to LIVE NOW — your open positions are public" : "Broadcast my positions to the public LIVE NOW feed"}
             </button>
-            {positions && positions.length === 0 && <div style={{ fontSize: 10, color: "#3a6a4a" }}>no open positions.</div>}
+            {positions && positions.length === 0 && <div style={{ fontSize: 10, color: "#71717a" }}>no open positions.</div>}
             {positions && positions.map((p) => {
               const qty = Number(p.position_qty);
               const long = qty > 0;
@@ -715,12 +715,12 @@ export default function MiniApp() {
               const pnl = mark && entry ? (mark - entry) * qty : Number(p.unrealized_pnl);
               const hasPnl = Number.isFinite(pnl);
               return (
-                <div key={p.symbol} style={{ display: "flex", alignItems: "center", gap: 8, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, padding: "7px 9px" }}>
+                <div key={p.symbol} style={{ display: "flex", alignItems: "center", gap: 8, background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 4, padding: "7px 9px" }}>
                   <span style={{ fontSize: 12, fontWeight: "bold", color: "#fff", flexShrink: 0 }}>{tk(p.symbol)}</span>
                   <span style={{ fontSize: 9, color: long ? green : red, flexShrink: 0 }}>{long ? "↑ LONG" : "↓ SHORT"} {Math.abs(qty)}</span>
-                  {mark > 0 && <span style={{ fontSize: 8, color: "#5a8a6a", flexShrink: 0 }}>@ {entry.toFixed(entry < 10 ? 4 : 2)}→{mark.toFixed(mark < 10 ? 4 : 2)}</span>}
-                  <span style={{ fontSize: 9, color: !hasPnl ? "#5a8a6a" : pnl >= 0 ? green : red, marginLeft: "auto", flexShrink: 0 }}>{hasPnl ? `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : "—"}</span>
-                  <button onClick={() => sharePosition(p)} title="Share to cast" style={{ flexShrink: 0, background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 4, padding: "5px 9px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: "pointer" }}>↗</button>
+                  {mark > 0 && <span style={{ fontSize: 8, color: "#a1a1aa", flexShrink: 0 }}>@ {entry.toFixed(entry < 10 ? 4 : 2)}→{mark.toFixed(mark < 10 ? 4 : 2)}</span>}
+                  <span style={{ fontSize: 9, color: !hasPnl ? "#a1a1aa" : pnl >= 0 ? green : red, marginLeft: "auto", flexShrink: 0 }}>{hasPnl ? `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : "—"}</span>
+                  <button onClick={() => sharePosition(p)} title="Share to cast" style={{ flexShrink: 0, background: "#1a1a1e", color: green, border: "1px solid #33333a", borderRadius: 4, padding: "5px 9px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: "pointer" }}>↗</button>
                   <button onClick={() => closePosition(p.symbol)} disabled={closingSym === p.symbol} style={{ flexShrink: 0, background: "#1a0a0a", color: red, border: `1px solid ${red}55`, borderRadius: 4, padding: "5px 10px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: closingSym === p.symbol ? "wait" : "pointer", letterSpacing: "0.05em", opacity: closingSym === p.symbol ? 0.6 : 1 }}>{closingSym === p.symbol ? "…" : "CLOSE"}</button>
                 </div>
               );
@@ -728,25 +728,25 @@ export default function MiniApp() {
           </div>
 
           {/* Asset price + chart (glance value) */}
-          <div style={{ borderTop: "1px solid #1a2e1a", paddingTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ borderTop: "1px solid #232327", paddingTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
               <span style={{ fontSize: 15, fontWeight: "bold", color: "#fff" }}>{sym}</span>
               <span style={{ fontSize: 14, color: "#fff" }}>{mkt ? `$${fmtPrice(mkt.price)}` : "—"}</span>
               {mkt && <span style={{ fontSize: 11, color: mkt.change >= 0 ? green : red }}>{mkt.change >= 0 ? "▲" : "▼"} {Math.abs(mkt.change).toFixed(2)}%</span>}
-              {mkt && <span style={{ marginLeft: "auto", fontSize: 9, color: "#5a8a6a" }}>funding <b style={{ color: mkt.funding >= 0 ? green : red }}>{(mkt.funding * 100).toFixed(4)}%</b></span>}
+              {mkt && <span style={{ marginLeft: "auto", fontSize: 9, color: "#a1a1aa" }}>funding <b style={{ color: mkt.funding >= 0 ? green : red }}>{(mkt.funding * 100).toFixed(4)}%</b></span>}
             </div>
             <AssetChart data={candles} />
             {mkt && (mkt.high > 0 || mkt.low > 0) && (
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#3a6a4a" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#71717a" }}>
                 <span>24h L ${fmtPrice(mkt.low)}</span>
                 <span>H ${fmtPrice(mkt.high)}</span>
               </div>
             )}
             {mkt && (mkt.vol > 0 || mkt.oi > 0) && (
-              <div style={{ display: "flex", gap: 10, fontSize: 8, color: "#3a6a4a", flexWrap: "wrap" }}>
-                <span>24h vol <b style={{ color: "#5a8a6a" }}>{fmtUsd(mkt.vol)}</b></span>
-                <span>OI <b style={{ color: "#5a8a6a" }}>{fmtUsd(mkt.oi)}</b></span>
-                {mkt.nextFunding > 0 && <span style={{ marginLeft: "auto" }}>next funding <b style={{ color: "#5a8a6a" }}>{fundingIn(mkt.nextFunding)}</b></span>}
+              <div style={{ display: "flex", gap: 10, fontSize: 8, color: "#71717a", flexWrap: "wrap" }}>
+                <span>24h vol <b style={{ color: "#a1a1aa" }}>{fmtUsd(mkt.vol)}</b></span>
+                <span>OI <b style={{ color: "#a1a1aa" }}>{fmtUsd(mkt.oi)}</b></span>
+                {mkt.nextFunding > 0 && <span style={{ marginLeft: "auto" }}>next funding <b style={{ color: "#a1a1aa" }}>{fundingIn(mkt.nextFunding)}</b></span>}
               </div>
             )}
           </div>
@@ -759,7 +759,7 @@ export default function MiniApp() {
               ))}
               {!MARKETS.includes(sym) && <button style={mktChip(true)}>{sym}</button>}
             </div>
-            <input value={mktSearch} onChange={(e) => setMktSearch(e.target.value.toUpperCase())} placeholder={markets ? `🔍 search ${markets.length} markets…` : "loading markets…"} style={{ width: "100%", boxSizing: "border-box", background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 11, padding: "6px 9px" }} />
+            <input value={mktSearch} onChange={(e) => setMktSearch(e.target.value.toUpperCase())} placeholder={markets ? `🔍 search ${markets.length} markets…` : "loading markets…"} style={{ width: "100%", boxSizing: "border-box", background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 11, padding: "6px 9px" }} />
             {mktSearch && markets && (() => {
               const hits = markets.filter((m) => m.includes(mktSearch));
               return (
@@ -767,7 +767,7 @@ export default function MiniApp() {
                   {hits.slice(0, 36).map((m) => (
                     <button key={m} onClick={() => { setSym(m); setMktSearch(""); setTradeMsg(null); }} style={mktChip(m === sym)}>{m}</button>
                   ))}
-                  {hits.length === 0 && <span style={{ fontSize: 9, color: "#3a6a4a" }}>no market matches “{mktSearch}”</span>}
+                  {hits.length === 0 && <span style={{ fontSize: 9, color: "#71717a" }}>no market matches “{mktSearch}”</span>}
                 </div>
               );
             })()}
@@ -775,33 +775,33 @@ export default function MiniApp() {
           {/* Size + leverage */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <div>
-              <div style={{ fontSize: 8, color: "#3a6a4a", letterSpacing: "0.1em" }}>SIZE (USDC)</div>
-              <input type="number" inputMode="decimal" min={1} value={notional} onChange={(e) => setNotional(Math.max(0, parseFloat(e.target.value) || 0))} style={{ width: "100%", boxSizing: "border-box", marginTop: 4, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 13, padding: "7px 9px" }} />
+              <div style={{ fontSize: 8, color: "#71717a", letterSpacing: "0.1em" }}>SIZE (USDC)</div>
+              <input type="number" inputMode="decimal" min={1} value={notional} onChange={(e) => setNotional(Math.max(0, parseFloat(e.target.value) || 0))} style={{ width: "100%", boxSizing: "border-box", marginTop: 4, background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 13, padding: "7px 9px" }} />
             </div>
             <div>
-              <div style={{ fontSize: 8, color: "#3a6a4a", letterSpacing: "0.1em" }}>LEVERAGE — {lev}x <span style={{ color: "#2a4a3a" }}>· max {maxLev}x</span></div>
+              <div style={{ fontSize: 8, color: "#71717a", letterSpacing: "0.1em" }}>LEVERAGE — {lev}x <span style={{ color: "#33333a" }}>· max {maxLev}x</span></div>
               <input type="range" min={1} max={maxLev} step={1} value={lev} onChange={(e) => setLev(parseInt(e.target.value, 10))} style={{ width: "100%", marginTop: 12 }} />
               <div style={{ display: "flex", gap: 5, marginTop: 6 }}>
                 {levPresets.map((p, i) => (
-                  <button key={p} onClick={() => setLev(p)} style={{ flex: 1, background: lev === p ? "#00ff8815" : "#0a0e0a", border: `1px solid ${lev === p ? "#00ff8860" : "#1e2d1e"}`, borderRadius: 3, padding: "4px 0", cursor: "pointer", color: lev === p ? green : "#4a7a5a", fontFamily: mono, fontSize: 10, fontWeight: "bold" }}>{i === levPresets.length - 1 ? "MAX" : `${p}x`}</button>
+                  <button key={p} onClick={() => setLev(p)} style={{ flex: 1, background: lev === p ? "#ededf015" : "#0a0a0b", border: `1px solid ${lev === p ? "#ededf060" : "#1e2d1e"}`, borderRadius: 3, padding: "4px 0", cursor: "pointer", color: lev === p ? green : "#71717a", fontFamily: mono, fontSize: 10, fontWeight: "bold" }}>{i === levPresets.length - 1 ? "MAX" : `${p}x`}</button>
                 ))}
               </div>
             </div>
           </div>
-          <div style={{ fontSize: 9, color: "#5a8a6a" }}>notional <b style={{ color: "#fff" }}>${notional.toFixed(0)}</b> · margin <b style={{ color: "#fff" }}>${margin.toFixed(2)}</b>{minNotional ? <> · min <b style={{ color: "#fff" }}>${minNotional}</b></> : null}</div>
+          <div style={{ fontSize: 9, color: "#a1a1aa" }}>notional <b style={{ color: "#fff" }}>${notional.toFixed(0)}</b> · margin <b style={{ color: "#fff" }}>${margin.toFixed(2)}</b>{minNotional ? <> · min <b style={{ color: "#fff" }}>${minNotional}</b></> : null}</div>
           {mkt && mkt.price > 0 && notional > 0 && (
-            <div style={{ fontSize: 9, color: "#5a8a6a" }}>
+            <div style={{ fontSize: 9, color: "#a1a1aa" }}>
               ≈ <b style={{ color: "#fff" }}>{(notional / mkt.price).toLocaleString("en-US", { maximumFractionDigits: 4 })} {sym}</b>
-              <span style={{ color: "#3a6a4a" }}> · est. liq </span>
+              <span style={{ color: "#71717a" }}> · est. liq </span>
               <span style={{ color: red }}>L ${fmtPrice(Math.max(0, mkt.price * (1 - 1 / lev + mmr)))}</span>
-              <span style={{ color: "#3a6a4a" }}> / </span>
+              <span style={{ color: "#71717a" }}> / </span>
               <span style={{ color: red }}>S ${fmtPrice(mkt.price * (1 + 1 / lev - mmr))}</span>
             </div>
           )}
           {belowMin && <div style={{ fontSize: 9, color: "#fbbf24", lineHeight: 1.5 }}>↑ {sym} needs ≥ ${minNotional} notional. Raise SIZE to ${minNotional} (bump leverage if the margin doesn&apos;t fit your balance).</div>}
           {/* Long / Short */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <button onClick={() => placeTrade("LONG")} disabled={tradeBusy || notional <= 0 || belowMin} style={{ background: green, color: "#04130c", border: `1px solid ${green}`, borderRadius: 4, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: belowMin ? "not-allowed" : "pointer", letterSpacing: "0.06em", opacity: belowMin ? 0.4 : tradeBusy && confirmSide !== "LONG" ? 0.4 : 1, boxShadow: prefillSide === "LONG" ? `0 0 0 2px ${green}` : "none" }}>{tradeBusy ? "…" : confirmSide === "LONG" ? "TAP TO CONFIRM ✓" : "↑ LONG"}</button>
+            <button onClick={() => placeTrade("LONG")} disabled={tradeBusy || notional <= 0 || belowMin} style={{ background: green, color: "#141416", border: `1px solid ${green}`, borderRadius: 4, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: belowMin ? "not-allowed" : "pointer", letterSpacing: "0.06em", opacity: belowMin ? 0.4 : tradeBusy && confirmSide !== "LONG" ? 0.4 : 1, boxShadow: prefillSide === "LONG" ? `0 0 0 2px ${green}` : "none" }}>{tradeBusy ? "…" : confirmSide === "LONG" ? "TAP TO CONFIRM ✓" : "↑ LONG"}</button>
             <button onClick={() => placeTrade("SHORT")} disabled={tradeBusy || notional <= 0 || belowMin} style={{ background: red, color: "#fff", border: `1px solid ${red}`, borderRadius: 4, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: belowMin ? "not-allowed" : "pointer", letterSpacing: "0.06em", opacity: belowMin ? 0.4 : tradeBusy && confirmSide !== "SHORT" ? 0.4 : 1, boxShadow: prefillSide === "SHORT" ? `0 0 0 2px ${red}` : "none" }}>{tradeBusy ? "…" : confirmSide === "SHORT" ? "TAP TO CONFIRM ✓" : "↓ SHORT"}</button>
           </div>
           {tradeMsg && (
@@ -811,45 +811,45 @@ export default function MiniApp() {
           )}
 
           {/* Manage funds (progressive disclosure — keeps the default view chart + trade) */}
-          <button onClick={() => setFundsOpen((o) => !o)} style={{ borderTop: "1px solid #1a2e1a", paddingTop: 10, background: "none", border: "none", borderRadius: 0, color: "#5a8a6a", fontFamily: mono, fontSize: 9, fontWeight: "bold", letterSpacing: "0.1em", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 6 }}>
+          <button onClick={() => setFundsOpen((o) => !o)} style={{ borderTop: "1px solid #232327", paddingTop: 10, background: "none", border: "none", borderRadius: 0, color: "#a1a1aa", fontFamily: mono, fontSize: 9, fontWeight: "bold", letterSpacing: "0.1em", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 6 }}>
             <span>⚙ MANAGE FUNDS</span>
-            {acct && <span style={{ color: "#3a6a4a", fontWeight: "normal" }}>· free ${acct.free.toFixed(2)}</span>}
-            <span style={{ marginLeft: "auto", color: "#3a6a4a" }}>{fundsOpen ? "▲" : "▼ deposit · withdraw"}</span>
+            {acct && <span style={{ color: "#71717a", fontWeight: "normal" }}>· free ${acct.free.toFixed(2)}</span>}
+            <span style={{ marginLeft: "auto", color: "#71717a" }}>{fundsOpen ? "▲" : "▼ deposit · withdraw"}</span>
           </button>
 
           {fundsOpen && (<>
           {/* Fund / deposit */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ fontSize: 8, color: "#3a6a4a", letterSpacing: "0.1em" }}>💰 FUND ACCOUNT (USDC · Arbitrum)</div>
+            <div style={{ fontSize: 8, color: "#71717a", letterSpacing: "0.1em" }}>💰 FUND ACCOUNT (USDC · Arbitrum)</div>
             <div style={{ display: "flex", gap: 8 }}>
-              <input type="number" inputMode="decimal" min={1} value={depositAmt} onChange={(e) => setDepositAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
-              <button onClick={deposit} disabled={depositing || depositAmt <= 0} style={{ flexShrink: 0, background: "#0a1a2a", color: "#4a9fff", border: "1px solid #1a3a5a", borderRadius: 4, padding: "8px 16px", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: depositing ? "wait" : "pointer", letterSpacing: "0.05em", opacity: depositing ? 0.6 : 1 }}>{depositing ? "…" : "DEPOSIT"}</button>
+              <input type="number" inputMode="decimal" min={1} value={depositAmt} onChange={(e) => setDepositAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
+              <button onClick={deposit} disabled={depositing || depositAmt <= 0} style={{ flexShrink: 0, background: "#1a1a1e", color: "#d4d4d8", border: "1px solid #1a3a5a", borderRadius: 4, padding: "8px 16px", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: depositing ? "wait" : "pointer", letterSpacing: "0.05em", opacity: depositing ? 0.6 : 1 }}>{depositing ? "…" : "DEPOSIT"}</button>
             </div>
             {depositMsg && <div style={{ fontSize: 10, color: depositMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{depositMsg.text}</div>}
           </div>
 
           {/* Withdraw */}
-          <div style={{ borderTop: "1px solid #1a2e1a", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ borderTop: "1px solid #232327", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 8, color: "#3a6a4a", letterSpacing: "0.1em" }}>🏧 WITHDRAW (USDC · to your wallet)</span>
-              {acct && <button onClick={() => setWithdrawAmt(Math.max(0, Math.floor(acct.free * 100) / 100))} style={{ marginLeft: "auto", background: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#5a8a6a", fontFamily: mono, fontSize: 9, padding: "2px 7px", cursor: "pointer" }}>MAX ${acct.free.toFixed(2)}</button>}
+              <span style={{ fontSize: 8, color: "#71717a", letterSpacing: "0.1em" }}>🏧 WITHDRAW (USDC · to your wallet)</span>
+              {acct && <button onClick={() => setWithdrawAmt(Math.max(0, Math.floor(acct.free * 100) / 100))} style={{ marginLeft: "auto", background: "none", border: "1px solid #232327", borderRadius: 3, color: "#a1a1aa", fontFamily: mono, fontSize: 9, padding: "2px 7px", cursor: "pointer" }}>MAX ${acct.free.toFixed(2)}</button>}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <input type="number" inputMode="decimal" min={1} value={withdrawAmt} onChange={(e) => setWithdrawAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
+              <input type="number" inputMode="decimal" min={1} value={withdrawAmt} onChange={(e) => setWithdrawAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
               <button onClick={withdraw} disabled={withdrawing || withdrawAmt <= 0} style={{ flexShrink: 0, background: "#1a140a", color: "#fbbf24", border: "1px solid #4a3a1a", borderRadius: 4, padding: "8px 16px", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: withdrawing ? "wait" : "pointer", letterSpacing: "0.05em", opacity: withdrawing ? 0.6 : 1 }}>{withdrawing ? "…" : "WITHDRAW"}</button>
             </div>
             {withdrawMsg && <div style={{ fontSize: 10, color: withdrawMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{withdrawMsg.text}</div>}
           </div>
           </>)}
 
-          <div style={{ fontSize: 8, color: "#2a4a3a" }}>real orders on Orderly · signs to authorize · non-custodial</div>
+          <div style={{ fontSize: 8, color: "#33333a" }}>real orders on Orderly · signs to authorize · non-custodial</div>
         </div>
       )}
 
       {/* Buy / Share */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <button onClick={buyNexus} disabled={buying} style={{ background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 5, padding: "10px 0", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: buying ? "wait" : "pointer", letterSpacing: "0.04em", opacity: buying ? 0.6 : 1 }}>{buying ? "OPENING…" : "🪙 BUY $NEXUS"}</button>
-        <button onClick={shareApp} style={{ background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 5, padding: "10px 0", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: "pointer", letterSpacing: "0.04em" }}>↗ SHARE</button>
+        <button onClick={buyNexus} disabled={buying} style={{ background: "#1a1a1e", color: green, border: "1px solid #33333a", borderRadius: 5, padding: "10px 0", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: buying ? "wait" : "pointer", letterSpacing: "0.04em", opacity: buying ? 0.6 : 1 }}>{buying ? "OPENING…" : "🪙 BUY $NEXUS"}</button>
+        <button onClick={shareApp} style={{ background: "#1a1a1e", color: green, border: "1px solid #33333a", borderRadius: 5, padding: "10px 0", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: "pointer", letterSpacing: "0.04em" }}>↗ SHARE</button>
       </div>
 
       {/* Autonomous agent — view status + one-tap deploy Proven Edge in PAPER */}
@@ -861,23 +861,23 @@ export default function MiniApp() {
         return (
           <div style={{ ...card, display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 9, color: "#3a6a4a", letterSpacing: "0.12em" }}>🤖 AUTONOMOUS AGENT</span>
-              {active && <span style={{ flexShrink: 0, fontSize: 8, color: mode === "AUTONOMOUS" ? "#ff8800" : mode === "ASSISTED" ? green : "#4a9fff", border: "1px solid #1e2d1e", borderRadius: 3, padding: "1px 6px", marginLeft: "auto" }}>{mode}</span>}
+              <span style={{ fontSize: 9, color: "#71717a", letterSpacing: "0.12em" }}>🤖 AUTONOMOUS AGENT</span>
+              {active && <span style={{ flexShrink: 0, fontSize: 8, color: mode === "AUTONOMOUS" ? "#ff8800" : mode === "ASSISTED" ? green : "#d4d4d8", border: "1px solid #1e2d1e", borderRadius: 3, padding: "1px 6px", marginLeft: "auto" }}>{mode}</span>}
             </div>
             {active ? (
               <>
-                <div style={{ fontSize: 11, color: "#8aaa9a", lineHeight: 1.5 }}>
+                <div style={{ fontSize: 11, color: "#a1a1aa", lineHeight: 1.5 }}>
                   Running <span style={{ color: "#fff" }}>{agentStatus?.config?.signalMode ?? "FUNDING_ONLY"}</span> on {tk((agentStatus?.config?.symbols ?? ["PERP_BTC_USDC"])[0])}.
                   {paper.length > 0 && <> Paper: <span style={{ color: paperNet >= 0 ? green : red }}>{paperNet >= 0 ? "+" : ""}${paperNet.toFixed(2)}</span> over {paper.length} trade{paper.length === 1 ? "" : "s"}.</>}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  <a href={`${APP}/lab?tab=agent`} style={{ fontSize: 10, color: green, textDecoration: "none", border: "1px solid #1a4a2a", borderRadius: 5, padding: "8px 0", textAlign: "center", fontFamily: mono, fontWeight: "bold", letterSpacing: "0.04em" }}>⚙ MANAGE ↗</a>
-                  <button onClick={shareAgent} style={{ fontSize: 10, color: green, background: "#0a1a0a", border: "1px solid #1a4a2a", borderRadius: 5, padding: "8px 0", textAlign: "center", fontFamily: mono, fontWeight: "bold", letterSpacing: "0.04em", cursor: "pointer" }}>↗ SHARE AGENT</button>
+                  <a href={`${APP}/lab?tab=agent`} style={{ fontSize: 10, color: green, textDecoration: "none", border: "1px solid #33333a", borderRadius: 5, padding: "8px 0", textAlign: "center", fontFamily: mono, fontWeight: "bold", letterSpacing: "0.04em" }}>⚙ MANAGE ↗</a>
+                  <button onClick={shareAgent} style={{ fontSize: 10, color: green, background: "#1a1a1e", border: "1px solid #33333a", borderRadius: 5, padding: "8px 0", textAlign: "center", fontFamily: mono, fontWeight: "bold", letterSpacing: "0.04em", cursor: "pointer" }}>↗ SHARE AGENT</button>
                 </div>
               </>
             ) : (
               <>
-                <div style={{ fontSize: 11, color: "#8aaa9a", lineHeight: 1.5 }}>
+                <div style={{ fontSize: 11, color: "#a1a1aa", lineHeight: 1.5 }}>
                   Try the <span style={{ color: "#fbbf24" }}>BTC Funding Fade</span> — a selective funding-fade with a breakeven risk-free stop. <span style={{ color: "#fff" }}>Experimental, PAPER only</span> (it doesn't yet pass our cross-market validation). No funds, no key.
                 </div>
                 <button onClick={deployPaperAgent} disabled={agentBusy} style={{ background: "#1a140a", color: "#fbbf24", border: "1px solid #4a3a1a", borderRadius: 5, padding: "10px 0", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: agentBusy ? "wait" : "pointer", letterSpacing: "0.04em", opacity: agentBusy ? 0.6 : 1 }}>{agentBusy ? "DEPLOYING…" : "🧪 PAPER-TEST BTC FUNDING FADE"}</button>
@@ -890,35 +890,35 @@ export default function MiniApp() {
 
       {/* Live calls feed */}
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 2 }}>
-        <span style={{ fontSize: 9, color: "#3a6a4a", letterSpacing: "0.12em" }}>📡 LIVE CALLS</span>
+        <span style={{ fontSize: 9, color: "#71717a", letterSpacing: "0.12em" }}>📡 LIVE CALLS</span>
         {liveCount > 0 && <span style={{ fontSize: 9, color: green }}>{liveCount} active</span>}
       </div>
-      {feed === null && <div style={{ ...card, color: "#3a6a4a", fontSize: 11 }}>loading feed…</div>}
-      {feed && feed.length === 0 && <div style={{ ...card, color: "#3a6a4a", fontSize: 11 }}>no calls yet — be the first 🟢</div>}
+      {feed === null && <div style={{ ...card, color: "#71717a", fontSize: 11 }}>loading feed…</div>}
+      {feed && feed.length === 0 && <div style={{ ...card, color: "#71717a", fontSize: 11 }}>no calls yet — be the first 🟢</div>}
       {feed && feed.map((t) => {
-        const sc = STATUS_COLOR[t.status] ?? "#8aaa9a";
+        const sc = STATUS_COLOR[t.status] ?? "#a1a1aa";
         return (
           <div key={t.id} style={{ ...card, display: "flex", flexDirection: "column", gap: 7, padding: "10px 12px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 10, color: "#8aaa9a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{t.agent ? "Nexus Agent" : (t.displayName || shortAddr(t.wallet))}</span>
-              {t.agent && <span style={{ flexShrink: 0, fontSize: 8, color: "#4a9fff", border: "1px solid #1a3a5a", borderRadius: 3, padding: "0 4px" }}>🤖</span>}
+              <span style={{ fontSize: 10, color: "#a1a1aa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{t.agent ? "Nexus Agent" : (t.displayName || shortAddr(t.wallet))}</span>
+              {t.agent && <span style={{ flexShrink: 0, fontSize: 8, color: "#d4d4d8", border: "1px solid #1a3a5a", borderRadius: 3, padding: "0 4px" }}>🤖</span>}
               <span style={{ flexShrink: 0, fontSize: 8, color: sc, border: `1px solid ${sc}33`, borderRadius: 3, padding: "1px 6px", marginLeft: "auto" }}>{t.status}</span>
-              <button onClick={() => shareThesis(t)} title="Share to cast" style={{ flexShrink: 0, background: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#5a8a6a", fontFamily: mono, fontSize: 10, padding: "2px 7px", cursor: "pointer" }}>↗</button>
+              <button onClick={() => shareThesis(t)} title="Share to cast" style={{ flexShrink: 0, background: "none", border: "1px solid #232327", borderRadius: 3, color: "#a1a1aa", fontFamily: mono, fontSize: 10, padding: "2px 7px", cursor: "pointer" }}>↗</button>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ fontSize: 15, fontWeight: "bold", color: "#fff" }}>{tk(t.symbol)}</span>
               <span style={{ fontSize: 10, color: t.direction === "LONG" ? green : red }}>{t.direction === "LONG" ? "↑" : "↓"} {t.direction}</span>
               <span style={{ fontSize: 10, color: t.riskReward >= 2 ? green : "#fbbf24" }}>R:R 1:{t.riskReward?.toFixed?.(2) ?? "—"}</span>
-              <button onClick={() => tradeThis(t)} title="Trade this call" style={{ marginLeft: "auto", flexShrink: 0, background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 3, fontFamily: mono, fontSize: 9, fontWeight: "bold", padding: "3px 9px", cursor: "pointer", letterSpacing: "0.05em" }}>⚡ TRADE</button>
+              <button onClick={() => tradeThis(t)} title="Trade this call" style={{ marginLeft: "auto", flexShrink: 0, background: "#1a1a1e", color: green, border: "1px solid #33333a", borderRadius: 3, fontFamily: mono, fontSize: 9, fontWeight: "bold", padding: "3px 9px", cursor: "pointer", letterSpacing: "0.05em" }}>⚡ TRADE</button>
             </div>
           </div>
         );
       })}
 
-      <div style={{ fontSize: 8, color: "#2a4a3a", textAlign: "center", marginTop: 4, lineHeight: 1.5 }}>
+      <div style={{ fontSize: 8, color: "#33333a", textAlign: "center", marginTop: 4, lineHeight: 1.5 }}>
         verify, don&apos;t trust
         <br />
-        <a href={APP} style={{ color: "#3a6a4a", textDecoration: "none" }}>full terminal ↗</a>
+        <a href={APP} style={{ color: "#71717a", textDecoration: "none" }}>full terminal ↗</a>
       </div>
     </div>
   );
