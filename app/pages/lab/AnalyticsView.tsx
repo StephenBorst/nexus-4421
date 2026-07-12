@@ -380,7 +380,7 @@ function TimingAndRisk({ orders }: { orders: ProcessedTrade[] }) {
       <div style={cardStyle}>
         <div style={{ fontSize: 10, color: "#71717a", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "var(--nx-font-mono)" }}>&#9632; RISK-ADJUSTED</div>
         {gated ? (
-          <div style={{ fontSize: 11, color: "#52525b", fontFamily: "var(--nx-font-mono)", lineHeight: 1.7 }}>
+          <div style={{ fontSize: 11, color: "#52525b", fontFamily: "var(--nx-font-ui)", lineHeight: 1.7 }}>
             need <span style={{ color: "#fbbf24" }}>{RISK_SAMPLE_GATE - stats.n}</span> more closed trades<br />
             <span style={{ color: "#33333a" }}>ratios are meaningless under {RISK_SAMPLE_GATE} samples — we won&apos;t fake them</span>
           </div>

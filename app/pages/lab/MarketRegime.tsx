@@ -88,7 +88,7 @@ export function MarketRegime() {
               <div style={{ fontSize: 16, color: "#fbbf24", fontFamily: "var(--nx-font-mono)" }}>{regime.fundSkew}% long</div>
             </div>
           </div>
-          <div style={{ fontSize: 11, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", lineHeight: 1.5, borderTop: "1px solid #232327", paddingTop: 8 }}>
+          <div style={{ fontSize: 11, color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", lineHeight: 1.5, borderTop: "1px solid #232327", paddingTop: 8 }}>
             <span style={{ color: "#71717a" }}>▶ agent:</span> {regime.agentNote}
           </div>
         </div>

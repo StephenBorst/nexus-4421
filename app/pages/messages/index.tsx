@@ -659,7 +659,7 @@ export default function MessagesPage() {
             </button>
           </div>
           {dmError && (
-            <div style={{ padding: "6px 10px", borderBottom: "1px solid #232327", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ff6b6b", lineHeight: 1.5 }}>
+            <div style={{ padding: "6px 10px", borderBottom: "1px solid #232327", fontFamily: "var(--nx-font-ui)", fontSize: 9, color: "#ff6b6b", lineHeight: 1.5 }}>
               {dmError}
             </div>
           )}
@@ -674,7 +674,7 @@ export default function MessagesPage() {
             };
             return (
               <div style={{ padding: "8px 10px", borderBottom: "1px solid #232327", background: "#1a1a1e" }}>
-                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#d4d4d8", lineHeight: 1.5, marginBottom: 6 }}>
+                <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9, color: "#d4d4d8", lineHeight: 1.5, marginBottom: 6 }}>
                   {shortAddr(inviteAddr)} isn’t on XMTP yet. Send them this link — it opens Messages and pre-fills a DM back to you:
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
@@ -708,7 +708,7 @@ export default function MessagesPage() {
               </div>
             )}
             {!loadingConvos && conversations.length === 0 && (
-              <div style={{ padding: 14, fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#33333a", lineHeight: 1.6 }}>
+              <div style={{ padding: 14, fontFamily: "var(--nx-font-ui)", fontSize: 9, color: "#33333a", lineHeight: 1.6 }}>
                 no conversations yet
                 <br />paste a wallet address above
               </div>
