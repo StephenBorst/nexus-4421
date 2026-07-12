@@ -118,6 +118,8 @@ html, body {
   --nx-font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   /* Phase C: reading/UI font (de-codify). Mono stays for numbers/tickers/addresses. */
   --nx-font-ui: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Editorial serif — headline moments only (section titles, regime labels). */
+  --nx-font-serif: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
 }
 
 .nx-card {
