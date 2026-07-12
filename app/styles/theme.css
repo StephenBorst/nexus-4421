@@ -1,5 +1,5 @@
 :root {
-  --oui-font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  --oui-font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   /* global font sizes */
   --oui-font-size-xs: 12px;   /* small labels, table footers */
