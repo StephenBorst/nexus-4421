@@ -22,18 +22,18 @@ function CalendarView({ dayGroups, onDayClick, viewMonth, viewYear, onPrevMonth,
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button style={navBtnStyle} onClick={onPrevMonth}>&#8592;</button>
-          <button style={{ ...navBtnStyle, background: "#00ff88", color: "#080c08", border: "none", fontWeight: "bold" }}>TODAY</button>
+          <button style={{ ...navBtnStyle, background: "#ededf0", color: "#0f0f11", border: "none", fontWeight: "bold" }}>TODAY</button>
           <button style={navBtnStyle} onClick={onNextMonth}>&#8594;</button>
-          <span style={{ fontSize: 20, color: "#00ff88", fontFamily: "var(--nx-font-mono)" }}>{MONTH_NAMES[viewMonth]} {viewYear}</span>
+          <span style={{ fontSize: 20, color: "#ededf0", fontFamily: "var(--nx-font-mono)" }}>{MONTH_NAMES[viewMonth]} {viewYear}</span>
         </div>
         <div style={{ ...cardStyle, display: "flex", gap: 20, padding: "10px 16px" }}>
-          <div><div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{"// PNL"}</div><div style={{ fontSize: 16, color: totalPnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)" }}>{formatPnl(totalPnl)}</div></div>
-          <div style={{ width: 1, background: "#1a2e1a" }} />
-          <div><div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{"// DAYS"}</div><div style={{ fontSize: 16, color: "#00ff88", fontFamily: "var(--nx-font-mono)" }}>{tradingDays}</div></div>
+          <div><div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{"// PNL"}</div><div style={{ fontSize: 16, color: totalPnl >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)" }}>{formatPnl(totalPnl)}</div></div>
+          <div style={{ width: 1, background: "#232327" }} />
+          <div><div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{"// DAYS"}</div><div style={{ fontSize: 16, color: "#ededf0", fontFamily: "var(--nx-font-mono)" }}>{tradingDays}</div></div>
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
-        {days.map((d) => <div key={d} style={{ fontSize: 10, color: "#3a5a4a", textAlign: "center", padding: "6px 0", fontFamily: "var(--nx-font-mono)" }}>{d}</div>)}
+        {days.map((d) => <div key={d} style={{ fontSize: 10, color: "#52525b", textAlign: "center", padding: "6px 0", fontFamily: "var(--nx-font-mono)" }}>{d}</div>)}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
         {cells.map((cellDay, i) => {
@@ -45,19 +45,19 @@ function CalendarView({ dayGroups, onDayClick, viewMonth, viewYear, onPrevMonth,
             <div key={i} role={data ? "button" : undefined} tabIndex={data ? 0 : -1}
               onClick={() => data && onDayClick(key, cellDay)}
               onKeyDown={(e) => e.key === "Enter" && data && onDayClick(key, cellDay)}
-              style={{ background: data ? "#0d120d" : "#0a0e0a", border: `1px solid ${isToday ? "#1a4a2a" : data ? "#1a3a1a" : "#121c12"}`, borderRadius: 4, height: cellH, padding: isMobile ? "3px 4px" : "6px 8px", cursor: data ? "pointer" : "default", fontFamily: "var(--nx-font-mono)", overflow: "hidden", boxSizing: "border-box" }}>
-              <div style={{ fontSize: isMobile ? 9 : 11, color: "#3a5a4a" }}>{cellDay}</div>
+              style={{ background: data ? "#141416" : "#0a0a0b", border: `1px solid ${isToday ? "#33333a" : data ? "#232327" : "#141416"}`, borderRadius: 4, height: cellH, padding: isMobile ? "3px 4px" : "6px 8px", cursor: data ? "pointer" : "default", fontFamily: "var(--nx-font-mono)", overflow: "hidden", boxSizing: "border-box" }}>
+              <div style={{ fontSize: isMobile ? 9 : 11, color: "#52525b" }}>{cellDay}</div>
               {data && (isMobile ? (
                 <div>
-                  <div style={{ fontSize: 10, color: data.pnl >= 0 ? "#00ff88" : "#ff4444", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{formatPnl(data.pnl)}</div>
-                  <div style={{ fontSize: 8, color: "#3a5a4a" }}>{data.trades}T · {data.trades ? `${Math.round((data.wins / data.trades) * 100)}%` : ""}</div>
+                  <div style={{ fontSize: 10, color: data.pnl >= 0 ? "#3ecf8e" : "#f7525f", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{formatPnl(data.pnl)}</div>
+                  <div style={{ fontSize: 8, color: "#52525b" }}>{data.trades}T · {data.trades ? `${Math.round((data.wins / data.trades) * 100)}%` : ""}</div>
                 </div>
               ) : (
                 <div>
-                  <div style={{ fontSize: 10, color: "#3a5a4a" }}>&#9632;</div>
-                  <div style={{ fontSize: 13, color: data.pnl >= 0 ? "#00ff88" : "#ff4444", fontWeight: "bold" }}>{formatPnl(data.pnl)}</div>
-                  <div style={{ fontSize: 9, color: "#3a5a4a" }}>{data.trades}T</div>
-                  <div style={{ fontSize: 9, color: "#3a5a4a" }}>{data.trades ? `${Math.round((data.wins / data.trades) * 100)}%` : ""}</div>
+                  <div style={{ fontSize: 10, color: "#52525b" }}>&#9632;</div>
+                  <div style={{ fontSize: 13, color: data.pnl >= 0 ? "#3ecf8e" : "#f7525f", fontWeight: "bold" }}>{formatPnl(data.pnl)}</div>
+                  <div style={{ fontSize: 9, color: "#52525b" }}>{data.trades}T</div>
+                  <div style={{ fontSize: 9, color: "#52525b" }}>{data.trades ? `${Math.round((data.wins / data.trades) * 100)}%` : ""}</div>
                 </div>
               ))}
             </div>
@@ -121,9 +121,9 @@ export function TradeLogAllView({
       ]).map(({ id, label }) => (
         <button key={id} onClick={() => setView(id)} style={{
           ...navBtnStyle, fontSize: 10, padding: "5px 16px",
-          color: view === id ? "#00ff88" : "#3a5a4a",
-          borderColor: view === id ? "#1a4a2a" : "#1a2e1a",
-          background: view === id ? "#0a2a0a" : "transparent",
+          color: view === id ? "#ededf0" : "#52525b",
+          borderColor: view === id ? "#33333a" : "#232327",
+          background: view === id ? "#1a1a1e" : "transparent",
         }}>{label}</button>
       ))}
     </div>
@@ -153,10 +153,10 @@ export function TradeLogAllView({
       {/* ── Summary bar ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8, marginBottom: 16 }}>
         {[
-          { label: "TOTAL PNL",   value: `${totalPnl >= 0 ? "+" : ""}$${Math.abs(totalPnl).toFixed(2)}`, color: totalPnl >= 0 ? "#00ff88" : "#ff4444" },
-          { label: "TRADING DAYS", value: String(sortedDays.length),  color: "#e8f0ea" },
-          { label: "WIN DAYS",    value: `${winDays} / ${sortedDays.length}`, color: "#00ff88" },
-          { label: "TOTAL TRADES", value: String(totalTrades),         color: "#e8f0ea" },
+          { label: "TOTAL PNL",   value: `${totalPnl >= 0 ? "+" : ""}$${Math.abs(totalPnl).toFixed(2)}`, color: totalPnl >= 0 ? "#3ecf8e" : "#f7525f" },
+          { label: "TRADING DAYS", value: String(sortedDays.length),  color: "#f4f4f5" },
+          { label: "WIN DAYS",    value: `${winDays} / ${sortedDays.length}`, color: "#ededf0" },
+          { label: "TOTAL TRADES", value: String(totalTrades),         color: "#f4f4f5" },
         ].map(r => (
           <div key={r.label} style={cardStyle}>
             <div style={labelStyle}>{r.label}</div>
@@ -170,9 +170,9 @@ export function TradeLogAllView({
         {(["all", "wins", "losses"] as const).map(f => (
           <button key={f} onClick={() => setFilter(f)} style={{
             ...navBtnStyle, fontSize: 10, padding: "5px 14px",
-            color: filter === f ? "#00ff88" : "#3a5a4a",
-            borderColor: filter === f ? "#1a4a2a" : "#1a2e1a",
-            background: filter === f ? "#0a2a0a" : "transparent",
+            color: filter === f ? "#ededf0" : "#52525b",
+            borderColor: filter === f ? "#33333a" : "#232327",
+            background: filter === f ? "#1a1a1e" : "transparent",
           }}>{f.toUpperCase()}</button>
         ))}
         <input
@@ -198,42 +198,42 @@ export function TradeLogAllView({
                 gridTemplateColumns: "180px 1fr repeat(4, 90px) 28px",
                 minWidth: isMobile ? 620 : undefined,
                 alignItems: "center", gap: 12,
-                borderColor: g.pnl >= 0 ? "#1a3a2a" : "#3a1a1a",
+                borderColor: g.pnl >= 0 ? "#232327" : "#3a1a1a",
                 transition: "background 0.15s",
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = "#101810")}
-              onMouseLeave={e => (e.currentTarget.style.background = "#0d120d")}
+              onMouseEnter={e => (e.currentTarget.style.background = "#141416")}
+              onMouseLeave={e => (e.currentTarget.style.background = "#141416")}
             >
               {/* date */}
               <div>
                 <div style={{ fontSize: 12, color: "#fff", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{formatKey(key)}</div>
-                {notes[key] && <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginTop: 2, fontStyle: "italic" }}>📝 note</div>}
+                {notes[key] && <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginTop: 2, fontStyle: "italic" }}>📝 note</div>}
               </div>
               {/* symbols */}
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {[...new Set(g.tradeList.map(t => t.symbol.replace("PERP_","").replace("_USDC","")))].map(s => (
-                  <span key={s} style={{ fontSize: 9, color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", background: "#0d120d", border: "1px solid #1e2d1e", borderRadius: 3, padding: "2px 6px" }}>{s}</span>
+                  <span key={s} style={{ fontSize: 9, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", background: "#141416", border: "1px solid #232327", borderRadius: 3, padding: "2px 6px" }}>{s}</span>
                 ))}
               </div>
               {/* stats */}
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>PNL</div>
-                <div style={{ fontSize: 14, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: g.pnl >= 0 ? "#00ff88" : "#ff4444" }}>{g.pnl >= 0 ? "+" : ""}${Math.abs(g.pnl).toFixed(2)}</div>
+                <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>PNL</div>
+                <div style={{ fontSize: 14, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: g.pnl >= 0 ? "#3ecf8e" : "#f7525f" }}>{g.pnl >= 0 ? "+" : ""}${Math.abs(g.pnl).toFixed(2)}</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>TRADES</div>
-                <div style={{ fontSize: 14, fontFamily: "var(--nx-font-mono)", color: "#8aaa9a" }}>{g.trades}</div>
+                <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>TRADES</div>
+                <div style={{ fontSize: 14, fontFamily: "var(--nx-font-mono)", color: "#a1a1aa" }}>{g.trades}</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>WIN RATE</div>
-                <div style={{ fontSize: 14, fontFamily: "var(--nx-font-mono)", color: winRate >= 50 ? "#00ff88" : "#ff4444" }}>{winRate}%</div>
+                <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>WIN RATE</div>
+                <div style={{ fontSize: 14, fontFamily: "var(--nx-font-mono)", color: winRate >= 50 ? "#3ecf8e" : "#f7525f" }}>{winRate}%</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ height: 40, width: 4, background: "#1a2e1a", borderRadius: 2, display: "inline-block", position: "relative", verticalAlign: "middle" }}>
-                  <div style={{ position: "absolute", bottom: 0, width: "100%", height: `${winRate}%`, background: g.pnl >= 0 ? "#00ff88" : "#ff4444", borderRadius: 2 }} />
+                <div style={{ height: 40, width: 4, background: "#232327", borderRadius: 2, display: "inline-block", position: "relative", verticalAlign: "middle" }}>
+                  <div style={{ position: "absolute", bottom: 0, width: "100%", height: `${winRate}%`, background: g.pnl >= 0 ? "#3ecf8e" : "#f7525f", borderRadius: 2 }} />
                 </div>
               </div>
-              <div style={{ fontSize: 14, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", textAlign: "right" }}>›</div>
+              <div style={{ fontSize: 14, color: "#33333a", fontFamily: "var(--nx-font-mono)", textAlign: "right" }}>›</div>
             </div>
           );
         })}
@@ -261,25 +261,25 @@ export function TradeLogView({ dayKey, data, onBack, initialNote, onSaveNote }: 
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #1a2e1a" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #232327" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: "var(--nx-font-mono)" }}>
           <button onClick={onBack} style={{ ...navBtnStyle, fontSize: 12 }}>&#8592; BACK</button>
-          <span style={{ fontSize: 13, color: "#00ff88" }}>&#9632; TRADING_LOG/{dayKey}</span>
+          <span style={{ fontSize: 13, color: "#ededf0" }}>&#9632; TRADING_LOG/{dayKey}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 9, color: "#3a5a4a", background: "#0d120d", border: "1px solid #1a2e1a", padding: "3px 8px", borderRadius: 3, fontFamily: "var(--nx-font-mono)" }}>{data.trades} TRADES</span>
+          <span style={{ fontSize: 9, color: "#52525b", background: "#141416", border: "1px solid #232327", padding: "3px 8px", borderRadius: 3, fontFamily: "var(--nx-font-mono)" }}>{data.trades} TRADES</span>
           <div style={{ display: "flex", gap: 4 }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#ff5f57" }} />
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#febc2e" }} />
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#28c840" }} />
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#3ecf8e" }} />
           </div>
         </div>
       </div>
       <div style={{ ...cardStyle, marginBottom: 12 }}>
-        <div style={{ fontSize: 10, color: "#3a5a4a", letterSpacing: "0.08em", marginBottom: 8, fontFamily: "var(--nx-font-mono)" }}>&#9632; NOTES</div>
+        <div style={{ fontSize: 10, color: "#52525b", letterSpacing: "0.08em", marginBottom: 8, fontFamily: "var(--nx-font-mono)" }}>&#9632; NOTES</div>
         <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add notes about this trading day..."
-          style={{ width: "100%", background: "#080c08", border: "1px solid #1a2e1a", borderRadius: 3, color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontSize: 12, padding: "10px 12px", resize: "none", height: 80, outline: "none" }} />
-        <button onClick={saveNote} style={{ ...navBtnStyle, marginTop: 8, color: saved ? "#00ff88" : "#4a7a5a" }}>
+          style={{ width: "100%", background: "#0f0f11", border: "1px solid #232327", borderRadius: 3, color: "#ededf0", fontFamily: "var(--nx-font-mono)", fontSize: 12, padding: "10px 12px", resize: "none", height: 80, outline: "none" }} />
+        <button onClick={saveNote} style={{ ...navBtnStyle, marginTop: 8, color: saved ? "#ededf0" : "#71717a" }}>
           &#9632; {saved ? "SAVED!" : "SAVE NOTE"}
         </button>
       </div>
@@ -288,27 +288,27 @@ export function TradeLogView({ dayKey, data, onBack, initialNote, onSaveNote }: 
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
             <div>
               <div style={{ fontSize: 16, color: "#fff", fontWeight: "bold", fontFamily: "var(--nx-font-mono)" }}>{trade.symbol.replace("_USDC", "").replace("PERP_", "")}</div>
-              <div style={{ fontSize: 10, color: trade.direction === "SHORT" ? "#ff4444" : "#00ff88", marginTop: 3, fontFamily: "var(--nx-font-mono)" }}>
+              <div style={{ fontSize: 10, color: trade.direction === "SHORT" ? "#f7525f" : "#3ecf8e", marginTop: 3, fontFamily: "var(--nx-font-mono)" }}>
                 {trade.direction === "SHORT" ? "↓" : "↑"} {trade.direction} {trade.leverage ? `${trade.leverage}x` : ""}
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 9, color: "#3a5a4a", letterSpacing: "0.08em", fontFamily: "var(--nx-font-mono)" }}>P&L</div>
-              <div style={{ fontSize: 18, fontWeight: "bold", color: trade.pnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)" }}>{formatPnl(trade.pnl)}</div>
+              <div style={{ fontSize: 9, color: "#52525b", letterSpacing: "0.08em", fontFamily: "var(--nx-font-mono)" }}>P&L</div>
+              <div style={{ fontSize: 18, fontWeight: "bold", color: trade.pnl >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)" }}>{formatPnl(trade.pnl)}</div>
             </div>
           </div>
           <div style={{ display: "flex", gap: 24, marginTop: 10 }}>
-            <div><div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>ENTRY</div><div style={{ fontSize: 12, color: "#8aaa9a", fontFamily: "var(--nx-font-mono)" }}>${trade.entryPrice?.toFixed(2) ?? "—"}</div></div>
-            <div><div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>EXIT</div><div style={{ fontSize: 12, color: "#8aaa9a", fontFamily: "var(--nx-font-mono)" }}>${trade.price.toFixed(2)}</div></div>
-            <div><div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>QTY</div><div style={{ fontSize: 12, color: "#8aaa9a", fontFamily: "var(--nx-font-mono)" }}>{trade.qty}</div></div>
+            <div><div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>ENTRY</div><div style={{ fontSize: 12, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)" }}>${trade.entryPrice?.toFixed(2) ?? "—"}</div></div>
+            <div><div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>EXIT</div><div style={{ fontSize: 12, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)" }}>${trade.price.toFixed(2)}</div></div>
+            <div><div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>QTY</div><div style={{ fontSize: 12, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)" }}>{trade.qty}</div></div>
           </div>
-          <div style={{ fontSize: 9, color: "#2a4a3a", marginTop: 8, fontFamily: "var(--nx-font-mono)" }}>{new Date(trade.timestamp).toLocaleTimeString()}</div>
+          <div style={{ fontSize: 9, color: "#33333a", marginTop: 8, fontFamily: "var(--nx-font-mono)" }}>{new Date(trade.timestamp).toLocaleTimeString()}</div>
         </div>
       ))}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8, marginTop: 12 }}>
-        <div style={cardStyle}><div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>TOTAL P&L</div><div style={{ fontSize: 14, color: data.pnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)" }}>{formatPnl(data.pnl)}</div></div>
-        <div style={cardStyle}><div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>WIN RATE</div><div style={{ fontSize: 14, color: "#00ff88", fontFamily: "var(--nx-font-mono)" }}>{data.trades ? `${Math.round((data.wins / data.trades) * 100)}%` : "—"}</div></div>
-        <div style={cardStyle}><div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>TRADES</div><div style={{ fontSize: 14, color: "#00ff88", fontFamily: "var(--nx-font-mono)" }}>{data.trades}</div></div>
+        <div style={cardStyle}><div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>TOTAL P&L</div><div style={{ fontSize: 14, color: data.pnl >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)" }}>{formatPnl(data.pnl)}</div></div>
+        <div style={cardStyle}><div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>WIN RATE</div><div style={{ fontSize: 14, color: "#ededf0", fontFamily: "var(--nx-font-mono)" }}>{data.trades ? `${Math.round((data.wins / data.trades) * 100)}%` : "—"}</div></div>
+        <div style={cardStyle}><div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>TRADES</div><div style={{ fontSize: 14, color: "#ededf0", fontFamily: "var(--nx-font-mono)" }}>{data.trades}</div></div>
       </div>
     </div>
   );

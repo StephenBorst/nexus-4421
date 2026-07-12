@@ -46,7 +46,7 @@
    strip seamless instead: force the page background to the app dark everywhere, and
    stop overscroll from revealing a different color. (Verified via ?vhdebug on Zerion.) */
 html, body, #root {
-  background: #0a0e0a !important;
+  background: #0a0a0b !important;
 }
 html, body {
   overscroll-behavior: none;
@@ -109,13 +109,15 @@ html, body {
    Migrate inline-styled controls to these classes to get premium feel + a11y focus
    for free. Vars mirror C/RADIUS/MOTION in theme.ts — keep the two in sync. */
 :root {
-  --nx-canvas: #0a0e0a; --nx-surface: #111811; --nx-surface-alt: #0d120d; --nx-inset: #080c08;
-  --nx-border: #1e2d1e; --nx-border-strong: #2a3a2a; --nx-border-accent: #00ff8850;
-  --nx-bright: #e8f0ea; --nx-fog: #8aaa9a; --nx-muted: #4a7a5a; --nx-faint: #3a5a4a;
-  --nx-accent: #00ff88; --nx-neg: #ff4444; --nx-warn: #fbbf24; --nx-info: #4a9fff;
+  --nx-canvas: #0a0a0b; --nx-surface: #141416; --nx-surface-alt: #0f0f11; --nx-inset: #08080a;
+  --nx-border: #232327; --nx-border-strong: #33333a; --nx-border-accent: #5a5a6355;
+  --nx-bright: #f4f4f5; --nx-fog: #a1a1aa; --nx-muted: #71717a; --nx-faint: #52525b;
+  --nx-accent: #ededf0; --nx-neg: #f7525f; --nx-warn: #fbbf24; --nx-info: #d4d4d8;
   --nx-r-sm: 3px; --nx-r-md: 6px; --nx-r-lg: 8px;
   --nx-dur: 170ms; --nx-ease: cubic-bezier(0.4, 0, 0.2, 1);
   --nx-font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  /* Phase C: reading/UI font (de-codify). Mono stays for numbers/tickers/addresses. */
+  --nx-font-ui: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 .nx-card {
@@ -146,17 +148,17 @@ html, body {
 .nx-btn:disabled { opacity: 0.5; cursor: default; transform: none; }
 
 .nx-btn-primary {
-  color: var(--nx-accent); background: #00ff8814;
+  color: var(--nx-accent); background: #ededf014;
   border-color: var(--nx-accent); font-weight: 600;
 }
-.nx-btn-primary:hover { background: #00ff8824; color: var(--nx-accent); border-color: var(--nx-accent); }
+.nx-btn-primary:hover { background: #ededf024; color: var(--nx-accent); border-color: var(--nx-accent); }
 
 /* Small icon/chip button — same interaction, tighter footprint (feed/card actions). */
 .nx-btn-icon { padding: 3px 7px; font-size: 9px; letter-spacing: 0.05em; text-transform: none; }
 
 /* Active/toggled state — rationed accent tint (following, comments open, etc.). */
-.nx-btn.is-active { color: var(--nx-accent); border-color: #1a4a2a; background: #0a1a0a; }
-.nx-btn.is-active:hover { color: var(--nx-accent); border-color: var(--nx-accent); background: #0a1f0e; }
+.nx-btn.is-active { color: var(--nx-accent); border-color: #33333a; background: #1a1a1e; }
+.nx-btn.is-active:hover { color: var(--nx-accent); border-color: var(--nx-accent); background: #1a1a1e; }
 
 .nx-badge {
   font-family: var(--nx-font-mono); font-size: 9px; letter-spacing: 0.05em;
@@ -170,7 +172,7 @@ html, body {
   box-sizing: border-box;
   transition: border-color var(--nx-dur) var(--nx-ease), box-shadow var(--nx-dur) var(--nx-ease);
 }
-.nx-input:focus { border-color: var(--nx-border-accent); box-shadow: 0 0 0 2px #00ff8818; }
+.nx-input:focus { border-color: var(--nx-border-accent); box-shadow: 0 0 0 2px #ededf018; }
 .nx-input::placeholder { color: var(--nx-faint); }
 
 @media (prefers-reduced-motion: reduce) {

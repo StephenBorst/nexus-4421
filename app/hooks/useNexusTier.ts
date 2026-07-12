@@ -38,10 +38,10 @@ export const TIER_META: Record<
   NexusTier,
   { label: string; glyph: string; color: string }
 > = {
-  ORACLE:    { label: "ORACLE",    glyph: "◆", color: "#00ff88" },
-  ARCHITECT: { label: "ARCHITECT", glyph: "◇", color: "#5fd6a0" },
-  OPERATOR:  { label: "OPERATOR",  glyph: "▪", color: "#3a8a6a" },
-  NONE:      { label: "",          glyph: "",  color: "#2a4a3a" },
+  ORACLE:    { label: "ORACLE",    glyph: "◆", color: "#ededf0" },
+  ARCHITECT: { label: "ARCHITECT", glyph: "◇", color: "#ededf0" },
+  OPERATOR:  { label: "OPERATOR",  glyph: "▪", color: "#3ecf8e" },
+  NONE:      { label: "",          glyph: "",  color: "#33333a" },
 };
 
 export function tierForBalance(balance: number): NexusTier {

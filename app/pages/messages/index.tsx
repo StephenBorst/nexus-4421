@@ -67,15 +67,15 @@ async function resolvePeer(convo: Conversation, myInboxId: string | null): Promi
 
 const S = {
   page: {
-    background: "#0a0e0a",
+    background: "#0a0a0b",
     minHeight: "100svh",
     display: "flex",
     flexDirection: "column" as const,
   },
   header: {
     padding: "8px 16px",
-    borderBottom: "1px solid #1a2e1a",
-    background: "#080c08",
+    borderBottom: "1px solid #232327",
+    background: "#0f0f11",
     display: "flex",
     alignItems: "center",
     gap: 10,
@@ -84,12 +84,12 @@ const S = {
     fontFamily: "var(--nx-font-mono)",
     fontSize: 9,
     letterSpacing: "0.12em",
-    color: "#3a5a4a",
+    color: "#52525b",
   },
   backBtn: {
     background: "none",
     border: "none",
-    color: "#00ff88",
+    color: "#ededf0",
     fontFamily: "var(--nx-font-mono)",
     fontSize: 18,
     lineHeight: 1,
@@ -105,19 +105,19 @@ const S = {
   },
   sidebar: {
     width: 260,
-    borderRight: "1px solid #1a2e1a",
+    borderRight: "1px solid #232327",
     display: "flex",
     flexDirection: "column" as const,
-    background: "#080c08",
+    background: "#0f0f11",
     flexShrink: 0,
   },
   sidebarHeader: {
     padding: "10px 14px",
-    borderBottom: "1px solid #1a2e1a",
+    borderBottom: "1px solid #232327",
     fontFamily: "var(--nx-font-mono)",
     fontSize: 9,
     letterSpacing: "0.1em",
-    color: "#3a5a4a",
+    color: "#52525b",
   },
   convoList: {
     flex: 1,
@@ -125,15 +125,15 @@ const S = {
   },
   convoItem: (active: boolean): React.CSSProperties => ({
     padding: "12px 14px",
-    borderBottom: "1px solid #0f1a0f",
+    borderBottom: "1px solid #141416",
     cursor: "pointer",
-    background: active ? "#0a1a0a" : "transparent",
-    borderLeft: active ? "2px solid #00ff88" : "2px solid transparent",
+    background: active ? "#1a1a1e" : "transparent",
+    borderLeft: active ? "2px solid #ededf0" : "2px solid transparent",
   }),
   convoName: {
     fontFamily: "var(--nx-font-mono)",
     fontSize: 11,
-    color: "#8aaa9a",
+    color: "#a1a1aa",
     marginBottom: 2,
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -142,7 +142,7 @@ const S = {
   convoPreview: {
     fontFamily: "var(--nx-font-mono)",
     fontSize: 9,
-    color: "#3a5a4a",
+    color: "#52525b",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap" as const,
@@ -155,11 +155,11 @@ const S = {
   },
   threadHeader: {
     padding: "10px 16px",
-    borderBottom: "1px solid #1a2e1a",
-    background: "#080c08",
+    borderBottom: "1px solid #232327",
+    background: "#0f0f11",
     fontFamily: "var(--nx-font-mono)",
     fontSize: 11,
-    color: "#8aaa9a",
+    color: "#a1a1aa",
     display: "flex",
     alignItems: "center",
     gap: 8,
@@ -175,39 +175,39 @@ const S = {
   bubble: (isMine: boolean): React.CSSProperties => ({
     maxWidth: "72%",
     alignSelf: isMine ? "flex-end" : "flex-start",
-    background: isMine ? "#0a1a0a" : "#080c08",
-    border: `1px solid ${isMine ? "#1a4a2a" : "#1a2e1a"}`,
+    background: isMine ? "#1a1a1e" : "#0f0f11",
+    border: `1px solid ${isMine ? "#33333a" : "#232327"}`,
     borderRadius: isMine ? "8px 8px 0 8px" : "8px 8px 8px 0",
     padding: "8px 12px",
   }),
   bubbleText: (isMine: boolean): React.CSSProperties => ({
     fontFamily: "var(--nx-font-mono)",
     fontSize: 11,
-    color: isMine ? "#00ff88" : "#8aaa9a",
+    color: isMine ? "#ededf0" : "#a1a1aa",
     lineHeight: 1.5,
     wordBreak: "break-word" as const,
   }),
   bubbleTime: {
     fontFamily: "var(--nx-font-mono)",
     fontSize: 8,
-    color: "#2a4a3a",
+    color: "#33333a",
     marginTop: 4,
     textAlign: "right" as const,
   },
   compose: {
     padding: "10px 16px",
-    borderTop: "1px solid #1a2e1a",
-    background: "#080c08",
+    borderTop: "1px solid #232327",
+    background: "#0f0f11",
     display: "flex",
     gap: 8,
     alignItems: "flex-end",
   },
   input: {
     flex: 1,
-    background: "#0d120d",
-    border: "1px solid #1a2e1a",
+    background: "#141416",
+    border: "1px solid #232327",
     borderRadius: 4,
-    color: "#00ff88",
+    color: "#ededf0",
     fontFamily: "var(--nx-font-mono)",
     fontSize: 11,
     padding: "8px 10px",
@@ -217,10 +217,10 @@ const S = {
     maxHeight: 120,
   },
   sendBtn: (disabled: boolean): React.CSSProperties => ({
-    background: disabled ? "#080c08" : "#0a1a0a",
-    border: `1px solid ${disabled ? "#1a2e1a" : "#00ff88"}`,
+    background: disabled ? "#0f0f11" : "#1a1a1e",
+    border: `1px solid ${disabled ? "#232327" : "#ededf0"}`,
     borderRadius: 4,
-    color: disabled ? "#2a4a3a" : "#00ff88",
+    color: disabled ? "#33333a" : "#ededf0",
     fontFamily: "var(--nx-font-mono)",
     fontSize: 9,
     letterSpacing: "0.08em",
@@ -241,16 +241,16 @@ const S = {
   centerLabel: {
     fontFamily: "var(--nx-font-mono)",
     fontSize: 11,
-    color: "#3a5a4a",
+    color: "#52525b",
     textAlign: "center" as const,
     lineHeight: 1.6,
     maxWidth: 320,
   },
   enableBtn: {
-    background: "#0a1a0a",
-    border: "1px solid #00ff88",
+    background: "#1a1a1e",
+    border: "1px solid #ededf0",
     borderRadius: 4,
-    color: "#00ff88",
+    color: "#ededf0",
     fontFamily: "var(--nx-font-mono)",
     fontSize: 10,
     letterSpacing: "0.1em",
@@ -260,7 +260,7 @@ const S = {
   errText: {
     fontFamily: "var(--nx-font-mono)",
     fontSize: 9,
-    color: "#ff4444",
+    color: "#f7525f",
     textAlign: "center" as const,
     maxWidth: 320,
   },
@@ -423,9 +423,9 @@ function ThreadView({
   return (
     <>
       <div style={S.threadHeader}>
-        <span style={{ color: "#00ff88", fontSize: 10 }}>⬡</span>
+        <span style={{ color: "#ededf0", fontSize: 10 }}>⬡</span>
         {peerDisplay}
-        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#2a4a3a", marginLeft: "auto" }}>
+        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#33333a", marginLeft: "auto" }}>
           end-to-end encrypted · XMTP
         </span>
       </div>
@@ -602,11 +602,11 @@ export default function MessagesPage() {
           <span style={S.headerLabel}>■ MESSAGES</span>
         </div>
         <div style={S.center}>
-          <div style={{ fontSize: 24, color: "#1a3a1a" }}>⬡</div>
+          <div style={{ fontSize: 24, color: "#232327" }}>⬡</div>
           <div style={S.centerLabel}>
             wallet-to-wallet encrypted DMs powered by XMTP
             <br />
-            <span style={{ color: "#2a4a3a", fontSize: 9 }}>
+            <span style={{ color: "#33333a", fontSize: 9 }}>
               you'll sign twice — once for the encryption key, once to register
             </span>
           </div>
@@ -624,7 +624,7 @@ export default function MessagesPage() {
       <div style={S.header}>
         <button onClick={goBack} style={S.backBtn} aria-label="Back" title="Back">‹</button>
         <span style={S.headerLabel}>■ MESSAGES</span>
-        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#1a4a2a", marginLeft: "auto" }}>
+        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#33333a", marginLeft: "auto" }}>
           ⬡ XMTP · end-to-end encrypted
         </span>
       </div>
@@ -635,11 +635,11 @@ export default function MessagesPage() {
           <div style={S.sidebarHeader}>CONVERSATIONS</div>
 
           {/* New DM input */}
-          <div style={{ padding: "8px 10px", borderBottom: "1px solid #1a2e1a", display: "flex", gap: 6 }}>
+          <div style={{ padding: "8px 10px", borderBottom: "1px solid #232327", display: "flex", gap: 6 }}>
             <input
               style={{
-                flex: 1, background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 3,
-                color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 7px", outline: "none",
+                flex: 1, background: "#141416", border: "1px solid #232327", borderRadius: 3,
+                color: "#ededf0", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 7px", outline: "none",
               }}
               placeholder="0x… new DM"
               value={dmAddress}
@@ -650,8 +650,8 @@ export default function MessagesPage() {
               onClick={startDM}
               disabled={!dmAddress.trim() || openingDM}
               style={{
-                background: "none", border: "1px solid #1a3a1a", borderRadius: 3,
-                color: "#3a6a4a", fontFamily: "var(--nx-font-mono)", fontSize: 9,
+                background: "none", border: "1px solid #232327", borderRadius: 3,
+                color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 9,
                 padding: "4px 8px", cursor: "pointer",
               }}
             >
@@ -659,7 +659,7 @@ export default function MessagesPage() {
             </button>
           </div>
           {dmError && (
-            <div style={{ padding: "6px 10px", borderBottom: "1px solid #1a2e1a", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ff6b6b", lineHeight: 1.5 }}>
+            <div style={{ padding: "6px 10px", borderBottom: "1px solid #232327", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ff6b6b", lineHeight: 1.5 }}>
               {dmError}
             </div>
           )}
@@ -673,8 +673,8 @@ export default function MessagesPage() {
               } catch { /* clipboard blocked — user can select manually */ }
             };
             return (
-              <div style={{ padding: "8px 10px", borderBottom: "1px solid #1a2e1a", background: "#0a1420" }}>
-                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#4a9fff", lineHeight: 1.5, marginBottom: 6 }}>
+              <div style={{ padding: "8px 10px", borderBottom: "1px solid #232327", background: "#1a1a1e" }}>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#d4d4d8", lineHeight: 1.5, marginBottom: 6 }}>
                   {shortAddr(inviteAddr)} isn’t on XMTP yet. Send them this link — it opens Messages and pre-fills a DM back to you:
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
@@ -682,18 +682,18 @@ export default function MessagesPage() {
                     readOnly
                     value={inviteLink}
                     onFocus={(e) => e.currentTarget.select()}
-                    style={{ flex: 1, background: "#0d120d", border: "1px solid #1a3a5a", borderRadius: 3, color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 8, padding: "5px 7px", outline: "none" }}
+                    style={{ flex: 1, background: "#141416", border: "1px solid #1a3a5a", borderRadius: 3, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 8, padding: "5px 7px", outline: "none" }}
                   />
                   <button
                     onClick={copy}
-                    style={{ background: "none", border: "1px solid #1a3a5a", borderRadius: 3, color: "#4a9fff", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 8px", cursor: "pointer", whiteSpace: "nowrap" }}
+                    style={{ background: "none", border: "1px solid #1a3a5a", borderRadius: 3, color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 8px", cursor: "pointer", whiteSpace: "nowrap" }}
                   >
                     {inviteCopied ? "COPIED ✓" : "COPY"}
                   </button>
                 </div>
                 <button
                   onClick={() => { setInviteAddr(null); setDmAddress(""); }}
-                  style={{ marginTop: 6, background: "none", border: "none", color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 8, cursor: "pointer", padding: 0 }}
+                  style={{ marginTop: 6, background: "none", border: "none", color: "#52525b", fontFamily: "var(--nx-font-mono)", fontSize: 8, cursor: "pointer", padding: 0 }}
                 >
                   dismiss
                 </button>
@@ -703,12 +703,12 @@ export default function MessagesPage() {
 
           <div style={S.convoList}>
             {loadingConvos && (
-              <div style={{ padding: 14, fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#2a4a3a" }}>
+              <div style={{ padding: 14, fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#33333a" }}>
                 loading...
               </div>
             )}
             {!loadingConvos && conversations.length === 0 && (
-              <div style={{ padding: 14, fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#2a4a3a", lineHeight: 1.6 }}>
+              <div style={{ padding: 14, fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#33333a", lineHeight: 1.6 }}>
                 no conversations yet
                 <br />paste a wallet address above
               </div>
@@ -735,7 +735,7 @@ export default function MessagesPage() {
               {isMobile && (
                 <button
                   onClick={() => setActiveConvo(null)}
-                  style={{ background: "none", border: "none", borderBottom: "1px solid #1a2e1a", color: "#3a6a4a", fontFamily: "var(--nx-font-mono)", fontSize: 11, padding: "10px 14px", cursor: "pointer", textAlign: "left", width: "100%" }}
+                  style={{ background: "none", border: "none", borderBottom: "1px solid #232327", color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 11, padding: "10px 14px", cursor: "pointer", textAlign: "left", width: "100%" }}
                 >
                   ← conversations
                 </button>
@@ -751,7 +751,7 @@ export default function MessagesPage() {
             </>
           ) : (
             <div style={S.center}>
-              <div style={{ fontSize: 28, color: "#1a2e1a" }}>⬡</div>
+              <div style={{ fontSize: 28, color: "#232327" }}>⬡</div>
               <div style={S.centerLabel}>
                 select a conversation or paste a wallet address to start a new DM
               </div>

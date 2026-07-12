@@ -36,7 +36,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
     id: "funding-harvester",
     name: "Funding Harvester",
     tag: "CONSERVATIVE",
-    accent: "#00ff88",
+    accent: "#ededf0",
     blurb: "Fade funding + OI extremes on BTC only. Low leverage, tight caps — the slow-and-steady default.",
     config: {
       symbols: ["PERP_BTC_USDC"], signalMode: "CONFLUENCE", leverage: 3, capitalPerTrade: 30,
@@ -48,7 +48,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
     id: "blue-chip-confluence",
     name: "Blue-Chip Confluence",
     tag: "BALANCED",
-    accent: "#4a9fff",
+    accent: "#d4d4d8",
     blurb: "Confluence across BTC + ETH. Both funding and OI must agree — fewer, higher-quality entries.",
     config: {
       symbols: ["PERP_BTC_USDC", "PERP_ETH_USDC"], signalMode: "CONFLUENCE", leverage: 5, capitalPerTrade: 40,

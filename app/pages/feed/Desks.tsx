@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { signWithInjected } from "@/utils/injectedWallet";
 
 const API_BASE = "https://og.nexustradinglabs.com";
-const green = "#00ff88";
+const green = "#ededf0";
 
 type Desk = {
   id: string; name: string; rank: number; members: number;
@@ -62,7 +62,7 @@ export default function Desks({ walletAddress }: { walletAddress: string | null 
     <div style={{ marginTop: 18 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
         <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: "bold", color: green, letterSpacing: "0.1em" }}>◆ DESKS</span>
-        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a" }}>teams ranked by combined verified record</span>
+        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b" }}>teams ranked by combined verified record</span>
       </div>
 
       {/* Create */}
@@ -77,19 +77,19 @@ export default function Desks({ walletAddress }: { walletAddress: string | null 
       {msg && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#fbbf24", marginBottom: 8 }}>{msg}</div>}
 
       {/* Leaderboard */}
-      {desks === null && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#2a4a3a" }}>loading desks…</div>}
-      {desks && desks.length === 0 && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#2a4a3a" }}>no desks yet — start one and recruit 🟢</div>}
+      {desks === null && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#33333a" }}>loading desks…</div>}
+      {desks && desks.length === 0 && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#33333a" }}>no desks yet — start one and recruit 🟢</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {desks?.map((d) => (
-          <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 5, padding: "8px 10px", overflowX: "auto" }}>
-            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#3a5a4a", flexShrink: 0, width: 22 }}>#{d.rank}</span>
+          <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "#0a0a0b", border: "1px solid #232327", borderRadius: 5, padding: "8px 10px", overflowX: "auto" }}>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#52525b", flexShrink: 0, width: 22 }}>#{d.rank}</span>
             <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: "bold", color: "#fff", flexShrink: 0 }}>{d.name}</span>
-            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#4a7a5a", flexShrink: 0 }}>{d.members}👤</span>
-            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#8aaa9a", flexShrink: 0 }}>{d.calls} calls · {d.hitRate}% · {d.totalR >= 0 ? "+" : ""}{d.totalR}R</span>
-            <span style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", color: d.score > 0 ? green : "#3a5a4a", flexShrink: 0 }}>{d.score || "—"}</span>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", flexShrink: 0 }}>{d.members}👤</span>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#a1a1aa", flexShrink: 0 }}>{d.calls} calls · {d.hitRate}% · {d.totalR >= 0 ? "+" : ""}{d.totalR}R</span>
+            <span style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", color: d.score > 0 ? green : "#52525b", flexShrink: 0 }}>{d.score || "—"}</span>
             {myDeskId === d.id
-              ? <button onClick={() => leave(d.id)} disabled={busy} style={{ flexShrink: 0, background: "#1a0a0a", color: "#ff4444", border: "1px solid #4a1a1a55", borderRadius: 4, padding: "5px 9px", fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: "bold", cursor: "pointer" }}>LEAVE</button>
-              : <button onClick={() => join(d.id)} disabled={busy} style={{ flexShrink: 0, background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 4, padding: "5px 9px", fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: "bold", cursor: "pointer" }}>JOIN</button>}
+              ? <button onClick={() => leave(d.id)} disabled={busy} style={{ flexShrink: 0, background: "#1a0a0a", color: "#f7525f", border: "1px solid #4a1a1a55", borderRadius: 4, padding: "5px 9px", fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: "bold", cursor: "pointer" }}>LEAVE</button>
+              : <button onClick={() => join(d.id)} disabled={busy} style={{ flexShrink: 0, background: "#1a1a1e", color: green, border: "1px solid #33333a", borderRadius: 4, padding: "5px 9px", fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: "bold", cursor: "pointer" }}>JOIN</button>}
           </div>
         ))}
       </div>

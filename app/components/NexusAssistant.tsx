@@ -27,7 +27,7 @@ function pickDefaultModel(provider: ProviderId, ids: string[]): string {
 
 const AGENT_API = "https://og.nexustradinglabs.com";
 const mono = "var(--nx-font-mono)";
-const GREEN = "#00ff88";
+const GREEN = "#ededf0";
 
 type DisplayMsg = ChatMsg & { tools?: string[] };
 
@@ -52,8 +52,8 @@ function inline(text: string): React.ReactNode {
   // Order matters: match **bold** before *italic*.
   return text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).map((p, i) => {
     if (p.startsWith("**") && p.endsWith("**")) return <b key={i} style={{ color: "#fff" }}>{p.slice(2, -2)}</b>;
-    if (p.startsWith("*") && p.endsWith("*")) return <i key={i} style={{ color: "#a8c8b8" }}>{p.slice(1, -1)}</i>;
-    if (p.startsWith("`") && p.endsWith("`")) return <code key={i} style={{ color: "#00ff88", background: "#0a1a0a", padding: "0 3px", borderRadius: 2 }}>{p.slice(1, -1)}</code>;
+    if (p.startsWith("*") && p.endsWith("*")) return <i key={i} style={{ color: "#d4d4d8" }}>{p.slice(1, -1)}</i>;
+    if (p.startsWith("`") && p.endsWith("`")) return <code key={i} style={{ color: "#ededf0", background: "#141416", padding: "0 3px", borderRadius: 2 }}>{p.slice(1, -1)}</code>;
     return p;
   });
 }
@@ -75,11 +75,11 @@ function renderRich(text: string): React.ReactNode {
       out.push(
         <table key={i} style={{ borderCollapse: "collapse", margin: "4px 0", fontSize: 10 }}>
           <thead><tr>{header.map((h, k) => (
-            <th key={k} style={{ textAlign: "left", color: "#8aaa9a", borderBottom: "1px solid #1a2e1a", padding: "2px 8px 2px 0", fontWeight: "bold" }}>{inline(h)}</th>
+            <th key={k} style={{ textAlign: "left", color: "#a1a1aa", borderBottom: "1px solid #232327", padding: "2px 8px 2px 0", fontWeight: "bold" }}>{inline(h)}</th>
           ))}</tr></thead>
           <tbody>{rows.map((r, ri) => (
             <tr key={ri}>{r.map((c, ci) => (
-              <td key={ci} style={{ padding: "2px 8px 2px 0", color: "#c8d8c8", verticalAlign: "top" }}>{inline(c)}</td>
+              <td key={ci} style={{ padding: "2px 8px 2px 0", color: "#d4d4d8", verticalAlign: "top" }}>{inline(c)}</td>
             ))}</tr>
           ))}</tbody>
         </table>
@@ -443,16 +443,16 @@ export default function NexusAssistant() {
       >
         {!seen && !pos && (
           <>
-            <style>{`@keyframes nexAiPulse{0%,100%{box-shadow:0 0 14px rgba(0,255,136,0.35)}50%{box-shadow:0 0 22px rgba(0,255,136,0.85)}}`}</style>
+            <style>{`@keyframes nexAiPulse{0%,100%{box-shadow:0 0 14px rgba(255,255,255,0.18)}50%{box-shadow:0 0 22px rgba(255,255,255,0.4)}}`}</style>
             <div
               onClick={openPanel}
               style={{
-                cursor: "pointer", background: "#0a1a0a", border: `1px solid ${GREEN}`, borderRadius: 6,
+                cursor: "pointer", background: "#141416", border: `1px solid ${GREEN}`, borderRadius: 6,
                 padding: "8px 12px", maxWidth: 200, boxShadow: "0 0 16px rgba(0,0,0,0.5)",
               }}
             >
               <div style={{ fontFamily: mono, fontSize: 10, color: GREEN, fontWeight: "bold", letterSpacing: "0.06em" }}>✦ Meet // NEXUS AI</div>
-              <div style={{ fontFamily: mono, fontSize: 8.5, color: "#8aaa9a", lineHeight: 1.5, marginTop: 2 }}>
+              <div style={{ fontFamily: mono, fontSize: 8.5, color: "#a1a1aa", lineHeight: 1.5, marginTop: 2 }}>
                 Your trading copilot — ask about the market, your positions, or your track record.
               </div>
             </div>
@@ -467,9 +467,9 @@ export default function NexusAssistant() {
           title="Nexus AI — tap to open, hold & drag to move"
           style={{
             width: 52, height: 52, borderRadius: "50%",
-            background: "#0a1a0a", border: `1px solid ${GREEN}`,
+            background: "#141416", border: `1px solid ${GREEN}`,
             color: GREEN, fontFamily: mono, fontSize: 20, cursor: "grab",
-            boxShadow: "0 0 16px rgba(0,255,136,0.35)", flexShrink: 0,
+            boxShadow: "0 0 16px rgba(255,255,255,0.18)", flexShrink: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
             animation: seen ? undefined : "nexAiPulse 2s infinite",
             touchAction: "none", userSelect: "none",
@@ -489,19 +489,19 @@ export default function NexusAssistant() {
       style={{
         position: "fixed", right: isMobile ? 0 : 16, bottom: isMobile ? 0 : 16, zIndex: 99999,
         width: panelW, height: panelH, maxWidth: "100vw",
-        background: "#080c08", border: `1px solid ${GREEN}`,
+        background: "#0c0c0d", border: `1px solid ${GREEN}`,
         borderRadius: isMobile ? "10px 10px 0 0" : 8, overflow: "hidden",
         display: "flex", flexDirection: "column",
         boxShadow: "0 0 24px rgba(0,0,0,0.6)",
       }}
     >
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid #1a2e1a", background: "#0a1a0a" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid #232327", background: "#141416" }}>
         <span style={{ fontFamily: mono, fontSize: 12, fontWeight: "bold", letterSpacing: "0.18em" }}>
-          <span style={{ color: GREEN, textShadow: "0 0 10px rgba(0,255,136,0.5)" }}>//</span>
+          <span style={{ color: GREEN, textShadow: "0 0 10px rgba(255,255,255,0.3)" }}>//</span>
           <span style={{ color: "#fff" }}> NEXUS AI</span>
         </span>
-        <span style={{ fontFamily: mono, fontSize: 8, color: "#4a7a5a" }}>{hostedActive ? `Hosted · ${HOSTED_TIERS.find((t) => t.id === hostedModel)?.label ?? hostedModel}` : `${PROVIDERS[provider].label.split(" ")[0]} · ${model}`}</span>
+        <span style={{ fontFamily: mono, fontSize: 8, color: "#71717a" }}>{hostedActive ? `Hosted · ${HOSTED_TIERS.find((t) => t.id === hostedModel)?.label ?? hostedModel}` : `${PROVIDERS[provider].label.split(" ")[0]} · ${model}`}</span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
           <button onClick={() => setView(view === "settings" ? "chat" : "settings")} title="Settings"
             style={btn(view === "settings")}>⚙</button>
@@ -525,7 +525,7 @@ export default function NexusAssistant() {
           {/* Messages */}
           <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
             {messages.length === 0 && (
-              <div style={{ fontFamily: mono, fontSize: 10, color: "#4a7a5a", lineHeight: 1.7 }}>
+              <div style={{ fontFamily: mono, fontSize: 10, color: "#71717a", lineHeight: 1.7 }}>
                 {ready
                   ? "Ask about your theses, agent, the market, or a trade idea. I can see your live session context."
                   : "Start with Nexus Hosted (PRO — no key needed) or bring your own API key. Tap ⚙ to set it up."}
@@ -545,7 +545,7 @@ export default function NexusAssistant() {
                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
                   {pageSuggestions.map((s) => (
                     <button key={s} onClick={() => setInput(s)} disabled={!ready}
-                      style={{ textAlign: "left", background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 4, color: ready ? "#8aaa9a" : "#2a4a3a", fontFamily: mono, fontSize: 10, padding: "6px 9px", cursor: ready ? "pointer" : "default" }}>
+                      style={{ textAlign: "left", background: "#141416", border: "1px solid #232327", borderRadius: 4, color: ready ? "#a1a1aa" : "#52525b", fontFamily: mono, fontSize: 10, padding: "6px 9px", cursor: ready ? "pointer" : "default" }}>
                       → {s}
                     </button>
                   ))}
@@ -555,16 +555,16 @@ export default function NexusAssistant() {
             {messages.map((m, i) => (
               <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%", display: "flex", flexDirection: "column", gap: 4 }}>
                 {m.tools && m.tools.length > 0 && (
-                  <div style={{ fontFamily: mono, fontSize: 8, color: "#4a7a5a", letterSpacing: "0.04em" }}>
+                  <div style={{ fontFamily: mono, fontSize: 8, color: "#71717a", letterSpacing: "0.04em" }}>
                     ⚡ {[...new Set(m.tools)].join(" · ")}
                   </div>
                 )}
                 <div style={{
-                  background: m.role === "user" ? "#0a1a0a" : "#0d120d",
-                  border: `1px solid ${m.role === "user" ? "#1a4a2a" : "#1a2e1a"}`,
+                  background: m.role === "user" ? "#141416" : "#141416",
+                  border: `1px solid ${m.role === "user" ? "#33333a" : "#232327"}`,
                   borderRadius: 8, padding: "8px 11px",
                   fontFamily: mono, fontSize: 11, lineHeight: 1.55,
-                  color: m.role === "user" ? GREEN : "#c8d8c8", whiteSpace: "pre-wrap", wordBreak: "break-word",
+                  color: m.role === "user" ? GREEN : "#d4d4d8", whiteSpace: "pre-wrap", wordBreak: "break-word",
                 }}>
                   {m.role === "assistant" ? renderRich(m.content) : m.content}
                 </div>
@@ -572,13 +572,13 @@ export default function NexusAssistant() {
               </div>
             ))}
             {loading && !messages[messages.length - 1]?.content && (
-              <div style={{ fontFamily: mono, fontSize: 10, color: "#4a7a5a" }}>thinking…</div>
+              <div style={{ fontFamily: mono, fontSize: 10, color: "#71717a" }}>thinking…</div>
             )}
             {error && <div style={{ fontFamily: mono, fontSize: 10, color: "#ff6b6b", lineHeight: 1.5 }}>⚠ {error}</div>}
           </div>
 
           {/* Composer */}
-          <div style={{ borderTop: "1px solid #1a2e1a", padding: 10, display: "flex", gap: 8, alignItems: "flex-end", background: "#0a0e0a" }}>
+          <div style={{ borderTop: "1px solid #232327", padding: 10, display: "flex", gap: 8, alignItems: "flex-end", background: "#0a0a0b" }}>
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -586,7 +586,7 @@ export default function NexusAssistant() {
               placeholder={ready ? "Ask Nexus AI…" : "Enable hosted (PRO) or set a key in ⚙"}
               rows={1}
               style={{
-                flex: 1, background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 4,
+                flex: 1, background: "#141416", border: "1px solid #232327", borderRadius: 4,
                 color: GREEN, fontFamily: mono, fontSize: 11, padding: "8px 10px", outline: "none",
                 resize: "none", maxHeight: 100, minHeight: 36,
               }}
@@ -597,14 +597,14 @@ export default function NexusAssistant() {
             ) : (
               <button onClick={send} disabled={!input.trim()}
                 style={{
-                  background: input.trim() ? "#0a1a0a" : "#080c08",
-                  border: `1px solid ${input.trim() ? GREEN : "#1a2e1a"}`,
-                  borderRadius: 4, color: input.trim() ? GREEN : "#2a4a3a",
+                  background: input.trim() ? "#141416" : "#0c0c0d",
+                  border: `1px solid ${input.trim() ? GREEN : "#232327"}`,
+                  borderRadius: 4, color: input.trim() ? GREEN : "#52525b",
                   fontFamily: mono, fontSize: 14, padding: "8px 12px", cursor: input.trim() ? "pointer" : "default",
                 }}>↑</button>
             )}
           </div>
-          <div style={{ fontFamily: mono, fontSize: 7.5, color: "#2a4a3a", textAlign: "center", padding: "0 8px 6px" }}>
+          <div style={{ fontFamily: mono, fontSize: 7.5, color: "#52525b", textAlign: "center", padding: "0 8px 6px" }}>
             Analysis & education only — not financial advice. Key stays on your device.
           </div>
         </>
@@ -618,7 +618,7 @@ function CopyBtn({ text }: { text: string }) {
   return (
     <button
       onClick={() => { navigator.clipboard?.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {}); }}
-      style={{ alignSelf: "flex-start", background: "none", border: "none", color: copied ? GREEN : "#2a4a3a", fontFamily: mono, fontSize: 8, cursor: "pointer", padding: "1px 0" }}
+      style={{ alignSelf: "flex-start", background: "none", border: "none", color: copied ? GREEN : "#52525b", fontFamily: mono, fontSize: 8, cursor: "pointer", padding: "1px 0" }}
     >
       {copied ? "✓ copied" : "⧉ copy"}
     </button>
@@ -627,8 +627,8 @@ function CopyBtn({ text }: { text: string }) {
 
 function btn(active: boolean): React.CSSProperties {
   return {
-    background: active ? "#0a1a0a" : "none", border: `1px solid ${active ? "#00ff88" : "#1a2e1a"}`,
-    borderRadius: 3, color: active ? "#00ff88" : "#8aaa9a", fontFamily: mono, fontSize: 11,
+    background: active ? "#141416" : "none", border: `1px solid ${active ? "#ededf0" : "#232327"}`,
+    borderRadius: 3, color: active ? "#ededf0" : "#a1a1aa", fontFamily: mono, fontSize: 11,
     width: 24, height: 24, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
   };
 }
@@ -650,11 +650,11 @@ function SettingsView({
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 14 }}>
       {/* Hosted (PRO) — no key needed; we inject ours server-side for PRO wallets. */}
-      <div style={{ border: `1px solid ${useHosted && isPro ? GREEN : "#1a2e1a"}`, borderRadius: 6, padding: 12, background: "#0a120a" }}>
+      <div style={{ border: `1px solid ${useHosted && isPro ? GREEN : "#232327"}`, borderRadius: 6, padding: 12, background: "#141416" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <div>
-            <div style={{ fontFamily: mono, fontSize: 11, color: GREEN, fontWeight: "bold" }}>◆ NEXUS HOSTED <span style={{ color: "#8aaa9a", fontWeight: "normal" }}>· PRO</span></div>
-            <div style={{ fontFamily: mono, fontSize: 9, color: "#8aaa9a", lineHeight: 1.5, marginTop: 3 }}>
+            <div style={{ fontFamily: mono, fontSize: 11, color: GREEN, fontWeight: "bold" }}>◆ NEXUS HOSTED <span style={{ color: "#a1a1aa", fontWeight: "normal" }}>· PRO</span></div>
+            <div style={{ fontFamily: mono, fontSize: 9, color: "#a1a1aa", lineHeight: 1.5, marginTop: 3 }}>
               {isPro ? "Run NEXUS AI with no API key — we host it. One wallet signature per session." : "Hosted AI is a PRO benefit. Subscribe or hold ARCHITECT $NEXUS to enable."}
             </div>
           </div>
@@ -665,9 +665,9 @@ function SettingsView({
             style={{
               flexShrink: 0, fontFamily: mono, fontSize: 10, fontWeight: "bold", borderRadius: 3, padding: "6px 14px",
               cursor: isPro ? "pointer" : "default",
-              background: useHosted && isPro ? "#00ff8815" : "#0d120d",
-              border: `1px solid ${useHosted && isPro ? GREEN : "#1a2e1a"}`,
-              color: !isPro ? "#3a5a4a" : useHosted ? GREEN : "#8aaa9a",
+              background: useHosted && isPro ? "#ededf015" : "#141416",
+              border: `1px solid ${useHosted && isPro ? GREEN : "#232327"}`,
+              color: !isPro ? "#52525b" : useHosted ? GREEN : "#a1a1aa",
             }}>
             {useHosted && isPro ? "ON" : "OFF"}
           </button>
@@ -675,8 +675,8 @@ function SettingsView({
 
         {/* Model tier — stronger model = lower daily cap, cheaper = higher cap. */}
         {useHosted && isPro && (
-          <div style={{ marginTop: 12, borderTop: "1px solid #1a2e1a", paddingTop: 10 }}>
-            <div style={{ fontFamily: mono, fontSize: 8, color: "#8aaa9a", letterSpacing: "0.12em", marginBottom: 6 }}>MODEL TIER · DAILY CAP</div>
+          <div style={{ marginTop: 12, borderTop: "1px solid #232327", paddingTop: 10 }}>
+            <div style={{ fontFamily: mono, fontSize: 8, color: "#a1a1aa", letterSpacing: "0.12em", marginBottom: 6 }}>MODEL TIER · DAILY CAP</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               {HOSTED_TIERS.map((t) => {
                 const on = hostedModel === t.id;
@@ -684,14 +684,14 @@ function SettingsView({
                   <button key={t.id} onClick={() => setHostedModel(t.id)}
                     style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, textAlign: "left",
-                      background: on ? "#0a1a0a" : "#0d120d", border: `1px solid ${on ? GREEN : "#1a2e1a"}`,
+                      background: on ? "#141416" : "#141416", border: `1px solid ${on ? GREEN : "#232327"}`,
                       borderRadius: 4, padding: "7px 10px", cursor: "pointer",
                     }}>
                     <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                      <span style={{ fontFamily: mono, fontSize: 10, color: on ? GREEN : "#7aaa8a", fontWeight: "bold" }}>{t.label}</span>
-                      <span style={{ fontFamily: mono, fontSize: 8, color: "#8aaa9a" }}>{t.note}</span>
+                      <span style={{ fontFamily: mono, fontSize: 10, color: on ? GREEN : "#a1a1aa", fontWeight: "bold" }}>{t.label}</span>
+                      <span style={{ fontFamily: mono, fontSize: 8, color: "#a1a1aa" }}>{t.note}</span>
                     </span>
-                    <span style={{ fontFamily: mono, fontSize: 10, color: on ? GREEN : "#8aaa9a", fontWeight: "bold", flexShrink: 0 }}>{t.cap}/day</span>
+                    <span style={{ fontFamily: mono, fontSize: 10, color: on ? GREEN : "#a1a1aa", fontWeight: "bold", flexShrink: 0 }}>{t.cap}/day</span>
                   </button>
                 );
               })}
@@ -700,7 +700,7 @@ function SettingsView({
         )}
       </div>
 
-      <div style={{ fontFamily: mono, fontSize: 10, color: "#8aaa9a", lineHeight: 1.6 }}>
+      <div style={{ fontFamily: mono, fontSize: 10, color: "#a1a1aa", lineHeight: 1.6 }}>
         {useHosted && isPro
           ? "Hosted is ON — no key needed. Or bring your own key below to use a different provider/model."
           : <>Bring your own model key. It's stored only in this browser (localStorage) and sent <b style={{ color: GREEN }}>directly</b> to the provider — never to Nexus servers.</>}
@@ -711,9 +711,9 @@ function SettingsView({
           {(Object.keys(PROVIDERS) as ProviderId[]).map((p) => (
             <button key={p} onClick={() => setProvider(p)}
               style={{
-                flex: 1, background: provider === p ? "#0a1a0a" : "#0d120d",
-                border: `1px solid ${provider === p ? GREEN : "#1a2e1a"}`, borderRadius: 4,
-                color: provider === p ? GREEN : "#8aaa9a", fontFamily: mono, fontSize: 10, padding: "7px 6px", cursor: "pointer",
+                flex: 1, background: provider === p ? "#141416" : "#141416",
+                border: `1px solid ${provider === p ? GREEN : "#232327"}`, borderRadius: 4,
+                color: provider === p ? GREEN : "#a1a1aa", fontFamily: mono, fontSize: 10, padding: "7px 6px", cursor: "pointer",
               }}>
               {PROVIDERS[p].label}
             </button>
@@ -726,16 +726,16 @@ function SettingsView({
           {modelChoices.map((mdl) => (
             <button key={mdl} onClick={() => setModel(mdl)}
               style={{
-                background: model === mdl ? "#0a1a0a" : "#0d120d",
-                border: `1px solid ${model === mdl ? GREEN : "#1a2e1a"}`, borderRadius: 4,
-                color: model === mdl ? GREEN : "#8aaa9a", fontFamily: mono, fontSize: 9, padding: "5px 9px", cursor: "pointer",
+                background: model === mdl ? "#141416" : "#141416",
+                border: `1px solid ${model === mdl ? GREEN : "#232327"}`, borderRadius: 4,
+                color: model === mdl ? GREEN : "#a1a1aa", fontFamily: mono, fontSize: 9, padding: "5px 9px", cursor: "pointer",
               }}>
               {mdl}
             </button>
           ))}
         </div>
         {!availableModels.length && (
-          <div style={{ fontFamily: mono, fontSize: 8, color: "#4a7a5a" }}>
+          <div style={{ fontFamily: mono, fontSize: 8, color: "#71717a" }}>
             Enter your key below to load your account's exact model list.
           </div>
         )}
@@ -755,7 +755,7 @@ function SettingsView({
       </Field>
 
       <button onClick={onDone}
-        style={{ background: "#0a1a0a", border: `1px solid ${GREEN}`, borderRadius: 4, color: GREEN, fontFamily: mono, fontSize: 11, padding: "9px", cursor: "pointer", letterSpacing: "0.08em" }}>
+        style={{ background: "#141416", border: `1px solid ${GREEN}`, borderRadius: 4, color: GREEN, fontFamily: mono, fontSize: 11, padding: "9px", cursor: "pointer", letterSpacing: "0.08em" }}>
         {apiKey.trim() ? "DONE →" : "SAVE KEY TO CONTINUE"}
       </button>
     </div>
@@ -765,13 +765,13 @@ function SettingsView({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <div style={{ fontFamily: mono, fontSize: 8, color: "#4a7a5a", letterSpacing: "0.1em" }}>{label}</div>
+      <div style={{ fontFamily: mono, fontSize: 8, color: "#71717a", letterSpacing: "0.1em" }}>{label}</div>
       {children}
     </div>
   );
 }
 
 const inputStyle: React.CSSProperties = {
-  background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 4,
-  color: "#00ff88", fontFamily: mono, fontSize: 10, padding: "8px 10px", outline: "none", width: "100%", boxSizing: "border-box",
+  background: "#141416", border: "1px solid #232327", borderRadius: 4,
+  color: "#ededf0", fontFamily: mono, fontSize: 10, padding: "8px 10px", outline: "none", width: "100%", boxSizing: "border-box",
 };

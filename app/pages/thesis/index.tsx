@@ -49,16 +49,16 @@ type VerifyResult = {
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  ACTIVE:      { label: "ACTIVE",      color: "#4a9fff", bg: "#0a1a2a", border: "#1a3a5a" },
-  HIT_TP:      { label: "HIT TP",      color: "#00ff88", bg: "#0a2a0a", border: "#1a4a2a" },
-  STOPPED_OUT: { label: "STOPPED OUT", color: "#ff4444", bg: "#2a0a0a", border: "#4a1a1a" },
+  ACTIVE:      { label: "ACTIVE",      color: "#d4d4d8", bg: "#1a1a1e", border: "#1a3a5a" },
+  HIT_TP:      { label: "HIT TP",      color: "#ededf0", bg: "#1a1a1e", border: "#33333a" },
+  STOPPED_OUT: { label: "STOPPED OUT", color: "#f7525f", bg: "#2a0a0a", border: "#4a1a1a" },
   INVALIDATED: { label: "INVALIDATED", color: "#fbbf24", bg: "#2a1a00", border: "#4a3a00" },
-  CLOSED:      { label: "CLOSED",      color: "#8aaa9a", bg: "#12161a", border: "#2a3a4a" },
-  PENDING:     { label: "PENDING",     color: "#8aaa9a", bg: "#0d120d", border: "#2a4a3a" },
+  CLOSED:      { label: "CLOSED",      color: "#a1a1aa", bg: "#12161a", border: "#2a3a4a" },
+  PENDING:     { label: "PENDING",     color: "#a1a1aa", bg: "#141416", border: "#33333a" },
 };
 
 // Neutral fallback for any unrecognized / future status value so the page never crashes.
-const STATUS_FALLBACK = { label: "UNKNOWN", color: "#8aaa9a", bg: "#0d120d", border: "#2a4a3a" };
+const STATUS_FALLBACK = { label: "UNKNOWN", color: "#a1a1aa", bg: "#141416", border: "#33333a" };
 
 function setMeta(property: string, content: string) {
   let el = document.querySelector(`meta[property="${property}"]`);
@@ -86,9 +86,9 @@ function Avatar({ pfp, displayName, size = 40 }: { pfp: string | null; displayNa
   return (
     <div style={{
       width: size, height: size, borderRadius: "50%",
-      border: "1px solid #1a3a1a", background: "#0d120d",
+      border: "1px solid #232327", background: "#141416",
       overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
-      color: "#3a5a4a", flexShrink: 0,
+      color: "#52525b", flexShrink: 0,
     }}>
       {pfp && !err ? (
         <img src={pfp} alt={displayName ?? ""} onError={() => setErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -198,20 +198,20 @@ export default function ThesisPage() {
   // ── Render helpers ────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div style={{ background: "#0a0e0a", minHeight: "100svh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#2a4a3a" }}>loading thesis...</div>
+      <div style={{ background: "#0a0a0b", minHeight: "100svh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#33333a" }}>loading thesis...</div>
       </div>
     );
   }
 
   if (notFound || !thesis) {
     return (
-      <div style={{ background: "#0a0e0a", minHeight: "100svh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
-        <div style={{ fontSize: 24, color: "#2a4a3a" }}>◆</div>
-        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#2a4a3a" }}>thesis not found or not public</div>
+      <div style={{ background: "#0a0a0b", minHeight: "100svh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
+        <div style={{ fontSize: 24, color: "#33333a" }}>◆</div>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#33333a" }}>thesis not found or not public</div>
         <button
           onClick={() => navigate("/feed")}
-          style={{ background: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "6px 14px", cursor: "pointer" }}
+          style={{ background: "none", border: "1px solid #232327", borderRadius: 3, color: "#52525b", fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "6px 14px", cursor: "pointer" }}
         >← BACK TO FEED</button>
       </div>
     );
@@ -244,32 +244,32 @@ export default function ThesisPage() {
   const shareFc = `https://warpcast.com/~/compose?text=${encodeURIComponent(shareText + "\n\n" + shareUrl)}&embeds[]=${encodeURIComponent(shareUrl)}`;
 
   return (
-    <div style={{ background: "#0a0e0a", minHeight: "100svh", padding: 0 }}>
+    <div style={{ background: "#0a0a0b", minHeight: "100svh", padding: 0 }}>
       {/* Top bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderBottom: "1px solid #1a2e1a", background: "#080c08" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderBottom: "1px solid #232327", background: "#0f0f11" }}>
         <button
           onClick={() => navigate(-1)}
-          style={{ background: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 10px", cursor: "pointer" }}
+          style={{ background: "none", border: "1px solid #232327", borderRadius: 3, color: "#52525b", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 10px", cursor: "pointer" }}
         >← BACK</button>
         <div style={{ flex: 1 }} />
         {/* Outbound share — X / Farcaster / copy link */}
         <a
           href={shareX} target="_blank" rel="noopener noreferrer"
           title="Share on X"
-          style={{ textDecoration: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 9px", letterSpacing: "0.05em" }}
+          style={{ textDecoration: "none", border: "1px solid #232327", borderRadius: 3, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 9px", letterSpacing: "0.05em" }}
         >𝕏 SHARE</a>
         <a
           href={shareFc} target="_blank" rel="noopener noreferrer"
           title="Share on Farcaster"
-          style={{ textDecoration: "none", border: "1px solid #1a2e1a", borderRadius: 3, color: "#8a7aff", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 9px", letterSpacing: "0.05em" }}
+          style={{ textDecoration: "none", border: "1px solid #232327", borderRadius: 3, color: "#8a7aff", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 9px", letterSpacing: "0.05em" }}
         >✦ CAST</a>
         <button
           onClick={handleShare}
           title="Copy link"
           style={{
-            background: copied ? "#0a1a0a" : "none",
-            border: `1px solid ${copied ? "#00ff88" : "#1a2e1a"}`,
-            borderRadius: 3, color: copied ? "#00ff88" : "#3a5a4a",
+            background: copied ? "#1a1a1e" : "none",
+            border: `1px solid ${copied ? "#ededf0" : "#232327"}`,
+            borderRadius: 3, color: copied ? "#ededf0" : "#52525b",
             fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 10px", cursor: "pointer", letterSpacing: "0.05em",
           }}
         >{copied ? "✓ COPIED" : "⧉ LINK"}</button>
@@ -278,7 +278,7 @@ export default function ThesisPage() {
       <div style={{ padding: 16, maxWidth: 720, margin: "0 auto" }}>
 
         {/* Thesis card */}
-        <div style={{ background: "#0d120d", border: `1px solid ${cfg.border}`, borderRadius: 4, padding: "20px 24px", marginBottom: 12 }}>
+        <div style={{ background: "#141416", border: `1px solid ${cfg.border}`, borderRadius: 4, padding: "20px 24px", marginBottom: 12 }}>
 
           {/* Header */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
@@ -288,8 +288,8 @@ export default function ThesisPage() {
                 onClick={() => navigate(`/feed/trader/${thesis.wallet}`)}
                 style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
               >
-                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#8aaa9a" }}>{traderName}</div>
-                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a" }}>{shortAddr}</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#a1a1aa" }}>{traderName}</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b" }}>{shortAddr}</div>
               </button>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -298,7 +298,7 @@ export default function ThesisPage() {
               ) : thesis.onChainId !== undefined ? (
                 <span style={{ fontSize: 14 }} title="on-chain verified">⛓</span>
               ) : null}
-              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#2a4a3a" }}>{timeAgo}</div>
+              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#33333a" }}>{timeAgo}</div>
               <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.08em", padding: "3px 8px", borderRadius: 3, background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color }}>
                 {cfg.label}
               </div>
@@ -308,22 +308,22 @@ export default function ThesisPage() {
           {/* Symbol + direction */}
           <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 20 }}>
             <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 36, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
-            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 16, color: thesis.direction === "LONG" ? "#00ff88" : "#ff4444" }}>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 16, color: thesis.direction === "LONG" ? "#3ecf8e" : "#f7525f" }}>
               {thesis.direction === "LONG" ? "↑" : "↓"} {thesis.direction} · {thesis.leverage.toFixed(1)}x
             </span>
           </div>
 
           {/* Key levels */}
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(3, minmax(0, 1fr))" : "repeat(5, minmax(0, 1fr))", gap: "10px 16px", marginBottom: 16, padding: 14, background: "#080c08", borderRadius: 4, border: "1px solid #1a2e1a" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(3, minmax(0, 1fr))" : "repeat(5, minmax(0, 1fr))", gap: "10px 16px", marginBottom: 16, padding: 14, background: "#0f0f11", borderRadius: 4, border: "1px solid #232327" }}>
             {[
-              { label: "ENTRY", val: `$${thesis.entryPrice.toFixed(2)}`,   color: "#8aaa9a" },
-              { label: "STOP",  val: `$${thesis.stopLoss.toFixed(2)}`,      color: "#ff4444" },
-              { label: "TP1",   val: `$${thesis.takeProfit1.toFixed(2)}`,   color: "#00ff88" },
-              { label: "R:R",   val: `1:${thesis.riskReward.toFixed(2)}`,   color: thesis.riskReward >= 2 ? "#00ff88" : "#fbbf24" },
-              { label: "SIZE",  val: `$${thesis.positionSize.toFixed(0)}`,  color: "#8aaa9a" },
+              { label: "ENTRY", val: `$${thesis.entryPrice.toFixed(2)}`,   color: "#a1a1aa" },
+              { label: "STOP",  val: `$${thesis.stopLoss.toFixed(2)}`,      color: "#f7525f" },
+              { label: "TP1",   val: `$${thesis.takeProfit1.toFixed(2)}`,   color: "#ededf0" },
+              { label: "R:R",   val: `1:${thesis.riskReward.toFixed(2)}`,   color: thesis.riskReward >= 2 ? "#ededf0" : "#fbbf24" },
+              { label: "SIZE",  val: `$${thesis.positionSize.toFixed(0)}`,  color: "#a1a1aa" },
             ].map(({ label, val, color }) => (
               <div key={label}>
-                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
+                <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
                 <div style={{ fontSize: 14, color, fontFamily: "var(--nx-font-mono)", fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{val}</div>
               </div>
             ))}
@@ -335,15 +335,15 @@ export default function ThesisPage() {
             const toSL = distancePct(markPrice, thesis.stopLoss);
             const toTP = distancePct(markPrice, thesis.takeProfit1);
             return (
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(4, minmax(0, 1fr))", gap: "10px 16px", marginBottom: 16, padding: 14, background: "#080c08", borderRadius: 4, border: "1px solid #1a3a5a" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(4, minmax(0, 1fr))", gap: "10px 16px", marginBottom: 16, padding: 14, background: "#0f0f11", borderRadius: 4, border: "1px solid #1a3a5a" }}>
                 {[
                   { label: "MARK",       val: `$${markPrice.toFixed(markPrice < 10 ? 4 : 2)}`, color: "#fff" },
-                  { label: "UNREALIZED", val: `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)`, color: pnl >= 0 ? "#00ff88" : "#ff4444" },
-                  { label: "TO SL",      val: `${toSL.toFixed(2)}%`, color: "#ff4444" },
-                  { label: "TO TP1",     val: `${toTP.toFixed(2)}%`, color: "#00ff88" },
+                  { label: "UNREALIZED", val: `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)`, color: pnl >= 0 ? "#3ecf8e" : "#f7525f" },
+                  { label: "TO SL",      val: `${toSL.toFixed(2)}%`, color: "#f7525f" },
+                  { label: "TO TP1",     val: `${toTP.toFixed(2)}%`, color: "#ededf0" },
                 ].map(({ label, val, color }) => (
                   <div key={label}>
-                    <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
+                    <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
                     <div style={{ fontSize: 13, color, fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{val}</div>
                   </div>
                 ))}
@@ -353,14 +353,14 @@ export default function ThesisPage() {
 
           {/* Actual PnL if closed */}
           {thesis.actualPnl !== null && thesis.status !== "ACTIVE" && (
-            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, color: thesis.actualPnl >= 0 ? "#00ff88" : "#ff4444", marginBottom: 12 }}>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, color: thesis.actualPnl >= 0 ? "#3ecf8e" : "#f7525f", marginBottom: 12 }}>
               ACTUAL PnL: {thesis.actualPnl >= 0 ? "+" : ""}${thesis.actualPnl.toFixed(2)}
             </div>
           )}
 
           {/* Notes */}
           {thesis.notes && (
-            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#5a8a6a", borderTop: "1px solid #1a2e1a", paddingTop: 12, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#a1a1aa", borderTop: "1px solid #232327", paddingTop: 12, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
               {thesis.notes}
             </div>
           )}
@@ -368,11 +368,11 @@ export default function ThesisPage() {
 
         {/* Ph25: Verify Outcome — only for closed theses */}
         {isClosed && (
-          <div style={{ background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 4, padding: "16px 20px" }}>
+          <div style={{ background: "#141416", border: "1px solid #232327", borderRadius: 4, padding: "16px 20px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#3a5a4a", letterSpacing: "0.05em" }}>PRICE VERIFICATION</div>
-                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#2a4a3a", marginTop: 2 }}>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#52525b", letterSpacing: "0.05em" }}>PRICE VERIFICATION</div>
+                <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#33333a", marginTop: 2 }}>
                   Cross-check recorded outcome against CoinGecko OHLC data
                 </div>
               </div>
@@ -381,8 +381,8 @@ export default function ThesisPage() {
                   onClick={handleVerify}
                   disabled={verifying}
                   style={{
-                    background: "none", border: "1px solid #1a3a1a", borderRadius: 3,
-                    color: verifying ? "#2a4a3a" : "#3a6a4a",
+                    background: "none", border: "1px solid #232327", borderRadius: 3,
+                    color: verifying ? "#33333a" : "#71717a",
                     fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 12px",
                     cursor: verifying ? "default" : "pointer", letterSpacing: "0.05em",
                   }}
@@ -391,9 +391,9 @@ export default function ThesisPage() {
             </div>
 
             {verifyResult && (
-              <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #1a2e1a" }}>
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #232327" }}>
                 {verifyResult.error ? (
-                  <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#ff4444" }}>
+                  <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#f7525f" }}>
                     error: {verifyResult.error}
                   </div>
                 ) : (
@@ -401,24 +401,24 @@ export default function ThesisPage() {
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <div style={{
                         fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: "bold",
-                        color: verifyResult.verified ? "#00ff88" : "#ff4444",
+                        color: verifyResult.verified ? "#3ecf8e" : "#f7525f",
                       }}>
                         {verifyResult.verified ? "✓ VERIFIED" : "✗ DISPUTED"}
                       </div>
-                      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#2a4a3a" }}>
+                      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#33333a" }}>
                         via {verifyResult.method} · {verifyResult.candlesChecked} candles
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 16 }}>
                       <div>
-                        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#3a5a4a" }}>TP HIT IN DATA</div>
-                        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: verifyResult.hitTP ? "#00ff88" : "#3a5a4a" }}>
+                        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#52525b" }}>TP HIT IN DATA</div>
+                        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: verifyResult.hitTP ? "#ededf0" : "#52525b" }}>
                           {verifyResult.hitTP ? "yes" : "no"}
                         </div>
                       </div>
                       <div>
-                        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#3a5a4a" }}>SL HIT IN DATA</div>
-                        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: verifyResult.hitSL ? "#ff4444" : "#3a5a4a" }}>
+                        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#52525b" }}>SL HIT IN DATA</div>
+                        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: verifyResult.hitSL ? "#f7525f" : "#52525b" }}>
                           {verifyResult.hitSL ? "yes" : "no"}
                         </div>
                       </div>
@@ -440,12 +440,12 @@ export default function ThesisPage() {
           <button
             onClick={() => navigate(`/feed/trader/${thesis.wallet}`)}
             style={{
-              background: "none", border: "1px solid #1a2e1a", borderRadius: 3,
-              color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontSize: 9,
+              background: "none", border: "1px solid #232327", borderRadius: 3,
+              color: "#52525b", fontFamily: "var(--nx-font-mono)", fontSize: 9,
               padding: "6px 14px", cursor: "pointer", letterSpacing: "0.05em",
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#00ff88"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#00ff88"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#3a5a4a"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a2e1a"; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#ededf0"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#ededf0"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#52525b"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#232327"; }}
           >VIEW {traderName.toUpperCase()} PROFILE →</button>
         </div>
       </div>

@@ -77,15 +77,15 @@ export default function ProfileAvatar() {
           width: 34,
           height: 34,
           borderRadius: "50%",
-          border: open ? "2px solid #00ff88" : "2px solid #1a2e1a",
-          background: showPfp ? "transparent" : "#0d120d",
+          border: open ? "2px solid #ededf0" : "2px solid #232327",
+          background: showPfp ? "transparent" : "#141416",
           cursor: "pointer",
           padding: 0,
           overflow: "hidden",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "#4a7a5a",
+          color: "#71717a",
           transition: "border-color 0.15s",
           flexShrink: 0,
         }}
@@ -110,8 +110,8 @@ export default function ProfileAvatar() {
             top: "calc(100% + 8px)",
             right: 0,
             zIndex: 9999,
-            background: "#0d120d",
-            border: "1px solid #1a2e1a",
+            background: "#141416",
+            border: "1px solid #232327",
             borderRadius: 6,
             padding: 16,
             width: 260,
@@ -119,7 +119,7 @@ export default function ProfileAvatar() {
           }}
         >
           {/* Header */}
-          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.12em", color: "#3a5a4a", marginBottom: 12 }}>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.12em", color: "#52525b", marginBottom: 12 }}>
             ■ PROFILE
           </div>
 
@@ -127,11 +127,11 @@ export default function ProfileAvatar() {
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
             <div style={{
               width: 44, height: 44, borderRadius: "50%",
-              border: "2px solid #1a2e1a",
-              background: "#080c08",
+              border: "2px solid #232327",
+              background: "#0f0f11",
               overflow: "hidden",
               display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#3a5a4a", flexShrink: 0,
+              color: "#52525b", flexShrink: 0,
             }}>
               {pfpInput && !imgError ? (
                 <img
@@ -145,15 +145,15 @@ export default function ProfileAvatar() {
               )}
             </div>
             <div>
-              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#8aaa9a" }}>
+              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#a1a1aa" }}>
                 {nameInput || shortAddr}
               </div>
-              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", marginTop: 2 }}>{shortAddr}</div>
+              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 2 }}>{shortAddr}</div>
             </div>
           </div>
 
           {/* Display name input */}
-          <label style={{ display: "block", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", letterSpacing: "0.1em", marginBottom: 4 }}>
+          <label style={{ display: "block", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", letterSpacing: "0.1em", marginBottom: 4 }}>
             DISPLAY NAME
           </label>
           <input
@@ -164,10 +164,10 @@ export default function ProfileAvatar() {
             maxLength={40}
             style={{
               width: "100%",
-              background: "#080c08",
-              border: "1px solid #1a2e1a",
+              background: "#0f0f11",
+              border: "1px solid #232327",
               borderRadius: 3,
-              color: "#00ff88",
+              color: "#ededf0",
               fontFamily: "var(--nx-font-mono)",
               fontSize: 11,
               padding: "6px 8px",
@@ -178,7 +178,7 @@ export default function ProfileAvatar() {
           />
 
           {/* PFP URL input */}
-          <label style={{ display: "block", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a", letterSpacing: "0.1em", marginBottom: 4 }}>
+          <label style={{ display: "block", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", letterSpacing: "0.1em", marginBottom: 4 }}>
             PFP IMAGE URL
           </label>
           <input
@@ -188,10 +188,10 @@ export default function ProfileAvatar() {
             placeholder="https://..."
             style={{
               width: "100%",
-              background: "#080c08",
-              border: "1px solid #1a2e1a",
+              background: "#0f0f11",
+              border: "1px solid #232327",
               borderRadius: 3,
-              color: "#00ff88",
+              color: "#ededf0",
               fontFamily: "var(--nx-font-mono)",
               fontSize: 11,
               padding: "6px 8px",
@@ -207,9 +207,9 @@ export default function ProfileAvatar() {
               disabled={saving}
               style={{
                 flex: 1,
-                background: "#0a2a0a",
-                border: "1px solid #1a4a2a",
-                color: saving ? "#3a5a4a" : "#00ff88",
+                background: "#1a1a1e",
+                border: "1px solid #33333a",
+                color: saving ? "#52525b" : "#ededf0",
                 fontFamily: "var(--nx-font-mono)",
                 fontSize: 10,
                 padding: "7px 0",
@@ -224,8 +224,8 @@ export default function ProfileAvatar() {
               onClick={() => setOpen(false)}
               style={{
                 background: "none",
-                border: "1px solid #1a2e1a",
-                color: "#4a7a5a",
+                border: "1px solid #232327",
+                color: "#71717a",
                 fontFamily: "var(--nx-font-mono)",
                 fontSize: 10,
                 padding: "7px 12px",

@@ -46,7 +46,7 @@ export function NexusTreasuryStack({ compact = false }: { compact?: boolean }) {
     <div style={{
       display: "flex", alignItems: "center", gap: compact ? 12 : 20,
       padding: compact ? "8px 12px" : "12px 16px",
-      background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 4,
+      background: "#141416", border: "1px solid #232327", borderRadius: 4,
       fontFamily: "var(--nx-font-mono)",
     }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -59,7 +59,7 @@ export function NexusTreasuryStack({ compact = false }: { compact?: boolean }) {
         <span style={{ fontSize: compact ? 14 : 18, fontWeight: "bold", color: C.text.bright }}>{pct}%</span>
       </div>
       {!compact && (
-        <div style={{ flex: 1, minWidth: 0, fontSize: 8, color: "#2a4a3a", lineHeight: 1.4, textAlign: "right" }}>
+        <div style={{ flex: 1, minWidth: 0, fontSize: 8, color: "#33333a", lineHeight: 1.4, textAlign: "right" }}>
           fees → buy the lows → held by treasury
           <br />
           provable on-chain · funds Season rewards

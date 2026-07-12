@@ -7,8 +7,8 @@
 import { useEffect, useState } from "react";
 
 const API_BASE = "https://og.nexustradinglabs.com";
-const green = "#00ff88";
-const red = "#ff4444";
+const green = "#ededf0";
+const red = "#f7525f";
 
 type LivePos = {
   wallet: string;
@@ -59,12 +59,12 @@ export default function LiveNow() {
         <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", color: green, letterSpacing: "0.12em" }}>
           ◆ LIVE NOW
         </span>
-        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a" }}>
+        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b" }}>
           {positions.length} position{positions.length !== 1 ? "s" : ""} open · live PnL from public price
         </span>
         <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: green, boxShadow: `0 0 6px ${green}` }} />
-          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#3a5a4a" }}>live</span>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#52525b" }}>live</span>
         </span>
       </div>
 
@@ -73,29 +73,29 @@ export default function LiveNow() {
           const long = p.direction === "LONG";
           const pct = p.unrealized_pnl_pct;
           const up = pct != null && pct >= 0;
-          const pnlColor = pct == null ? "#8aaa9a" : up ? green : red;
+          const pnlColor = pct == null ? "#a1a1aa" : up ? green : red;
           return (
             <div
               key={`${p.wallet}-${p.symbol}-${i}`}
               style={{
-                flexShrink: 0, minWidth: 132, background: "#0a0e0a",
-                border: `1px solid ${pct == null ? "#1e2d1e" : up ? "#1a4a2a" : "#4a1a1a"}`,
+                flexShrink: 0, minWidth: 132, background: "#0a0a0b",
+                border: `1px solid ${pct == null ? "#232327" : up ? "#33333a" : "#4a1a1a"}`,
                 borderRadius: 5, padding: "8px 10px", fontFamily: "var(--nx-font-mono)",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: 13, fontWeight: "bold", color: "#fff" }}>{tk(p.symbol)}</span>
                 <span style={{ fontSize: 9, color: long ? green : red }}>{long ? "↑ LONG" : "↓ SHORT"}</span>
-                <span style={{ marginLeft: "auto", fontSize: 8, color: p.agent ? "#4a9fff" : "#00ff88", border: `1px solid ${p.agent ? "#1a3a5a" : "#1a4a2a"}`, borderRadius: 3, padding: "0 4px" }}>{p.agent ? "🤖" : "👤"}</span>
+                <span style={{ marginLeft: "auto", fontSize: 8, color: p.agent ? "#d4d4d8" : "#ededf0", border: `1px solid ${p.agent ? "#1a3a5a" : "#33333a"}`, borderRadius: 3, padding: "0 4px" }}>{p.agent ? "🤖" : "👤"}</span>
               </div>
               <div style={{ fontSize: 15, fontWeight: "bold", color: pnlColor, marginTop: 5 }}>
                 {pct == null ? "—" : `${up ? "+" : ""}${pct.toFixed(2)}%`}
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 3, gap: 4 }}>
-                <span style={{ fontSize: 8, color: "#3a5a4a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 8, color: "#52525b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {p.agent ? "Nexus Agent" : (p.displayName || shortAddr(p.wallet))}
                 </span>
-                <span style={{ fontSize: 8, color: "#3a5a4a", flexShrink: 0 }}>{ago(p.opened_at)} ago</span>
+                <span style={{ fontSize: 8, color: "#52525b", flexShrink: 0 }}>{ago(p.opened_at)} ago</span>
               </div>
             </div>
           );

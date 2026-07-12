@@ -10,7 +10,7 @@ import { useSearchParams } from "react-router-dom";
 import { AnalyticsView } from "@/pages/lab/AnalyticsView";
 import type { ProcessedTrade } from "@/pages/lab/types";
 
-const GREEN = "#00ff88";
+const GREEN = "#ededf0";
 const mono = "var(--nx-font-mono)";
 
 type HLFill = {
@@ -94,12 +94,12 @@ export default function AnalyzePage() {
   }, [trades]);
 
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px 80px", fontFamily: mono, color: "#e8f0ea" }}>
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px 80px", fontFamily: mono, color: "#f4f4f5" }}>
       <div style={{ marginBottom: 6, fontSize: 11, letterSpacing: "0.15em", color: GREEN }}>// WALLET X-RAY</div>
       <h1 style={{ fontSize: 26, fontWeight: 800, margin: "0 0 8px", letterSpacing: "-0.01em" }}>
         X-ray any trader. <span style={{ color: GREEN }}>Grade the tape.</span>
       </h1>
-      <p style={{ fontSize: 13, color: "#6a8a7a", maxWidth: 620, lineHeight: 1.6, margin: "0 0 20px" }}>
+      <p style={{ fontSize: 13, color: "#a1a1aa", maxWidth: 620, lineHeight: 1.6, margin: "0 0 20px" }}>
         Paste any Hyperliquid wallet and get the full Nexus trading breakdown — score, risk-adjusted
         ratios, hold-time, leverage, timing, and per-asset edge. No login. Then bring your own edge to
         Nexus and prove it on-chain.
@@ -113,7 +113,7 @@ export default function AnalyzePage() {
           placeholder="0x… Hyperliquid wallet address"
           spellCheck={false}
           style={{
-            flex: "1 1 360px", background: "#0a0e0a", border: `1px solid ${isAddress(input) ? GREEN : "#1a2e1a"}`,
+            flex: "1 1 360px", background: "#0a0a0b", border: `1px solid ${isAddress(input) ? GREEN : "#232327"}`,
             borderRadius: 6, padding: "12px 14px", color: "#fff", fontFamily: mono, fontSize: 13, outline: "none",
           }}
         />
@@ -121,7 +121,7 @@ export default function AnalyzePage() {
           onClick={submit}
           disabled={loading}
           style={{
-            background: GREEN, color: "#04130c", border: "none", borderRadius: 6, padding: "12px 24px",
+            background: GREEN, color: "#141416", border: "none", borderRadius: 6, padding: "12px 24px",
             fontFamily: mono, fontWeight: 700, fontSize: 13, letterSpacing: "0.06em", cursor: loading ? "default" : "pointer",
             opacity: loading ? 0.6 : 1,
           }}
@@ -135,18 +135,18 @@ export default function AnalyzePage() {
       )}
 
       {loading && (
-        <div style={{ fontSize: 12, color: "#6a8a7a", fontFamily: mono }}>$ ./xray.sh --wallet {address?.slice(0, 8)}… <span style={{ color: GREEN }}>fetching fills…</span></div>
+        <div style={{ fontSize: 12, color: "#a1a1aa", fontFamily: mono }}>$ ./xray.sh --wallet {address?.slice(0, 8)}… <span style={{ color: GREEN }}>fetching fills…</span></div>
       )}
 
       {trades && trades.length > 0 && (
         <>
-          <div style={{ fontSize: 11, color: "#6a8a7a", fontFamily: mono, marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: "#a1a1aa", fontFamily: mono, marginBottom: 10 }}>
             <span style={{ color: GREEN }}>{trades.length}</span> closed perp trades · source: Hyperliquid · {address?.slice(0, 6)}…{address?.slice(-4)}
           </div>
           <AnalyticsView orders={trades} totalPnl={totalPnl} winRate={winRate} collateral={0} />
-          <div style={{ marginTop: 24, padding: "16px 18px", border: `1px solid #1a3a2a`, borderRadius: 8, background: "#0a150a", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ fontSize: 13, color: "#e8f0ea" }}>Like what you see? Build a track record nobody can fake.</div>
-            <a href="/lab" style={{ background: GREEN, color: "#04130c", textDecoration: "none", borderRadius: 6, padding: "10px 20px", fontFamily: mono, fontWeight: 700, fontSize: 12, letterSpacing: "0.06em" }}>OPEN THE LAB →</a>
+          <div style={{ marginTop: 24, padding: "16px 18px", border: `1px solid #232327`, borderRadius: 8, background: "#141416", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 13, color: "#f4f4f5" }}>Like what you see? Build a track record nobody can fake.</div>
+            <a href="/lab" style={{ background: GREEN, color: "#141416", textDecoration: "none", borderRadius: 6, padding: "10px 20px", fontFamily: mono, fontWeight: 700, fontSize: 12, letterSpacing: "0.06em" }}>OPEN THE LAB →</a>
           </div>
         </>
       )}
@@ -155,8 +155,8 @@ export default function AnalyzePage() {
           (even with no Hyperliquid history), deep-linking the wallet into Orderly's
           official explorer (trades, deposits/withdrawals, liquidations, PnL). */}
       {address && isAddress(address) && !loading && (
-        <div style={{ marginTop: trades && trades.length ? 16 : 24, padding: "16px 18px", border: "1px solid #15324a", borderRadius: 8, background: "#0a1320" }}>
-          <div style={{ fontSize: 11, letterSpacing: "0.15em", color: "#4a9fff", marginBottom: 8 }}>// CROSS-VERIFY ON ORDERLY</div>
+        <div style={{ marginTop: trades && trades.length ? 16 : 24, padding: "16px 18px", border: "1px solid #15324a", borderRadius: 8, background: "#1a1a1e" }}>
+          <div style={{ fontSize: 11, letterSpacing: "0.15em", color: "#d4d4d8", marginBottom: 8 }}>// CROSS-VERIFY ON ORDERLY</div>
           <p style={{ fontSize: 12.5, color: "#8aa6c0", lineHeight: 1.6, margin: "0 0 12px", maxWidth: 640 }}>
             Nexus runs on <b style={{ color: "#cfe0f0" }}>Orderly Network</b>&apos;s omnichain liquidity. Don&apos;t trust our
             numbers — independently verify this wallet&apos;s on-chain trading (executed trades, deposits &amp;
@@ -166,7 +166,7 @@ export default function AnalyzePage() {
             href={`https://orderly-dashboard.orderly.network/explorer?q=${address}`}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ display: "inline-block", background: "#0a1f33", color: "#4a9fff", border: "1px solid #1f4a6e", textDecoration: "none", borderRadius: 6, padding: "10px 18px", fontFamily: mono, fontWeight: 700, fontSize: 12, letterSpacing: "0.06em" }}
+            style={{ display: "inline-block", background: "#1a1a1e", color: "#d4d4d8", border: "1px solid #1f4a6e", textDecoration: "none", borderRadius: 6, padding: "10px 18px", fontFamily: mono, fontWeight: 700, fontSize: 12, letterSpacing: "0.06em" }}
           >
             VERIFY {address.slice(0, 6)}…{address.slice(-4)} ON ORDERLY ↗
           </a>
