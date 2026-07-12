@@ -61,8 +61,8 @@ export default function NotificationBell() {
           width: 34,
           height: 34,
           borderRadius: "50%",
-          border: open ? "2px solid #00ff88" : "2px solid #1a2e1a",
-          background: "#0d120d",
+          border: open ? "2px solid #ededf0" : "2px solid #232327",
+          background: "#141416",
           cursor: "pointer",
           padding: 0,
           display: "flex",
@@ -80,7 +80,7 @@ export default function NotificationBell() {
               position: "absolute",
               top: -3,
               right: -3,
-              background: "#ff4444",
+              background: "#f7525f",
               color: "#fff",
               borderRadius: "50%",
               minWidth: 16,
@@ -110,8 +110,8 @@ export default function NotificationBell() {
             top: "calc(100% + 8px)",
             right: 0,
             zIndex: 9999,
-            background: "#0d120d",
-            border: "1px solid #1a2e1a",
+            background: "#141416",
+            border: "1px solid #232327",
             borderRadius: 6,
             width: 300,
             boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
@@ -122,7 +122,7 @@ export default function NotificationBell() {
           <div
             style={{
               padding: "10px 14px",
-              borderBottom: "1px solid #1a2e1a",
+              borderBottom: "1px solid #232327",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -133,7 +133,7 @@ export default function NotificationBell() {
                 fontFamily: "var(--nx-font-mono)",
                 fontSize: 9,
                 letterSpacing: "0.12em",
-                color: "#3a5a4a",
+                color: "#52525b",
               }}
             >
               ■ NOTIFICATIONS
@@ -144,7 +144,7 @@ export default function NotificationBell() {
                 style={{
                   background: "none",
                   border: "none",
-                  color: "#00ff88",
+                  color: "#ededf0",
                   fontFamily: "var(--nx-font-mono)",
                   fontSize: 9,
                   cursor: "pointer",
@@ -165,7 +165,7 @@ export default function NotificationBell() {
                   padding: "20px 14px",
                   fontFamily: "var(--nx-font-mono)",
                   fontSize: 11,
-                  color: "#3a5a4a",
+                  color: "#52525b",
                   textAlign: "center",
                 }}
               >
@@ -178,7 +178,7 @@ export default function NotificationBell() {
                   style={{
                     padding: "10px 14px",
                     borderBottom: "1px solid #0f1a0f",
-                    background: n.readAt ? "transparent" : "#0a1a0a",
+                    background: n.readAt ? "transparent" : "#1a1a1e",
                     display: "flex",
                     gap: 10,
                     alignItems: "flex-start",
@@ -194,7 +194,7 @@ export default function NotificationBell() {
                       style={{
                         fontFamily: "var(--nx-font-mono)",
                         fontSize: 11,
-                        color: n.readAt ? "#8aaa9a" : "#8aaa9a",
+                        color: n.readAt ? "#a1a1aa" : "#a1a1aa",
                         lineHeight: 1.4,
                         wordBreak: "break-word",
                       }}
@@ -205,7 +205,7 @@ export default function NotificationBell() {
                       style={{
                         fontFamily: "var(--nx-font-mono)",
                         fontSize: 9,
-                        color: "#2a4a3a",
+                        color: "#33333a",
                         marginTop: 3,
                       }}
                     >
@@ -218,7 +218,7 @@ export default function NotificationBell() {
                     style={{
                       background: "none",
                       border: "none",
-                      color: "#2a4a3a",
+                      color: "#33333a",
                       cursor: "pointer",
                       fontSize: 11,
                       padding: "0 0 0 4px",

@@ -28,14 +28,14 @@ export function BuyNexusButton({ size = "md" }: { size?: "sm" | "md" }) {
         fontSize,
         fontWeight: "bold",
         letterSpacing: "0.06em",
-        color: "#04130c",
-        background: "#00ff88",
-        border: "1px solid #00ff88",
+        color: "#141416",
+        background: "#ededf0",
+        border: "1px solid #ededf0",
         borderRadius: 3,
         padding: pad,
         textDecoration: "none",
         whiteSpace: "nowrap",
-        boxShadow: "0 0 12px rgba(0,255,136,0.25)",
+        boxShadow: "0 0 12px rgba(237,237,240,0.25)",
       }}
     >
       BUY $NEXUS ↗

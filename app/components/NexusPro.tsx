@@ -16,7 +16,7 @@ import {
 import { NexusTierBadge } from "@/components/NexusTierBadge";
 import { BuyNexusButton } from "@/components/BuyNexusButton";
 
-const card: React.CSSProperties = { background: "#0d120d", border: "1px solid #1a4a2a", borderRadius: 6, padding: 16 };
+const card: React.CSSProperties = { background: "#141416", border: "1px solid #33333a", borderRadius: 6, padding: 16 };
 const mono = "var(--nx-font-mono)";
 
 const DISMISS_KEY = "nexus_pro_dismissed";
@@ -98,9 +98,9 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
   if (isPro) {
     return (
       <div style={{ ...card, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <span style={{ fontFamily: mono, fontSize: 12, fontWeight: "bold", color: "#00ff88", letterSpacing: "0.08em" }}>◆ {TIER_NAME.toUpperCase()} · ACTIVE</span>
+        <span style={{ fontFamily: mono, fontSize: 12, fontWeight: "bold", color: "#ededf0", letterSpacing: "0.08em" }}>◆ {TIER_NAME.toUpperCase()} · ACTIVE</span>
         <NexusTierBadge tier={tier} size="md" />
-        <span style={{ fontFamily: mono, fontSize: 10, color: "#8aaa9a", marginLeft: "auto" }}>
+        <span style={{ fontFamily: mono, fontSize: 10, color: "#a1a1aa", marginLeft: "auto" }}>
           {via === "holder" ? "unlocked via $NEXUS holdings" : "subscription active"}
         </span>
       </div>
@@ -110,13 +110,13 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
   return (
     <div style={{ ...card }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        <span style={{ fontFamily: mono, fontSize: 13, fontWeight: "bold", color: "#00ff88", letterSpacing: "0.1em" }}>◆ {TIER_NAME.toUpperCase()}</span>
-        <span style={{ fontFamily: mono, fontSize: 10, color: "#8aaa9a" }}>the operator tier — unlock the full terminal</span>
+        <span style={{ fontFamily: mono, fontSize: 13, fontWeight: "bold", color: "#ededf0", letterSpacing: "0.1em" }}>◆ {TIER_NAME.toUpperCase()}</span>
+        <span style={{ fontFamily: mono, fontSize: 10, color: "#a1a1aa" }}>the operator tier — unlock the full terminal</span>
         <button
           onClick={dismiss}
           style={{
-            marginLeft: "auto", background: "none", border: "1px solid #1a2e1a", borderRadius: 3,
-            color: "#3a5a4a", fontFamily: mono, fontSize: 9, padding: "3px 10px",
+            marginLeft: "auto", background: "none", border: "1px solid #232327", borderRadius: 3,
+            color: "#52525b", fontFamily: mono, fontSize: 9, padding: "3px 10px",
             cursor: "pointer", letterSpacing: "0.05em", alignSelf: "center",
           }}
         >
@@ -127,9 +127,9 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
       {/* Benefits */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8, marginBottom: 14 }}>
         {PRO_FEATURES.map((f) => (
-          <div key={f.key} style={{ background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 4, padding: "8px 10px" }}>
-            <div style={{ fontFamily: mono, fontSize: 10, color: "#00ff88", marginBottom: 2 }}>◇ {f.label}</div>
-            <div style={{ fontFamily: mono, fontSize: 8, color: "#8aaa9a", lineHeight: 1.4 }}>{f.desc}</div>
+          <div key={f.key} style={{ background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4, padding: "8px 10px" }}>
+            <div style={{ fontFamily: mono, fontSize: 10, color: "#ededf0", marginBottom: 2 }}>◇ {f.label}</div>
+            <div style={{ fontFamily: mono, fontSize: 8, color: "#a1a1aa", lineHeight: 1.4 }}>{f.desc}</div>
           </div>
         ))}
       </div>
@@ -137,59 +137,59 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
       {/* Paths to PRO */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
         {/* Path 1 — hold (live today) */}
-        <div style={{ border: "1px solid #1a4a2a", borderRadius: 4, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ border: "1px solid #33333a", borderRadius: 4, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ fontFamily: mono, fontSize: 10, color: "#fff", fontWeight: "bold" }}>
             HOLD <span style={{ color: TIER_META[PRO_HOLDER_TIER].color }}>{TIER_META[PRO_HOLDER_TIER].glyph} {PRO_HOLDER_TIER}</span>
           </div>
-          <div style={{ fontFamily: mono, fontSize: 9, color: "#8aaa9a" }}>
-            Hold {holderMin.toLocaleString()} $NEXUS → PRO unlocked, free. <span style={{ color: "#00ff88" }}>Live now.</span>
+          <div style={{ fontFamily: mono, fontSize: 9, color: "#a1a1aa" }}>
+            Hold {holderMin.toLocaleString()} $NEXUS → PRO unlocked, free. <span style={{ color: "#ededf0" }}>Live now.</span>
           </div>
           <BuyNexusButton size="sm" />
         </div>
 
         {/* Path 2 — subscribe USDC */}
-        <div style={{ border: "1px solid #1a2e1a", borderRadius: 4, padding: 12, display: "flex", flexDirection: "column", gap: 8, opacity: PAYMENTS_LIVE ? 1 : 0.7 }}>
+        <div style={{ border: "1px solid #232327", borderRadius: 4, padding: 12, display: "flex", flexDirection: "column", gap: 8, opacity: PAYMENTS_LIVE ? 1 : 0.7 }}>
           <div style={{ fontFamily: mono, fontSize: 10, color: "#fff", fontWeight: "bold" }}>SUBSCRIBE</div>
-          <div style={{ fontFamily: mono, fontSize: 9, color: "#8aaa9a" }}>
+          <div style={{ fontFamily: mono, fontSize: 9, color: "#a1a1aa" }}>
             <span style={{ color: "#fff", fontSize: 13, fontWeight: "bold" }}>${PRO_MONTHLY_USDC}</span>/mo in USDC.
-            Pay in $NEXUS → <span style={{ color: "#00ff88" }}>${nexusDiscountedPrice()}/mo ({NEXUS_PAY_DISCOUNT_PCT}% off)</span>.
+            Pay in $NEXUS → <span style={{ color: "#ededf0" }}>${nexusDiscountedPrice()}/mo ({NEXUS_PAY_DISCOUNT_PCT}% off)</span>.
           </div>
           {!PAYMENTS_LIVE ? (
-            <div style={{ fontFamily: mono, fontSize: 9, color: "#4a7a5a", border: "1px solid #1a2e1a", borderRadius: 3, padding: "5px 10px", textAlign: "center" }}>coming soon</div>
+            <div style={{ fontFamily: mono, fontSize: 9, color: "#71717a", border: "1px solid #232327", borderRadius: 3, padding: "5px 10px", textAlign: "center" }}>coming soon</div>
           ) : !subOpen ? (
-            <button onClick={() => setSubOpen(true)} style={{ fontFamily: mono, fontSize: 10, color: "#04130c", background: "#00ff88", border: "none", borderRadius: 3, padding: "7px 10px", cursor: "pointer", fontWeight: "bold", letterSpacing: "0.06em" }}>SUBSCRIBE — USDC</button>
+            <button onClick={() => setSubOpen(true)} style={{ fontFamily: mono, fontSize: 10, color: "#141416", background: "#ededf0", border: "none", borderRadius: 3, padding: "7px 10px", cursor: "pointer", fontWeight: "bold", letterSpacing: "0.06em" }}>SUBSCRIBE — USDC</button>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <div style={{ display: "flex", gap: 4 }}>
                 {([["usdc", `$${PRO_MONTHLY_USDC} USDC`], ["nexus", `$${nexusDiscountedPrice()} $NEXUS`]] as const).map(([m, lbl]) => (
                   <button key={m} onClick={() => { setMethod(m); setSubStatus("idle"); setSubMsg(""); }}
                     style={{ flex: 1, fontFamily: mono, fontSize: 8.5, cursor: "pointer", borderRadius: 3, padding: "4px 6px",
-                      background: method === m ? "#00ff8815" : "#0a0e0a", border: `1px solid ${method === m ? "#00ff88" : "#1a2e1a"}`,
-                      color: method === m ? "#00ff88" : "#8aaa9a" }}>{lbl}{m === "nexus" ? " · 25% off" : ""}</button>
+                      background: method === m ? "#ededf015" : "#0a0a0b", border: `1px solid ${method === m ? "#ededf0" : "#232327"}`,
+                      color: method === m ? "#ededf0" : "#a1a1aa" }}>{lbl}{m === "nexus" ? " · 25% off" : ""}</button>
                 ))}
               </div>
-              <div style={{ fontFamily: mono, fontSize: 8.5, color: "#8aaa9a", lineHeight: 1.5 }}>
+              <div style={{ fontFamily: mono, fontSize: 8.5, color: "#a1a1aa", lineHeight: 1.5 }}>
                 {method === "usdc"
                   ? <>1. Send <span style={{ color: "#fff" }}>${PRO_MONTHLY_USDC} USDC on Arbitrum</span> to:</>
                   : <>1. Send <span style={{ color: "#fff" }}>{nexusAmt ? `~${nexusAmt}` : "…"} $NEXUS on Base</span> to:</>}
               </div>
-              <button onClick={copyReceiver} title="Copy" style={{ fontFamily: mono, fontSize: 8.5, color: "#00ff88", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 3, padding: "6px 8px", cursor: "pointer", textAlign: "left", wordBreak: "break-all" }}>
+              <button onClick={copyReceiver} title="Copy" style={{ fontFamily: mono, fontSize: 8.5, color: "#ededf0", background: "#0a0a0b", border: "1px solid #232327", borderRadius: 3, padding: "6px 8px", cursor: "pointer", textAlign: "left", wordBreak: "break-all" }}>
                 {SUBSCRIPTION_RECEIVER} {copied ? "✓ copied" : "⧉"}
               </button>
-              <div style={{ fontFamily: mono, fontSize: 8.5, color: "#8aaa9a" }}>2. Paste the transaction hash:</div>
+              <div style={{ fontFamily: mono, fontSize: 8.5, color: "#a1a1aa" }}>2. Paste the transaction hash:</div>
               <input value={txHash} onChange={(e) => setTxHash(e.target.value)} placeholder="0x…" spellCheck={false}
-                style={{ fontFamily: mono, fontSize: 9, color: "#fff", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 3, padding: "6px 8px", outline: "none" }} />
+                style={{ fontFamily: mono, fontSize: 9, color: "#fff", background: "#0a0a0b", border: "1px solid #232327", borderRadius: 3, padding: "6px 8px", outline: "none" }} />
               <button onClick={verifyPayment} disabled={subStatus === "verifying" || subStatus === "ok"}
-                style={{ fontFamily: mono, fontSize: 10, color: "#04130c", background: subStatus === "ok" ? "#1a4a2a" : "#00ff88", border: "none", borderRadius: 3, padding: "7px 10px", cursor: subStatus === "verifying" ? "default" : "pointer", fontWeight: "bold", opacity: subStatus === "verifying" ? 0.6 : 1 }}>
+                style={{ fontFamily: mono, fontSize: 10, color: "#141416", background: subStatus === "ok" ? "#33333a" : "#ededf0", border: "none", borderRadius: 3, padding: "7px 10px", cursor: subStatus === "verifying" ? "default" : "pointer", fontWeight: "bold", opacity: subStatus === "verifying" ? 0.6 : 1 }}>
                 {subStatus === "verifying" ? "VERIFYING…" : subStatus === "ok" ? "✓ ACTIVATED" : `ACTIVATE ${TIER_NAME.toUpperCase()}`}
               </button>
-              {subMsg && <div style={{ fontFamily: mono, fontSize: 8.5, color: subStatus === "ok" ? "#00ff88" : "#ff6a6a", lineHeight: 1.4 }}>{subMsg}</div>}
+              {subMsg && <div style={{ fontFamily: mono, fontSize: 8.5, color: subStatus === "ok" ? "#ededf0" : "#ff6a6a", lineHeight: 1.4 }}>{subMsg}</div>}
             </div>
           )}
         </div>
       </div>
 
-      <div style={{ fontFamily: mono, fontSize: 8, color: "#2a4a3a", marginTop: 10, lineHeight: 1.4 }}>
+      <div style={{ fontFamily: mono, fontSize: 8, color: "#33333a", marginTop: 10, lineHeight: 1.4 }}>
         {TIER_NAME} is a software subscription. $NEXUS pays for it (consumptive use) or unlocks it by holdings (access) — no revenue share, no yield.
       </div>
     </div>

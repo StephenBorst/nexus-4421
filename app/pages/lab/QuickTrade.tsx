@@ -36,16 +36,16 @@ function PositionRow({ position }: { position: Record<string, unknown> }) {
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 4, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4, flexWrap: "wrap" }}>
       <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", color: "#fff", minWidth: 56 }}>{ticker}</span>
-      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: isLong ? "#00ff88" : "#ff4444" }}>{isLong ? "↑ LONG" : "↓ SHORT"}</span>
-      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#8aaa9a" }}>{Math.abs(qty)} @ ${entry.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
-      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", color: uPnl >= 0 ? "#00ff88" : "#ff4444" }}>{uPnl >= 0 ? "+" : ""}${uPnl.toFixed(2)}</span>
+      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: isLong ? "#3ecf8e" : "#f7525f" }}>{isLong ? "↑ LONG" : "↓ SHORT"}</span>
+      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#a1a1aa" }}>{Math.abs(qty)} @ ${entry.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
+      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", color: uPnl >= 0 ? "#3ecf8e" : "#f7525f" }}>{uPnl >= 0 ? "+" : ""}${uPnl.toFixed(2)}</span>
       <button onClick={close} disabled={isMutating} style={{
         marginLeft: "auto", background: "#1a0a0a", color: "#ff7a7a", border: "1px solid #4a1a1a", borderRadius: 3,
         padding: "5px 12px", cursor: isMutating ? "wait" : "pointer", fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", letterSpacing: "0.06em",
       }}>{isMutating ? "CLOSING…" : "CLOSE"}</button>
-      {err && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ff4444", width: "100%" }}>{err}</span>}
+      {err && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#f7525f", width: "100%" }}>{err}</span>}
     </div>
   );
 }
@@ -66,9 +66,9 @@ function snapQty(raw: number, baseTick: number, baseMin: number): number {
   return q;
 }
 
-const card: React.CSSProperties = { background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 6, padding: 16 };
-const label: React.CSSProperties = { fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.1em", color: "#4a7a5a" };
-const input: React.CSSProperties = { background: "#0a0e0a", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: "var(--nx-font-mono)", fontSize: 14, padding: "8px 10px", width: "100%", boxSizing: "border-box" };
+const card: React.CSSProperties = { background: "#141416", border: "1px solid #232327", borderRadius: 6, padding: 16 };
+const label: React.CSSProperties = { fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.1em", color: "#71717a" };
+const input: React.CSSProperties = { background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: "var(--nx-font-mono)", fontSize: 14, padding: "8px 10px", width: "100%", boxSizing: "border-box" };
 
 export function QuickTrade() {
   const { state: accountState } = useAccount();
@@ -145,13 +145,13 @@ export function QuickTrade() {
   }
 
   if (!connected) {
-    return <div style={{ textAlign: "center", padding: "48px 20px", fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#4a7a5a" }}>Connect a wallet to place quick trades.</div>;
+    return <div style={{ textAlign: "center", padding: "48px 20px", fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#71717a" }}>Connect a wallet to place quick trades.</div>;
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 460, margin: "0 auto" }}>
-      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#8aaa9a" }}>
-        <span style={{ color: "#00ff88" }}>//</span> QUICK TRADE <span style={{ color: "#4a7a5a", fontSize: 9 }}>· one-tap market order</span>
+      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#a1a1aa" }}>
+        <span style={{ color: "#ededf0" }}>//</span> QUICK TRADE <span style={{ color: "#71717a", fontSize: 9 }}>· one-tap market order</span>
       </div>
 
       {/* Market selector */}
@@ -163,8 +163,8 @@ export function QuickTrade() {
             const sel = s === symbol;
             return (
               <button key={s} onClick={() => { setSymbol(s); setMsg(null); }} style={{
-                background: sel ? "#00ff8815" : "#0a0e0a", border: `1px solid ${sel ? "#00ff8860" : "#1e2d1e"}`,
-                borderRadius: 3, padding: "5px 12px", cursor: "pointer", color: sel ? "#00ff88" : "#4a7a5a",
+                background: sel ? "#ededf015" : "#0a0a0b", border: `1px solid ${sel ? "#ededf060" : "#1e2d1e"}`,
+                borderRadius: 3, padding: "5px 12px", cursor: "pointer", color: sel ? "#ededf0" : "#71717a",
                 fontFamily: "var(--nx-font-mono)", fontSize: 12,
               }}>{tk(s)}</button>
             );
@@ -185,17 +185,17 @@ export function QuickTrade() {
                 const sel = s === symbol;
                 return (
                   <button key={s} onClick={() => { setSymbol(s); setMktSearch(""); setMsg(null); }} style={{
-                    background: sel ? "#00ff8815" : "#0a0e0a", border: `1px solid ${sel ? "#00ff8860" : "#1e2d1e"}`,
-                    borderRadius: 3, padding: "5px 12px", cursor: "pointer", color: sel ? "#00ff88" : "#4a7a5a",
+                    background: sel ? "#ededf015" : "#0a0a0b", border: `1px solid ${sel ? "#ededf060" : "#1e2d1e"}`,
+                    borderRadius: 3, padding: "5px 12px", cursor: "pointer", color: sel ? "#ededf0" : "#71717a",
                     fontFamily: "var(--nx-font-mono)", fontSize: 12,
                   }}>{tk(s)}</button>
                 );
               })}
-              {hits.length === 0 && <span style={{ ...label, color: "#3a6a4a" }}>no market matches &ldquo;{mktSearch}&rdquo;</span>}
+              {hits.length === 0 && <span style={{ ...label, color: "#71717a" }}>no market matches &ldquo;{mktSearch}&rdquo;</span>}
             </div>
           );
         })()}
-        <div style={{ ...label, marginTop: 10, color: "#8aaa9a" }}>
+        <div style={{ ...label, marginTop: 10, color: "#a1a1aa" }}>
           MARK: {markPrice ? `$${Number(markPrice).toLocaleString(undefined, { maximumFractionDigits: 4 })}` : "—"}
           {availableBalance != null && <span style={{ marginLeft: 14 }} title="Free collateral — USDC available to open positions (not locked as margin)">FREE: ${Number(availableBalance).toFixed(2)}</span>}
         </div>
@@ -213,7 +213,7 @@ export function QuickTrade() {
               onChange={(e) => setNotional(Math.max(0, parseFloat(e.target.value) || 0))} />
           </div>
           <div>
-            <div style={label}>LEVERAGE — {levClamped}x <span style={{ color: "#4a7a5a" }}>(max {cap}x)</span></div>
+            <div style={label}>LEVERAGE — {levClamped}x <span style={{ color: "#71717a" }}>(max {cap}x)</span></div>
             <input style={{ marginTop: 14, width: "100%" }} type="range" min={1} max={cap} step={1} value={levClamped}
               onChange={(e) => setLev(parseInt(e.target.value, 10))} />
           </div>
@@ -237,19 +237,19 @@ export function QuickTrade() {
       {/* One-tap LONG / SHORT */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <button onClick={() => tap("BUY")} disabled={tooSmall || !!busy || isMutating} style={{
-          background: tooSmall ? "#0a1a0a" : "#00ff88", color: tooSmall ? "#4a7a5a" : "#04130c", border: "1px solid #00ff88",
+          background: tooSmall ? "#1a1a1e" : "#ededf0", color: tooSmall ? "#71717a" : "#141416", border: "1px solid #ededf0",
           borderRadius: 4, padding: "14px 0", cursor: tooSmall ? "not-allowed" : "pointer", fontFamily: "var(--nx-font-mono)",
           fontSize: 14, fontWeight: "bold", letterSpacing: "0.08em", opacity: busy === "SELL" ? 0.4 : 1,
         }}>{busy === "BUY" ? "PLACING…" : confirmSide === "BUY" ? "TAP TO CONFIRM ✓" : "↑ LONG"}</button>
         <button onClick={() => tap("SELL")} disabled={tooSmall || !!busy || isMutating} style={{
-          background: tooSmall ? "#1a0a0a" : "#ff4444", color: tooSmall ? "#6a3a3a" : "#fff", border: "1px solid #ff4444",
+          background: tooSmall ? "#1a0a0a" : "#f7525f", color: tooSmall ? "#6a3a3a" : "#fff", border: "1px solid #f7525f",
           borderRadius: 4, padding: "14px 0", cursor: tooSmall ? "not-allowed" : "pointer", fontFamily: "var(--nx-font-mono)",
           fontSize: 14, fontWeight: "bold", letterSpacing: "0.08em", opacity: busy === "BUY" ? 0.4 : 1,
         }}>{busy === "SELL" ? "PLACING…" : confirmSide === "SELL" ? "TAP TO CONFIRM ✓" : "↓ SHORT"}</button>
       </div>
 
       {msg && (
-        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: msg.ok ? "#00ff88" : "#ff4444", textAlign: "center" }}>{msg.text}</div>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: msg.ok ? "#3ecf8e" : "#f7525f", textAlign: "center" }}>{msg.text}</div>
       )}
 
       {/* Open positions — close any without leaving the tab (full loop) */}
@@ -262,7 +262,7 @@ export function QuickTrade() {
         </div>
       )}
 
-      <div style={{ ...label, textAlign: "center", color: "#2a4a3a" }}>
+      <div style={{ ...label, textAlign: "center", color: "#33333a" }}>
         Real market order on Orderly · for limit / TP-SL use the full trade page
       </div>
     </div>

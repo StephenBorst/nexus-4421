@@ -26,7 +26,7 @@ export function PnlChart({ points }: { points: number[] }) {
 
   if (points.length < 2) {
     return (
-      <div style={{ height: 190, display: "flex", alignItems: "center", justifyContent: "center", color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>
+      <div style={{ height: 190, display: "flex", alignItems: "center", justifyContent: "center", color: "#33333a", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>
         no data yet
       </div>
     );
@@ -43,7 +43,7 @@ export function PnlChart({ points }: { points: number[] }) {
   const x = (i: number) => padX + (i / (points.length - 1)) * iw;
   const y = (v: number) => padY + (1 - (v - min) / range) * (h - padY * 2);
   const up = points[points.length - 1] >= 0;
-  const stroke = up ? "#00ff88" : "#ff5555";
+  const stroke = up ? "#ededf0" : "#ff5555";
   const line = points.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
   const linePath = "M" + line.join(" L");
   // Close the fill to the ZERO baseline (not the chart bottom) so a losing curve
@@ -77,13 +77,13 @@ export function PnlChart({ points }: { points: number[] }) {
           <line key={i} x1={0} y1={gy} x2={cw - gutter} y2={gy} stroke="#12201a" strokeWidth="1" />
         ))}
         {/* Value axis: max (top), 0 baseline, min (bottom) — the numbers the curve was missing. */}
-        <text x={axisX} y={y(max) + 3} fill="#3a5a4a" fontSize="9" fontFamily="var(--nx-font-mono)" textAnchor="start">{fmt(max)}</text>
+        <text x={axisX} y={y(max) + 3} fill="#52525b" fontSize="9" fontFamily="var(--nx-font-mono)" textAnchor="start">{fmt(max)}</text>
         {showZero && (
-          <text x={axisX} y={zeroY + 3} fill="#2a4a3a" fontSize="9" fontFamily="var(--nx-font-mono)" textAnchor="start">$0</text>
+          <text x={axisX} y={zeroY + 3} fill="#33333a" fontSize="9" fontFamily="var(--nx-font-mono)" textAnchor="start">$0</text>
         )}
-        <text x={axisX} y={y(min) + 3} fill="#3a5a4a" fontSize="9" fontFamily="var(--nx-font-mono)" textAnchor="start">{fmt(min)}</text>
+        <text x={axisX} y={y(min) + 3} fill="#52525b" fontSize="9" fontFamily="var(--nx-font-mono)" textAnchor="start">{fmt(min)}</text>
         {showZero && (
-          <line x1={0} y1={zeroY} x2={cw - gutter} y2={zeroY} stroke="#2a3a2a" strokeWidth="1" strokeDasharray="2 4" />
+          <line x1={0} y1={zeroY} x2={cw - gutter} y2={zeroY} stroke="#33333a" strokeWidth="1" strokeDasharray="2 4" />
         )}
         <path d={areaPath} fill={`url(#${gid})`} />
         {/* glow = a wider, faint underlay stroke (pure paint, NOT an svg filter —
@@ -92,7 +92,7 @@ export function PnlChart({ points }: { points: number[] }) {
         <path d={linePath} fill="none" stroke={stroke} strokeOpacity="0.95" strokeWidth="2.25" strokeLinejoin="round" strokeLinecap="round" />
         <circle cx={lastX} cy={lastY} r="6" fill={stroke} fillOpacity="0.18" />
         <circle cx={lastX} cy={lastY} r="3.2" fill={stroke} />
-        <circle cx={lastX} cy={lastY} r="3.2" fill="none" stroke="#0a0e0a" strokeWidth="1" />
+        <circle cx={lastX} cy={lastY} r="3.2" fill="none" stroke="#0a0a0b" strokeWidth="1" />
         {/* Final cumulative value, pinned to the end point (the headline number). */}
         <text x={axisX} y={lastY + 3} fill={stroke} fontSize="11" fontWeight="700" fontFamily="var(--nx-font-mono)" textAnchor="start">{fmt(last)}</text>
       </svg>
@@ -120,7 +120,7 @@ export function PnlBars({ values, labels }: { values: number[]; labels?: string[
 
   if (values.length < 1) {
     return (
-      <div style={{ height: 96, display: "flex", alignItems: "center", justifyContent: "center", color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>
+      <div style={{ height: 96, display: "flex", alignItems: "center", justifyContent: "center", color: "#33333a", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>
         no data yet
       </div>
     );
@@ -138,12 +138,12 @@ export function PnlBars({ values, labels }: { values: number[]; labels?: string[
   return (
     <div ref={measureRef} style={{ width: "100%", overflow: "hidden" }}>
       <svg width={cw} height={h} viewBox={`0 0 ${cw} ${h}`} style={{ display: "block", maxWidth: "100%", overflow: "hidden" }}>
-        <line x1={0} y1={zeroY} x2={cw} y2={zeroY} stroke="#2a3a2a" strokeWidth="1" strokeDasharray="2 4" />
+        <line x1={0} y1={zeroY} x2={cw} y2={zeroY} stroke="#33333a" strokeWidth="1" strokeDasharray="2 4" />
         {values.map((v, i) => {
           const x = i * (bw + gap);
           const bh = Math.max(1, Math.abs(v) * scale);
           const yy = v >= 0 ? zeroY - bh : zeroY;
-          const col = v >= 0 ? "#00ff88" : "#ff5555";
+          const col = v >= 0 ? "#ededf0" : "#ff5555";
           const tip = labels?.[i] ?? `${v >= 0 ? "+" : "-"}$${Math.abs(v).toFixed(2)}`;
           return (
             <g key={i}>
@@ -164,7 +164,7 @@ export function PnlBars({ values, labels }: { values: number[]; labels?: string[
 // ─── Empty State ─────────────────────────────────────────
 export function EmptyState({ message }: { message: string }) {
   return (
-    <div style={{ padding: "40px 0", textAlign: "center", color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
+    <div style={{ padding: "40px 0", textAlign: "center", color: "#33333a", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
       <div style={{ fontSize: 20, marginBottom: 8 }}>&#9632;</div>
       {message}
     </div>

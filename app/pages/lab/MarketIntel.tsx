@@ -41,7 +41,7 @@ function NewsTab() {
   const [countdown, setCountdown] = useState(300);
   const isMob = useIsMobile();
 
-  const TEAL   = "#00ff88", GREEN = "#00ff88", RED = "#ff4444", YELLOW = "#fbbf24";
+  const TEAL   = "#3ecf8e", GREEN = "#3ecf8e", RED = "#f7525f", YELLOW = "#fbbf24";
   const DIM    = "rgba(255,255,255,0.35)", MUTED = "rgba(255,255,255,0.60)", BRIGHT = "rgba(255,255,255,0.87)";
   const CATS   = ["ALL", "CRYPTO", "MACRO", "DEFI", "MARKETS", "GEOPOLITICS"];
   const catClr = (c: string) => c === "MACRO" ? YELLOW : c === "DEFI" ? TEAL : c === "GEOPOLITICS" ? RED : c === "MARKETS" ? MUTED : GREEN;
@@ -164,9 +164,9 @@ export function MarketIntelView() {
         ]).map(({ id, label }) => (
           <button key={id} onClick={() => setSub(id)} style={{
             ...navBtnStyle, fontSize: 10, padding: "5px 16px",
-            color: sub === id ? "#00ff88" : "#3a5a4a",
-            borderColor: sub === id ? "#1a4a2a" : "#1a2e1a",
-            background: sub === id ? "#0a2a0a" : "transparent",
+            color: sub === id ? "#ededf0" : "#52525b",
+            borderColor: sub === id ? "#33333a" : "#232327",
+            background: sub === id ? "#0c1f18" : "transparent",
           }}>{label}</button>
         ))}
       </div>

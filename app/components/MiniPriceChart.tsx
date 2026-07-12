@@ -61,26 +61,26 @@ export function MiniPriceChart({ symbol, height = 96 }: { symbol: string; height
     up = closes[closes.length - 1] >= closes[0];
     changePct = closes[0] ? ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100 : null;
   }
-  const color = up ? "#00ff88" : "#ff4444";
+  const color = up ? "#3ecf8e" : "#f7525f";
 
   return (
     <div ref={wrapRef} style={{ width: "100%" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.1em", color: "#4a7a5a" }}>24H · 15m</span>
+        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.1em", color: "#71717a" }}>24H · 15m</span>
         {changePct != null && (
           <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", color }}>
             {changePct >= 0 ? "+" : ""}{changePct.toFixed(2)}%
           </span>
         )}
       </div>
-      <svg width={width} height={height} style={{ display: "block", background: "#0a0e0a", border: "1px solid #1a2e1a", borderRadius: 4 }}>
+      <svg width={width} height={height} style={{ display: "block", background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4 }}>
         {path ? (
           <>
             <path d={`${path} L${width - pad},${height} L${pad},${height} Z`} fill={color} opacity={0.07} />
             <path d={path} fill="none" stroke={color} strokeWidth={1.5} />
           </>
         ) : (
-          <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" fontFamily="monospace" fontSize={10} fill="#2a4a3a">
+          <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" fontFamily="monospace" fontSize={10} fill="#33333a">
             {failed ? "chart unavailable" : "loading chart…"}
           </text>
         )}

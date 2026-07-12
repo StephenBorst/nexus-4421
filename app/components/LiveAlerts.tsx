@@ -6,8 +6,8 @@
 import { useEffect, useRef, useState } from "react";
 
 const API_BASE = "https://og.nexustradinglabs.com";
-const green = "#00ff88";
-const red = "#ff4444";
+const green = "#ededf0";
+const red = "#f7525f";
 const NOTIF_KEY = "nexus_live_notif"; // "on" once the user enables OS notifications
 
 type LivePos = {
@@ -69,17 +69,17 @@ export default function LiveAlerts() {
   return (
     <div style={{ position: "fixed", left: 16, bottom: 16, zIndex: 9000, display: "flex", flexDirection: "column", gap: 8, maxWidth: 280 }}>
       {showEnable && (
-        <div style={{ background: "#0d120d", border: "1px solid #1a3a1a", borderRadius: 6, padding: "8px 10px", fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#8aaa9a", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ background: "#141416", border: "1px solid #232327", borderRadius: 6, padding: "8px 10px", fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#a1a1aa", display: "flex", alignItems: "center", gap: 8 }}>
           <span>🔔 Get pinged when traders open positions</span>
-          <button onClick={enableNotif} style={{ marginLeft: "auto", flexShrink: 0, background: "#0a1a0a", color: green, border: "1px solid #1a4a2a", borderRadius: 3, padding: "3px 8px", fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: "bold", cursor: "pointer" }}>ON</button>
-          <button onClick={() => { setShowEnable(false); window.localStorage.setItem(NOTIF_KEY, "off"); }} style={{ flexShrink: 0, background: "none", border: "none", color: "#3a5a4a", cursor: "pointer", fontSize: 12 }}>✕</button>
+          <button onClick={enableNotif} style={{ marginLeft: "auto", flexShrink: 0, background: "#1a1a1e", color: green, border: "1px solid #33333a", borderRadius: 3, padding: "3px 8px", fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: "bold", cursor: "pointer" }}>ON</button>
+          <button onClick={() => { setShowEnable(false); window.localStorage.setItem(NOTIF_KEY, "off"); }} style={{ flexShrink: 0, background: "none", border: "none", color: "#52525b", cursor: "pointer", fontSize: 12 }}>✕</button>
         </div>
       )}
       {toasts.map((t) => (
         <a
           key={t.id}
           href={`/perp/${t.symbol.startsWith("PERP_") ? t.symbol : `PERP_${t.symbol}_USDC`}`}
-          style={{ textDecoration: "none", background: "#0d120d", border: `1px solid ${t.direction === "LONG" ? "#1a4a2a" : "#4a1a1a"}`, borderRadius: 6, padding: "9px 11px", fontFamily: "var(--nx-font-mono)", display: "flex", alignItems: "center", gap: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.5)" }}
+          style={{ textDecoration: "none", background: "#141416", border: `1px solid ${t.direction === "LONG" ? "#33333a" : "#4a1a1a"}`, borderRadius: 6, padding: "9px 11px", fontFamily: "var(--nx-font-mono)", display: "flex", alignItems: "center", gap: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.5)" }}
         >
           <span style={{ fontSize: 13 }}>🔔</span>
           <span style={{ fontSize: 11, color: "#e8f0ea" }}>

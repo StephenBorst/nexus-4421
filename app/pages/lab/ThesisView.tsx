@@ -80,7 +80,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
     <div style={{
       ...cardStyle,
       border: `1px solid ${cfg.border}`,
-      background: isClosed ? "#0a0c0a" : "#0d120d",
+      background: isClosed ? "#0a0c0a" : "#141416",
       opacity: t.status === "INVALIDATED" ? 0.7 : 1,
     }}>
       {/* Top row */}
@@ -88,35 +88,35 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
         <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flex: 1, minWidth: 0 }}>
           <div style={{ minWidth: 52 }}>
             <div style={{ fontSize: 16, color: "#fff", fontWeight: "bold", fontFamily: "var(--nx-font-mono)" }}>{t.symbol.replace("PERP_","").replace("_USDC","")}</div>
-            <div style={{ fontSize: 10, color: t.direction === "LONG" ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)" }}>
+            <div style={{ fontSize: 10, color: t.direction === "LONG" ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)" }}>
               {t.direction === "LONG" ? "↑" : "↓"} {t.direction} · {t.leverage.toFixed(1)}x
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(6, auto)", gap: isMobile ? "8px 12px" : "0 16px", flex: 1 }}>
             {[
               { label: "ENTRY", val: `$${t.entryPrice.toFixed(2)}` },
-              { label: "STOP", val: `$${t.stopLoss.toFixed(2)}`, color: "#ff4444" },
-              { label: "TP1", val: `$${t.takeProfit1.toFixed(2)}`, color: "#00ff88" },
+              { label: "STOP", val: `$${t.stopLoss.toFixed(2)}`, color: "#f7525f" },
+              { label: "TP1", val: `$${t.takeProfit1.toFixed(2)}`, color: "#ededf0" },
               { label: "SIZE", val: `$${t.positionSize.toFixed(0)}` },
-              { label: "R:R", val: `1:${t.riskReward.toFixed(2)}`, color: t.riskReward >= 2 ? "#00ff88" : "#fbbf24" },
+              { label: "R:R", val: `1:${t.riskReward.toFixed(2)}`, color: t.riskReward >= 2 ? "#ededf0" : "#fbbf24" },
               { label: "72H FUND", val: `$${t.fundingCost72h.toFixed(3)}`, color: "#fbbf24" },
             ].map(({ label, val, color }) => (
               <div key={label}>
-                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
-                <div style={{ fontSize: 12, color: color ?? "#8aaa9a", fontFamily: "var(--nx-font-mono)" }}>{val}</div>
+                <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
+                <div style={{ fontSize: 12, color: color ?? "#a1a1aa", fontFamily: "var(--nx-font-mono)" }}>{val}</div>
               </div>
             ))}
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: isMobile ? "row" : "column", alignItems: isMobile ? "center" : "flex-end", justifyContent: isMobile ? "space-between" : "flex-start", gap: 6, flexShrink: 0 }}>
-          {!isMobile && <div style={{ fontSize: 9, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)" }}>{new Date(t.createdAt).toLocaleDateString()}</div>}
+          {!isMobile && <div style={{ fontSize: 9, color: "#33333a", fontFamily: "var(--nx-font-mono)" }}>{new Date(t.createdAt).toLocaleDateString()}</div>}
           <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
             {t.status === "ACTIVE" && walletAddress && (
               <a
                 href={`https://t.me/nexustradinglabs_bot?start=${walletAddress.toLowerCase()}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ ...navBtnStyle, fontSize: 10, color: "#29b6f6", borderColor: "#0a2a3a", textDecoration: "none", display: "inline-block", textAlign: "center", minHeight: 36, lineHeight: "22px", padding: "6px 12px" }}
+                style={{ ...navBtnStyle, fontSize: 10, color: "#29b6f6", borderColor: "#1a1a1e", textDecoration: "none", display: "inline-block", textAlign: "center", minHeight: 36, lineHeight: "22px", padding: "6px 12px" }}
               >
                 🔔 ALERTS
               </a>
@@ -129,7 +129,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
               const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
               return (
                 <a href={xUrl} target="_blank" rel="noopener noreferrer" title="Share this call on X"
-                  style={{ ...navBtnStyle, fontSize: 10, color: "#8aaa9a", borderColor: "#1a2e1a", textDecoration: "none", display: "inline-block", textAlign: "center", minHeight: 36, lineHeight: "22px", padding: "6px 12px" }}>
+                  style={{ ...navBtnStyle, fontSize: 10, color: "#a1a1aa", borderColor: "#232327", textDecoration: "none", display: "inline-block", textAlign: "center", minHeight: 36, lineHeight: "22px", padding: "6px 12px" }}>
                   𝕏 SHARE
                 </a>
               );
@@ -143,9 +143,9 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
                 ? { isPublic: false, holdersOnly: true }
                 : { isPublic: false, holdersOnly: false };
               const meta = {
-                PRIVATE: { label: "📡 PRIVATE", color: "#3a5a4a", border: "#1a2e1a", bg: "transparent" },
-                PUBLIC:  { label: "📡 PUBLIC",  color: "#00ff88", border: "#1a4a2a", bg: "#0a2a0a" },
-                HOLDERS: { label: "◆ HOLDERS",  color: "#5fd6a0", border: "#1a4a3a", bg: "#0a2a1a" },
+                PRIVATE: { label: "📡 PRIVATE", color: "#52525b", border: "#232327", bg: "transparent" },
+                PUBLIC:  { label: "📡 PUBLIC",  color: "#ededf0", border: "#33333a", bg: "#0c1f18" },
+                HOLDERS: { label: "◆ HOLDERS",  color: "#5fd6a0", border: "#33333a", bg: "#0c1f18" },
               }[vis];
               return (
                 <button
@@ -176,10 +176,10 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
                 takeProfit2: t.takeProfit2, leverage: t.leverage,
               }, navigate)}
               title="Hand the agent THIS exact trade: it enters your direction and manages to your stop/targets with the agent's full exit engine (scale-out, trailing, breakeven, timeout). One-shot."
-              style={{ ...navBtnStyle, fontSize: 10, color: "#00ff88", borderColor: "#1a4a2a", minHeight: 36, padding: "6px 12px" }}>
+              style={{ ...navBtnStyle, fontSize: 10, color: "#ededf0", borderColor: "#33333a", minHeight: 36, padding: "6px 12px" }}>
               ▶ TRADE
             </button>
-            <button onClick={() => onRemove(t.id)} style={{ ...navBtnStyle, fontSize: 10, color: "#ff4444", borderColor: "#2a1a1a", minHeight: 36, padding: "6px 12px" }}>REMOVE</button>
+            <button onClick={() => onRemove(t.id)} style={{ ...navBtnStyle, fontSize: 10, color: "#f7525f", borderColor: "#2a1a1a", minHeight: 36, padding: "6px 12px" }}>REMOVE</button>
           </div>
         </div>
       </div>
@@ -194,9 +194,9 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
               fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "6px 12px",
               cursor: "pointer", borderRadius: 3, letterSpacing: "0.06em",
               minHeight: 32,
-              border: `1px solid ${active ? c.border : "#1a2e1a"}`,
+              border: `1px solid ${active ? c.border : "#232327"}`,
               background: active ? c.bg : "transparent",
-              color: active ? c.color : "#2a4a3a",
+              color: active ? c.color : "#33333a",
             }}>{c.label}</button>
           );
         })}
@@ -209,30 +209,30 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
         const toTP = distancePct(markPrice, t.takeProfit1);
         const isWinning = pnl >= 0;
         return (
-          <div style={{ borderTop: "1px solid #1a2e1a", paddingTop: 10, marginBottom: 10 }}>
+          <div style={{ borderTop: "1px solid #232327", paddingTop: 10, marginBottom: 10 }}>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: "8px 16px" }}>
               <div>
-                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginBottom: 2 }}>MARK PRICE</div>
+                <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 2 }}>MARK PRICE</div>
                 <div style={{ fontSize: 13, color: "#fff", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>
                   ${markPrice.toFixed(markPrice < 10 ? 4 : 2)}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginBottom: 2 }}>UNREALIZED P&L</div>
-                <div style={{ fontSize: 13, fontFamily: "var(--nx-font-mono)", fontWeight: "bold", color: isWinning ? "#00ff88" : "#ff4444" }}>
+                <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 2 }}>UNREALIZED P&L</div>
+                <div style={{ fontSize: 13, fontFamily: "var(--nx-font-mono)", fontWeight: "bold", color: isWinning ? "#3ecf8e" : "#f7525f" }}>
                   {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
                   <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.7 }}>({pct >= 0 ? "+" : ""}{pct.toFixed(2)}%)</span>
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginBottom: 2 }}>TO SL</div>
-                <div style={{ fontSize: 13, color: "#ff4444", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>
+                <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 2 }}>TO SL</div>
+                <div style={{ fontSize: 13, color: "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>
                   {toSL.toFixed(2)}%
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginBottom: 2 }}>TO TP1</div>
-                <div style={{ fontSize: 13, color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>
+                <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 2 }}>TO TP1</div>
+                <div style={{ fontSize: 13, color: "#ededf0", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>
                   {toTP.toFixed(2)}%
                 </div>
               </div>
@@ -243,15 +243,15 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
 
       {/* Actual P&L — only shown when closed */}
       {isClosed && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, paddingTop: 8, borderTop: "1px solid #1a2e1a" }}>
-          <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", whiteSpace: "nowrap" }}>ACTUAL P&L</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, paddingTop: 8, borderTop: "1px solid #232327" }}>
+          <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", whiteSpace: "nowrap" }}>ACTUAL P&L</div>
           {t.actualPnl !== null && !inputVisible ? (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ fontSize: 16, color: t.actualPnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>
+              <div style={{ fontSize: 16, color: t.actualPnl >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>
                 {formatPnl(t.actualPnl)}
               </div>
               {accuracy !== null && (
-                <div style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>
+                <div style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>
                   {accuracy.toFixed(0)}% of plan
                 </div>
               )}
@@ -268,7 +268,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
                 // eslint-disable-next-line jsx-a11y/no-autofocus
                 autoFocus
               />
-              <button onClick={saveActual} style={{ ...navBtnStyle, fontSize: 10, color: "#00ff88", borderColor: "#1a4a2a" }}>SAVE</button>
+              <button onClick={saveActual} style={{ ...navBtnStyle, fontSize: 10, color: "#ededf0", borderColor: "#33333a" }}>SAVE</button>
               {t.actualPnl !== null && (
                 <button onClick={() => setInputVisible(false)} style={{ ...navBtnStyle, fontSize: 10 }}>CANCEL</button>
               )}
@@ -279,7 +279,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
 
       {/* Notes */}
       {t.notes && (
-        <div style={{ marginTop: 6, paddingTop: 8, borderTop: "1px solid #1a2e1a", fontSize: 11, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", fontStyle: "italic" }}>
+        <div style={{ marginTop: 6, paddingTop: 8, borderTop: "1px solid #232327", fontSize: 11, color: "#52525b", fontFamily: "var(--nx-font-mono)", fontStyle: "italic" }}>
           &quot;{t.notes}&quot;
         </div>
       )}
@@ -312,41 +312,41 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
     <div style={{ marginTop: 16, marginBottom: 16 }}>
       {/* Breakdown Card */}
       <div style={{ ...cardStyle, marginBottom: 8 }}>
-        <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 16, fontFamily: "var(--nx-font-mono)" }}>
-          <span style={{ color: "#3a5a4a" }}>&#9632;</span> ACCURACY BREAKDOWN
+        <div style={{ fontSize: 10, color: "#71717a", letterSpacing: "0.1em", marginBottom: 16, fontFamily: "var(--nx-font-mono)" }}>
+          <span style={{ color: "#52525b" }}>&#9632;</span> ACCURACY BREAKDOWN
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
-          <div style={{ background: "#0a150a", border: "1px solid #1a4a2a", borderRadius: 4, padding: "10px 12px" }}>
-            <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>HIT TP</div>
-            <div style={{ fontSize: 28, color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{hits}</div>
+          <div style={{ background: "#141416", border: "1px solid #33333a", borderRadius: 4, padding: "10px 12px" }}>
+            <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>HIT TP</div>
+            <div style={{ fontSize: 28, color: "#ededf0", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{hits}</div>
           </div>
           <div style={{ background: "#150a0a", border: "1px solid #4a1a1a", borderRadius: 4, padding: "10px 12px" }}>
-            <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>STOPPED OUT</div>
-            <div style={{ fontSize: 28, color: "#ff4444", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{stoppedOut}</div>
+            <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>STOPPED OUT</div>
+            <div style={{ fontSize: 28, color: "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{stoppedOut}</div>
           </div>
           <div style={{ background: "#150e00", border: "1px solid #4a3a00", borderRadius: 4, padding: "10px 12px" }}>
-            <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>INVALIDATED</div>
+            <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>INVALIDATED</div>
             <div style={{ fontSize: 28, color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{invalidated}</div>
           </div>
-          <div style={{ background: "#0a0e0a", border: "1px solid #1a3a5a", borderRadius: 4, padding: "10px 12px" }}>
-            <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>WIN RATE</div>
-            <div style={{ fontSize: 28, color: "#4a9fff", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{winRate}%</div>
-            <div style={{ height: 3, background: "#1a2e1a", borderRadius: 2, marginTop: 8 }}>
-              <div style={{ height: 3, background: "#4a9fff", borderRadius: 2, width: `${winRate}%` }} />
+          <div style={{ background: "#0a0a0b", border: "1px solid #1a3a5a", borderRadius: 4, padding: "10px 12px" }}>
+            <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>WIN RATE</div>
+            <div style={{ fontSize: 28, color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{winRate}%</div>
+            <div style={{ height: 3, background: "#232327", borderRadius: 2, marginTop: 8 }}>
+              <div style={{ height: 3, background: "#d4d4d8", borderRadius: 2, width: `${winRate}%` }} />
             </div>
           </div>
         </div>
         {/* TOTAL P&L — its own full-width row so the number matches the count tiles'
             size (congruent, easy on the eye) without ever overflowing a narrow tile. */}
-        <div style={{ background: "#0a0e0a", border: `1px solid ${totalActualPnl >= 0 ? "#1a4a2a" : "#4a1a1a"}`, borderRadius: 4, padding: "10px 14px", marginTop: 8, display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ background: "#0a0a0b", border: `1px solid ${totalActualPnl >= 0 ? "#33333a" : "#4a1a1a"}`, borderRadius: 4, padding: "10px 14px", marginTop: 8, display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div>
-            <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>TOTAL ACTUAL P&amp;L</div>
-            <div style={{ fontSize: 28, color: totalActualPnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontWeight: "bold", whiteSpace: "nowrap" }}>
+            <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>TOTAL ACTUAL P&amp;L</div>
+            <div style={{ fontSize: 28, color: totalActualPnl >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold", whiteSpace: "nowrap" }}>
               {withPnl.length > 0 ? formatPnl(totalActualPnl) : "—"}
             </div>
           </div>
           {withPnl.length > 0 && (
-            <div style={{ fontSize: 9, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)" }}>{withPnl.length} logged</div>
+            <div style={{ fontSize: 9, color: "#33333a", fontFamily: "var(--nx-font-mono)" }}>{withPnl.length} logged</div>
           )}
         </div>
       </div>
@@ -356,19 +356,19 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8 }}>
           {/* Best Thesis */}
           <div style={cardStyle}>
-            <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; BEST THESIS</div>
+            <div style={{ fontSize: 10, color: "#71717a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; BEST THESIS</div>
             {bestThesis ? (
               <>
-                <div style={{ background: "#0a150a", border: "1px solid #1a3a1a", borderRadius: 4, padding: "10px 12px", marginBottom: 8 }}>
+                <div style={{ background: "#141416", border: "1px solid #232327", borderRadius: 4, padding: "10px 12px", marginBottom: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
                     <span style={{ fontSize: 15, color: "#fff", fontWeight: "bold", fontFamily: "var(--nx-font-mono)" }}>{bestThesis.symbol}</span>
-                    <span style={{ fontSize: 16, color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{formatPnl(bestThesis.actualPnl ?? 0)}</span>
+                    <span style={{ fontSize: 16, color: "#ededf0", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{formatPnl(bestThesis.actualPnl ?? 0)}</span>
                   </div>
                   <div style={{ display: "flex", gap: 12 }}>
-                    <div style={{ fontSize: 10, color: bestThesis.direction === "LONG" ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)" }}>
+                    <div style={{ fontSize: 10, color: bestThesis.direction === "LONG" ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)" }}>
                       {bestThesis.direction === "LONG" ? "↑" : "↓"} {bestThesis.direction}
                     </div>
-                    <div style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>1:{bestThesis.riskReward.toFixed(2)} R:R</div>
+                    <div style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>1:{bestThesis.riskReward.toFixed(2)} R:R</div>
                   </div>
                 </div>
                 <div style={{ fontSize: 9, color: STATUS_CONFIG[bestThesis.status].color, fontFamily: "var(--nx-font-mono)", letterSpacing: "0.06em" }}>
@@ -376,25 +376,25 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
                 </div>
               </>
             ) : (
-              <div style={{ fontSize: 11, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)" }}>no P&L logged yet</div>
+              <div style={{ fontSize: 11, color: "#33333a", fontFamily: "var(--nx-font-mono)" }}>no P&L logged yet</div>
             )}
           </div>
 
           {/* Worst Thesis */}
           <div style={cardStyle}>
-            <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; WORST THESIS</div>
+            <div style={{ fontSize: 10, color: "#71717a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; WORST THESIS</div>
             {worstThesis ? (
               <>
                 <div style={{ background: "#150a0a", border: "1px solid #3a1a1a", borderRadius: 4, padding: "10px 12px", marginBottom: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
                     <span style={{ fontSize: 15, color: "#fff", fontWeight: "bold", fontFamily: "var(--nx-font-mono)" }}>{worstThesis.symbol}</span>
-                    <span style={{ fontSize: 16, color: "#ff4444", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{formatPnl(worstThesis.actualPnl ?? 0)}</span>
+                    <span style={{ fontSize: 16, color: "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{formatPnl(worstThesis.actualPnl ?? 0)}</span>
                   </div>
                   <div style={{ display: "flex", gap: 12 }}>
-                    <div style={{ fontSize: 10, color: worstThesis.direction === "LONG" ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)" }}>
+                    <div style={{ fontSize: 10, color: worstThesis.direction === "LONG" ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)" }}>
                       {worstThesis.direction === "LONG" ? "↑" : "↓"} {worstThesis.direction}
                     </div>
-                    <div style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>1:{worstThesis.riskReward.toFixed(2)} R:R</div>
+                    <div style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>1:{worstThesis.riskReward.toFixed(2)} R:R</div>
                   </div>
                 </div>
                 <div style={{ fontSize: 9, color: STATUS_CONFIG[worstThesis.status].color, fontFamily: "var(--nx-font-mono)", letterSpacing: "0.06em" }}>
@@ -402,7 +402,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
                 </div>
               </>
             ) : (
-              <div style={{ fontSize: 11, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)" }}>
+              <div style={{ fontSize: 11, color: "#33333a", fontFamily: "var(--nx-font-mono)" }}>
                 {withPnl.length === 1 ? "need 2+ results" : "no P&L logged yet"}
               </div>
             )}
@@ -411,11 +411,11 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
           {/* Cumulative Thesis P&L Chart — spans the full row so the curve stretches
               across the frame (mirrors the P&L accuracy breakdown), not a half tile. */}
           <div style={{ ...cardStyle, gridColumn: "1 / -1" }}>
-            <div style={{ fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 4, fontFamily: "var(--nx-font-mono)" }}>&#9632; THESIS P&amp;L</div>
+            <div style={{ fontSize: 10, color: "#71717a", letterSpacing: "0.1em", marginBottom: 4, fontFamily: "var(--nx-font-mono)" }}>&#9632; THESIS P&amp;L</div>
             <PnlChart points={cumulativePoints} />
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-              <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{sortedByDate.length} results plotted</div>
-              <div style={{ fontSize: 10, color: totalActualPnl >= 0 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{formatPnl(totalActualPnl)}</div>
+              <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{sortedByDate.length} results plotted</div>
+              <div style={{ fontSize: 10, color: totalActualPnl >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{formatPnl(totalActualPnl)}</div>
             </div>
           </div>
         </div>
@@ -495,12 +495,12 @@ export function ThesisAnalyticsView() {
   }
 
   const endVal = equityPoints.length > 0 ? equityPoints[equityPoints.length - 1] : 0;
-  const lineColor = endVal >= 0 ? "#00ff88" : "#ff4444";
+  const lineColor = endVal >= 0 ? "#3ecf8e" : "#f7525f";
 
   const renderEquityCurve = () => {
     if (equityPoints.length < 2) {
       return (
-        <div style={{ padding: "20px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#2a4a3a" }}>
+        <div style={{ padding: "20px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#33333a" }}>
           Not enough data yet.
         </div>
       );
@@ -517,7 +517,7 @@ export function ThesisAnalyticsView() {
     const lastY = toY(equityPoints[equityPoints.length - 1]);
     return (
       <svg viewBox={`0 0 ${w} ${svgH}`} style={{ width: "100%", height: 120 }}>
-        <line x1="0" y1={zeroY} x2={w} y2={zeroY} stroke="#1a2e1a" strokeWidth="1" strokeDasharray="4,4" />
+        <line x1="0" y1={zeroY} x2={w} y2={zeroY} stroke="#232327" strokeWidth="1" strokeDasharray="4,4" />
         <polyline points={pts} fill="none" stroke={lineColor} strokeWidth="2" />
         <circle cx={w} cy={lastY} r="4" fill={lineColor} />
       </svg>
@@ -535,11 +535,11 @@ export function ThesisAnalyticsView() {
       }}
     >
       <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#fff" }}>{a.sym}</span>
-      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, textAlign: "right", color: a.winRate >= 50 ? "#00ff88" : "#ff4444" }}>
+      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, textAlign: "right", color: a.winRate >= 50 ? "#3ecf8e" : "#f7525f" }}>
         {a.winRate.toFixed(0)}%
       </span>
-      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, textAlign: "right", color: "#3a5a4a" }}>{a.total}</span>
-      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, textAlign: "right", color: a.avgRR >= 2 ? "#00ff88" : "#fbbf24" }}>
+      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, textAlign: "right", color: "#52525b" }}>{a.total}</span>
+      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, textAlign: "right", color: a.avgRR >= 2 ? "#ededf0" : "#fbbf24" }}>
         1:{a.avgRR.toFixed(1)}
       </span>
     </div>
@@ -548,7 +548,7 @@ export function ThesisAnalyticsView() {
   const tableHeader = () => (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 54px 40px 54px", gap: 8, marginBottom: 6 }}>
       {["SYMBOL", "WR", "N", "AVG R:R"].map((col) => (
-        <span key={col} style={{ fontSize: 8, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", textAlign: col !== "SYMBOL" ? "right" : "left" }}>
+        <span key={col} style={{ fontSize: 8, color: "#33333a", fontFamily: "var(--nx-font-mono)", textAlign: col !== "SYMBOL" ? "right" : "left" }}>
           {col}
         </span>
       ))}
@@ -560,21 +560,21 @@ export function ThesisAnalyticsView() {
       {/* Summary stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
         {[
-          { label: "TOTAL THESES", val: summaryStats.total.toString(), color: "#8aaa9a" as string },
+          { label: "TOTAL THESES", val: summaryStats.total.toString(), color: "#a1a1aa" as string },
           {
             label: "WIN RATE",
             val: closed.length > 0 ? `${summaryStats.winRate.toFixed(1)}%` : "—",
-            color: (closed.length > 0 ? (summaryStats.winRate >= 50 ? "#00ff88" : "#ff4444") : "#3a5a4a") as string,
+            color: (closed.length > 0 ? (summaryStats.winRate >= 50 ? "#3ecf8e" : "#f7525f") : "#52525b") as string,
           },
           {
             label: "AVG R:R",
             val: theses.length > 0 ? `1:${summaryStats.avgRR.toFixed(2)}` : "—",
-            color: (theses.length > 0 ? (summaryStats.avgRR >= 2 ? "#00ff88" : "#fbbf24") : "#3a5a4a") as string,
+            color: (theses.length > 0 ? (summaryStats.avgRR >= 2 ? "#ededf0" : "#fbbf24") : "#52525b") as string,
           },
           {
             label: "TOTAL P&L",
             val: closed.length > 0 ? `${summaryStats.totalPnl >= 0 ? "+" : ""}$${Math.abs(summaryStats.totalPnl).toFixed(2)}` : "—",
-            color: (closed.length > 0 ? (summaryStats.totalPnl >= 0 ? "#00ff88" : "#ff4444") : "#3a5a4a") as string,
+            color: (closed.length > 0 ? (summaryStats.totalPnl >= 0 ? "#3ecf8e" : "#f7525f") : "#52525b") as string,
           },
         ].map(({ label, val, color }) => (
           <div key={label} style={cardStyle}>
@@ -587,7 +587,7 @@ export function ThesisAnalyticsView() {
       {/* Equity curve */}
       <div style={cardStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em" }}>◆ EQUITY CURVE</span>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", letterSpacing: "0.1em" }}>◆ EQUITY CURVE</span>
           {equityPoints.length >= 2 && (
             <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", color: lineColor }}>
               {summaryStats.totalPnl >= 0 ? "+" : ""}${Math.abs(summaryStats.totalPnl).toFixed(2)}
@@ -601,28 +601,28 @@ export function ThesisAnalyticsView() {
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(130px, 1fr))", gap: 8 }}>
         {/* Win streak */}
         <div style={cardStyle}>
-          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 14 }}>◆ WIN STREAK</div>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", letterSpacing: "0.1em", marginBottom: 14 }}>◆ WIN STREAK</div>
           <div style={{ marginBottom: 14 }}>
             <div style={labelStyle}>CURRENT STREAK</div>
-            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 28, fontWeight: "bold", color: streaks.current > 0 ? "#00ff88" : "#2a4a3a" }}>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 28, fontWeight: "bold", color: streaks.current > 0 ? "#ededf0" : "#33333a" }}>
               {streaks.current}
-              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#3a5a4a", marginLeft: 6 }}>wins</span>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#52525b", marginLeft: 6 }}>wins</span>
             </div>
           </div>
           <div>
             <div style={labelStyle}>BEST STREAK</div>
-            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 22, fontWeight: "bold", color: streaks.best > 0 ? "#00ff88" : "#2a4a3a" }}>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 22, fontWeight: "bold", color: streaks.best > 0 ? "#ededf0" : "#33333a" }}>
               {streaks.best}
-              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#3a5a4a", marginLeft: 6 }}>wins</span>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#52525b", marginLeft: 6 }}>wins</span>
             </div>
           </div>
         </div>
 
         {/* Best markets */}
         <div style={cardStyle}>
-          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 10 }}>◆ BEST MARKETS</div>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", letterSpacing: "0.1em", marginBottom: 10 }}>◆ BEST MARKETS</div>
           {bestAssets.length === 0 ? (
-            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#2a4a3a" }}>no closed theses yet</div>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#33333a" }}>no closed theses yet</div>
           ) : (
             <>
               {tableHeader()}
@@ -633,9 +633,9 @@ export function ThesisAnalyticsView() {
 
         {/* Worst markets */}
         <div style={cardStyle}>
-          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#4a7a5a", letterSpacing: "0.1em", marginBottom: 10 }}>◆ WORST MARKETS</div>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", letterSpacing: "0.1em", marginBottom: 10 }}>◆ WORST MARKETS</div>
           {worstAssets.length === 0 ? (
-            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#2a4a3a" }}>no closed theses yet</div>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#33333a" }}>no closed theses yet</div>
           ) : (
             <>
               {tableHeader()}
@@ -917,29 +917,29 @@ export function ThesisView() {
   return (
     <div>
       {/* Header */}
-      <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #1a2e1a", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #232327", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <div style={{ fontSize: 10, color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.12em", marginBottom: 4 }}>
+          <div style={{ fontSize: 10, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.12em", marginBottom: 4 }}>
             &#9632; NEXUS THESIS ENGINE
           </div>
-          <div style={{ fontSize: 11, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>
+          <div style={{ fontSize: 11, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>
           </div>
         </div>
         {thesisAccuracy !== null && (
           <div style={{ ...cardStyle, padding: "8px 16px", display: "flex", gap: 20 }}>
             <div>
-              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>THESIS ACCURACY</div>
-              <div style={{ fontSize: 20, color: thesisAccuracy >= 50 ? "#00ff88" : "#ff4444", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{thesisAccuracy}%</div>
+              <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>THESIS ACCURACY</div>
+              <div style={{ fontSize: 20, color: thesisAccuracy >= 50 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{thesisAccuracy}%</div>
             </div>
-            <div style={{ width: 1, background: "#1a2e1a" }} />
+            <div style={{ width: 1, background: "#232327" }} />
             <div>
-              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>CLOSED</div>
-              <div style={{ fontSize: 20, color: "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{closedTrades.length}</div>
+              <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>CLOSED</div>
+              <div style={{ fontSize: 20, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{closedTrades.length}</div>
             </div>
-            <div style={{ width: 1, background: "#1a2e1a" }} />
+            <div style={{ width: 1, background: "#232327" }} />
             <div>
-              <div style={{ fontSize: 8, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>ACTIVE</div>
-              <div style={{ fontSize: 20, color: "#4a9fff", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{trades.filter((t) => t.status === "ACTIVE").length}</div>
+              <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>ACTIVE</div>
+              <div style={{ fontSize: 20, color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{trades.filter((t) => t.status === "ACTIVE").length}</div>
             </div>
           </div>
         )}
@@ -949,7 +949,7 @@ export function ThesisView() {
         {/* Form */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={cardStyle}>
-            <div style={{ fontSize: 10, color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; INSTRUMENT</div>
+            <div style={{ fontSize: 10, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; INSTRUMENT</div>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 160px", gap: 8 }}>
               <div>
                 <span style={fieldLabelStyle}>SYMBOL</span>
@@ -962,9 +962,9 @@ export function ThesisView() {
                     <button key={d} onClick={() => set("direction", d)} style={{
                       flex: 1, padding: "8px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11,
                       cursor: "pointer", borderRadius: 3, border: "1px solid",
-                      background: form.direction === d ? (d === "LONG" ? "#0a2a0a" : "#2a0a0a") : "#080c08",
-                      borderColor: form.direction === d ? (d === "LONG" ? "#00ff88" : "#ff4444") : "#1a2e1a",
-                      color: form.direction === d ? (d === "LONG" ? "#00ff88" : "#ff4444") : "#3a5a4a",
+                      background: form.direction === d ? (d === "LONG" ? "#0c1f18" : "#2a0a0a") : "#0f0f11",
+                      borderColor: form.direction === d ? (d === "LONG" ? "#3ecf8e" : "#f7525f") : "#232327",
+                      color: form.direction === d ? (d === "LONG" ? "#3ecf8e" : "#f7525f") : "#52525b",
                     }}>{d === "LONG" ? "↑ LONG" : "↓ SHORT"}</button>
                   ))}
                 </div>
@@ -973,7 +973,7 @@ export function ThesisView() {
           </div>
 
           <div style={cardStyle}>
-            <div style={{ fontSize: 10, color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; PRICE LEVELS</div>
+            <div style={{ fontSize: 10, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; PRICE LEVELS</div>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: 8 }}>
               {[
                 { key: "entryPrice", label: "ENTRY", placeholder: "95000" },
@@ -984,7 +984,7 @@ export function ThesisView() {
                 <div key={key}>
                   <span style={fieldLabelStyle}>{label}</span>
                   <input
-                    style={{ ...inputStyle, borderColor: key === "stopLoss" ? "#2a1a1a" : key.startsWith("take") ? "#1a2a1a" : "#1a2e1a" }}
+                    style={{ ...inputStyle, borderColor: key === "stopLoss" ? "#2a1a1a" : key.startsWith("take") ? "#232327" : "#232327" }}
                     type="number" placeholder={placeholder}
                     value={form[key as keyof typeof form] as string}
                     onChange={(e) => set(key, e.target.value)}
@@ -997,7 +997,7 @@ export function ThesisView() {
               {(() => {
                 const chip = (extra?: React.CSSProperties): React.CSSProperties => ({
                   fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 9px", borderRadius: 3,
-                  border: "1px solid #1a2e1a", background: "#0a0e0a", color: "#4a7a5a", cursor: "pointer", ...extra,
+                  border: "1px solid #232327", background: "#0a0a0b", color: "#71717a", cursor: "pointer", ...extra,
                 });
                 const hasEntry = parseFloat(form.entryPrice) > 0;
                 const hasStop = parseFloat(form.stopLoss) > 0;
@@ -1005,10 +1005,10 @@ export function ThesisView() {
                   <>
                     <button onClick={fillEntryFromMark} disabled={!form.symbol || markBusy}
                       title="Fill entry with the current mark price"
-                      style={chip({ color: form.symbol ? "#4a9fff" : "#2a4a3a", borderColor: "#12324a", cursor: form.symbol ? "pointer" : "not-allowed" })}>
+                      style={chip({ color: form.symbol ? "#d4d4d8" : "#33333a", borderColor: "#12324a", cursor: form.symbol ? "pointer" : "not-allowed" })}>
                       {markBusy ? "…" : "⟳ ENTRY = MARK"}
                     </button>
-                    <span style={{ fontSize: 8, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", marginLeft: 4 }}>STOP</span>
+                    <span style={{ fontSize: 8, color: "#33333a", fontFamily: "var(--nx-font-mono)", marginLeft: 4 }}>STOP</span>
                     {[1, 2, 5].map((p) => (
                       <button key={p} onClick={() => applyStopPct(p)} disabled={!hasEntry}
                         title={`Stop ${p}% ${form.direction === "LONG" ? "below" : "above"} entry`}
@@ -1016,11 +1016,11 @@ export function ThesisView() {
                         −{p}%
                       </button>
                     ))}
-                    <span style={{ fontSize: 8, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", marginLeft: 4 }}>TP</span>
+                    <span style={{ fontSize: 8, color: "#33333a", fontFamily: "var(--nx-font-mono)", marginLeft: 4 }}>TP</span>
                     {[1, 2, 3].map((r) => (
                       <button key={r} onClick={() => applyTpR(r)} disabled={!hasEntry || !hasStop}
                         title={`Target at ${r}× the entry→stop risk`}
-                        style={chip({ color: hasEntry && hasStop ? "#00ff88" : "#2a4a3a", borderColor: "#1a2a1a", cursor: hasEntry && hasStop ? "pointer" : "not-allowed" })}>
+                        style={chip({ color: hasEntry && hasStop ? "#ededf0" : "#33333a", borderColor: "#232327", cursor: hasEntry && hasStop ? "pointer" : "not-allowed" })}>
                         {r}R
                       </button>
                     ))}
@@ -1031,7 +1031,7 @@ export function ThesisView() {
           </div>
 
           <div style={cardStyle}>
-            <div style={{ fontSize: 10, color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; RISK + FUNDING</div>
+            <div style={{ fontSize: 10, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; RISK + FUNDING</div>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr", gap: 8 }}>
               <div>
                 <span style={fieldLabelStyle}>ACCOUNT SIZE (USDC)</span>
@@ -1044,11 +1044,11 @@ export function ThesisView() {
               <div>
                 <span style={fieldLabelStyle}>FUNDING RATE (% per 8h)</span>
                 <input
-                  style={{ ...inputStyle, borderColor: fundingIsPositive ? "#1a2a1a" : "#2a1a1a", color: fundingIsPositive ? "#00ff88" : "#ff4444" }}
+                  style={{ ...inputStyle, borderColor: fundingIsPositive ? "#232327" : "#2a1a1a", color: fundingIsPositive ? "#3ecf8e" : "#f7525f" }}
                   type="number" placeholder="0.01" step="0.001"
                   value={form.fundingRate} onChange={(e) => set("fundingRate", e.target.value)}
                 />
-                <div style={{ fontSize: 9, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", marginTop: 4 }}>
+                <div style={{ fontSize: 9, color: "#33333a", fontFamily: "var(--nx-font-mono)", marginTop: 4 }}>
                   {fundingIsPositive ? "longs pay shorts" : "shorts pay longs"}
                 </div>
               </div>
@@ -1056,7 +1056,7 @@ export function ThesisView() {
           </div>
 
           <div style={cardStyle}>
-            <div style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 8 }}>&#9632; THESIS / REASONING</div>
+            <div style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 8 }}>&#9632; THESIS / REASONING</div>
             <textarea
               style={{ ...inputStyle, height: 80, resize: "none" }}
               placeholder="Why are you taking this trade? What needs to be true for it to work? What invalidates it?"
@@ -1067,41 +1067,41 @@ export function ThesisView() {
 
         {/* Output Panel */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8, position: isMobile ? "static" : "sticky", top: 16 }}>
-          <div style={{ ...cardStyle, border: "1px solid #1a3a2a" }}>
-            <div style={{ fontSize: 10, color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 16 }}>&#9632; CALCULATED OUTPUT</div>
+          <div style={{ ...cardStyle, border: "1px solid #232327" }}>
+            <div style={{ fontSize: 10, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 16 }}>&#9632; CALCULATED OUTPUT</div>
             {!calc ? (
-              <div style={{ fontSize: 11, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", textAlign: "center", padding: "20px 0" }}>
+              <div style={{ fontSize: 11, color: "#33333a", fontFamily: "var(--nx-font-mono)", textAlign: "center", padding: "20px 0" }}>
                 fill in entry, stop, tp1,<br />account size + risk %
               </div>
             ) : (
               <>
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em" }}>POSITION SIZE</div>
-                  <div style={{ fontSize: 28, color: "#00ff88", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>${calc.positionSize.toFixed(0)}</div>
-                  <div style={{ fontSize: 10, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)" }}>usdc notional</div>
+                  <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em" }}>POSITION SIZE</div>
+                  <div style={{ fontSize: 28, color: "#ededf0", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>${calc.positionSize.toFixed(0)}</div>
+                  <div style={{ fontSize: 10, color: "#33333a", fontFamily: "var(--nx-font-mono)" }}>usdc notional</div>
                 </div>
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em" }}>LEVERAGE REQUIRED</div>
-                  <div style={{ fontSize: 22, fontFamily: "var(--nx-font-mono)", fontWeight: "bold", color: calc.leverage > 25 ? "#ff4444" : calc.leverage > 10 ? "#fbbf24" : "#00ff88" }}>
+                  <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em" }}>LEVERAGE REQUIRED</div>
+                  <div style={{ fontSize: 22, fontFamily: "var(--nx-font-mono)", fontWeight: "bold", color: calc.leverage > 25 ? "#f7525f" : calc.leverage > 10 ? "#fbbf24" : "#3ecf8e" }}>
                     {calc.leverage.toFixed(1)}x
                   </div>
                 </div>
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em" }}>RISK AMOUNT</div>
-                  <div style={{ fontSize: 18, color: "#ff4444", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>${calc.riskAmount.toFixed(2)}</div>
-                  <div style={{ fontSize: 10, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)" }}>{form.riskPercent}% of account</div>
+                  <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em" }}>RISK AMOUNT</div>
+                  <div style={{ fontSize: 18, color: "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>${calc.riskAmount.toFixed(2)}</div>
+                  <div style={{ fontSize: 10, color: "#33333a", fontFamily: "var(--nx-font-mono)" }}>{form.riskPercent}% of account</div>
                 </div>
-                <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: "1px solid #1a2e1a" }}>
-                  <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em" }}>RISK / REWARD</div>
-                  <div style={{ fontSize: 22, fontFamily: "var(--nx-font-mono)", fontWeight: "bold", color: calc.riskReward >= 2 ? "#00ff88" : calc.riskReward >= 1 ? "#fbbf24" : "#ff4444" }}>
+                <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: "1px solid #232327" }}>
+                  <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em" }}>RISK / REWARD</div>
+                  <div style={{ fontSize: 22, fontFamily: "var(--nx-font-mono)", fontWeight: "bold", color: calc.riskReward >= 2 ? "#3ecf8e" : calc.riskReward >= 1 ? "#fbbf24" : "#f7525f" }}>
                     1 : {calc.riskReward.toFixed(2)}
                   </div>
-                  <div style={{ fontSize: 10, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)" }}>
+                  <div style={{ fontSize: 10, color: "#33333a", fontFamily: "var(--nx-font-mono)" }}>
                     {calc.riskReward >= 2 ? "good setup" : calc.riskReward >= 1 ? "marginal" : "unfavorable"}
                   </div>
                 </div>
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em", marginBottom: 8 }}>
+                  <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em", marginBottom: 8 }}>
                     FUNDING COST ({parseFloat(form.fundingRate) >= 0 ? form.direction : form.direction === "LONG" ? "SHORT" : "LONG"} pays)
                   </div>
                   {[
@@ -1110,7 +1110,7 @@ export function ThesisView() {
                     { label: "72h", val: calc.fundingCost72h },
                   ].map(({ label, val }) => (
                     <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                      <span style={{ fontSize: 10, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{label}</span>
+                      <span style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{label}</span>
                       <span style={{ fontSize: 13, color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>${val.toFixed(3)}</span>
                     </div>
                   ))}
@@ -1123,19 +1123,19 @@ export function ThesisView() {
                     </div>
                     {[
                       { label: "SYMBOL", val: `PERP_${form.symbol.toUpperCase()}_USDC` },
-                      { label: "SIDE", val: form.direction, color: form.direction === "LONG" ? "#00ff88" : "#ff4444" },
+                      { label: "SIDE", val: form.direction, color: form.direction === "LONG" ? "#3ecf8e" : "#f7525f" },
                       { label: "ENTRY", val: `$${parseFloat(form.entryPrice).toLocaleString()}` },
                       { label: "QTY", val: (calc.positionSize / parseFloat(form.entryPrice)).toFixed(6) },
                       { label: "SIZE", val: `$${calc.positionSize.toFixed(0)} notional` },
-                      { label: "STOP", val: `$${parseFloat(form.stopLoss).toLocaleString()}`, color: "#ff4444" },
-                      { label: "TP1", val: `$${parseFloat(form.takeProfit1).toLocaleString()}`, color: "#00ff88" },
+                      { label: "STOP", val: `$${parseFloat(form.stopLoss).toLocaleString()}`, color: "#f7525f" },
+                      { label: "TP1", val: `$${parseFloat(form.takeProfit1).toLocaleString()}`, color: "#ededf0" },
                     ].map(({ label, val, color }) => (
                       <div key={label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                        <span style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>{label}</span>
-                        <span style={{ fontSize: 10, color: color ?? "#8aaa9a", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{val}</span>
+                        <span style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{label}</span>
+                        <span style={{ fontSize: 10, color: color ?? "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{val}</span>
                       </div>
                     ))}
-                    <div style={{ fontSize: 9, color: "#ff4444", fontFamily: "var(--nx-font-mono)", marginTop: 10, marginBottom: 10, lineHeight: 1.5 }}>
+                    <div style={{ fontSize: 9, color: "#f7525f", fontFamily: "var(--nx-font-mono)", marginTop: 10, marginBottom: 10, lineHeight: 1.5 }}>
                       ⚠ REAL FUNDS. This places a live order on Orderly<br />
                       with your connected wallet. Cannot be undone.
                     </div>
@@ -1143,7 +1143,7 @@ export function ThesisView() {
                       <button onClick={() => setLiveConfirm(false)} style={{
                         flex: 1, padding: "8px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11,
                         cursor: "pointer", borderRadius: 3, border: "1px solid #2a2a2a",
-                        background: "#0a0a0a", color: "#3a5a4a", letterSpacing: "0.06em",
+                        background: "#0a0a0a", color: "#52525b", letterSpacing: "0.06em",
                       }}>ABORT</button>
                       <button onClick={deployLive} style={{
                         flex: 2, padding: "8px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11,
@@ -1161,13 +1161,13 @@ export function ThesisView() {
                   </div>
                 )}
                 {liveStatus === "success" && (
-                  <div style={{ padding: "10px 12px", background: "#0a1a00", border: "1px solid #1a4a00", borderRadius: 4, fontSize: 11, color: "#00ff88", fontFamily: "var(--nx-font-mono)", marginBottom: 8 }}>
+                  <div style={{ padding: "10px 12px", background: "#141416", border: "1px solid #33333a", borderRadius: 4, fontSize: 11, color: "#ededf0", fontFamily: "var(--nx-font-mono)", marginBottom: 8 }}>
                     &#9632; ORDER LIVE — entry limit + TP/SL bracket set
                   </div>
                 )}
                 {liveStatus === "error" && (
                   <div style={{ padding: "10px 12px", background: "#1a0a0a", border: "1px solid #4a1a1a", borderRadius: 4, marginBottom: 8 }}>
-                    <div style={{ fontSize: 10, color: "#ff4444", fontFamily: "var(--nx-font-mono)" }}>&#9632; ORDER FAILED</div>
+                    <div style={{ fontSize: 10, color: "#f7525f", fontFamily: "var(--nx-font-mono)" }}>&#9632; ORDER FAILED</div>
                     {liveError && <div style={{ fontSize: 9, color: "#3a2a2a", fontFamily: "var(--nx-font-mono)", marginTop: 4 }}>{liveError}</div>}
                   </div>
                 )}
@@ -1183,9 +1183,9 @@ export function ThesisView() {
                     <button onClick={deployPaper} disabled={!formValid} style={{
                       width: "100%", padding: "9px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11,
                       cursor: formValid ? "pointer" : "not-allowed", borderRadius: 3,
-                      border: `1px solid ${deployed ? "#00ff88" : "#1a4a2a"}`,
-                      background: deployed ? "#0a2a0a" : "#080c08",
-                      color: deployed ? "#00ff88" : formValid ? "#4a9fff" : "#2a4a3a",
+                      border: `1px solid ${deployed ? "#ededf0" : "#33333a"}`,
+                      background: deployed ? "#0c1f18" : "#0f0f11",
+                      color: deployed ? "#ededf0" : formValid ? "#d4d4d8" : "#33333a",
                       letterSpacing: "0.08em", marginBottom: 6,
                     }}>
                       {deployed ? "&#9632; DEPLOYED" : "&#9632; DEPLOY (PAPER)"}
@@ -1203,7 +1203,7 @@ export function ThesisView() {
                       }}>
                       &#9632; DEPLOY (LIVE)
                     </button>
-                    {!form.symbol && <div style={{ fontSize: 9, color: "#2a4a3a", fontFamily: "var(--nx-font-mono)", textAlign: "center", marginTop: 6 }}>enter symbol to deploy</div>}
+                    {!form.symbol && <div style={{ fontSize: 9, color: "#33333a", fontFamily: "var(--nx-font-mono)", textAlign: "center", marginTop: 6 }}>enter symbol to deploy</div>}
                     {form.symbol && !isWalletReady && <div style={{ fontSize: 9, color: "#3a2a1a", fontFamily: "var(--nx-font-mono)", textAlign: "center", marginTop: 6 }}>connect wallet to deploy live</div>}
                   </>
                 )}
@@ -1220,7 +1220,7 @@ export function ThesisView() {
       {trades.length > 0 && (
         <div style={{ marginTop: 16 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-            <div style={{ fontSize: 10, color: "#4a7a5a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.12em" }}>
+            <div style={{ fontSize: 10, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.12em" }}>
               &#9632; THESIS_LOG ({filteredTrades.length}/{trades.length})
             </div>
             <div style={{ display: "flex", gap: 4 }}>
@@ -1231,9 +1231,9 @@ export function ThesisView() {
                   <button key={f} onClick={() => setFilter(f)} style={{
                     fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "3px 9px",
                     cursor: "pointer", borderRadius: 3, letterSpacing: "0.06em",
-                    border: `1px solid ${active ? (c?.border ?? "#1a4a2a") : "#1a2e1a"}`,
-                    background: active ? (c?.bg ?? "#0a1a0a") : "transparent",
-                    color: active ? (c?.color ?? "#00ff88") : "#2a4a3a",
+                    border: `1px solid ${active ? (c?.border ?? "#33333a") : "#232327"}`,
+                    background: active ? (c?.bg ?? "#1a1a1e") : "transparent",
+                    color: active ? (c?.color ?? "#ededf0") : "#33333a",
                   }}>{f === "ALL" ? "ALL" : STATUS_CONFIG[f as ThesisStatus].label}</button>
                 );
               })}

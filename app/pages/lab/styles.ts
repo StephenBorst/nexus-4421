@@ -53,9 +53,9 @@ export const fieldLabelStyle: CSSProperties = {
 };
 
 export const STATUS_CONFIG: Record<ThesisStatus, { label: string; color: string; bg: string; border: string }> = {
-  ACTIVE:      { label: "ACTIVE",      color: "#4a9fff", bg: "#0a1a2a", border: "#1a3a5a" },
-  HIT_TP:      { label: "HIT TP",      color: "#00ff88", bg: "#0a2a0a", border: "#1a4a2a" },
-  STOPPED_OUT: { label: "STOPPED OUT", color: "#ff4444", bg: "#2a0a0a", border: "#4a1a1a" },
+  ACTIVE:      { label: "ACTIVE",      color: "#d4d4d8", bg: "#1a1a1e", border: "#1a3a5a" },
+  HIT_TP:      { label: "HIT TP",      color: "#ededf0", bg: "#0c1f18", border: "#33333a" },
+  STOPPED_OUT: { label: "STOPPED OUT", color: "#f7525f", bg: "#2a0a0a", border: "#4a1a1a" },
   INVALIDATED: { label: "INVALIDATED", color: "#fbbf24", bg: "#2a1a00", border: "#4a3a00" },
 };
 
@@ -93,7 +93,7 @@ export const agentInputStyle: CSSProperties = {
 
 // The ONE rationed accent CTA — filled green. Use ≤1 per card/screen.
 export const btnPrimary: CSSProperties = {
-  background: "#00ff8818",
+  background: "#ededf018",
   border: `1px solid ${C.accent}`,
   borderRadius: RADIUS.sm,
   color: C.accent,

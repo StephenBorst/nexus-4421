@@ -48,7 +48,7 @@ export function MarketRegime() {
     const fundScore = 100 - Math.abs(fundSkew - 50) * 2; // extreme one-sided funding = lower
     const score = Math.round(breadth * 0.5 + btcScore * 0.4 + fundScore * 0.1);
     const label = score >= 60 ? "RISK-ON" : score >= 42 ? "NEUTRAL" : "RISK-OFF";
-    const color = score >= 60 ? "#00ff88" : score >= 42 ? "#fbbf24" : "#ff4c6a";
+    const color = score >= 60 ? "#ededf0" : score >= 42 ? "#fbbf24" : "#ff4c6a";
     const agentNote =
       label === "RISK-ON"
         ? "Broad strength — momentum/trend presets favored; funding fades are riskier into strength."
@@ -62,34 +62,34 @@ export function MarketRegime() {
 
   return (
     <div style={{ ...cardStyle, marginBottom: 14 }}>
-      <div style={{ fontSize: 10, color: "#00ff88", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>
-        &#9632; MARKET REGIME <span style={{ color: "#4a7a5a" }}>— live, computed</span>
+      <div style={{ fontSize: 10, color: "#ededf0", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>
+        &#9632; MARKET REGIME <span style={{ color: "#71717a" }}>— live, computed</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 16, alignItems: "center" }}>
         <div style={{ textAlign: "center", minWidth: 120 }}>
           <div style={{ fontSize: 40, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: regime.color, lineHeight: 1 }}>{regime.score}</div>
           <div style={{ fontSize: 12, fontFamily: "var(--nx-font-mono)", color: regime.color, letterSpacing: "0.1em", marginTop: 4 }}>{regime.label}</div>
-          <div style={{ height: 4, background: "#1a2e1a", borderRadius: 2, marginTop: 8 }}>
+          <div style={{ height: 4, background: "#232327", borderRadius: 2, marginTop: 8 }}>
             <div style={{ height: 4, background: regime.color, borderRadius: 2, width: `${regime.score}%` }} />
           </div>
         </div>
         <div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: 8, marginBottom: 10 }}>
             <div>
-              <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>BREADTH</div>
-              <div style={{ fontSize: 16, color: regime.breadth >= 50 ? "#00ff88" : "#ff4c6a", fontFamily: "var(--nx-font-mono)" }}>{regime.breadth}% up</div>
+              <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>BREADTH</div>
+              <div style={{ fontSize: 16, color: regime.breadth >= 50 ? "#ededf0" : "#ff4c6a", fontFamily: "var(--nx-font-mono)" }}>{regime.breadth}% up</div>
             </div>
             <div>
-              <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>BTC 24H</div>
-              <div style={{ fontSize: 16, color: regime.btcChg >= 0 ? "#00ff88" : "#ff4c6a", fontFamily: "var(--nx-font-mono)" }}>{regime.btcChg >= 0 ? "+" : ""}{regime.btcChg.toFixed(2)}%</div>
+              <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>BTC 24H</div>
+              <div style={{ fontSize: 16, color: regime.btcChg >= 0 ? "#ededf0" : "#ff4c6a", fontFamily: "var(--nx-font-mono)" }}>{regime.btcChg >= 0 ? "+" : ""}{regime.btcChg.toFixed(2)}%</div>
             </div>
             <div>
-              <div style={{ fontSize: 9, color: "#3a5a4a", fontFamily: "var(--nx-font-mono)" }}>FUNDING SKEW</div>
+              <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>FUNDING SKEW</div>
               <div style={{ fontSize: 16, color: "#fbbf24", fontFamily: "var(--nx-font-mono)" }}>{regime.fundSkew}% long</div>
             </div>
           </div>
-          <div style={{ fontSize: 11, color: "#6a8a7a", fontFamily: "var(--nx-font-mono)", lineHeight: 1.5, borderTop: "1px solid #1a2e1a", paddingTop: 8 }}>
-            <span style={{ color: "#4a7a5a" }}>▶ agent:</span> {regime.agentNote}
+          <div style={{ fontSize: 11, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", lineHeight: 1.5, borderTop: "1px solid #232327", paddingTop: 8 }}>
+            <span style={{ color: "#71717a" }}>▶ agent:</span> {regime.agentNote}
           </div>
         </div>
       </div>

@@ -102,7 +102,7 @@ export default function CommentsPanel({
   }
 
   return (
-    <div style={{ borderTop: "1px solid #1a2e1a", padding: "12px 16px", background: "#080c08" }}>
+    <div style={{ borderTop: "1px solid #232327", padding: "12px 16px", background: "#0f0f11" }}>
       {/* Reaction bar */}
       <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
         {ALLOWED_EMOJIS.map((emoji) => {
@@ -114,10 +114,10 @@ export default function CommentsPanel({
               onClick={() => handleReaction(emoji)}
               disabled={!walletAddress}
               style={{
-                background: reacted ? "#0a1a0a" : "#080c08",
-                border: `1px solid ${reacted ? "#00ff88" : "#1a2e1a"}`,
+                background: reacted ? "#1a1a1e" : "#0f0f11",
+                border: `1px solid ${reacted ? "#ededf0" : "#232327"}`,
                 borderRadius: 20,
-                color: reacted ? "#00ff88" : "#8aaa9a",
+                color: reacted ? "#ededf0" : "#a1a1aa",
                 fontFamily: "var(--nx-font-mono)",
                 fontSize: 13,
                 padding: "3px 10px",
@@ -129,7 +129,7 @@ export default function CommentsPanel({
             >
               {emoji}
               {wallets.length > 0 && (
-                <span style={{ fontSize: 10, color: reacted ? "#00ff88" : "#8aaa9a" }}>
+                <span style={{ fontSize: 10, color: reacted ? "#ededf0" : "#a1a1aa" }}>
                   {wallets.length}
                 </span>
               )}
@@ -140,12 +140,12 @@ export default function CommentsPanel({
 
       {/* Comment list */}
       {loading ? (
-        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#2a4a3a", paddingBottom: 10 }}>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#33333a", paddingBottom: 10 }}>
           loading...
         </div>
       ) : comments.length === 0 ? (
         <div style={{
-          fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#2a4a3a",
+          fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#33333a",
           textAlign: "center", padding: "8px 0 12px",
         }}>
           No comments yet.
@@ -159,8 +159,8 @@ export default function CommentsPanel({
             const isOwn = c.wallet === walletLower;
             return (
               <div key={c.id} style={{
-                background: "#0a0e0a",
-                border: "1px solid #1a2e1a",
+                background: "#0a0a0b",
+                border: "1px solid #232327",
                 borderRadius: 3,
                 padding: "7px 10px",
               }}>
@@ -168,9 +168,9 @@ export default function CommentsPanel({
                   display: "flex", justifyContent: "space-between",
                   alignItems: "center", marginBottom: 3,
                 }}>
-                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3a5a4a" }}>
+                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b" }}>
                     {shortWallet(c.wallet)}
-                    <span style={{ marginLeft: 8, color: "#2a4a3a" }}>
+                    <span style={{ marginLeft: 8, color: "#33333a" }}>
                       {relativeTime(c.createdAt)}
                     </span>
                   </span>
@@ -180,7 +180,7 @@ export default function CommentsPanel({
                       title="Delete comment"
                       style={{
                         background: "none", border: "none",
-                        color: "#3a5a4a", cursor: "pointer",
+                        color: "#52525b", cursor: "pointer",
                         fontFamily: "var(--nx-font-mono)", fontSize: 10,
                         padding: 0, lineHeight: 1,
                       }}
@@ -190,7 +190,7 @@ export default function CommentsPanel({
                   )}
                 </div>
                 <div style={{
-                  fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#8aaa9a",
+                  fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#a1a1aa",
                   lineHeight: 1.5, wordBreak: "break-word",
                 }}>
                   {c.text}
@@ -217,10 +217,10 @@ export default function CommentsPanel({
               style={{
                 width: "100%",
                 boxSizing: "border-box",
-                background: "#0a0e0a",
-                border: "1px solid #1a2e1a",
+                background: "#0a0a0b",
+                border: "1px solid #232327",
                 borderRadius: 3,
-                color: "#00ff88",
+                color: "#ededf0",
                 fontFamily: "var(--nx-font-mono)",
                 fontSize: 11,
                 padding: "7px 10px",
@@ -233,14 +233,14 @@ export default function CommentsPanel({
             <span style={{
               position: "absolute", bottom: 6, right: 8,
               fontFamily: "var(--nx-font-mono)", fontSize: 9,
-              color: text.length >= 260 ? "#fbbf24" : "#2a4a3a",
+              color: text.length >= 260 ? "#fbbf24" : "#33333a",
               pointerEvents: "none",
             }}>
               {text.length}/280
             </span>
           </div>
           {err && (
-            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ff4444", marginTop: 4 }}>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#f7525f", marginTop: 4 }}>
               {err}
             </div>
           )}
@@ -249,9 +249,9 @@ export default function CommentsPanel({
               onClick={() => void handleSubmit()}
               disabled={submitting || !text.trim()}
               style={{
-                background: text.trim() && !submitting ? "#0a1a0a" : "#080c08",
-                border: `1px solid ${text.trim() && !submitting ? "#00ff88" : "#1a2e1a"}`,
-                color: text.trim() && !submitting ? "#00ff88" : "#2a4a3a",
+                background: text.trim() && !submitting ? "#1a1a1e" : "#0f0f11",
+                border: `1px solid ${text.trim() && !submitting ? "#ededf0" : "#232327"}`,
+                color: text.trim() && !submitting ? "#ededf0" : "#33333a",
                 fontFamily: "var(--nx-font-mono)",
                 fontSize: 10,
                 padding: "5px 14px",
