@@ -36,9 +36,10 @@ export const MOTION = {
 } as const;
 
 // ── Color — surfaces stratified by luminance, ONE rationed accent ────────────
-// Editorial-black direction (2026-07): neutral near-black canvas + bone text +
-// ONE blue accent (interaction/brand). Green is DEMOTED to a data role — profit
-// only (`pos`) — so up/down P&L is the only chroma on a given screen. Red = loss.
+// Editorial-black direction (2026-07): MONOCHROME — neutral near-black canvas +
+// bone/white as the only "accent" (CTA + interaction), no chromatic brand color.
+// Green is DEMOTED to a data role — profit only (`pos`) — so up/down P&L is the
+// ONLY chroma on a given screen. Red = loss. Keeps a subtle terminal register.
 export const C = {
   canvas: "#0a0a0b",
   surface: "#141416",
@@ -46,23 +47,23 @@ export const C = {
   inset: "#08080a",
   border: "#232327",
   borderStrong: "#33333a",
-  borderAccent: "#2b7fff50",
+  borderAccent: "#5a5a6355",
   text: {
     bright: "#f4f4f5", // primary values / headings (bone)
     fog: "#a1a1aa",    // secondary text
     muted: "#71717a",  // labels
     faint: "#52525b",  // hints / captions
   },
-  accent: "#2b7fff", // voltage blue — CTA + interaction, not P&L
+  accent: "#ededf0", // bone/white — CTA + interaction, NOT P&L
   pos: "#3ecf8e",    // profit / up / live
   neg: "#f7525f",    // loss / down
   warn: "#fbbf24",
-  info: "#3b82f6",
+  info: "#d4d4d8",   // neutral status (active/closed) — stays monochrome
 } as const;
 
 // Status tints (thesis/agent states) — surface + border + text, from the palette.
 export const STATUS_TINT = {
-  active:  { color: C.info, bg: "#0e1726", border: "#1e2f4a" },
+  active:  { color: C.info, bg: "#1a1a1e", border: "#33333a" },
   pos:     { color: C.pos, bg: "#0c1f18", border: "#1a3d31" },
   neg:     { color: C.neg, bg: "#241012", border: "#4a1e22" },
   warn:    { color: C.warn, bg: "#2a1a00", border: "#4a3a00" },

@@ -9,10 +9,10 @@ const highlightDepositButton = () => {
     style.id = "ntl-highlight-styles";
     style.textContent = `
       .ntl-deposit-wrapper { position: relative; display: inline-block; }
-      .ntl-deposit-ring { position: absolute; inset: -6px; border-radius: 8px; border: 2px solid #2b7fff; pointer-events: none; z-index: 9998; animation: ntl-ring 1.5s ease-in-out infinite; }
-      @keyframes ntl-ring { 0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(43,127,255,0.4); } 50% { opacity:0.6; box-shadow: 0 0 0 8px rgba(43,127,255,0); } }
-      .ntl-deposit-tip { position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%); background: #2b7fff; color: #fff; font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; padding: 5px 10px; white-space: nowrap; pointer-events: none; z-index: 9999; }
-      .ntl-deposit-tip::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: #2b7fff; }
+      .ntl-deposit-ring { position: absolute; inset: -6px; border-radius: 8px; border: 2px solid #ededf0; pointer-events: none; z-index: 9998; animation: ntl-ring 1.5s ease-in-out infinite; }
+      @keyframes ntl-ring { 0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(237,237,240,0.4); } 50% { opacity:0.6; box-shadow: 0 0 0 8px rgba(237,237,240,0); } }
+      .ntl-deposit-tip { position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%); background: #ededf0; color: #0a0a0b; font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; padding: 5px 10px; white-space: nowrap; pointer-events: none; z-index: 9999; }
+      .ntl-deposit-tip::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: #ededf0; }
     `;
     document.head.appendChild(style);
   }
@@ -43,9 +43,9 @@ const removeDepositHighlight = () => {
 };
 
 const STEPS = [
-  { id: 1, tag: "STEP_01 / 03", title: "Connect Your Wallet", subtitle: "Non-custodial. Your keys, your funds.", description: "Connect any EVM wallet (MetaMask, Rabby, WalletConnect) or Solana wallet. Nexus never holds your assets — all positions are settled on-chain.", cta: "Connect Wallet", icon: (<svg viewBox="0 0 40 40" fill="none" style={{ width: 38, height: 38 }}><rect x="4" y="10" width="32" height="22" rx="3" stroke="#2b7fff" strokeWidth="1.5" /><path d="M4 16h32" stroke="#2b7fff" strokeWidth="1.5" /><circle cx="28" cy="23" r="2.5" fill="#2b7fff" /></svg>) },
-  { id: 2, tag: "STEP_02 / 03", title: "Deposit USDC", subtitle: "Any chain. No bridging. No hassle.", description: "Send USDC from Ethereum, Arbitrum, Base, Optimism, Solana, or any EVM chain. Keep a small amount of ETH on your source chain for gas. Arbitrum is the default.", cta: "Show Me Where", icon: (<svg viewBox="0 0 40 40" fill="none" style={{ width: 38, height: 38 }}><circle cx="20" cy="20" r="14" stroke="#2b7fff" strokeWidth="1.5" /><path d="M20 10v20M14 15h9a3 3 0 010 6h-6a3 3 0 010 6h10" stroke="#2b7fff" strokeWidth="1.5" strokeLinecap="round" /></svg>) },
-  { id: 3, tag: "STEP_03 / 03", title: "Place Your First Trade", subtitle: "93+ markets. Up to 100x leverage.", description: "Trade crypto perpetuals, RWAs, and equities on-chain. Pro-grade execution powered by Orderly Network on Arbitrum. No custodians. No compromises.", cta: "Launch App", icon: (<svg viewBox="0 0 40 40" fill="none" style={{ width: 38, height: 38 }}><polyline points="4,30 14,18 22,24 36,8" stroke="#2b7fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><polyline points="28,8 36,8 36,16" stroke="#2b7fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>) },
+  { id: 1, tag: "STEP_01 / 03", title: "Connect Your Wallet", subtitle: "Non-custodial. Your keys, your funds.", description: "Connect any EVM wallet (MetaMask, Rabby, WalletConnect) or Solana wallet. Nexus never holds your assets — all positions are settled on-chain.", cta: "Connect Wallet", icon: (<svg viewBox="0 0 40 40" fill="none" style={{ width: 38, height: 38 }}><rect x="4" y="10" width="32" height="22" rx="3" stroke="#ededf0" strokeWidth="1.5" /><path d="M4 16h32" stroke="#ededf0" strokeWidth="1.5" /><circle cx="28" cy="23" r="2.5" fill="#ededf0" /></svg>) },
+  { id: 2, tag: "STEP_02 / 03", title: "Deposit USDC", subtitle: "Any chain. No bridging. No hassle.", description: "Send USDC from Ethereum, Arbitrum, Base, Optimism, Solana, or any EVM chain. Keep a small amount of ETH on your source chain for gas. Arbitrum is the default.", cta: "Show Me Where", icon: (<svg viewBox="0 0 40 40" fill="none" style={{ width: 38, height: 38 }}><circle cx="20" cy="20" r="14" stroke="#ededf0" strokeWidth="1.5" /><path d="M20 10v20M14 15h9a3 3 0 010 6h-6a3 3 0 010 6h10" stroke="#ededf0" strokeWidth="1.5" strokeLinecap="round" /></svg>) },
+  { id: 3, tag: "STEP_03 / 03", title: "Place Your First Trade", subtitle: "93+ markets. Up to 100x leverage.", description: "Trade crypto perpetuals, RWAs, and equities on-chain. Pro-grade execution powered by Orderly Network on Arbitrum. No custodians. No compromises.", cta: "Launch App", icon: (<svg viewBox="0 0 40 40" fill="none" style={{ width: 38, height: 38 }}><polyline points="4,30 14,18 22,24 36,8" stroke="#ededf0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><polyline points="28,8 36,8 36,16" stroke="#ededf0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>) },
 ];
 
 const CHAINS = ["Arbitrum", "Ethereum", "Base", "Optimism", "Solana", "Any EVM"];
@@ -76,33 +76,33 @@ export default function OnboardingModal({ onComplete, onSkip }) {
         .ntl-ov.v{opacity:1}.ntl-ov.x{opacity:0;pointer-events:none}
         .ntl-m{position:relative;width:500px;max-width:100%;background:#0c0c0d;border:1px solid #232327;border-radius:14px;overflow:hidden;transform:translateY(20px);transition:transform .4s cubic-bezier(.16,1,.3,1)}
         .ntl-ov.v .ntl-m{transform:translateY(0)}
-        .ntl-sc{position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#2b7fff,transparent);animation:sc 4s linear infinite;opacity:.4;pointer-events:none}
+        .ntl-sc{position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#ededf0,transparent);animation:sc 4s linear infinite;opacity:.4;pointer-events:none}
         @keyframes sc{0%{top:0}100%{top:100%}}
-        .ntl-co{position:absolute;width:10px;height:10px;border-color:#2b7fff;border-style:solid;opacity:.35}
+        .ntl-co{position:absolute;width:10px;height:10px;border-color:#ededf0;border-style:solid;opacity:.35}
         .tl{top:6px;left:6px;border-width:1px 0 0 1px}.tr{top:6px;right:6px;border-width:1px 1px 0 0}
         .bl{bottom:6px;left:6px;border-width:0 0 1px 1px}.br{bottom:6px;right:6px;border-width:0 1px 1px 0}
         .ntl-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 12px;border-bottom:1px solid #1a1a1e}
         .ntl-br2{display:flex;align-items:center;gap:8px;font-size:9px;letter-spacing:.18em;color:#71717a;font-weight:600}
-        .ntl-dt{width:6px;height:6px;background:#2b7fff;border-radius:50%;animation:dt 2s ease-in-out infinite}
+        .ntl-dt{width:6px;height:6px;background:#ededf0;border-radius:50%;animation:dt 2s ease-in-out infinite}
         @keyframes dt{0%,100%{opacity:1}50%{opacity:.3}}
         .ntl-xb{background:none;border:1px solid #232327;color:#71717a;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;font-family:inherit;border-radius:6px;transition:all .2s}
         .ntl-xb:hover{border-color:#444;color:#a1a1aa}
         .ntl-pg{display:flex;gap:4px;padding:10px 18px 0}
         .ntl-pb{height:2px;flex:1;background:#1c1c20;border-radius:2px;transition:background .4s}
-        .ntl-pb.a{background:#2b7fff}.ntl-pb.d{background:#1e4d8f}
+        .ntl-pb.a{background:#ededf0}.ntl-pb.d{background:#3a3a40}
         .ntl-bd{padding:26px 18px 22px;animation:fi .3s ease}
         @keyframes fi{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
-        .ntl-tg{font-size:9px;letter-spacing:.2em;color:#2b7fff;font-weight:600;opacity:.85;margin-bottom:14px}
+        .ntl-tg{font-size:9px;letter-spacing:.2em;color:#ededf0;font-weight:600;opacity:.85;margin-bottom:14px}
         .ntl-ic{margin-bottom:18px}
         .ntl-tl2{font-family:'Inter',system-ui,sans-serif;font-size:26px;font-weight:800;color:#f4f4f5;line-height:1.1;margin-bottom:6px;letter-spacing:-.03em}
-        .ntl-sb{font-size:11px;letter-spacing:.1em;color:#2b7fff;font-weight:600;margin-bottom:14px}
+        .ntl-sb{font-size:11px;letter-spacing:.1em;color:#d4d4d8;font-weight:600;margin-bottom:14px}
         .ntl-dc{font-size:13px;line-height:1.7;color:#a1a1aa;margin-bottom:20px}
         .ntl-chs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px}
-        .ntl-ch{font-size:9px;letter-spacing:.1em;padding:4px 8px;border-radius:5px;border:1px solid #1e2a3f;color:#6b93c7;background:#0c1420;transition:all .3s}
-        .ntl-ch.ac{border-color:#2b7fff;color:#2b7fff;background:#0e1a2e}
+        .ntl-ch{font-size:9px;letter-spacing:.1em;padding:4px 8px;border-radius:5px;border:1px solid #2a2a2f;color:#8a8a92;background:#141416;transition:all .3s}
+        .ntl-ch.ac{border-color:#ededf0;color:#ededf0;background:#1c1c20}
         .ntl-ac{display:flex;gap:8px}
-        .ntl-ct{flex:1;background:#2b7fff;color:#fff;border:none;border-radius:8px;padding:12px 16px;font-family:'Inter',system-ui,sans-serif;font-size:12px;font-weight:700;letter-spacing:.04em;cursor:pointer;transition:background .2s}
-        .ntl-ct:hover{background:#1f6fe8}
+        .ntl-ct{flex:1;background:#ededf0;color:#0a0a0b;border:none;border-radius:8px;padding:12px 16px;font-family:'Inter',system-ui,sans-serif;font-size:12px;font-weight:700;letter-spacing:.04em;cursor:pointer;transition:background .2s}
+        .ntl-ct:hover{background:#ffffff}
         .ntl-sk{background:none;border:1px solid #232327;color:#71717a;padding:12px 14px;border-radius:8px;font-family:'Inter',system-ui,sans-serif;font-size:11px;font-weight:500;letter-spacing:.02em;cursor:pointer;transition:all .2s;white-space:nowrap}
         .ntl-sk:hover{border-color:#333;color:#555}
         .ntl-ft{padding:10px 18px;border-top:1px solid #0d0d0d;display:flex;align-items:center;gap:6px}

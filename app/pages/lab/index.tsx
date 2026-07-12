@@ -120,20 +120,20 @@ export default function TheLabPage() {
 
   return (
     <div style={{ background: "#0a0a0b", minHeight: "100dvh", padding: 0 }}>
-      <style>{`@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px #2b7fff}50%{opacity:0.4;box-shadow:0 0 2px #2b7fff}}`}</style>
+      <style>{`@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px #ededf0}50%{opacity:0.4;box-shadow:0 0 2px #ededf0}}`}</style>
       {/* ── BRIEFING HEADER ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "6px 10px" : "6px 18px", background: "#0f0f11", borderBottom: "1px solid #232327", flexWrap: "wrap", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#2b7fff", letterSpacing: "0.25em", fontWeight: "bold", textShadow: "0 0 12px rgba(43,127,255,0.5)" }}>//</span>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#ededf0", letterSpacing: "0.25em", fontWeight: "bold", textShadow: "0 0 12px rgba(255,255,255,0.25)" }}>//</span>
           <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#f4f4f5", letterSpacing: "0.25em", fontWeight: "bold" }}>THE LAB</span>
-          <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#2b7fff", boxShadow: "0 0 8px #2b7fff", animation: "pulse 2s infinite" }} />
+          <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#ededf0", boxShadow: "0 0 8px #ededf0", animation: "pulse 2s infinite" }} />
         </div>
         <div style={isMobile
           ? { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px 6px", width: "100%", marginTop: 4 }
           : { display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
           {[
             { label: "OPEN", val: connected ? String(openCount) : "—", color: openCount > 0 ? "#fbbf24" : "#71717a" },
-            { label: "CLOSED", val: connected ? String(processedTrades.length) : "—", color: "#3b82f6" },
+            { label: "CLOSED", val: connected ? String(processedTrades.length) : "—", color: "#d4d4d8" },
             { label: "WIN RATE", val: connected && processedTrades.length > 0 ? `${winRate.toFixed(1)}%` : "—", color: connected && processedTrades.length > 0 ? (winRate >= 50 ? "#3ecf8e" : "#f7525f") : "#71717a" },
             { label: "REALIZED P&L", val: connected && processedTrades.length > 0 ? `${totalPnl >= 0 ? "+" : ""}$${Math.abs(totalPnl).toFixed(2)}` : "—", color: connected && processedTrades.length > 0 ? (totalPnl >= 0 ? "#3ecf8e" : "#f7525f") : "#71717a" },
             { label: "UNREALIZED", val: connected && openCount > 0 ? `${unrealizedPnl >= 0 ? "+" : ""}$${Math.abs(unrealizedPnl).toFixed(2)}` : "—", color: connected && openCount > 0 ? (unrealizedPnl >= 0 ? "#3ecf8e" : "#f7525f") : "#71717a" },
@@ -151,9 +151,9 @@ export default function TheLabPage() {
         <div style={{ display: "flex", gap: isMobile ? 4 : 2, flex: 1, flexWrap: isMobile ? "wrap" : "nowrap" }}>
           {tabs.map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-              background: activeTab === tab.id ? "#0e1a2e" : "none",
-              border: `1px solid ${activeTab === tab.id ? "#2b7fff" : "transparent"}`,
-              color: activeTab === tab.id ? "#2b7fff" : "#71717a",
+              background: activeTab === tab.id ? "#1a1a1e" : "none",
+              border: `1px solid ${activeTab === tab.id ? "#ededf0" : "transparent"}`,
+              color: activeTab === tab.id ? "#ededf0" : "#71717a",
               fontFamily: "var(--nx-font-mono)",
               fontSize: isMobile ? 10 : 11,
               padding: isMobile ? "6px 8px" : "5px 12px",
