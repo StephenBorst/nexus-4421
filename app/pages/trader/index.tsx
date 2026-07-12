@@ -53,7 +53,7 @@ type FeedThesis = {
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
   ACTIVE:      { label: "ACTIVE",      color: "#d4d4d8", bg: "#1a1a1e", border: "#1a3a5a" },
-  HIT_TP:      { label: "HIT TP",      color: "#ededf0", bg: "#0c1f18", border: "#33333a" },
+  HIT_TP:      { label: "HIT TP",      color: "#ededf0", bg: "#1a1a1e", border: "#33333a" },
   STOPPED_OUT: { label: "STOPPED OUT", color: "#f7525f", bg: "#2a0a0a", border: "#4a1a1a" },
   INVALIDATED: { label: "INVALIDATED", color: "#fbbf24", bg: "#2a1a00", border: "#4a3a00" },
   CLOSED:      { label: "CLOSED",      color: "#a1a1aa", bg: "#12161a", border: "#2a3a4a" },
@@ -464,7 +464,7 @@ function CopyModal({ thesis, walletAddress, onClose }: { thesis: FeedThesis; wal
           onClick={handleSave}
           disabled={saving || saved || !calc || hasValidationErr}
           style={{
-            width: "100%", background: saved ? "#0c1f18" : calc && !hasValidationErr ? "#1a1a1e" : "#0f0f11",
+            width: "100%", background: saved ? "#1a1a1e" : calc && !hasValidationErr ? "#1a1a1e" : "#0f0f11",
             border: `1px solid ${saved ? "#ededf0" : calc && !hasValidationErr ? "#ededf0" : "#232327"}`,
             color: saved ? "#ededf0" : calc && !hasValidationErr ? "#ededf0" : "#33333a",
             fontFamily: "var(--nx-font-mono)", fontSize: 11, letterSpacing: "0.1em",

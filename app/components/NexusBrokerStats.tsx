@@ -65,21 +65,21 @@ export function NexusBrokerStats({ compact = false }: { compact?: boolean }) {
       style={{
         display: "flex", alignItems: "center", gap: compact ? 12 : 18,
         padding: compact ? "8px 12px" : "12px 16px",
-        background: "#0d120d", border: "1px solid #1a2e1a", borderRadius: 4,
+        background: "#0d120d", border: "1px solid #232327", borderRadius: 4,
         fontFamily: "var(--nx-font-mono)", textDecoration: "none",
       }}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <span style={{ fontSize: 8, letterSpacing: "0.12em", color: "#3a5a4a" }}>📊 NEXUS ON ORDERLY</span>
-        <span style={{ fontSize: compact ? 12 : 13, color: "#8aaa9a" }}>
-          {vol != null ? <>vol <b style={{ color: "#fff" }}>{fmtUsd(vol)}</b></> : <span style={{ color: "#5fd6a0" }}>network stats</span>}
+        <span style={{ fontSize: 8, letterSpacing: "0.12em", color: "#52525b" }}>📊 NEXUS ON ORDERLY</span>
+        <span style={{ fontSize: compact ? 12 : 13, color: "#a1a1aa" }}>
+          {vol != null ? <>vol <b style={{ color: "#fff" }}>{fmtUsd(vol)}</b></> : <span style={{ color: "#ededf0" }}>network stats</span>}
           {fees != null && <> · fees <b style={{ color: "#fff" }}>{fmtUsd(fees)}</b></>}
         </span>
       </div>
-      <div style={{ width: 1, alignSelf: "stretch", background: "#1a2e1a" }} />
-      <span style={{ fontSize: compact ? 10 : 11, color: "#5fd6a0", whiteSpace: "nowrap" }}>verify on Orderly ↗</span>
+      <div style={{ width: 1, alignSelf: "stretch", background: "#232327" }} />
+      <span style={{ fontSize: compact ? 10 : 11, color: "#ededf0", whiteSpace: "nowrap" }}>verify on Orderly ↗</span>
       {!compact && (
-        <div style={{ flex: 1, minWidth: 0, fontSize: 8, color: "#2a4a3a", lineHeight: 1.4, textAlign: "right" }}>
+        <div style={{ flex: 1, minWidth: 0, fontSize: 8, color: "#33333a", lineHeight: 1.4, textAlign: "right" }}>
           third-party-verified
           <br />
           Orderly Network dashboard

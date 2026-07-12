@@ -74,7 +74,7 @@ export function PnlChart({ points }: { points: number[] }) {
           </linearGradient>
         </defs>
         {grid.map((gy, i) => (
-          <line key={i} x1={0} y1={gy} x2={cw - gutter} y2={gy} stroke="#12201a" strokeWidth="1" />
+          <line key={i} x1={0} y1={gy} x2={cw - gutter} y2={gy} stroke="#1a1a1e" strokeWidth="1" />
         ))}
         {/* Value axis: max (top), 0 baseline, min (bottom) — the numbers the curve was missing. */}
         <text x={axisX} y={y(max) + 3} fill="#52525b" fontSize="9" fontFamily="var(--nx-font-mono)" textAnchor="start">{fmt(max)}</text>

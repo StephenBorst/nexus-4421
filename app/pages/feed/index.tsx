@@ -53,7 +53,7 @@ type FeedThesis = {
 
 const STATUS_CONFIG = {
   ACTIVE:      { label: "ACTIVE",      color: "#d4d4d8", bg: "#1a1a1e", border: "#1a3a5a" },
-  HIT_TP:      { label: "HIT TP",      color: "#ededf0", bg: "#0c1f18", border: "#33333a" },
+  HIT_TP:      { label: "HIT TP",      color: "#ededf0", bg: "#1a1a1e", border: "#33333a" },
   STOPPED_OUT: { label: "STOPPED OUT", color: "#f7525f", bg: "#2a0a0a", border: "#4a1a1a" },
   INVALIDATED: { label: "INVALIDATED", color: "#fbbf24", bg: "#2a1a00", border: "#4a3a00" },
   CLOSED:      { label: "CLOSED",      color: "#a1a1aa", bg: "#12161a", border: "#2a3a4a" },
@@ -368,7 +368,7 @@ function CopyModal({
           disabled={saving || saved || !calc || hasValidationErr}
           style={{
             width: "100%",
-            background: saved ? "#0c1f18" : calc && !hasValidationErr ? "#1a1a1e" : "#0f0f11",
+            background: saved ? "#1a1a1e" : calc && !hasValidationErr ? "#1a1a1e" : "#0f0f11",
             border: `1px solid ${saved ? "#ededf0" : calc && !hasValidationErr ? "#ededf0" : "#232327"}`,
             color: saved ? "#ededf0" : calc && !hasValidationErr ? "#ededf0" : "#33333a",
             fontFamily: "var(--nx-font-mono)",
@@ -837,7 +837,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
           </code>
           <a href={`${API_BASE}/theses/ledger`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#d4d4d8", textDecoration: "none" }}>verify ↗</a>
           {callLedger.onChain?.verified && (
-            <a href={callLedger.onChain.explorer || "#"} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ededf0", textDecoration: "none", border: "1px solid #33333a", borderRadius: 3, padding: "2px 6px", background: "#0c1f18" }}>⛓ ANCHORED ON-CHAIN ↗</a>
+            <a href={callLedger.onChain.explorer || "#"} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ededf0", textDecoration: "none", border: "1px solid #33333a", borderRadius: 3, padding: "2px 6px", background: "#1a1a1e" }}>⛓ ANCHORED ON-CHAIN ↗</a>
           )}
         </div>
       )}
@@ -882,7 +882,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                 </div>
                 {/* Badge line — never clipped, wraps if needed */}
                 <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 2 }}>
-                  {trader.graded && <span title="Calls graded from public price — trustless" style={{ fontSize: 8, color: "#ededf0", border: "1px solid #33333a", borderRadius: 2, padding: "1px 4px", background: "#0c1f18" }}>✓ VERIFIED</span>}
+                  {trader.graded && <span title="Calls graded from public price — trustless" style={{ fontSize: 8, color: "#ededf0", border: "1px solid #33333a", borderRadius: 2, padding: "1px 4px", background: "#1a1a1e" }}>✓ VERIFIED</span>}
                   {trader.graded?.meritRank && <span title={`${trader.graded.meritRank.title} — merit rank earned from your graded calls (not bought)`} style={{ fontSize: 8, color: "#141416", fontWeight: "bold", border: "1px solid #ededf0", borderRadius: 2, padding: "1px 5px", background: "#ededf0", letterSpacing: "0.04em" }}>{trader.graded.meritRank.glyph} {trader.graded.meritRank.title.toUpperCase()}</span>}
                   {!trader.graded && emerging.has(trader.wallet.toLowerCase()) && (
                     <span title="Resolved public-price-graded calls — 5 needed to become a Verified Caller" style={{ fontSize: 8, color: "#fbbf24", border: "1px solid #4a3a00", borderRadius: 2, padding: "1px 4px", background: "#1a1206" }}>
@@ -1083,7 +1083,7 @@ function ContributePrompt({ prominent = false }: { prominent?: boolean }) {
   const navigate = useNavigate();
   return (
     <div style={{
-      background: "linear-gradient(180deg,#0c1f18,#0a0a0b)", border: `1px solid ${prominent ? "#ededf0" : "#33333a"}`,
+      background: "linear-gradient(180deg,#1a1a1e,#0a0a0b)", border: `1px solid ${prominent ? "#ededf0" : "#33333a"}`,
       borderRadius: 6, padding: prominent ? "18px 20px" : "16px 18px", display: "flex", alignItems: "center",
       gap: 14, flexWrap: "wrap", marginBottom: prominent ? 12 : 0, marginTop: prominent ? 0 : 4,
       boxShadow: prominent ? "0 0 0 1px #ededf030, 0 8px 24px -12px #ededf040" : undefined,

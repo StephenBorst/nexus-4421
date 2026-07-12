@@ -207,7 +207,7 @@ export default function ProfileAvatar() {
               disabled={saving}
               style={{
                 flex: 1,
-                background: "#0c1f18",
+                background: "#1a1a1e",
                 border: "1px solid #33333a",
                 color: saving ? "#52525b" : "#ededf0",
                 fontFamily: "var(--nx-font-mono)",

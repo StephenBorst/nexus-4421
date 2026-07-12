@@ -72,7 +72,7 @@ const fundingIn = (ts: number) => {
 // Dependency-free candlestick chart (TradingView UDF OHLC → SVG). Keeps the frame
 // light; mirrors the Lab's terminal aesthetic (mono + #3ecf8e / #f7525f).
 function AssetChart({ data }: { data: Candle[] | null }) {
-  const box: React.CSSProperties = { width: "100%", height: 88, background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 4 };
+  const box: React.CSSProperties = { width: "100%", height: 88, background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4 };
   if (!data || data.length < 2) {
     return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#33333a" }}>{data ? "no chart data" : "loading chart…"}</div>;
   }
@@ -640,7 +640,7 @@ export default function MiniApp() {
 
   const shell: React.CSSProperties = { background: bg, color: "#e8f0ea", minHeight: "100svh", fontFamily: mono, padding: 14, display: "flex", flexDirection: "column", gap: 11 };
   const card: React.CSSProperties = { background: "#141416", border: "1px solid #232327", borderRadius: 6, padding: 12 };
-  const mktChip = (active: boolean): React.CSSProperties => ({ background: active ? "#ededf015" : "#0a0a0b", border: `1px solid ${active ? "#ededf060" : "#1e2d1e"}`, borderRadius: 3, padding: "4px 11px", cursor: "pointer", color: active ? green : "#71717a", fontFamily: mono, fontSize: 12 });
+  const mktChip = (active: boolean): React.CSSProperties => ({ background: active ? "#ededf015" : "#0a0a0b", border: `1px solid ${active ? "#ededf060" : "#232327"}`, borderRadius: 3, padding: "4px 11px", cursor: "pointer", color: active ? green : "#71717a", fontFamily: mono, fontSize: 12 });
   const levPresets = [2, 5, 10, 25, 50, 100].filter((p) => p < maxLev).concat(maxLev); // per-market, incl. real MAX
   const liveCount = feed?.filter((t) => t.status === "ACTIVE").length ?? 0;
   const margin = notional / (lev || 1);
@@ -653,7 +653,7 @@ export default function MiniApp() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ color: green, fontWeight: "bold", letterSpacing: "0.25em" }}>//</span>
           <span style={{ color: "#fff", fontWeight: "bold", letterSpacing: "0.2em" }}>NEXUS</span>
-          <button onClick={saveApp} style={{ marginLeft: "auto", background: added ? "#0c1f18" : "none", border: `1px solid ${added ? "#33333a" : "#232327"}`, borderRadius: 3, color: added ? green : "#a1a1aa", fontFamily: mono, fontSize: 9, padding: "3px 9px", cursor: "pointer", letterSpacing: "0.06em" }}>{added ? "★ SAVED" : "★ SAVE"}</button>
+          <button onClick={saveApp} style={{ marginLeft: "auto", background: added ? "#1a1a1e" : "none", border: `1px solid ${added ? "#33333a" : "#232327"}`, borderRadius: 3, color: added ? green : "#a1a1aa", fontFamily: mono, fontSize: 9, padding: "3px 9px", cursor: "pointer", letterSpacing: "0.06em" }}>{added ? "★ SAVED" : "★ SAVE"}</button>
         </div>
         <div style={{ fontSize: 9, color: "#71717a", marginTop: 4, letterSpacing: "0.05em" }}>the terminal that makes you a better trader</div>
         {addErr && <div style={{ fontSize: 9, color: "#fbbf24", marginTop: 6, lineHeight: 1.5, wordBreak: "break-word" }}>add failed: {addErr}</div>}
@@ -700,7 +700,7 @@ export default function MiniApp() {
               {acct && <span style={{ fontSize: 10, color: "#a1a1aa" }}>free <b style={{ color: "#fff" }}>${acct.free.toFixed(2)}</b> · value <b style={{ color: "#fff" }}>${acct.total.toFixed(2)}</b></span>}
               <button onClick={() => refreshStatus()} disabled={statusBusy} style={{ marginLeft: "auto", background: "#1a1a1e", color: green, border: "1px solid #33333a", borderRadius: 4, padding: "5px 11px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: statusBusy ? "wait" : "pointer", letterSpacing: "0.05em", opacity: statusBusy ? 0.6 : 1 }}>{statusBusy ? "…" : acct ? "↻ REFRESH" : "↻ LOAD"}</button>
             </div>
-            <button onClick={toggleBroadcast} style={{ display: "flex", alignItems: "center", gap: 6, background: broadcast ? "#0c1f18" : "#0a0a0b", border: `1px solid ${broadcast ? "#33333a" : "#1e2d1e"}`, borderRadius: 4, padding: "6px 9px", fontFamily: mono, fontSize: 9, cursor: "pointer", color: broadcast ? green : "#a1a1aa", textAlign: "left" }}>
+            <button onClick={toggleBroadcast} style={{ display: "flex", alignItems: "center", gap: 6, background: broadcast ? "#1a1a1e" : "#0a0a0b", border: `1px solid ${broadcast ? "#33333a" : "#232327"}`, borderRadius: 4, padding: "6px 9px", fontFamily: mono, fontSize: 9, cursor: "pointer", color: broadcast ? green : "#a1a1aa", textAlign: "left" }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: broadcast ? green : "#33333a", boxShadow: broadcast ? `0 0 6px ${green}` : "none", flexShrink: 0 }} />
               📡 {broadcast ? "BROADCASTING to LIVE NOW — your open positions are public" : "Broadcast my positions to the public LIVE NOW feed"}
             </button>
@@ -715,7 +715,7 @@ export default function MiniApp() {
               const pnl = mark && entry ? (mark - entry) * qty : Number(p.unrealized_pnl);
               const hasPnl = Number.isFinite(pnl);
               return (
-                <div key={p.symbol} style={{ display: "flex", alignItems: "center", gap: 8, background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 4, padding: "7px 9px" }}>
+                <div key={p.symbol} style={{ display: "flex", alignItems: "center", gap: 8, background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4, padding: "7px 9px" }}>
                   <span style={{ fontSize: 12, fontWeight: "bold", color: "#fff", flexShrink: 0 }}>{tk(p.symbol)}</span>
                   <span style={{ fontSize: 9, color: long ? green : red, flexShrink: 0 }}>{long ? "↑ LONG" : "↓ SHORT"} {Math.abs(qty)}</span>
                   {mark > 0 && <span style={{ fontSize: 8, color: "#a1a1aa", flexShrink: 0 }}>@ {entry.toFixed(entry < 10 ? 4 : 2)}→{mark.toFixed(mark < 10 ? 4 : 2)}</span>}
@@ -759,7 +759,7 @@ export default function MiniApp() {
               ))}
               {!MARKETS.includes(sym) && <button style={mktChip(true)}>{sym}</button>}
             </div>
-            <input value={mktSearch} onChange={(e) => setMktSearch(e.target.value.toUpperCase())} placeholder={markets ? `🔍 search ${markets.length} markets…` : "loading markets…"} style={{ width: "100%", boxSizing: "border-box", background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 11, padding: "6px 9px" }} />
+            <input value={mktSearch} onChange={(e) => setMktSearch(e.target.value.toUpperCase())} placeholder={markets ? `🔍 search ${markets.length} markets…` : "loading markets…"} style={{ width: "100%", boxSizing: "border-box", background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 11, padding: "6px 9px" }} />
             {mktSearch && markets && (() => {
               const hits = markets.filter((m) => m.includes(mktSearch));
               return (
@@ -776,14 +776,14 @@ export default function MiniApp() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <div>
               <div style={{ fontSize: 8, color: "#71717a", letterSpacing: "0.1em" }}>SIZE (USDC)</div>
-              <input type="number" inputMode="decimal" min={1} value={notional} onChange={(e) => setNotional(Math.max(0, parseFloat(e.target.value) || 0))} style={{ width: "100%", boxSizing: "border-box", marginTop: 4, background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 13, padding: "7px 9px" }} />
+              <input type="number" inputMode="decimal" min={1} value={notional} onChange={(e) => setNotional(Math.max(0, parseFloat(e.target.value) || 0))} style={{ width: "100%", boxSizing: "border-box", marginTop: 4, background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 13, padding: "7px 9px" }} />
             </div>
             <div>
               <div style={{ fontSize: 8, color: "#71717a", letterSpacing: "0.1em" }}>LEVERAGE — {lev}x <span style={{ color: "#33333a" }}>· max {maxLev}x</span></div>
               <input type="range" min={1} max={maxLev} step={1} value={lev} onChange={(e) => setLev(parseInt(e.target.value, 10))} style={{ width: "100%", marginTop: 12 }} />
               <div style={{ display: "flex", gap: 5, marginTop: 6 }}>
                 {levPresets.map((p, i) => (
-                  <button key={p} onClick={() => setLev(p)} style={{ flex: 1, background: lev === p ? "#ededf015" : "#0a0a0b", border: `1px solid ${lev === p ? "#ededf060" : "#1e2d1e"}`, borderRadius: 3, padding: "4px 0", cursor: "pointer", color: lev === p ? green : "#71717a", fontFamily: mono, fontSize: 10, fontWeight: "bold" }}>{i === levPresets.length - 1 ? "MAX" : `${p}x`}</button>
+                  <button key={p} onClick={() => setLev(p)} style={{ flex: 1, background: lev === p ? "#ededf015" : "#0a0a0b", border: `1px solid ${lev === p ? "#ededf060" : "#232327"}`, borderRadius: 3, padding: "4px 0", cursor: "pointer", color: lev === p ? green : "#71717a", fontFamily: mono, fontSize: 10, fontWeight: "bold" }}>{i === levPresets.length - 1 ? "MAX" : `${p}x`}</button>
                 ))}
               </div>
             </div>
@@ -822,7 +822,7 @@ export default function MiniApp() {
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ fontSize: 8, color: "#71717a", letterSpacing: "0.1em" }}>💰 FUND ACCOUNT (USDC · Arbitrum)</div>
             <div style={{ display: "flex", gap: 8 }}>
-              <input type="number" inputMode="decimal" min={1} value={depositAmt} onChange={(e) => setDepositAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
+              <input type="number" inputMode="decimal" min={1} value={depositAmt} onChange={(e) => setDepositAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
               <button onClick={deposit} disabled={depositing || depositAmt <= 0} style={{ flexShrink: 0, background: "#1a1a1e", color: "#d4d4d8", border: "1px solid #1a3a5a", borderRadius: 4, padding: "8px 16px", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: depositing ? "wait" : "pointer", letterSpacing: "0.05em", opacity: depositing ? 0.6 : 1 }}>{depositing ? "…" : "DEPOSIT"}</button>
             </div>
             {depositMsg && <div style={{ fontSize: 10, color: depositMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{depositMsg.text}</div>}
@@ -835,7 +835,7 @@ export default function MiniApp() {
               {acct && <button onClick={() => setWithdrawAmt(Math.max(0, Math.floor(acct.free * 100) / 100))} style={{ marginLeft: "auto", background: "none", border: "1px solid #232327", borderRadius: 3, color: "#a1a1aa", fontFamily: mono, fontSize: 9, padding: "2px 7px", cursor: "pointer" }}>MAX ${acct.free.toFixed(2)}</button>}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <input type="number" inputMode="decimal" min={1} value={withdrawAmt} onChange={(e) => setWithdrawAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
+              <input type="number" inputMode="decimal" min={1} value={withdrawAmt} onChange={(e) => setWithdrawAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4, color: "#e8f0ea", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
               <button onClick={withdraw} disabled={withdrawing || withdrawAmt <= 0} style={{ flexShrink: 0, background: "#1a140a", color: "#fbbf24", border: "1px solid #4a3a1a", borderRadius: 4, padding: "8px 16px", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: withdrawing ? "wait" : "pointer", letterSpacing: "0.05em", opacity: withdrawing ? 0.6 : 1 }}>{withdrawing ? "…" : "WITHDRAW"}</button>
             </div>
             {withdrawMsg && <div style={{ fontSize: 10, color: withdrawMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{withdrawMsg.text}</div>}
@@ -862,7 +862,7 @@ export default function MiniApp() {
           <div style={{ ...card, display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 9, color: "#71717a", letterSpacing: "0.12em" }}>🤖 AUTONOMOUS AGENT</span>
-              {active && <span style={{ flexShrink: 0, fontSize: 8, color: mode === "AUTONOMOUS" ? "#ff8800" : mode === "ASSISTED" ? green : "#d4d4d8", border: "1px solid #1e2d1e", borderRadius: 3, padding: "1px 6px", marginLeft: "auto" }}>{mode}</span>}
+              {active && <span style={{ flexShrink: 0, fontSize: 8, color: mode === "AUTONOMOUS" ? "#ff8800" : mode === "ASSISTED" ? green : "#d4d4d8", border: "1px solid #232327", borderRadius: 3, padding: "1px 6px", marginLeft: "auto" }}>{mode}</span>}
             </div>
             {active ? (
               <>

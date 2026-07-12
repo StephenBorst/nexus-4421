@@ -45,7 +45,7 @@ function CalendarView({ dayGroups, onDayClick, viewMonth, viewYear, onPrevMonth,
             <div key={i} role={data ? "button" : undefined} tabIndex={data ? 0 : -1}
               onClick={() => data && onDayClick(key, cellDay)}
               onKeyDown={(e) => e.key === "Enter" && data && onDayClick(key, cellDay)}
-              style={{ background: data ? "#141416" : "#0a0a0b", border: `1px solid ${isToday ? "#33333a" : data ? "#232327" : "#121c12"}`, borderRadius: 4, height: cellH, padding: isMobile ? "3px 4px" : "6px 8px", cursor: data ? "pointer" : "default", fontFamily: "var(--nx-font-mono)", overflow: "hidden", boxSizing: "border-box" }}>
+              style={{ background: data ? "#141416" : "#0a0a0b", border: `1px solid ${isToday ? "#33333a" : data ? "#232327" : "#141416"}`, borderRadius: 4, height: cellH, padding: isMobile ? "3px 4px" : "6px 8px", cursor: data ? "pointer" : "default", fontFamily: "var(--nx-font-mono)", overflow: "hidden", boxSizing: "border-box" }}>
               <div style={{ fontSize: isMobile ? 9 : 11, color: "#52525b" }}>{cellDay}</div>
               {data && (isMobile ? (
                 <div>
@@ -123,7 +123,7 @@ export function TradeLogAllView({
           ...navBtnStyle, fontSize: 10, padding: "5px 16px",
           color: view === id ? "#ededf0" : "#52525b",
           borderColor: view === id ? "#33333a" : "#232327",
-          background: view === id ? "#0c1f18" : "transparent",
+          background: view === id ? "#1a1a1e" : "transparent",
         }}>{label}</button>
       ))}
     </div>
@@ -172,7 +172,7 @@ export function TradeLogAllView({
             ...navBtnStyle, fontSize: 10, padding: "5px 14px",
             color: filter === f ? "#ededf0" : "#52525b",
             borderColor: filter === f ? "#33333a" : "#232327",
-            background: filter === f ? "#0c1f18" : "transparent",
+            background: filter === f ? "#1a1a1e" : "transparent",
           }}>{f.toUpperCase()}</button>
         ))}
         <input
@@ -212,7 +212,7 @@ export function TradeLogAllView({
               {/* symbols */}
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {[...new Set(g.tradeList.map(t => t.symbol.replace("PERP_","").replace("_USDC","")))].map(s => (
-                  <span key={s} style={{ fontSize: 9, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", background: "#141416", border: "1px solid #1e2d1e", borderRadius: 3, padding: "2px 6px" }}>{s}</span>
+                  <span key={s} style={{ fontSize: 9, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", background: "#141416", border: "1px solid #232327", borderRadius: 3, padding: "2px 6px" }}>{s}</span>
                 ))}
               </div>
               {/* stats */}

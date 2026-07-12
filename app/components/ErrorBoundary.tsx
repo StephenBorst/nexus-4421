@@ -175,7 +175,7 @@ export function ErrorBoundary() {
         <div style={{
           marginTop: '1.5rem',
           padding: '1rem',
-          background: '#1a2a1a',
+          background: '#232327',
           borderLeft: '3px solid #4a9',
           borderRadius: '4px',
         }}>

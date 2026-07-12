@@ -177,7 +177,7 @@ export default function NotificationBell() {
                   key={n.id}
                   style={{
                     padding: "10px 14px",
-                    borderBottom: "1px solid #0f1a0f",
+                    borderBottom: "1px solid #141416",
                     background: n.readAt ? "transparent" : "#1a1a1e",
                     display: "flex",
                     gap: 10,

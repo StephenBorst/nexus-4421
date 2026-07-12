@@ -39,7 +39,7 @@ export const TIER_META: Record<
   { label: string; glyph: string; color: string }
 > = {
   ORACLE:    { label: "ORACLE",    glyph: "◆", color: "#ededf0" },
-  ARCHITECT: { label: "ARCHITECT", glyph: "◇", color: "#5fd6a0" },
+  ARCHITECT: { label: "ARCHITECT", glyph: "◇", color: "#ededf0" },
   OPERATOR:  { label: "OPERATOR",  glyph: "▪", color: "#3ecf8e" },
   NONE:      { label: "",          glyph: "",  color: "#33333a" },
 };

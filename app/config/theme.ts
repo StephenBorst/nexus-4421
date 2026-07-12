@@ -2,8 +2,8 @@
 // Promoted out of app/pages/lab/tokens.ts so every surface (Lab, Feed, Messages,
 // mini app, components) draws from the same system instead of 400+ hardcoded hexes.
 // Borrows Linear's DISCIPLINE (rationed accent, 4px spacing scale, defined type
-// scale, hierarchy by weight/tone not color). Identity (2026-07): editorial neutral
-// black + bone text + ONE blue accent; green reserved for profit. Full reference:
+// scale, hierarchy by weight/tone not color). Identity (2026-07): MONOCHROME editorial
+// neutral black + bone/white accent; green reserved for profit only. Full reference:
 // app/DESIGN.md.
 //
 // THE RULES (why it should feel calm + intuitive, not busy):
@@ -64,18 +64,18 @@ export const C = {
 // Status tints (thesis/agent states) — surface + border + text, from the palette.
 export const STATUS_TINT = {
   active:  { color: C.info, bg: "#1a1a1e", border: "#33333a" },
-  pos:     { color: C.pos, bg: "#0c1f18", border: "#1a3d31" },
+  pos:     { color: C.pos, bg: "#1a1a1e", border: "#33333a" },
   neg:     { color: C.neg, bg: "#241012", border: "#4a1e22" },
   warn:    { color: C.warn, bg: "#2a1a00", border: "#4a3a00" },
 } as const;
 
 // Drift map — legacy near-duplicate greens → canonical tone. Referenced when
 // migrating raw hex so the collapse is deliberate, not guesswork.
-//   #3a6a4a → text.muted · #5a7a6a → text.fog · #5a8a6a → text.fog
+//   #71717a → text.muted · #a1a1aa → text.fog · #a1a1aa → text.fog
 export const DRIFT_TO_CANONICAL: Record<string, string> = {
-  "#3a6a4a": C.text.muted,
-  "#5a7a6a": C.text.fog,
-  "#5a8a6a": C.text.fog,
+  "#71717a": C.text.muted,
+  "#a1a1aa": C.text.fog,
+  "#a1a1aa": C.text.fog,
 };
 
 // ── Type scale — monospace, tuned for dense terminal UI ──────────────────────

@@ -409,7 +409,7 @@ function TimingAndRisk({ orders }: { orders: ProcessedTrade[] }) {
             return (
               <div key={b.h} title={`${fmtHr(b.h)} — ${b.trades} trades, ${wr}% WR`} style={{
                 height: 22, borderRadius: 2, background: hourWinColor(wr, b.trades),
-                border: "1px solid #0e1a0e", opacity: b.trades ? Math.max(0.4, b.trades / maxHourTrades) : 1,
+                border: "1px solid #141416", opacity: b.trades ? Math.max(0.4, b.trades / maxHourTrades) : 1,
               }} />
             );
           })}

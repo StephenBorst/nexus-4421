@@ -166,7 +166,7 @@ export function MarketIntelView() {
             ...navBtnStyle, fontSize: 10, padding: "5px 16px",
             color: sub === id ? "#ededf0" : "#52525b",
             borderColor: sub === id ? "#33333a" : "#232327",
-            background: sub === id ? "#0c1f18" : "transparent",
+            background: sub === id ? "#1a1a1e" : "transparent",
           }}>{label}</button>
         ))}
       </div>

@@ -144,8 +144,8 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
                 : { isPublic: false, holdersOnly: false };
               const meta = {
                 PRIVATE: { label: "📡 PRIVATE", color: "#52525b", border: "#232327", bg: "transparent" },
-                PUBLIC:  { label: "📡 PUBLIC",  color: "#ededf0", border: "#33333a", bg: "#0c1f18" },
-                HOLDERS: { label: "◆ HOLDERS",  color: "#5fd6a0", border: "#33333a", bg: "#0c1f18" },
+                PUBLIC:  { label: "📡 PUBLIC",  color: "#ededf0", border: "#33333a", bg: "#1a1a1e" },
+                HOLDERS: { label: "◆ HOLDERS",  color: "#ededf0", border: "#33333a", bg: "#1a1a1e" },
               }[vis];
               return (
                 <button
@@ -530,7 +530,7 @@ export function ThesisAnalyticsView() {
       style={{
         display: "grid", gridTemplateColumns: "1fr 54px 40px 54px", gap: 8,
         padding: "5px 0",
-        borderBottom: i < maxIdx ? "1px solid #0f1f0f" : "none",
+        borderBottom: i < maxIdx ? "1px solid #141416" : "none",
         alignItems: "center",
       }}
     >
@@ -962,7 +962,7 @@ export function ThesisView() {
                     <button key={d} onClick={() => set("direction", d)} style={{
                       flex: 1, padding: "8px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11,
                       cursor: "pointer", borderRadius: 3, border: "1px solid",
-                      background: form.direction === d ? (d === "LONG" ? "#0c1f18" : "#2a0a0a") : "#0f0f11",
+                      background: form.direction === d ? (d === "LONG" ? "#1a1a1e" : "#2a0a0a") : "#0f0f11",
                       borderColor: form.direction === d ? (d === "LONG" ? "#3ecf8e" : "#f7525f") : "#232327",
                       color: form.direction === d ? (d === "LONG" ? "#3ecf8e" : "#f7525f") : "#52525b",
                     }}>{d === "LONG" ? "↑ LONG" : "↓ SHORT"}</button>
@@ -1184,7 +1184,7 @@ export function ThesisView() {
                       width: "100%", padding: "9px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11,
                       cursor: formValid ? "pointer" : "not-allowed", borderRadius: 3,
                       border: `1px solid ${deployed ? "#ededf0" : "#33333a"}`,
-                      background: deployed ? "#0c1f18" : "#0f0f11",
+                      background: deployed ? "#1a1a1e" : "#0f0f11",
                       color: deployed ? "#ededf0" : formValid ? "#d4d4d8" : "#33333a",
                       letterSpacing: "0.08em", marginBottom: 6,
                     }}>

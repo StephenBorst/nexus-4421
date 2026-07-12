@@ -161,7 +161,7 @@ export function HoldersRoom({ walletAddress }: { walletAddress: string | null })
           <div style={{ marginTop: 12 }}>
             <button
               onClick={() => setSignNonce((n) => n + 1)}
-              style={{ background: "#0c1f18", border: "1px solid #33333a", borderRadius: 3, color: "#5fd6a0", fontFamily: "var(--nx-font-mono)", fontSize: 11, padding: "6px 14px", cursor: "pointer", letterSpacing: "0.08em" }}
+              style={{ background: "#1a1a1e", border: "1px solid #33333a", borderRadius: 3, color: "#ededf0", fontFamily: "var(--nx-font-mono)", fontSize: 11, padding: "6px 14px", cursor: "pointer", letterSpacing: "0.08em" }}
             >
               ◆ SIGN TO ENTER
             </button>

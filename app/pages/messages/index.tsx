@@ -125,7 +125,7 @@ const S = {
   },
   convoItem: (active: boolean): React.CSSProperties => ({
     padding: "12px 14px",
-    borderBottom: "1px solid #0f1a0f",
+    borderBottom: "1px solid #141416",
     cursor: "pointer",
     background: active ? "#1a1a1e" : "transparent",
     borderLeft: active ? "2px solid #ededf0" : "2px solid transparent",

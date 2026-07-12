@@ -79,7 +79,7 @@ export default function LiveNow() {
               key={`${p.wallet}-${p.symbol}-${i}`}
               style={{
                 flexShrink: 0, minWidth: 132, background: "#0a0a0b",
-                border: `1px solid ${pct == null ? "#1e2d1e" : up ? "#33333a" : "#4a1a1a"}`,
+                border: `1px solid ${pct == null ? "#232327" : up ? "#33333a" : "#4a1a1a"}`,
                 borderRadius: 5, padding: "8px 10px", fontFamily: "var(--nx-font-mono)",
               }}
             >

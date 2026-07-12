@@ -89,7 +89,7 @@ function AgentTrackRecord({ title, accent, trades, paper, onReset, summary }: {
   const since = sinceMs ? new Date(sinceMs).toLocaleDateString() : null;
 
   return (
-    <div style={{ ...agentCardStyle, borderColor: tr > 0 ? (net >= 0 ? "#33333a" : "#4a1a1a") : "#1e2d1e" }}>
+    <div style={{ ...agentCardStyle, borderColor: tr > 0 ? (net >= 0 ? "#33333a" : "#4a1a1a") : "#232327" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ ...agentLabelStyle, color: accent }}>{title}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -828,7 +828,7 @@ export function AgentView() {
             </a>
           </div>
           {!tgLinked && (
-            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #12241a", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #1a1a1e", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", lineHeight: 1.4, flex: 1, minWidth: 150 }}>
                 Link not opening Telegram? Some in-app browsers block it. Open <b style={{ color: "#a1a1aa" }}>@{TG_BOT}</b> in Telegram and send this:
               </span>
@@ -838,7 +838,7 @@ export function AgentView() {
                   navigator.clipboard?.writeText(cmd).then(() => { setTgCopied(true); setTimeout(() => setTgCopied(false), 2000); }).catch(() => {});
                 }}
                 style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: "bold", color: tgCopied ? "#ededf0" : "#a1a1aa",
-                  border: `1px solid ${tgCopied ? "#33333a" : "#1e2d1e"}`, background: "#0a0a0b", borderRadius: 3, padding: "6px 12px", cursor: "pointer", flexShrink: 0 }}>
+                  border: `1px solid ${tgCopied ? "#33333a" : "#232327"}`, background: "#0a0a0b", borderRadius: 3, padding: "6px 12px", cursor: "pointer", flexShrink: 0 }}>
                 {tgCopied ? "COPIED ✓" : "COPY /start CMD"}
               </button>
             </div>
@@ -877,7 +877,7 @@ export function AgentView() {
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 11, color: "#5fd6a0", fontFamily: "var(--nx-font-mono)", lineHeight: 1.5, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "#ededf0", fontFamily: "var(--nx-font-mono)", lineHeight: 1.5, marginBottom: 12 }}>
               The agent enters {isLong ? "LONG" : "SHORT"} {tk} and manages to your stop/targets (scale-out, trailing, breakeven, timeout). It stops after this one trade.
             </div>
             {/* Entry type: fill now (MARKET) vs wait for a price (LIMIT) */}
@@ -888,7 +888,7 @@ export function AgentView() {
                   <button key={et} onClick={() => setDirectiveEntry(et)} style={{
                     flex: 1, padding: "7px 0", fontFamily: "var(--nx-font-mono)", fontSize: 10, cursor: "pointer", borderRadius: 3,
                     border: `1px solid ${directiveEntry === et ? "#ededf0" : "#232327"}`,
-                    background: directiveEntry === et ? "#0c1f18" : "#0f0f11",
+                    background: directiveEntry === et ? "#1a1a1e" : "#0f0f11",
                     color: directiveEntry === et ? "#ededf0" : "#52525b",
                   }}>{et === "MARKET" ? "MARKET (fill now)" : "LIMIT (wait for price)"}</button>
                 ))}
@@ -930,7 +930,7 @@ export function AgentView() {
               <button onClick={armDirective} disabled={directiveBusy} style={{
                 flex: 2, padding: "9px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", letterSpacing: "0.06em",
                 cursor: directiveBusy ? "wait" : "pointer", borderRadius: 3,
-                border: `1px solid ${live ? "#ff6600" : "#33333a"}`, background: live ? "#1a0800" : "#0c1f18",
+                border: `1px solid ${live ? "#ff6600" : "#33333a"}`, background: live ? "#1a0800" : "#1a1a1e",
                 color: live ? "#ff6600" : "#ededf0",
               }}>{directiveBusy ? "ARMING…" : live ? "▶ ARM LIVE — GO LIVE" : "▶ ARM (PAPER)"}</button>
             </div>
@@ -956,7 +956,7 @@ export function AgentView() {
               <span style={{ fontSize: 16, color: "#fff", fontWeight: "bold" }}>{tk}</span>
               <span style={{ fontSize: 12, color: isLong ? "#3ecf8e" : "#f7525f", fontWeight: "bold" }}>{isLong ? "↑ LONG" : "↓ SHORT"}</span>
               {activeDirective.leverage ? <span style={{ fontSize: 11, color: "#a1a1aa" }}>{activeDirective.leverage}x</span> : null}
-              {activeDirective.filledPrice ? <span style={{ fontSize: 11, color: "#5fd6a0" }}>filled {num(activeDirective.filledPrice)}</span> : null}
+              {activeDirective.filledPrice ? <span style={{ fontSize: 11, color: "#ededf0" }}>filled {num(activeDirective.filledPrice)}</span> : null}
             </div>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#a1a1aa", marginBottom: armed ? 12 : 0 }}>
               <span>entry {num(activeDirective.entryPrice)}</span>
@@ -999,7 +999,7 @@ export function AgentView() {
                   }} style={{
                     flex: "1 1 200px", textAlign: "left", cursor: "pointer",
                     background: active ? "#ededf010" : "#0a0a0b",
-                    border: `1px solid ${active ? "#ededf0" : "#1e2d1e"}`, borderRadius: 6, padding: "10px 12px",
+                    border: `1px solid ${active ? "#ededf0" : "#232327"}`, borderRadius: 6, padding: "10px 12px",
                   }}>
                     <div style={{ color: active ? "#ededf0" : "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>{p.label}{active ? " ✓" : ""}</div>
                     <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 10, marginTop: 3, lineHeight: 1.4 }}>{p.blurb}</div>
@@ -1030,7 +1030,7 @@ export function AgentView() {
                     }}
                     style={{
                       flex: "0 0 200px", textAlign: "left", cursor: "pointer",
-                      background: "#0a0a0b", border: `1px solid ${locked ? "#1e2d1e" : p.accent + "40"}`,
+                      background: "#0a0a0b", border: `1px solid ${locked ? "#232327" : p.accent + "40"}`,
                       borderRadius: 6, padding: "10px 12px",
                     }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
@@ -1058,7 +1058,7 @@ export function AgentView() {
             const wr = pt.length ? Math.round((wins / pt.length) * 100) : 0;
             if (pt.length < 5 || net <= 0) return null;
             return (
-              <div style={{ ...agentCardStyle, borderColor: "#33333a", background: "#0c1f18" }}>
+              <div style={{ ...agentCardStyle, borderColor: "#33333a", background: "#1a1a1e" }}>
                 <div style={{ ...agentLabelStyle, color: "#ededf0" }}>🎓 READY TO GO LIVE?</div>
                 <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 12, lineHeight: 1.6, marginTop: 8 }}>
                   Your paper agent is proven — <strong style={{ color: "#ededf0" }}>+${net.toFixed(2)}</strong> over{" "}
@@ -1119,7 +1119,7 @@ export function AgentView() {
                   <button key={mode} onClick={() => setConfig({ ...config, mode })} style={{
                     flex: 1,
                     background: sel ? `${color}20` : "#0a0a0b",
-                    border: `1px solid ${sel ? color : "#1e2d1e"}`,
+                    border: `1px solid ${sel ? color : "#232327"}`,
                     borderRadius: 4, padding: "10px 16px", cursor: "pointer",
                     color: sel ? color : "#71717a",
                     fontFamily: "var(--nx-font-mono)", fontSize: 12, letterSpacing: "0.05em",
@@ -1163,7 +1163,7 @@ export function AgentView() {
                     onClick={() => { if (locked) { setProNote(true); return; } setProNote(false); setConfig({ ...config, signalMode: v }); }}
                     style={{
                     background: sel ? "#ededf015" : "#0a0a0b",
-                    border: `1px solid ${sel ? "#ededf060" : "#1e2d1e"}`,
+                    border: `1px solid ${sel ? "#ededf060" : "#232327"}`,
                     borderRadius: 3, padding: "4px 10px", cursor: "pointer",
                     color: locked ? "#52525b" : sel ? "#ededf0" : "#71717a",
                     fontFamily: "var(--nx-font-mono)", fontSize: 11,
@@ -1172,7 +1172,7 @@ export function AgentView() {
               })}
             </div>
             {proNote && (
-              <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 6, color: "#5fd6a0" }}>
+              <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 6, color: "#ededf0" }}>
                 ◆ Advanced strategies are Emerald tier — hold $NEXUS or subscribe (see Emerald in the Lab).
               </div>
             )}
@@ -1202,7 +1202,7 @@ export function AgentView() {
                 style={{
                   flexShrink: 0, cursor: "pointer", fontFamily: "var(--nx-font-mono)", fontSize: 11, borderRadius: 4, padding: "6px 16px",
                   background: config.respectRegime ? "#ededf015" : "#0a0a0b",
-                  border: `1px solid ${config.respectRegime ? "#ededf0" : "#1e2d1e"}`,
+                  border: `1px solid ${config.respectRegime ? "#ededf0" : "#232327"}`,
                   color: config.respectRegime ? "#ededf0" : "#71717a",
                 }}>
                 {config.respectRegime ? "ON" : "OFF"}
@@ -1223,7 +1223,7 @@ export function AgentView() {
                 style={{
                   flexShrink: 0, cursor: "pointer", fontFamily: "var(--nx-font-mono)", fontSize: 11, borderRadius: 4, padding: "6px 16px",
                   background: config.volScaledStops ? "#ededf015" : "#0a0a0b",
-                  border: `1px solid ${config.volScaledStops ? "#ededf0" : "#1e2d1e"}`,
+                  border: `1px solid ${config.volScaledStops ? "#ededf0" : "#232327"}`,
                   color: config.volScaledStops ? "#ededf0" : "#71717a",
                 }}>
                 {config.volScaledStops ? "ON" : "OFF"}
@@ -1247,7 +1247,7 @@ export function AgentView() {
                     });
                   }} style={{
                     background: selected ? "#ededf015" : "#0a0a0b",
-                    border: `1px solid ${selected ? "#ededf060" : "#1e2d1e"}`,
+                    border: `1px solid ${selected ? "#ededf060" : "#232327"}`,
                     borderRadius: 3, padding: "4px 10px", cursor: "pointer",
                     color: selected ? "#ededf0" : "#71717a",
                     fontFamily: "var(--nx-font-mono)", fontSize: 11,
@@ -1320,7 +1320,7 @@ export function AgentView() {
                   <button onClick={toggleScaleOut} style={{
                     fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "4px 12px", borderRadius: 3, cursor: "pointer",
                     background: scaleOut ? "#ededf015" : "#0a0a0b",
-                    border: `1px solid ${scaleOut ? "#ededf0" : "#1e2d1e"}`,
+                    border: `1px solid ${scaleOut ? "#ededf0" : "#232327"}`,
                     color: scaleOut ? "#ededf0" : "#71717a",
                   }}>
                     SCALE-OUT {scaleOut ? "ON" : "OFF"}
@@ -1406,7 +1406,7 @@ export function AgentView() {
                   <button onClick={isPro ? toggle : undefined} disabled={!isPro} style={{
                     fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "4px 12px", borderRadius: 3, cursor: isPro ? "pointer" : "not-allowed",
                     background: on ? "#ededf015" : "#0a0a0b",
-                    border: `1px solid ${on ? "#ededf0" : "#1e2d1e"}`,
+                    border: `1px solid ${on ? "#ededf0" : "#232327"}`,
                     color: on ? "#ededf0" : "#71717a", opacity: isPro ? 1 : 0.5,
                   }}>
                     {on ? "ON" : "OFF"}
@@ -1469,13 +1469,13 @@ export function AgentView() {
                     <div>
                       <div style={{ ...agentLabelStyle, fontSize: 9 }}>WEBHOOK URL (secret — keep private)</div>
                       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        <code style={{ flex: 1, minWidth: 0, overflowX: "auto", whiteSpace: "nowrap", color: "#ededf0", background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 3, padding: "6px 8px", fontSize: 11 }}>{webhookInfo.url}</code>
+                        <code style={{ flex: 1, minWidth: 0, overflowX: "auto", whiteSpace: "nowrap", color: "#ededf0", background: "#0a0a0b", border: "1px solid #232327", borderRadius: 3, padding: "6px 8px", fontSize: 11 }}>{webhookInfo.url}</code>
                         <button onClick={() => navigator.clipboard?.writeText(webhookInfo.url)} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 10px" }}>COPY</button>
                       </div>
                     </div>
                     <div>
                       <div style={{ ...agentLabelStyle, fontSize: 9 }}>ALERT MESSAGE (paste into TradingView)</div>
-                      <code style={{ display: "block", color: "#c0c0c0", background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 3, padding: "8px", fontSize: 10, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                      <code style={{ display: "block", color: "#c0c0c0", background: "#0a0a0b", border: "1px solid #232327", borderRadius: 3, padding: "8px", fontSize: 10, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
                         {`{ "action": "BUY", "symbol": "BTC", "passphrase": "${webhookInfo.passphrase}" }`}
                       </code>
                       <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 9, marginTop: 6, lineHeight: 1.5 }}>
@@ -1553,7 +1553,7 @@ export function AgentView() {
                     {/* When OI-driven modes ARE testable, surface the OI-window caveat
                         (funding+price span the full window; confluence only the recorded OI). */}
                     {!backtest.untestable && backtest.note && (
-                      <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, lineHeight: 1.5, marginBottom: 10, padding: "6px 8px", border: "1px solid #1e2d1e", borderRadius: 3 }}>
+                      <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, lineHeight: 1.5, marginBottom: 10, padding: "6px 8px", border: "1px solid #232327", borderRadius: 3 }}>
                         ◆ {backtest.note}
                       </div>
                     )}
@@ -1571,7 +1571,7 @@ export function AgentView() {
                     </div>
                     <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
                       {backtest.perSymbol.map((s: any) => (
-                        <div key={s.symbol} style={{ display: "flex", justifyContent: "space-between", fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#a1a1aa", borderTop: "1px solid #1e2d1e", paddingTop: 4 }}>
+                        <div key={s.symbol} style={{ display: "flex", justifyContent: "space-between", fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#a1a1aa", borderTop: "1px solid #232327", paddingTop: 4 }}>
                           <span>{s.symbol.replace("PERP_", "").replace("_USDC", "")}</span>
                           <span>{s.trades} trades · {s.winRate}% win · PF {s.profitFactor} · <span style={{ color: s.netUsd >= 0 ? "#3ecf8e" : "#f7525f" }}>{s.netUsd >= 0 ? "+" : ""}${s.netUsd}</span></span>
                         </div>
@@ -1630,7 +1630,7 @@ export function AgentView() {
                     </div>
                     <div style={{ overflowX: "auto" }}>
                       <div style={{ minWidth: 340 }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 70px 52px 56px", gap: 6, fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", padding: "0 0 4px", borderBottom: "1px solid #1e2d1e" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 70px 52px 56px", gap: 6, fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", padding: "0 0 4px", borderBottom: "1px solid #232327" }}>
                           <span>STRATEGY</span><span style={{ textAlign: "right" }}>NET$</span><span style={{ textAlign: "right" }}>WIN%</span><span style={{ textAlign: "right" }}>TRADES</span>
                         </div>
                         {sweep.results.slice(0, 12).map((r: any, i: number) => (
@@ -1675,7 +1675,7 @@ export function AgentView() {
             {strategies.length > 0 && (
               <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
                 {strategies.map((s) => (
-                  <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 3 }}>
+                  <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: "#0a0a0b", border: "1px solid #232327", borderRadius: 3 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
                       <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 9, marginTop: 2 }}>
@@ -1685,7 +1685,7 @@ export function AgentView() {
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                      <button onClick={() => togglePublish(s)} title={s.public ? "Public — click to make private" : "Share to the community board"} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 10px", color: s.public ? "#ededf0" : "#a1a1aa", borderColor: s.public ? "#ededf050" : "#1e2d1e" }}>{s.public ? "🌐 PUBLIC" : "SHARE"}</button>
+                      <button onClick={() => togglePublish(s)} title={s.public ? "Public — click to make private" : "Share to the community board"} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 10px", color: s.public ? "#ededf0" : "#a1a1aa", borderColor: s.public ? "#ededf050" : "#232327" }}>{s.public ? "🌐 PUBLIC" : "SHARE"}</button>
                       <button onClick={() => loadStrategy(s)} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 12px" }}>LOAD</button>
                       <button onClick={() => deleteStrategy(s.id)} style={{ ...navBtnStyle, fontSize: 9, padding: "5px 10px", color: "#f7525f", borderColor: "#f7525f50" }}>✕</button>
                     </div>
@@ -1715,14 +1715,14 @@ export function AgentView() {
             ) : (
               <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
                 {community.map((s) => (
-                  <div key={s.owner + s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: "#0a0a0b", border: "1px solid #1e2d1e", borderRadius: 3 }}>
+                  <div key={s.owner + s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: "#0a0a0b", border: "1px solid #232327", borderRadius: 3 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                         {s.name} <span style={{ color: "#d4d4d8", fontSize: 9 }}>{s.style}</span>
                         {(() => {
                           const v = s.validation;
                           if (!v) return null;
-                          if (v.status === "validating") return <span title="Walk-forward validation running" style={{ fontSize: 8, color: "#a1a1aa", border: "1px solid #1e2d1e", borderRadius: 3, padding: "1px 5px" }}>⏳ VALIDATING</span>;
+                          if (v.status === "validating") return <span title="Walk-forward validation running" style={{ fontSize: 8, color: "#a1a1aa", border: "1px solid #232327", borderRadius: 3, padding: "1px 5px" }}>⏳ VALIDATING</span>;
                           if (v.status === "pending_oi") return <span title="Awaiting OI history to validate the confluence signal" style={{ fontSize: 8, color: "#d4d4d8", border: "1px solid #1a3a5a", borderRadius: 3, padding: "1px 5px" }}>⏳ OI PENDING</span>;
                           if (v.status !== "done") return null;
                           const vc = v.verdict === "ROBUST" ? "#3ecf8e" : v.verdict === "FRAGILE" ? "#fbbf24" : "#f7525f";
@@ -1747,7 +1747,7 @@ export function AgentView() {
           </div>
 
           {!isActive && (
-            <div style={{ marginTop: 16, padding: "8px 10px", borderRadius: 3, background: "#0a0a0b", border: "1px solid #1e2d1e" }}>
+            <div style={{ marginTop: 16, padding: "8px 10px", borderRadius: 3, background: "#0a0a0b", border: "1px solid #232327" }}>
               <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", lineHeight: 1.6 }}>
                 {config.mode === "PAPER"
                   ? <>🧪 Paper mode is fully simulated — <strong style={{ color: "#a1a1aa" }}>no key stored, no orders placed, no funds at risk</strong>. Activate to start building a paper track record against live prices.</>
@@ -1832,7 +1832,7 @@ export function AgentView() {
               {pending.map((t) => (
                 <div key={t.id} style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
-                  gap: 12, padding: "10px 0", borderBottom: "1px solid #1e2d1e",
+                  gap: 12, padding: "10px 0", borderBottom: "1px solid #232327",
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
                     <span style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>
@@ -2096,7 +2096,7 @@ export function AgentView() {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
               {config.symbols.map((sym) => (
                 <span key={sym} style={{
-                  background: "#141416", border: "1px solid #1e2d1e", borderRadius: 3,
+                  background: "#141416", border: "1px solid #232327", borderRadius: 3,
                   padding: "3px 8px", fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#a1a1aa",
                 }}>
                   {sym.replace("PERP_", "").replace("_USDC", "")}
@@ -2126,7 +2126,7 @@ export function AgentView() {
               </div>
             ) : (
               <div style={{ marginTop: 8, overflowX: "auto" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr 1.3fr", gap: 8, minWidth: 580, padding: "6px 0", borderBottom: "1px solid #1e2d1e" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr 1.3fr", gap: 8, minWidth: 580, padding: "6px 0", borderBottom: "1px solid #232327" }}>
                   {["SYMBOL", "DIR", "ENTRY", "EXIT", "P&L", "REASON", "STRATEGY"].map((h) => (
                     <span key={h} style={{ ...agentLabelStyle, fontSize: 9, marginBottom: 0 }}>{h}</span>
                   ))}
@@ -2219,7 +2219,7 @@ export function AgentView() {
                 </a>
                 {ledgerInfo.onChain?.verified && (
                   <a href={ledgerInfo.onChain.explorer || "#"} target="_blank" rel="noopener noreferrer"
-                    style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ededf0", textDecoration: "none", border: "1px solid #33333a", borderRadius: 3, padding: "2px 6px", background: "#0c1f18" }}>
+                    style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ededf0", textDecoration: "none", border: "1px solid #33333a", borderRadius: 3, padding: "2px 6px", background: "#1a1a1e" }}>
                     ⛓ ANCHORED ON-CHAIN ↗
                   </a>
                 )}
@@ -2249,7 +2249,7 @@ export function AgentView() {
                     <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                       {e.pfp
                         ? <img src={e.pfp} alt="" style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                        : <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#0c1f18", border: "1px solid #232327", flexShrink: 0 }} />}
+                        : <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#1a1a1e", border: "1px solid #232327", flexShrink: 0 }} />}
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {who}{isMe && <span style={{ color: "#ededf0", fontSize: 9 }}> (you)</span>}
@@ -2280,7 +2280,7 @@ export function AgentView() {
                       disabled={!e.config || isMe}
                       style={{
                         background: e.config && !isMe ? "#ededf015" : "#0a0a0b",
-                        border: `1px solid ${e.config && !isMe ? "#ededf0" : "#1e2d1e"}`,
+                        border: `1px solid ${e.config && !isMe ? "#ededf0" : "#232327"}`,
                         borderRadius: 4, color: e.config && !isMe ? "#ededf0" : "#52525b",
                         fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "7px 10px",
                         cursor: e.config && !isMe ? "pointer" : "default", letterSpacing: "0.03em",
