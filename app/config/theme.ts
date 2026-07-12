@@ -23,6 +23,9 @@ export const S = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, huge: 48 } as 
 export const RADIUS = { sm: 3, md: 6, lg: 8 } as const;
 
 export const MONO = "var(--nx-font-mono)";
+// Reading/UI font (Phase C de-codify). Use for prose, headings, buttons, labels;
+// keep MONO for numbers, prices, tickers, addresses, dense data tables.
+export const UI = "var(--nx-font-ui)";
 
 // ── Responsive — single breakpoint (matches useIsMobile) ─────────────────────
 export const BP = { mobile: 768 } as const;
@@ -82,12 +85,12 @@ export const DRIFT_TO_CANONICAL: Record<string, string> = {
 export const TYPE = {
   micro:   { fontFamily: MONO, fontSize: 9,  lineHeight: 1.4, letterSpacing: "0.12em", textTransform: "uppercase" as const },
   caption: { fontFamily: MONO, fontSize: 10, lineHeight: 1.5, letterSpacing: "0.10em" },
-  body:    { fontFamily: MONO, fontSize: 11, lineHeight: 1.5 },
-  bodyLg:  { fontFamily: MONO, fontSize: 13, lineHeight: 1.5 },
+  body:    { fontFamily: UI,   fontSize: 12, lineHeight: 1.55 },
+  bodyLg:  { fontFamily: UI,   fontSize: 14, lineHeight: 1.55 },
   value:   { fontFamily: MONO, fontSize: 16, lineHeight: 1.2, fontWeight: 600 },
   valueLg: { fontFamily: MONO, fontSize: 20, lineHeight: 1.2, fontWeight: 600, letterSpacing: "-0.01em" },
-  heading: { fontFamily: MONO, fontSize: 28, lineHeight: 1.2, fontWeight: 700, letterSpacing: "-0.02em" },
-  display: { fontFamily: MONO, fontSize: 40, lineHeight: 1.1, fontWeight: 700, letterSpacing: "-0.03em" },
+  heading: { fontFamily: UI,   fontSize: 28, lineHeight: 1.2, fontWeight: 700, letterSpacing: "-0.02em" },
+  display: { fontFamily: UI,   fontSize: 40, lineHeight: 1.1, fontWeight: 700, letterSpacing: "-0.03em" },
 } as const;
 
 // ── Text-role helpers — compose from TYPE + a tone. Use these over ad-hoc sizes.

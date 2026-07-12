@@ -116,6 +116,8 @@ html, body {
   --nx-r-sm: 3px; --nx-r-md: 6px; --nx-r-lg: 8px;
   --nx-dur: 170ms; --nx-ease: cubic-bezier(0.4, 0, 0.2, 1);
   --nx-font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  /* Phase C: reading/UI font (de-codify). Mono stays for numbers/tickers/addresses. */
+  --nx-font-ui: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 .nx-card {
