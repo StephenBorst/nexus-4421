@@ -15,8 +15,8 @@ export function LabWelcome() {
     <div style={{ padding: "32px 8px" }}>
       <div style={{ textAlign: "center", marginBottom: 32 }}>
         <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#ededf0", letterSpacing: "0.3em", marginBottom: 12, textShadow: "0 0 12px rgba(237,237,240,0.5)" }}>// THE LAB</div>
-        <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 28, color: "#fff", fontWeight: "bold", marginBottom: 12, lineHeight: 1.25 }}>
-          The trading terminal that<br />makes you a better trader.
+        <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 34, color: "#fff", fontWeight: 700, marginBottom: 14, lineHeight: 1.2, letterSpacing: "-0.01em" }}>
+          The trading terminal that<br />makes you a <span style={{ fontStyle: "italic" }}>better trader.</span>
         </div>
         <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 13.5, color: "#a1a1aa", maxWidth: 580, margin: "0 auto", lineHeight: 1.6 }}>
           Plan it, automate it, grade it. Most apps just let you trade — The Lab turns every
