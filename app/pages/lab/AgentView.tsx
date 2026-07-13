@@ -763,16 +763,18 @@ export function AgentView() {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ display: "inline-block" }}>
             <span style={{ display: "block", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 3 }}>Autonomous</span>
-            <span style={{ display: "block", fontFamily: "var(--nx-font-serif)", fontSize: 22, fontWeight: 700, color: "#f4f4f5", lineHeight: 1, letterSpacing: "-0.01em" }}>Nexus Agent</span>
-          </span>
-          <span style={{
-            fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "3px 10px", borderRadius: 3,
-            background: isActive ? "#3ecf8e15" : "#f7525f15",
-            border: `1px solid ${isActive ? "#3ecf8e40" : "#f7525f40"}`,
-            color: isActive ? "#3ecf8e" : "#f7525f",
-            textTransform: "uppercase", letterSpacing: "0.1em",
-          }}>
-            {isActive ? (hasPosition ? "● TRADING" : "● WATCHING") : "○ INACTIVE"}
+            <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontFamily: "var(--nx-font-serif)", fontSize: 22, fontWeight: 700, color: "#f4f4f5", lineHeight: 1, letterSpacing: "-0.01em" }}>Nexus Trading Agent</span>
+              <span style={{
+                fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "3px 10px", borderRadius: 3,
+                background: isActive ? "#3ecf8e15" : "#f7525f15",
+                border: `1px solid ${isActive ? "#3ecf8e40" : "#f7525f40"}`,
+                color: isActive ? "#3ecf8e" : "#f7525f",
+                textTransform: "uppercase", letterSpacing: "0.1em", whiteSpace: "nowrap",
+              }}>
+                {isActive ? (hasPosition ? "● TRADING" : "● WATCHING") : "○ INACTIVE"}
+              </span>
+            </span>
           </span>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

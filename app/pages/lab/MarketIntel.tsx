@@ -41,7 +41,7 @@ function NewsTab() {
   const [countdown, setCountdown] = useState(300);
   const isMob = useIsMobile();
 
-  const TEAL   = "#3ecf8e", GREEN = "#3ecf8e", RED = "#f7525f", YELLOW = "#fbbf24";
+  const TEAL   = "#ededf0", GREEN = "#a1a1aa", RED = "#f7525f", YELLOW = "#fbbf24";
   const DIM    = "rgba(255,255,255,0.35)", MUTED = "rgba(255,255,255,0.60)", BRIGHT = "rgba(255,255,255,0.87)";
   const CATS   = ["ALL", "CRYPTO", "MACRO", "DEFI", "MARKETS", "GEOPOLITICS"];
   const catClr = (c: string) => c === "MACRO" ? YELLOW : c === "DEFI" ? TEAL : c === "GEOPOLITICS" ? RED : c === "MARKETS" ? MUTED : GREEN;
