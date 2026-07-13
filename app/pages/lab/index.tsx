@@ -166,7 +166,7 @@ export default function TheLabPage() {
           ))}
         </div>
         {!isMobile && (
-          <div style={{ fontSize: 9, fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", color: syncing ? "#fbbf24" : synced ? "#3ecf8e" : "#3a3a40", flexShrink: 0, marginLeft: 8 }}>
+          <div style={{ fontSize: 9, fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", color: syncing ? "#fbbf24" : synced ? "#ededf0" : "#3a3a40", flexShrink: 0, marginLeft: 8, textShadow: synced ? "0 0 8px rgba(237,237,240,0.5)" : "none" }}>
             {syncing ? "⟳" : synced ? "●" : rootWalletAddress ? "○" : "○ CONNECT WALLET"}
           </div>
         )}
