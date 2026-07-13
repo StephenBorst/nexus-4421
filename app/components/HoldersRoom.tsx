@@ -142,9 +142,12 @@ export function HoldersRoom({ walletAddress }: { walletAddress: string | null })
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {/* Welcome + burn counter */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#a1a1aa", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ color: "#ededf0" }}>//</span> HOLDERS ROOM
-          <NexusTierBadge tier={tier} size="md" />
+        <div>
+          <div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>Hold</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontFamily: "var(--nx-font-serif)", fontSize: 24, fontWeight: 700, color: "#f4f4f5", lineHeight: 1.1, letterSpacing: "-0.01em" }}>The Holders Room</span>
+            <NexusTierBadge tier={tier} size="md" />
+          </div>
         </div>
         <NexusTreasuryStack compact />
       </div>

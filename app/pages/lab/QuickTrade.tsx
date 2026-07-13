@@ -150,8 +150,9 @@ export function QuickTrade() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 460, margin: "0 auto" }}>
-      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#a1a1aa" }}>
-        <span style={{ color: "#ededf0" }}>//</span> QUICK TRADE <span style={{ color: "#71717a", fontSize: 9 }}>· one-tap market order</span>
+      <div>
+        <div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>Trade</div>
+        <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 24, fontWeight: 700, color: "#f4f4f5", lineHeight: 1.1, letterSpacing: "-0.01em" }}>Quick Trade <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, fontWeight: 400, color: "#52525b" }}>· one-tap market order</span></div>
       </div>
 
       {/* Market selector */}

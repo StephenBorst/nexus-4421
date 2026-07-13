@@ -72,12 +72,10 @@ export const STATUS_TINT = {
   warn:    { color: C.warn, bg: "#2a1a00", border: "#4a3a00" },
 } as const;
 
-// Drift map — legacy near-duplicate greens → canonical tone. Referenced when
+// Drift map — legacy near-duplicate tones → canonical. Referenced when
 // migrating raw hex so the collapse is deliberate, not guesswork.
-//   #71717a → text.muted · #a1a1aa → text.fog · #a1a1aa → text.fog
 export const DRIFT_TO_CANONICAL: Record<string, string> = {
   "#71717a": C.text.muted,
-  "#a1a1aa": C.text.fog,
   "#a1a1aa": C.text.fog,
 };
 

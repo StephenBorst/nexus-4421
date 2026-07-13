@@ -156,6 +156,10 @@ export function MarketIntelView() {
   const [sub, setSub] = useState<"intel" | "news">("intel");
   return (
     <div>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>Scout</div>
+        <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 24, fontWeight: 700, color: "#f4f4f5", lineHeight: 1.1, letterSpacing: "-0.01em" }}>The Market Terminal</div>
+      </div>
       <MarketRegime />
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
         {([

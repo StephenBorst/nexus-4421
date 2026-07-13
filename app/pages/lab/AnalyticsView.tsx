@@ -513,7 +513,11 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+        <div>
+          <div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>Grade</div>
+          <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 24, fontWeight: 700, color: "#f4f4f5", lineHeight: 1.1, letterSpacing: "-0.01em" }}>Performance Analytics</div>
+        </div>
         <a href="/analyze" style={{ fontSize: 10, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em", textDecoration: "none", border: "1px solid #232327", borderRadius: 4, padding: "5px 10px" }}>
           ▶ X-RAY ANY WALLET
         </a>
