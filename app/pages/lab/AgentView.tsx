@@ -762,9 +762,9 @@ export function AgentView() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, rowGap: 10, marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ display: "inline-block" }}>
-            <span style={{ display: "block", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 3 }}>Autonomous</span>
+            <span style={{ display: "block", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 3 }}>Automate</span>
             <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ fontFamily: "var(--nx-font-serif)", fontSize: 22, fontWeight: 700, color: "#f4f4f5", lineHeight: 1, letterSpacing: "-0.01em" }}>Nexus Trading Agent</span>
+              <span style={{ fontFamily: "var(--nx-font-serif)", fontSize: 22, fontWeight: 700, color: "#f4f4f5", lineHeight: 1, letterSpacing: "-0.01em" }}>Autonomous Trading Agent</span>
               <span style={{
                 fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "3px 10px", borderRadius: 3,
                 background: isActive ? "#3ecf8e15" : "#f7525f15",

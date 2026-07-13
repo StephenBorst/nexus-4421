@@ -920,7 +920,7 @@ export function ThesisView() {
       <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #232327", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>
-            The Lab
+            Plan
           </div>
           <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 24, fontWeight: 700, color: "#f4f4f5", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
             The Nexus Thesis Engine
