@@ -160,11 +160,12 @@ const fmtPct     = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 
 const lsLabel = (ls: number | null) =>
   ls === null ? "—" : ls > 1.35 ? "LONGS DOM" : ls < 0.75 ? "SHORTS DOM" : "BALANCED";
+// Crowding is squeeze RISK, not direction-good/bad → amber (caution), not red/green.
 const lsColor = (ls: number | null) =>
-  ls === null ? DIM : ls > 1.35 ? GREEN : ls < 0.75 ? RED : MUTED;
+  ls === null ? DIM : (ls > 1.35 || ls < 0.75) ? YELLOW : MUTED;
 
 const signalColor = (sig: string) =>
-  sig.includes("LONGS") ? GREEN : sig.includes("SHORTS") ? RED : sig.includes("CONCENTRATION") || sig.includes("ELEVATED") ? YELLOW : MUTED;
+  sig.includes("LONGS") || sig.includes("SHORTS") || sig.includes("CONCENTRATION") || sig.includes("ELEVATED") ? YELLOW : MUTED;
 
 function assetSignalLabel(a: HLAsset): string {
   if (a.signal === "CROWDED LONGS")      return `${a.name} Crowded Longs`;
@@ -733,7 +734,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
           {(["BTC", "ETH", "SOL"] as const).map(sym => {
             const ls = lsRatios[sym] ?? null;
             const status = ls === null ? "—" : ls > 1.35 ? "LONG FLUSH" : ls < 0.75 ? "SHORT SQUEEZE" : "BALANCED";
-            const sc = ls === null ? DIM : ls > 1.35 ? RED : ls < 0.75 ? GREEN : YELLOW;
+            const sc = ls === null ? DIM : (ls > 1.35 || ls < 0.75) ? YELLOW : MUTED;
             const d = getDerivData(sym);
             const oi = d?.oi ?? 0;
             // Estimate liq exposure from OI × typical daily liq rate
@@ -754,19 +755,19 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
                 <div style={{ marginBottom: "5px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
                     <span style={{ color: DIM }}>LONGS</span>
-                    <span style={{ color: status === "LONG FLUSH" ? RED : MUTED }}>{oi > 0 ? fmtLiq(longLiq) : "—"}</span>
+                    <span style={{ color: status === "LONG FLUSH" ? YELLOW : MUTED }}>{oi > 0 ? fmtLiq(longLiq) : "—"}</span>
                   </div>
                   <div style={{ height: "3px", background: "rgba(255,255,255,0.06)", borderRadius: "1px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.round(longPct * 100)}%`, background: status === "LONG FLUSH" ? RED : GREEN, opacity: 0.8 }} />
+                    <div style={{ height: "100%", width: `${Math.round(longPct * 100)}%`, background: status === "LONG FLUSH" ? YELLOW : MUTED, opacity: 0.8 }} />
                   </div>
                 </div>
                 <div style={{ marginBottom: "6px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
                     <span style={{ color: DIM }}>SHORTS</span>
-                    <span style={{ color: status === "SHORT SQUEEZE" ? GREEN : MUTED }}>{oi > 0 ? fmtLiq(shortLiq) : "—"}</span>
+                    <span style={{ color: status === "SHORT SQUEEZE" ? YELLOW : MUTED }}>{oi > 0 ? fmtLiq(shortLiq) : "—"}</span>
                   </div>
                   <div style={{ height: "3px", background: "rgba(255,255,255,0.06)", borderRadius: "1px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.round(shortPct * 100)}%`, background: status === "SHORT SQUEEZE" ? GREEN : RED, opacity: 0.8 }} />
+                    <div style={{ height: "100%", width: `${Math.round(shortPct * 100)}%`, background: status === "SHORT SQUEEZE" ? YELLOW : MUTED, opacity: 0.8 }} />
                   </div>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: DIM, borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "5px" }}>
@@ -792,7 +793,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
           {(["BTC", "ETH", "SOL"] as const).map(sym => {
             const ls = lsRatios[sym] ?? null;
             const status = ls === null ? "LOADING" : ls > 1.35 ? "LONG FLUSH" : ls < 0.75 ? "SHORT SQUEEZE" : "BALANCED";
-            const sc = ls === null ? DIM : ls > 1.35 ? RED : ls < 0.75 ? GREEN : YELLOW;
+            const sc = ls === null ? DIM : (ls > 1.35 || ls < 0.75) ? YELLOW : MUTED;
             const longPct  = ls !== null ? Math.min(0.92, ls / (ls + 1)) : 0.5;
             const shortPct = 1 - longPct;
             const desc =
@@ -800,7 +801,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
               status === "SHORT SQUEEZE" ? "Shorts dominant — watch for violent upside unwind"  :
               status === "BALANCED"      ? "Positioning balanced — no clear crowding signal"    : "Fetching ratio…";
             return (
-              <div key={sym} style={{ padding: "10px 12px", background: "rgba(255,255,255,0.02)", border: `1px solid ${ls === null ? "rgba(255,255,255,0.05)" : ls > 1.35 ? "rgba(245,97,139,0.15)" : ls < 0.75 ? "rgba(41,233,169,0.15)" : "rgba(255,255,255,0.06)"}` }}>
+              <div key={sym} style={{ padding: "10px 12px", background: "rgba(255,255,255,0.02)", border: `1px solid ${ls === null ? "rgba(255,255,255,0.05)" : (ls > 1.35 || ls < 0.75) ? "rgba(251,191,36,0.18)" : "rgba(255,255,255,0.06)"}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                   <span style={{ color: BRIGHT, fontWeight: 700, fontSize: "14px" }}>{sym}</span>
                   <span style={{ color: sc, fontSize: "10px", letterSpacing: "0.07em", fontWeight: 700 }}>{status}</span>
@@ -809,12 +810,12 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
                 {/* L/S bar */}
                 <div style={{ marginBottom: "8px" }}>
                   <div style={{ display: "flex", height: "6px", borderRadius: "2px", overflow: "hidden", gap: "1px" }}>
-                    <div style={{ flex: longPct, background: RED, opacity: ls !== null ? 0.75 : 0.2 }} />
-                    <div style={{ flex: shortPct, background: GREEN, opacity: ls !== null ? 0.75 : 0.2 }} />
+                    <div style={{ flex: longPct, background: "#d4d4d8", opacity: ls !== null ? 0.7 : 0.2 }} />
+                    <div style={{ flex: shortPct, background: "#52525b", opacity: ls !== null ? 0.9 : 0.2 }} />
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", marginTop: "3px", fontSize: "10px" }}>
-                    <span style={{ color: RED }}>L {Math.round(longPct * 100)}%</span>
-                    <span style={{ color: GREEN }}>S {Math.round(shortPct * 100)}%</span>
+                    <span style={{ color: "#d4d4d8" }}>L {Math.round(longPct * 100)}%</span>
+                    <span style={{ color: "#71717a" }}>S {Math.round(shortPct * 100)}%</span>
                   </div>
                 </div>
 

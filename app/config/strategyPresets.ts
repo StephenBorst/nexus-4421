@@ -20,7 +20,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
     id: "proven-edge",
     name: "BTC Funding Fade",
     tag: "EXPERIMENTAL",
-    accent: "#fbbf24",
+    accent: "#71717a",
     blurb: "Selective funding-fade on BTC: enters only when funding is a top-5% extreme, with a breakeven risk-free stop. Marginal in single-window tests but it does NOT hold up under our cross-market walk-forward — so we won't call it proven. Treat it as an experiment, PAPER only. We label what's validated and what isn't.",
     config: {
       symbols: ["PERP_BTC_USDC"], signalMode: "FUNDING_ONLY", leverage: 5, capitalPerTrade: 50,
@@ -36,7 +36,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
     id: "funding-harvester",
     name: "Funding Harvester",
     tag: "CONSERVATIVE",
-    accent: "#ededf0",
+    accent: "#71717a",
     blurb: "Fade funding + OI extremes on BTC only. Low leverage, tight caps — the slow-and-steady default.",
     config: {
       symbols: ["PERP_BTC_USDC"], signalMode: "CONFLUENCE", leverage: 3, capitalPerTrade: 30,
@@ -48,7 +48,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
     id: "blue-chip-confluence",
     name: "Blue-Chip Confluence",
     tag: "BALANCED",
-    accent: "#d4d4d8",
+    accent: "#71717a",
     blurb: "Confluence across BTC + ETH. Both funding and OI must agree — fewer, higher-quality entries.",
     config: {
       symbols: ["PERP_BTC_USDC", "PERP_ETH_USDC"], signalMode: "CONFLUENCE", leverage: 5, capitalPerTrade: 40,
@@ -60,7 +60,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
     id: "oi-divergence-hunter",
     name: "OI Divergence Hunter",
     tag: "BALANCED",
-    accent: "#a855f7",
+    accent: "#71717a",
     blurb: "Trade open-interest divergence alone on BTC + ETH. Catches positioning unwinds funding misses.",
     config: {
       symbols: ["PERP_BTC_USDC", "PERP_ETH_USDC"], signalMode: "OI_ONLY", leverage: 5, capitalPerTrade: 40,
@@ -72,7 +72,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
     id: "funding-scalper",
     name: "Funding Scalper",
     tag: "AGGRESSIVE",
-    accent: "#fbbf24",
+    accent: "#71717a",
     blurb: "Fast funding-only entries across BTC/ETH/SOL. Higher leverage, tight TP/SL, more trades/day.",
     config: {
       symbols: ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC"], signalMode: "FUNDING_ONLY", leverage: 8,
@@ -84,7 +84,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
     id: "momentum-rider",
     name: "Momentum Rider",
     tag: "EMERALD · TREND",
-    accent: "#ff8800",
+    accent: "#3ecf8e",
     pro: true,
     blurb: "Trade WITH a price move above threshold across majors. Rides strength — noisy, test in paper.",
     config: {
@@ -97,7 +97,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
     id: "mean-reversion-fade",
     name: "Mean Reversion Fade",
     tag: "EMERALD · FADE",
-    accent: "#ff4c6a",
+    accent: "#3ecf8e",
     pro: true,
     blurb: "Fade sharp moves on BTC + ETH — buy the dip, sell the rip above your price threshold.",
     config: {
