@@ -29,6 +29,48 @@ export function snapQty({ capitalPerTrade, leverage, markPrice, baseTick, baseMi
   return { qty, ok: true, reason: null };
 }
 
+/**
+ * Volatility-targeted position sizing (opt-in, "B"). Scale capital INVERSELY to
+ * recent realized volatility so risk-per-trade stays roughly constant across
+ * symbols and regimes — size up in calm tape, down in wild tape. This is the
+ * mechanic our own backtests point to (R:R / sizing beats signal quality).
+ * Off when volTargetPct<=0 or realized vol is absent → returns capital unchanged
+ * (existing agents are byte-for-byte the same). Clamped so it never blows up size.
+ * @param {number} capitalPerTrade  base margin per trade (USDC)
+ * @param {number} realizedVolPct   recent realized volatility, in % (e.g. 2.4)
+ * @param {number} volTargetPct     target volatility, in % (0/undefined = off)
+ * @param {{minScale?:number,maxScale?:number}} [opts]
+ * @returns {number} scaled capital (clamped, 2dp)
+ */
+export function volScaledCapital(capitalPerTrade, realizedVolPct, volTargetPct, opts = {}) {
+  const minScale = opts.minScale ?? 0.4;
+  const maxScale = opts.maxScale ?? 2;
+  if (!(capitalPerTrade > 0)) return 0;
+  if (!(volTargetPct > 0) || !(realizedVolPct > 0)) return capitalPerTrade; // off / no data
+  const scale = Math.min(maxScale, Math.max(minScale, volTargetPct / realizedVolPct));
+  return parseFloat((capitalPerTrade * scale).toFixed(2));
+}
+
+/**
+ * Realized volatility (%) from a recent close series — stdev of pct returns,
+ * annualization-free (period vol, matches the cadence of the samples). Returns
+ * null if fewer than 3 points. Used to feed volScaledCapital.
+ * @param {number[]} closes
+ * @returns {number|null} realized vol in %
+ */
+export function realizedVolPct(closes) {
+  if (!Array.isArray(closes) || closes.length < 3) return null;
+  const rets = [];
+  for (let i = 1; i < closes.length; i++) {
+    const a = closes[i - 1], b = closes[i];
+    if (a > 0 && b > 0) rets.push((b - a) / a);
+  }
+  if (rets.length < 2) return null;
+  const mean = rets.reduce((s, r) => s + r, 0) / rets.length;
+  const variance = rets.reduce((s, r) => s + (r - mean) ** 2, 0) / rets.length;
+  return Math.sqrt(variance) * 100;
+}
+
 /** Whether the daily counters should reset (>24h since last reset). */
 export function shouldResetDaily(lastReset, now, dayMs = DAY_MS) {
   return now - (lastReset || 0) > dayMs;

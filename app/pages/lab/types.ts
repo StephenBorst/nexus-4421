@@ -65,6 +65,7 @@ export interface AgentConfig {
   maxDailyLossUsdc: number;
   fundingThreshold: number;
   fundingPercentileMin?: number; // 0=off; fade only when funding is ≥ this percentile vs its history
+  volTargetPct?: number; // 0=off; volatility-targeted sizing — scale capital inversely to recent realized vol
   signalMode: "CONFLUENCE" | "FUNDING_ONLY" | "OI_ONLY" | "MOMENTUM" | "MEAN_REVERSION";
   oiChangeThreshold: number; // % min OI move for the OI-divergence rule to count (0 = any)
   priceChangeThreshold: number; // % price move on the tick that triggers MOMENTUM / MEAN_REVERSION
@@ -170,6 +171,7 @@ export const DEFAULT_CONFIG: AgentConfig = {
   // most extreme vs history. Flipped the strategy from -$55 to +$22 (PF ~1.45,
   // 56% win). CONFLUENCE stays available (flagship) but can't be backtested yet.
   fundingPercentileMin: 95,
+  volTargetPct: 0, // off by default; >0 enables vol-targeted sizing (exec computes realized vol)
   signalMode: "FUNDING_ONLY",
   oiChangeThreshold: 0, // any OI move counts by default
   priceChangeThreshold: 0.5, // % tick move to trigger momentum / mean-reversion

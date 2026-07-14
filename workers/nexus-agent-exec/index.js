@@ -13,7 +13,7 @@
 
 import * as ed from "@noble/ed25519";
 import bs58 from "bs58";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice, breakevenArmed, directiveExpired, directiveShouldFill, directiveLevels } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice, breakevenArmed, directiveExpired, directiveShouldFill, directiveLevels, volScaledCapital, realizedVolPct } from "./logic.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const COOLDOWN_MS = 15 * 60 * 1000; // 15 min between trades
@@ -551,13 +551,34 @@ async function enterPosition(address, state, config, signal, env, cache) {
   // for THIS entry (the user supplies the edge). null for normal signal entries.
   const directive = signal.directive || null;
   const effLeverage = (directive && directive.leverage > 0) ? directive.leverage : config.leverage;
-  const effCapital = (directive && directive.capitalPerTrade > 0) ? directive.capitalPerTrade : config.capitalPerTrade;
+  let effCapital = (directive && directive.capitalPerTrade > 0) ? directive.capitalPerTrade : config.capitalPerTrade;
 
   const symbol = signal.symbol;
   const side = signal.direction === "SHORT" ? "SELL" : "BUY";
 
   // Fetch current mark price (shared per-symbol cache) + tick size
   const markPrice = await getMarkPrice(symbol, env, cache);
+
+  // B — volatility-targeted sizing (opt-in). Scale capital inversely to recent
+  // realized vol so risk-per-trade is steady across symbols/regimes. Gated on
+  // config.volTargetPct>0 and NOT for directives (user set their own size). Fully
+  // fail-safe: any fetch/vol error leaves effCapital unchanged (existing agents
+  // with volTargetPct unset are byte-for-byte identical).
+  if (config.volTargetPct > 0 && !directive) {
+    try {
+      const nowSec = Math.floor(Date.now() / 1000);
+      const hist = await orderlyPublicGet(`${ORDERLY_API}/tv/history?symbol=${symbol}&resolution=15&from=${nowSec - 24 * 3600}&to=${nowSec}`);
+      const closes = (hist && hist.s === "ok" && Array.isArray(hist.c)) ? hist.c.map(Number) : null;
+      const rv = realizedVolPct(closes);
+      if (rv) {
+        const scaled = volScaledCapital(effCapital, rv, config.volTargetPct);
+        if (scaled > 0) {
+          console.log(`[exec] ${address.slice(0, 10)} vol-sizing: rv=${rv.toFixed(2)}% target=${config.volTargetPct}% cap ${effCapital}→${scaled}`);
+          effCapital = scaled;
+        }
+      }
+    } catch (e) { /* fail-safe: keep effCapital as-is */ }
+  }
 
   // Fetch symbol info for step size + min order constraints
   const infoData = await orderlyPublicGet(`${ORDERLY_API}/v1/public/info/${symbol}`);

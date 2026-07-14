@@ -1275,6 +1275,7 @@ export function AgentView() {
                 { key: "maxDailyLossUsdc", label: "MAX DAILY LOSS", suffix: "USDC", min: 1, max: 500, step: 1 },
                 { key: "fundingThreshold", label: "FUNDING THRESHOLD", suffix: "%", min: 0.001, max: 0.1, step: 0.001 },
                 { key: "fundingPercentileMin", label: "FUNDING %ILE MIN", suffix: "pct (0=off)", min: 0, max: 99, step: 5 },
+                { key: "volTargetPct", label: "VOL-TARGET SIZE", suffix: "% (0=off)", min: 0, max: 8, step: 0.5 },
                 { key: "oiChangeThreshold", label: "OI MOVE THRESHOLD", suffix: "%", min: 0, max: 10, step: 0.05 },
                 { key: "priceChangeThreshold", label: "PRICE MOVE THRESHOLD", suffix: "%", min: 0.1, max: 10, step: 0.1 },
               ].map(({ key, label, suffix, min, max, step }) => (

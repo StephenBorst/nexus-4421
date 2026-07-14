@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-agent-exec/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice, breakevenArmed, directiveExpired, directiveShouldFill, directiveLevels } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice, breakevenArmed, directiveExpired, directiveShouldFill, directiveLevels, volScaledCapital, realizedVolPct } from "./logic.mjs";
 
 // ─── snapQty ───────────────────────────────────────────────
 test("snapQty: snaps cleanly to base_tick (no float artifacts)", () => {
@@ -351,4 +351,49 @@ test("directiveLevels: SHORT direction-side correct", () => {
   assert.ok(!r.error);
   assert.equal(r.slPercent, 2.11);
   assert.equal(r.tpPercent, 3.16);
+});
+
+// ─── volScaledCapital / realizedVolPct (B: vol-targeted sizing) ───
+test("volScaledCapital: off when volTargetPct<=0 → capital unchanged", () => {
+  assert.equal(volScaledCapital(50, 2.4, 0), 50);
+  assert.equal(volScaledCapital(50, 2.4, undefined), 50);
+});
+
+test("volScaledCapital: off when realized vol absent → capital unchanged", () => {
+  assert.equal(volScaledCapital(50, 0, 2), 50);
+  assert.equal(volScaledCapital(50, null, 2), 50);
+});
+
+test("volScaledCapital: high vol → sizes DOWN, calm vol → sizes UP", () => {
+  // target 2%, realized 4% → scale 0.5 → 25
+  assert.equal(volScaledCapital(50, 4, 2), 25);
+  // target 2%, realized 1% → scale 2 → 100
+  assert.equal(volScaledCapital(50, 1, 2), 100);
+});
+
+test("volScaledCapital: clamps scale to [minScale, maxScale]", () => {
+  // realized 10% vs target 2% → 0.2 but clamped to 0.4 → 20
+  assert.equal(volScaledCapital(50, 10, 2), 20);
+  // realized 0.1% vs target 2% → 20x but clamped to 2 → 100
+  assert.equal(volScaledCapital(50, 0.1, 2), 100);
+});
+
+test("volScaledCapital: guards bad capital", () => {
+  assert.equal(volScaledCapital(0, 2, 2), 0);
+  assert.equal(volScaledCapital(-5, 2, 2), 0);
+});
+
+test("realizedVolPct: null on too-few points", () => {
+  assert.equal(realizedVolPct([100]), null);
+  assert.equal(realizedVolPct([100, 101]), null);
+});
+
+test("realizedVolPct: flat series → ~0 vol", () => {
+  const v = realizedVolPct([100, 100, 100, 100]);
+  assert.ok(v !== null && v < 1e-9);
+});
+
+test("realizedVolPct: computes a positive vol for a moving series", () => {
+  const v = realizedVolPct([100, 102, 99, 103, 98]);
+  assert.ok(v !== null && v > 0);
 });
