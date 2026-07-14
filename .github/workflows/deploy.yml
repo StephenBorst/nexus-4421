@@ -65,3 +65,16 @@ jobs:
       - name: Deploy Worker (nexus-lab-api)
         working-directory: workers/nexus-lab-api
         run: npm ci && npx wrangler@3 deploy
+
+      # Agent workers deploy from committed source too, so exec/brain logic no
+      # longer drifts from a forgotten manual `wrangler deploy`. Secrets set on
+      # the workers persist across code deploys (wrangler deploy doesn't touch
+      # them), so this only pushes code. exec has npm deps (@noble/*, bs58) →
+      # npm ci; brain has none → deploy directly.
+      - name: Deploy Worker (nexus-agent-exec)
+        working-directory: workers/nexus-agent-exec
+        run: npm ci && npx wrangler@3 deploy
+
+      - name: Deploy Worker (nexus-agent-brain)
+        working-directory: workers/nexus-agent-brain
+        run: npx wrangler@3 deploy

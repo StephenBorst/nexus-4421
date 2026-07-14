@@ -164,9 +164,11 @@ Migrated the single-user bot → full multi-user, non-custodial, autonomous agen
   Rule: agent must be FLAT before you trade manually on the same account (positions net together; agent tracks KV).
 - **Verified live:** TP/SL/TIMEOUT closes, signing, reconcile self-heal, encrypted-key round-trip, Supabase logging
   + History read (lab-api also needs `SUPABASE_URL`/`SUPABASE_ANON_KEY` secrets — was missing, caused empty History).
-- **Deploy:** frontend → push `main` (CI → Cloudflare Pages). Workers → `npx wrangler deploy` per dir. ⚠️ CI's
-  deploy.yml redeploys nexus-lab-api from committed source — so COMMIT worker changes or CI overwrites manual deploys.
-  Worker observability logs enabled in each wrangler.toml (`[observability.logs] enabled=true`).
+- **Deploy:** frontend → push `main` (CI → Cloudflare Pages). ⚠️ CI's deploy.yml now redeploys **nexus-lab-api,
+  nexus-agent-exec, AND nexus-agent-brain** from committed source on every push to main — so COMMIT worker changes
+  or CI overwrites manual deploys (secrets persist; wrangler deploy only pushes code). The other workers
+  (nexus-ledger-anchor, nexus-lab-alerts) are still manual `npx wrangler deploy` per dir. Worker observability
+  logs enabled in each wrangler.toml (`[observability.logs] enabled=true`).
 
 ## Bankr agent control (chat-deploy the agent — Phase A+B SHIPPED, 2026-06-02)
 Bankr/Farcaster users can deploy/control the autonomous agent by chat. Two additive lab-api routes
