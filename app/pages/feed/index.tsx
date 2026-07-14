@@ -1492,7 +1492,9 @@ export default function FeedPage() {
         {view === "feed" && (
           <>
             {!loading && !error && <FeedPulse feed={feed} />}
-            {!loading && !error && <AgentTrackRecord />}
+            {/* AgentTrackRecord hidden: paper-strat backtest shows the live agent's
+                edge is net-negative/breakeven — don't surface it as social proof
+                until a proven edge returns. Component kept for easy re-enable. */}
             {/* Filters */}
             <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
               {(["ALL", "ACTIVE", "HIT_TP", "STOPPED_OUT", "INVALIDATED"] as FilterStatus[]).map((f) => (
