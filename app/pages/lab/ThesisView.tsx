@@ -13,6 +13,7 @@ import { cardStyle, labelStyle, navBtnStyle, inputStyle, fieldLabelStyle, STATUS
 import { deployToAgent, thesisToAgentConfig, thesisAgentNotice, deployDirectiveFromThesis } from "@/utils/agentPrefill";
 import { formatPnl } from "./helpers";
 import { PnlChart, EmptyState } from "./components";
+import { SharePoster, type PosterData } from "./SharePoster";
 
 function calcThesis(form: {
   entryPrice: string; stopLoss: string; takeProfit1: string; takeProfit2: string;
@@ -54,6 +55,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
 }) {
   const [actualInput, setActualInput] = useState(t.actualPnl !== null ? String(t.actualPnl) : "");
   const [inputVisible, setInputVisible] = useState(false);
+  const [poster, setPoster] = useState<PosterData | null>(null);
   const navigate = useNavigate();
   const cfg = STATUS_CONFIG[t.status] ?? STATUS_CONFIG.ACTIVE;
   const isClosed = CLOSED_STATUSES.includes(t.status);
@@ -83,6 +85,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
       background: isClosed ? "#0a0a0b" : "#141416",
       opacity: t.status === "INVALIDATED" ? 0.7 : 1,
     }}>
+      {poster && <SharePoster data={poster} onClose={() => setPoster(null)} />}
       {/* Top row */}
       <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "flex-start", justifyContent: "space-between", marginBottom: 10, gap: isMobile ? 10 : 0 }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flex: 1, minWidth: 0 }}>
@@ -134,6 +137,17 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
                 </a>
               );
             })()}
+            {t.isPublic && (
+              <button
+                title="Generate a branded, downloadable share card for this call"
+                onClick={() => setPoster({
+                  kind: "thesis", symbol: t.symbol, direction: t.direction,
+                  entry: t.entryPrice, stop: t.stopLoss, target: t.takeProfit1,
+                  rr: t.riskReward, note: t.notes ?? null,
+                })}
+                style={{ ...navBtnStyle, fontSize: 10, color: "#a1a1aa", borderColor: "#232327", minHeight: 36, padding: "6px 12px", cursor: "pointer" }}
+              >◆ CARD</button>
+            )}
             {(() => {
               // 3-state visibility cycle: PRIVATE → PUBLIC → HOLDERS → PRIVATE
               const vis = t.holdersOnly ? "HOLDERS" : t.isPublic ? "PUBLIC" : "PRIVATE";

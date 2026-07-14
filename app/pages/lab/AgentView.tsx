@@ -12,6 +12,7 @@ import { STRATEGY_PRESETS } from "@/config/strategyPresets";
 import { STYLE_PRESETS, deriveStyle, type TradingStyle } from "@/config/agentStyles";
 import { AGENT_PREFILL_KEY, DIRECTIVE_PREFILL_KEY, type AgentPrefill, type DirectiveDraft } from "@/utils/agentPrefill";
 import { PnlChart, CountUp, TableSkeleton } from "./components";
+import { SharePoster, type PosterData } from "./SharePoster";
 
 // The directional directive as returned by GET /agent/:address (read-only mirror).
 type ActiveDirective = {
@@ -243,6 +244,8 @@ export function AgentView() {
   const [tgCopied, setTgCopied] = useState(false);
   // History: which trade row is expanded (progressive-disclosure detail panel).
   const [expandedTrade, setExpandedTrade] = useState<string | null>(null);
+  // Share poster (in-app branded card) — set to open the modal for a trade.
+  const [posterData, setPosterData] = useState<PosterData | null>(null);
   const [tab, setTab] = useState<"config" | "status" | "history" | "leaderboard">("config");
   const [leaderboard, setLeaderboard] = useState<AgentLeaderboardEntry[] | null>(null);
   const [lbLoading, setLbLoading] = useState(false);
@@ -760,6 +763,7 @@ export function AgentView() {
 
   return (
     <div>
+      {posterData && <SharePoster data={posterData} onClose={() => setPosterData(null)} />}
       {/* ─── Header ──────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, rowGap: 10, marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -2230,6 +2234,20 @@ export function AgentView() {
                               <span style={{ color: "#3f3f46" }}>· independently exchange-auditable</span>
                             </div>
                           )}
+                          <div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPosterData({
+                                  kind: "trade", symbol: trade.symbol, direction: trade.direction,
+                                  entry: trade.entry_price, exit: trade.exit_price,
+                                  pnlPct: trade.pnl_percent ?? null, pnlUsd: trade.pnl,
+                                  leverage: trade.leverage ?? null, reason: trade.reason ?? null, held: holdLabel,
+                                });
+                              }}
+                              style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.05em", color: "#a1a1aa", background: "none", border: "1px solid #33333a", borderRadius: 3, padding: "4px 10px", cursor: "pointer" }}
+                            >↗ SHARE CARD</button>
+                          </div>
                         </div>
                       </div>
                     </div>
