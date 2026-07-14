@@ -5,8 +5,8 @@ import { deployToAgent } from "@/utils/agentPrefill";
 
 // ─── Constants ────────────────────────────────────────────────
 const REFRESH_INTERVAL = 60; // seconds
-const TEAL   = "#ededf0";
-const GREEN  = "#ededf0";
+const TEAL   = "#ededf0"; // neutral accent (headers, slight-bullish, bars)
+const GREEN  = "#3ecf8e"; // genuine UP/positive: gainers, +change, bullish, greed
 const RED    = "#f7525f";
 const YELLOW = "#fbbf24";
 const DIM    = "#71717a";
