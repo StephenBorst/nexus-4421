@@ -201,7 +201,12 @@ export function QuickTrade() {
           {availableBalance != null && <span style={{ marginLeft: 14 }} title="Free collateral — USDC available to open positions (not locked as margin)">FREE: ${Number(availableBalance).toFixed(2)}</span>}
         </div>
         <div style={{ marginTop: 10 }}>
-          <MiniPriceChart symbol={symbol} />
+          <MiniPriceChart symbol={symbol} height={132} />
+        </div>
+        <div style={{ marginTop: 8, textAlign: "right" }}>
+          <a href={`/perp/${symbol}`} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#71717a", textDecoration: "none" }}>
+            Open full chart →
+          </a>
         </div>
       </div>
 
