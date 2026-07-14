@@ -53,9 +53,9 @@ function PosterSVG({ data, svgRef }: { data: PosterData; svgRef: React.Ref<SVGSV
     if (data.reason) rows.push({ label: "EXIT REASON", value: data.reason });
     if (data.held) rows.push({ label: "HELD", value: data.held });
   } else {
-    headline = data.direction;
-    headlineColor = dirColor;
-    subline = data.rr != null ? `${data.rr.toFixed(2)}R planned` : "trade thesis";
+    headline = data.rr != null ? `${data.rr.toFixed(2)}R` : "THESIS";
+    headlineColor = data.rr != null ? GREEN : BRIGHT;
+    subline = data.rr != null ? "R:R planned · trustless grade" : "trade thesis";
     if (data.entry != null) rows.push({ label: "ENTRY", value: `$${data.entry.toLocaleString()}` });
     if (data.stop != null) rows.push({ label: "STOP", value: `$${data.stop.toLocaleString()}`, color: RED });
     if (data.target != null) rows.push({ label: "TARGET", value: `$${data.target.toLocaleString()}`, color: GREEN });
@@ -63,42 +63,64 @@ function PosterSVG({ data, svgRef }: { data: PosterData; svgRef: React.Ref<SVGSV
   }
 
   const MONO = "'IBM Plex Mono', ui-monospace, monospace";
+  const SANS = "Manrope, Arial, sans-serif";
+  const kindLabel = data.kind === "trade" ? "// AUTONOMOUS TRADE" : "// TRADE THESIS";
+  // Trade outcome bar: zero-centered, length ∝ |P&L%| (capped), win right / loss left.
+  const pnlPct = data.kind === "trade" ? (data.pnlPct ?? 0) : null;
+  const barMag = pnlPct != null ? Math.min(1, Math.abs(pnlPct) / 6) : 0;
+  const RX = 1140; // right brand-column anchor — mirrors the SDK PnL poster
   return (
     <svg ref={svgRef} width={W} height={H} viewBox={`0 0 ${W} ${H}`} xmlns="http://www.w3.org/2000/svg" style={{ display: "block", width: "100%", height: "auto", borderRadius: 8 }}>
       <rect width={W} height={H} fill={BG} />
       <rect x="1" y="1" width={W - 2} height={H - 2} fill="none" stroke="#232327" strokeWidth="2" rx="14" />
-      {/* faint left accent bar in the direction color */}
-      <rect x="0" y="0" width="6" height={H} fill={dirColor} opacity="0.5" />
 
-      {/* Brand */}
-      <text x="56" y="82" fill={BRIGHT} fontFamily={MONO} fontSize="26" fontWeight="700" letterSpacing="6">// NEXUS TRADING LABS</text>
-      <text x="56" y="112" fill={FAINT} fontFamily={MONO} fontSize="16" letterSpacing="2">{data.kind === "trade" ? "AUTONOMOUS TRADE · verify — don't trust" : "TRADE THESIS · graded from public price"}</text>
+      {/* ── LEFT: content zone ─────────────────────────────── */}
+      <text x="60" y="80" fill={GREEN} fontFamily={MONO} fontSize="17" letterSpacing="5" fillOpacity="0.9">{kindLabel}</text>
 
       {/* Symbol + direction chip */}
-      <text x="56" y="230" fill={BRIGHT} fontFamily={MONO} fontSize="92" fontWeight="700">{asset(data.symbol)}</text>
-      <rect x="58" y="262" width={data.direction.length * 20 + 40} height="44" rx="6" fill={PANEL} stroke={dirColor} strokeWidth="1.5" />
-      <text x="78" y="292" fill={dirColor} fontFamily={MONO} fontSize="24" fontWeight="700" letterSpacing="2">{isLong ? "▲ " : "▼ "}{data.direction}</text>
+      <text x="60" y="164" fill={BRIGHT} fontFamily={MONO} fontSize="72" fontWeight="700">{asset(data.symbol)}</text>
+      <rect x="62" y="192" width={data.direction.length * 18 + 44} height="42" rx="6" fill={PANEL} stroke={dirColor} strokeWidth="1.5" />
+      <text x="82" y="221" fill={dirColor} fontFamily={MONO} fontSize="22" fontWeight="700" letterSpacing="2">{isLong ? "▲ " : "▼ "}{data.direction}</text>
 
-      {/* Headline metric (right) */}
-      <text x={W - 56} y="210" fill={headlineColor} fontFamily={MONO} fontSize="108" fontWeight="700" textAnchor="end">{headline}</text>
-      <text x={W - 56} y="252" fill={MUTED} fontFamily={MONO} fontSize="22" textAnchor="end">{subline}</text>
+      {/* Hero metric */}
+      <text x="60" y="330" fill={headlineColor} fontFamily={MONO} fontSize="96" fontWeight="700">{headline}</text>
+      <text x="60" y="372" fill={MUTED} fontFamily={MONO} fontSize="20" letterSpacing="1">{subline}</text>
 
-      {/* Detail rows */}
+      {/* Trade outcome bar */}
+      {pnlPct != null && (
+        <g>
+          <rect x="60" y="398" width="470" height="8" rx="4" fill="#141416" />
+          <rect x="294" y="393" width="2" height="18" fill="#33333a" />
+          {pnlPct >= 0
+            ? <rect x="295" y="398" width={barMag * 235} height="8" rx="4" fill={GREEN} />
+            : <rect x={295 - barMag * 235} y="398" width={barMag * 235} height="8" rx="4" fill={RED} />}
+        </g>
+      )}
+
+      {/* Detail rows (2×2 in the left zone) */}
       {rows.slice(0, 4).map((r, i) => {
-        const x = 56 + (i % 2) * 580;
-        const y = 400 + Math.floor(i / 2) * 90;
+        const x = 60 + (i % 2) * 250;
+        const y = 448 + Math.floor(i / 2) * 64;
         return (
           <g key={r.label}>
-            <text x={x} y={y} fill={FAINT} fontFamily={MONO} fontSize="18" letterSpacing="2">{r.label}</text>
-            <text x={x} y={y + 40} fill={r.color ?? BRIGHT} fontFamily={MONO} fontSize="40" fontWeight="700">{r.value}</text>
+            <text x={x} y={y} fill={FAINT} fontFamily={MONO} fontSize="16" letterSpacing="2">{r.label}</text>
+            <text x={x} y={y + 34} fill={r.color ?? BRIGHT} fontFamily={MONO} fontSize="32" fontWeight="700">{r.value}</text>
           </g>
         );
       })}
 
+      {/* ── RIGHT: brand column (mirrors the SDK PnL poster) ── */}
+      <line x1="830" y1="150" x2="830" y2="470" stroke={GREEN} strokeOpacity="0.3" strokeWidth="2" />
+      <text x={RX} y="228" textAnchor="end" fontFamily={MONO} fontSize="15" letterSpacing="5" fill={GREEN} fillOpacity="0.85">// OMNICHAIN TRADING</text>
+      <text x={RX} y="300" textAnchor="end" fontFamily={SANS} fontSize="56" fontWeight="700" fill={BRIGHT}>Nexus</text>
+      <text x={RX} y="358" textAnchor="end" fontFamily={SANS} fontSize="56" fontWeight="700" fill="#6b6b70">Trading</text>
+      <text x={RX} y="416" textAnchor="end" fontFamily={SANS} fontSize="56" fontWeight="700" fill={BRIGHT}>Labs</text>
+      <text x={RX} y="458" textAnchor="end" fontFamily={MONO} fontSize="16" fill="#8a8a90">Perp DEX · Arbitrum · Orderly</text>
+
       {/* Footer */}
-      <line x1="56" y1="560" x2={W - 56} y2="560" stroke="#1a1a1e" strokeWidth="1" />
-      <text x="56" y="596" fill={FAINT} fontFamily={MONO} fontSize="18" letterSpacing="1">trade.nexustradinglabs.com</text>
-      <text x={W - 56} y="596" fill={GREEN} fontFamily={MONO} fontSize="18" letterSpacing="1" textAnchor="end">◆ THE LAB</text>
+      <line x1="60" y1="560" x2={W - 60} y2="560" stroke="#1a1a1e" strokeWidth="1" />
+      <text x="60" y="596" fill={GREEN} fontFamily={MONO} fontSize="15" letterSpacing="1" fillOpacity="0.7">◆ VERIFY, DON'T TRUST</text>
+      <text x={RX} y="596" fill={FAINT} fontFamily={MONO} fontSize="15" letterSpacing="1" textAnchor="end">nexustradinglabs.com</text>
     </svg>
   );
 }

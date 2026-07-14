@@ -12,7 +12,7 @@ import type { ThesisTrade, ThesisStatus } from "./types";
 import { cardStyle, labelStyle, navBtnStyle, inputStyle, fieldLabelStyle, STATUS_CONFIG, CLOSED_STATUSES } from "./styles";
 import { deployToAgent, thesisToAgentConfig, thesisAgentNotice, deployDirectiveFromThesis } from "@/utils/agentPrefill";
 import { formatPnl } from "./helpers";
-import { PnlChart, EmptyState } from "./components";
+import { PnlChart, EmptyState, Coachmark } from "./components";
 import { SharePoster, type PosterData } from "./SharePoster";
 
 function calcThesis(form: {
@@ -1254,6 +1254,11 @@ export function ThesisView() {
               })}
             </div>
           </div>
+          {filteredTrades.length > 0 && (
+            <Coachmark storageKey="nexus_coach_directional_v1" badge="STEP 1 / 2" title="Turn a thesis into a graded trade">
+              See <strong style={{ color: "#d4d4d8" }}>▶ TRADE</strong> on a thesis? That hands your exact call to the agent — it executes <strong style={{ color: "#d4d4d8" }}>your</strong> direction with full exit management, then grades the result on-chain. Your read, our rigor, trustless proof. (<strong style={{ color: "#d4d4d8" }}>⚡ AUTOMATE</strong> is different — it lets the agent pick entries from funding/OI signals.)
+            </Coachmark>
+          )}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {filteredTrades.map((t) => (
               <ThesisCard key={t.id} t={t} onUpdate={updateTrade} onRemove={removeTrade} walletAddress={walletAddress} isMobile={isMobile} markPrice={livePrices[t.symbol] ?? null} />

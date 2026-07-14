@@ -30,6 +30,45 @@ export function CountUp({ value, format, durationMs = 620 }: {
   return <>{format(display)}</>;
 }
 
+// ─── Coachmark ───────────────────────────────────────────
+// One-time, dismissible teaching callout — makes a flow legible without a heavy
+// tour lib. Gated by a localStorage key so it shows once per browser. Terminal
+// register: green left-rule, mono, "GOT IT" to dismiss. Renders nothing once
+// dismissed or when `when` is false.
+export function Coachmark({ storageKey, badge, title, children, when = true }: {
+  storageKey: string; badge?: string; title: string; children: React.ReactNode; when?: boolean;
+}) {
+  const [show, setShow] = useState(() => {
+    try { return localStorage.getItem(storageKey) !== "1"; } catch { return true; }
+  });
+  if (!show || !when) return null;
+  const dismiss = () => {
+    try { localStorage.setItem(storageKey, "1"); } catch { /* private mode */ }
+    setShow(false);
+  };
+  return (
+    <div className="nx-fade-in" style={{
+      display: "flex", gap: 12, alignItems: "flex-start",
+      background: "linear-gradient(90deg, #0d140f, #0f0f11)",
+      border: "1px solid #1e3a2a", borderLeft: "3px solid #3ecf8e",
+      borderRadius: 6, padding: "12px 14px", marginBottom: 12,
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          {badge && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.1em", color: "#0a0a0b", background: "#3ecf8e", borderRadius: 3, padding: "2px 6px", fontWeight: 700 }}>{badge}</span>}
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#3ecf8e", fontWeight: 700, letterSpacing: "0.03em" }}>{title}</span>
+        </div>
+        <div style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: 12, color: "#a1a1aa", lineHeight: 1.5 }}>{children}</div>
+      </div>
+      <button onClick={dismiss} style={{
+        flexShrink: 0, fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.05em",
+        color: "#71717a", background: "none", border: "1px solid #232327", borderRadius: 3,
+        padding: "4px 9px", cursor: "pointer",
+      }}>GOT IT</button>
+    </div>
+  );
+}
+
 // ─── Sparkline ───────────────────────────────────────────
 // Tiny dependency-free trend line for inline use in dense rows (movers, market
 // cards). Auto-colors by first→last direction unless `color` is given. Renders

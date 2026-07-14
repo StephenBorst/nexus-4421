@@ -11,7 +11,7 @@ import { isProStrategy } from "@/config/subscription";
 import { STRATEGY_PRESETS } from "@/config/strategyPresets";
 import { STYLE_PRESETS, deriveStyle, type TradingStyle } from "@/config/agentStyles";
 import { AGENT_PREFILL_KEY, DIRECTIVE_PREFILL_KEY, type AgentPrefill, type DirectiveDraft } from "@/utils/agentPrefill";
-import { PnlChart, CountUp, TableSkeleton } from "./components";
+import { PnlChart, CountUp, TableSkeleton, Coachmark } from "./components";
 import { SharePoster, type PosterData } from "./SharePoster";
 
 // The directional directive as returned by GET /agent/:address (read-only mirror).
@@ -867,6 +867,11 @@ export function AgentView() {
         return (
           <div style={{ ...agentCardStyle, borderColor: "#ededf0", background: "#0f0f11", marginBottom: 12 }}>
             <div style={agentLabelStyle}>// ▶ TRADE THIS THESIS <span style={{ color: "#71717a" }}>— one-shot, managed by the agent</span></div>
+            <div style={{ marginTop: 10 }}>
+              <Coachmark storageKey="nexus_coach_arm_v1" badge="STEP 2 / 2" title="Arm in PAPER first">
+                This hands the agent <strong style={{ color: "#d4d4d8" }}>this exact trade</strong> — your direction, your stops and targets — and it manages the exit for you (scale-out, trailing, breakeven, timeout). Start in <strong style={{ color: "#d4d4d8" }}>PAPER</strong> to watch it work risk-free, then flip to GO LIVE once you trust it. Every close is graded on-chain.
+              </Coachmark>
+            </div>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 12, marginTop: 10, marginBottom: 10, fontFamily: "var(--nx-font-mono)" }}>
               <span style={{ fontSize: 18, color: "#fff", fontWeight: "bold" }}>{tk}</span>
               <span style={{ fontSize: 13, color: isLong ? "#3ecf8e" : "#f7525f", fontWeight: "bold" }}>{isLong ? "↑ LONG" : "↓ SHORT"}</span>
