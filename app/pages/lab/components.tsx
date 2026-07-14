@@ -30,6 +30,29 @@ export function CountUp({ value, format, durationMs = 620 }: {
   return <>{format(display)}</>;
 }
 
+// ─── Sparkline ───────────────────────────────────────────
+// Tiny dependency-free trend line for inline use in dense rows (movers, market
+// cards). Auto-colors by first→last direction unless `color` is given. Renders
+// nothing below 2 points so callers can drop it in unconditionally.
+export function Sparkline({ points, width = 64, height = 20, color, strokeWidth = 1.5 }: {
+  points: number[]; width?: number; height?: number; color?: string; strokeWidth?: number;
+}) {
+  if (!points || points.length < 2) return null;
+  const min = Math.min(...points), max = Math.max(...points);
+  const range = max - min || 1;
+  const up = points[points.length - 1] >= points[0];
+  const stroke = color ?? (up ? "#3ecf8e" : "#f7525f");
+  const n = points.length;
+  const x = (i: number) => (i / (n - 1)) * (width - strokeWidth) + strokeWidth / 2;
+  const y = (v: number) => height - strokeWidth / 2 - ((v - min) / range) * (height - strokeWidth);
+  const d = points.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" L");
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: "block", flexShrink: 0 }} aria-hidden>
+      <path d={`M${d}`} fill="none" stroke={stroke} strokeWidth={strokeWidth} strokeLinejoin="round" strokeLinecap="round" strokeOpacity="0.9" />
+    </svg>
+  );
+}
+
 // ─── History skeleton ────────────────────────────────────
 // Shimmer placeholder rows for the trade-history table while state resolves.
 export function TableSkeleton({ rows = 4 }: { rows?: number }) {

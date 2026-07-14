@@ -247,8 +247,18 @@ async function computeCallerStats(env, maxHorizonS = 30 * 86400) {
   for (const { wallet, t } of calls) {
     const g = gradeCall(t, history[t.symbol]);
     if (g.outcome === "PENDING" || g.outcome === "INVALID") continue;
-    const a = byWallet[wallet] || (byWallet[wallet] = { calls: 0, wins: 0, rSum: 0 });
+    const a = byWallet[wallet] || (byWallet[wallet] = { calls: 0, wins: 0, rSum: 0, resolved: [] });
     a.calls += 1; if (g.outcome === "WIN") a.wins += 1; a.rSum += g.r;
+    // Track (time, R) so the leaderboard can emit a cumulative-R equity curve —
+    // the same trustless grade, just as a series instead of an aggregate.
+    a.resolved.push({ at: t.createdAt || 0, r: g.r });
+  }
+  // Build the chronological cumulative-R series per wallet (a.rSeries).
+  for (const a of Object.values(byWallet)) {
+    a.resolved.sort((x, y) => x.at - y.at);
+    let run = 0;
+    a.rSeries = a.resolved.map((c) => (run += c.r, Math.round(run * 100) / 100));
+    delete a.resolved; // internal only — keep the returned shape lean
   }
   return byWallet;
 }
@@ -4300,6 +4310,7 @@ document.getElementById("btn").addEventListener("click",go);
           totalR: Math.round(a.rSum * 100) / 100,
           score,
           meritRank: rankCaller(a), // earned identity rank (SIGNAL/SHARP/APEX) or null
+          rSeries: a.rSeries || [],  // cumulative-R equity curve (chronological)
         });
       }
       eligible.sort((x, y) => y.score - x.score || y.avgR - x.avgR);

@@ -18,6 +18,7 @@ import { NexusMarket } from "@/components/NexusMarket";
 import type { ThesisTrade } from "@/pages/lab/types";
 import CommentsPanel from "@/components/CommentsPanel";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
+import { Sparkline } from "@/pages/lab/components";
 import LiveNow from "./LiveNow";
 import Desks from "./Desks";
 import WatchOnlyBanner from "./WatchOnlyBanner";
@@ -760,7 +761,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
   }, [board.length]);
 
   // Trustless call grades (public-price graded, on-chain anchored) keyed by wallet.
-  const [graded, setGraded] = useState<Map<string, { hitRate: number; avgR: number; calls: number; score: number; meritRank: { tier: string; title: string; glyph: string } | null }>>(new Map());
+  const [graded, setGraded] = useState<Map<string, { hitRate: number; avgR: number; calls: number; score: number; meritRank: { tier: string; title: string; glyph: string } | null; rSeries: number[] }>>(new Map());
   const [emerging, setEmerging] = useState<Map<string, { calls: number; toQualify: number }>>(new Map());
   const [callLedger, setCallLedger] = useState<{ ledgerHash?: string; onChain?: { verified?: boolean; explorer?: string } | null } | null>(null);
   useEffect(() => {
@@ -770,9 +771,9 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
       fetch(`${API_BASE}/theses/ledger`).then((r) => r.json()).catch(() => null),
     ]).then(([lb, led]) => {
       if (cancel) return;
-      const m = new Map<string, { hitRate: number; avgR: number; calls: number; score: number; meritRank: { tier: string; title: string; glyph: string } | null }>();
+      const m = new Map<string, { hitRate: number; avgR: number; calls: number; score: number; meritRank: { tier: string; title: string; glyph: string } | null; rSeries: number[] }>();
       for (const e of (lb?.leaderboard || [])) {
-        if (e.wallet) m.set(e.wallet.toLowerCase(), { hitRate: e.hitRate, avgR: e.avgR, calls: e.calls, score: e.score, meritRank: e.meritRank ?? null });
+        if (e.wallet) m.set(e.wallet.toLowerCase(), { hitRate: e.hitRate, avgR: e.avgR, calls: e.calls, score: e.score, meritRank: e.meritRank ?? null, rSeries: Array.isArray(e.rSeries) ? e.rSeries : [] });
       }
       setGraded(m);
       const em = new Map<string, { calls: number; toQualify: number }>();
@@ -899,6 +900,15 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                   <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 2 }}>{shortAddr}</div>
                 )}
               </div>
+
+              {/* Cumulative-R equity curve — the trustless track record as a shape,
+                  not just a number. Only for graded callers with ≥2 resolved calls. */}
+              {trader.graded && trader.graded.rSeries.length >= 2 && (
+                <div style={{ flexShrink: 0, textAlign: "center" }}>
+                  <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 2 }}>R CURVE</div>
+                  <Sparkline points={trader.graded.rSeries} width={72} height={22} />
+                </div>
+              )}
 
               {/* Win rate — hero stat */}
               <div style={{ textAlign: "center", minWidth: 60, flexShrink: 0 }}>

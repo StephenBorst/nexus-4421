@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePrivateQuery, useAccount } from "@orderly.network/hooks";
 import { deployToAgent } from "@/utils/agentPrefill";
+import { Sparkline } from "@/pages/lab/components";
 
 // ─── Constants ────────────────────────────────────────────────
 const REFRESH_INTERVAL = 60; // seconds
@@ -16,7 +17,7 @@ const BRIGHT = "#f4f4f5";
 // ─── Types ────────────────────────────────────────────────────
 interface FearGreedData  { value: number; label: string }
 interface GlobalData     { btcDom: number; ethDom: number; mcapChange24h: number; totalMcap: number }
-interface Mover          { symbol: string; change24h: number }
+interface Mover          { symbol: string; change24h: number; spark: number[] }
 
 interface HLAsset {
   name: string;      // symbol shorthand e.g. "BTC"
@@ -51,13 +52,21 @@ async function fetchGlobal(): Promise<GlobalData> {
 
 async function fetchMovers(): Promise<{ gainers: Mover[]; losers: Mover[] }> {
   const [gRes, lRes] = await Promise.all([
-    fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=price_change_percentage_24h_desc&per_page=8&page=1&sparkline=false"),
-    fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=price_change_percentage_24h_asc&per_page=8&page=1&sparkline=false"),
+    fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=price_change_percentage_24h_desc&per_page=8&page=1&sparkline=true"),
+    fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=price_change_percentage_24h_asc&per_page=8&page=1&sparkline=true"),
   ]);
   const [gData, lData] = await Promise.all([gRes.json(), lRes.json()]);
   // Stablecoins peg to $1 — they're noise in a movers list ("USDC -0.0%"), so drop them.
   const STABLES = new Set(["USDT", "USDC", "DAI", "USDE", "FDUSD", "TUSD", "BUSD", "USDS", "PYUSD", "USDD", "GUSD", "FRAX", "LUSD"]);
-  const toMover = (c: any): Mover => ({ symbol: c.symbol.toUpperCase(), change24h: c.price_change_percentage_24h ?? 0 });
+  // CoinGecko's 7d sparkline is hourly (~168 pts); downsample to ~24 for a crisp
+  // small line. Fails soft to [] if the field is absent.
+  const toSpark = (c: any): number[] => {
+    const arr: number[] = Array.isArray(c?.sparkline_in_7d?.price) ? c.sparkline_in_7d.price : [];
+    if (arr.length <= 24) return arr;
+    const step = Math.ceil(arr.length / 24);
+    return arr.filter((_, i) => i % step === 0);
+  };
+  const toMover = (c: any): Mover => ({ symbol: c.symbol.toUpperCase(), change24h: c.price_change_percentage_24h ?? 0, spark: toSpark(c) });
   const notStable = (c: any) => !STABLES.has(String(c.symbol || "").toUpperCase());
   return {
     gainers: gData.filter((c: any) => c.price_change_percentage_24h > 0 && notStable(c)).slice(0, 6).map(toMover),
@@ -642,8 +651,11 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
                 onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.03)")}
                 onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
               >
-                <span style={{ color: MUTED, fontSize: "12px" }}>{g.symbol}</span>
-                <span style={{ color: GREEN, fontSize: "12px", fontWeight: 600 }}>+{g.change24h.toFixed(1)}%</span>
+                <span style={{ color: MUTED, fontSize: "12px", flexShrink: 0 }}>{g.symbol}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <Sparkline points={g.spark} color="#3ecf8e" />
+                  <span style={{ color: GREEN, fontSize: "12px", fontWeight: 600, width: 52, textAlign: "right" }}>+{g.change24h.toFixed(1)}%</span>
+                </span>
               </a>
             )) ?? <div style={{ color: DIM, fontSize: "12px" }}>Loading…</div>}
           </div>
@@ -660,8 +672,11 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
                 onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.03)")}
                 onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
               >
-                <span style={{ color: MUTED, fontSize: "12px" }}>{l.symbol}</span>
-                <span style={{ color: RED, fontSize: "12px", fontWeight: 600 }}>{l.change24h.toFixed(1)}%</span>
+                <span style={{ color: MUTED, fontSize: "12px", flexShrink: 0 }}>{l.symbol}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <Sparkline points={l.spark} color="#f7525f" />
+                  <span style={{ color: RED, fontSize: "12px", fontWeight: 600, width: 52, textAlign: "right" }}>{l.change24h.toFixed(1)}%</span>
+                </span>
               </a>
             )) ?? <div style={{ color: DIM, fontSize: "12px" }}>Loading…</div>}
           </div>
