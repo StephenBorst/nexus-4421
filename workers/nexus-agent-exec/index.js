@@ -682,6 +682,7 @@ async function enterPosition(address, state, config, signal, env, cache) {
     opened_at: Date.now(),
     order_id: orderId,
     paper,
+    leverage: effLeverage,
     tpPercent: effTp,
     slPercent: effSl,
     // Strategy label stamped at ENTRY (config can change before close) so the trade
@@ -1067,7 +1068,7 @@ async function partialClose(address, state, config, env, action, cache) {
 
   const sliceTrade = {
     symbol: pos.symbol, direction: pos.direction, entry_price: pos.entry_price,
-    exit_price: price, qty: slice, pnl: pnlUsdc, pnl_percent: pnlPct,
+    exit_price: price, qty: slice, leverage: pos.leverage ?? null, pnl: pnlUsdc, pnl_percent: pnlPct,
     reason: "TP_PARTIAL",
     opened_at: new Date(pos.opened_at).toISOString(), closed_at: new Date().toISOString(),
   };
@@ -1170,6 +1171,7 @@ async function closePosition(address, state, env, reason, cache) {
     entry_price: entryForPnl,
     exit_price: exitPrice,
     qty: closeQty,
+    leverage: pos.leverage ?? null,
     pnl: pnlUsdc,
     pnl_percent: pnlPct,
     reason,

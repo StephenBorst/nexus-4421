@@ -123,7 +123,10 @@ export interface AgentTrade {
   direction: string;
   entry_price: number;
   exit_price: number;
+  qty?: number;            // base units filled (older trades: absent)
+  leverage?: number | null; // leverage used at entry (older trades: absent/null)
   pnl: number;
+  pnl_percent?: number;    // P&L as % of margin
   reason: string;
   strategy?: string | null; // "DAY · FUNDING_ONLY" — stamped at entry (older trades: null)
   opened_at: string;

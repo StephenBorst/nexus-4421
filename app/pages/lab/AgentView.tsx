@@ -11,6 +11,7 @@ import { isProStrategy } from "@/config/subscription";
 import { STRATEGY_PRESETS } from "@/config/strategyPresets";
 import { STYLE_PRESETS, deriveStyle, type TradingStyle } from "@/config/agentStyles";
 import { AGENT_PREFILL_KEY, DIRECTIVE_PREFILL_KEY, type AgentPrefill, type DirectiveDraft } from "@/utils/agentPrefill";
+import { PnlChart, CountUp, TableSkeleton } from "./components";
 
 // The directional directive as returned by GET /agent/:address (read-only mirror).
 type ActiveDirective = {
@@ -240,6 +241,8 @@ export function AgentView() {
   const [directiveBusy, setDirectiveBusy] = useState(false);
   const [tgLinked, setTgLinked] = useState(false);
   const [tgCopied, setTgCopied] = useState(false);
+  // History: which trade row is expanded (progressive-disclosure detail panel).
+  const [expandedTrade, setExpandedTrade] = useState<string | null>(null);
   const [tab, setTab] = useState<"config" | "status" | "history" | "leaderboard">("config");
   const [leaderboard, setLeaderboard] = useState<AgentLeaderboardEntry[] | null>(null);
   const [lbLoading, setLbLoading] = useState(false);
@@ -745,10 +748,9 @@ export function AgentView() {
 
   if (loading) {
     return (
-      <div style={{ ...agentCardStyle, textAlign: "center", padding: 40 }}>
-        <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 13 }}>
-          // LOADING AGENT STATE...
-        </div>
+      <div style={agentCardStyle}>
+        <div style={{ ...agentLabelStyle, opacity: 0.7 }}>// LOADING AGENT STATE…</div>
+        <TableSkeleton rows={5} />
       </div>
     );
   }
@@ -2135,31 +2137,85 @@ export function AgentView() {
                     <span key={h} style={{ ...agentLabelStyle, fontSize: 9, marginBottom: 0 }}>{h}</span>
                   ))}
                 </div>
-                {histTrades.map((trade, i) => (
-                  <div key={trade.id || i} style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr 1.3fr", gap: 8, minWidth: 580, padding: "8px 0", borderBottom: "1px solid #0d1117" }}>
-                    <span style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
-                      {trade.symbol.replace("PERP_", "").replace("_USDC", "")}
-                    </span>
-                    <span style={{ color: trade.direction === "LONG" ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
-                      {trade.direction}
-                    </span>
-                    <span style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
-                      ${trade.entry_price.toLocaleString()}
-                    </span>
-                    <span style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
-                      ${trade.exit_price.toLocaleString()}
-                    </span>
-                    <span style={{ color: trade.pnl >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600 }}>
-                      {trade.pnl >= 0 ? "+" : ""}${trade.pnl.toFixed(2)}
-                    </span>
-                    <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: trade.reason === "TP" ? "#3ecf8e" : trade.reason === "SL" ? "#f7525f" : trade.reason === "BE" ? "#d4d4d8" : "#ff8800" }}>
-                      {trade.reason}
-                    </span>
-                    <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={trade.strategy ?? undefined}>
-                      {trade.strategy ?? "—"}
-                    </span>
+                {histTrades.map((trade, i) => {
+                  const rowId = trade.id || String(i);
+                  const open = expandedTrade === rowId;
+                  const asset = trade.symbol.replace("PERP_", "").replace("_USDC", "");
+                  const qty = trade.qty ?? 0;
+                  const notional = qty * (trade.entry_price || 0);
+                  const openedMs = trade.opened_at ? new Date(trade.opened_at).getTime() : 0;
+                  const closedMs = trade.closed_at ? new Date(trade.closed_at).getTime() : 0;
+                  const holdMin = openedMs && closedMs ? Math.max(0, Math.round((closedMs - openedMs) / 60000)) : null;
+                  const holdLabel = holdMin == null ? null : holdMin >= 60 ? `${(holdMin / 60).toFixed(1)}h` : `${holdMin}m`;
+                  // R-multiple = realized P&L% ÷ risk taken (stop distance). Only when we
+                  // have both the trade's %P&L and its stop; the true measure of a call.
+                  const rMultiple = (trade.pnl_percent != null && (trade as unknown as { slPercent?: number }).slPercent)
+                    ? trade.pnl_percent / ((trade as unknown as { slPercent: number }).slPercent * (trade.leverage || 1))
+                    : null;
+                  const entryRef = (trade as unknown as { entry_order_id?: string }).entry_order_id;
+                  const closeRef = (trade as unknown as { close_order_id?: string }).close_order_id;
+                  const chip = (label: string, value: string, color = "#a1a1aa") => (
+                    <span><span style={{ color: "#3f3f46" }}>{label} </span><span style={{ color }}>{value}</span></span>
+                  );
+                  return (
+                  <div
+                    key={rowId}
+                    className={`nx-trade-row is-clickable${open ? " is-open" : ""}`}
+                    style={{ minWidth: 580, borderBottom: "1px solid #0d1117" }}
+                    onClick={() => setExpandedTrade(open ? null : rowId)}
+                    role="button" tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpandedTrade(open ? null : rowId); } }}
+                  >
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr 1.3fr", gap: 8, padding: "9px 0" }}>
+                      <span style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>{asset}</span>
+                      <span style={{ color: trade.direction === "LONG" ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
+                        {trade.direction}
+                      </span>
+                      <span style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>${trade.entry_price.toLocaleString()}</span>
+                      <span style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>${trade.exit_price.toLocaleString()}</span>
+                      <span style={{ color: trade.pnl >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600 }}>
+                        {trade.pnl >= 0 ? "+" : ""}${trade.pnl.toFixed(2)}
+                      </span>
+                      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: trade.reason === "TP" ? "#3ecf8e" : trade.reason === "SL" ? "#f7525f" : trade.reason === "BE" ? "#d4d4d8" : "#ff8800" }}>
+                        {trade.reason}
+                      </span>
+                      <span style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", minWidth: 0 }}>
+                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={trade.strategy ?? undefined}>
+                          {trade.strategy ?? "—"}
+                        </span>
+                        <span className="nx-chevron" style={{ marginLeft: "auto", flexShrink: 0, fontSize: 10 }}>&#9656;</span>
+                      </span>
+                    </div>
+                    {/* Progressive-disclosure detail panel */}
+                    <div className={`nx-expand${open ? " is-open" : ""}`}>
+                      <div className="nx-expand-inner">
+                        <div style={{ padding: "2px 0 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
+                            {trade.leverage != null && chip("LEV", `${trade.leverage}x`)}
+                            {qty > 0 && chip("SIZE", `${qty.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${asset}`)}
+                            {notional > 0 && chip("NOTIONAL", `$${notional.toLocaleString(undefined, { maximumFractionDigits: 0 })}`)}
+                            {trade.pnl_percent != null && chip("P&L", `${trade.pnl_percent >= 0 ? "+" : ""}${trade.pnl_percent.toFixed(2)}%`, trade.pnl_percent >= 0 ? "#3ecf8e" : "#f7525f")}
+                            {rMultiple != null && isFinite(rMultiple) && chip("R", `${rMultiple >= 0 ? "+" : ""}${rMultiple.toFixed(2)}R`, rMultiple >= 0 ? "#3ecf8e" : "#f7525f")}
+                            {holdLabel && chip("HELD", holdLabel)}
+                          </div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontFamily: "var(--nx-font-mono)", fontSize: 9 }}>
+                            {openedMs > 0 && chip("OPENED", new Date(openedMs).toLocaleString(), "#71717a")}
+                            {closedMs > 0 && chip("CLOSED", new Date(closedMs).toLocaleString(), "#71717a")}
+                          </div>
+                          {(entryRef || closeRef) && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontFamily: "var(--nx-font-mono)", fontSize: 9 }}>
+                              <span style={{ color: "#3f3f46" }}>ORDERLY REF</span>
+                              {entryRef && chip("entry", String(entryRef), "#71717a")}
+                              {closeRef && chip("close", String(closeRef), "#71717a")}
+                              <span style={{ color: "#3f3f46" }}>· independently exchange-auditable</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -2171,23 +2227,41 @@ export function AgentView() {
             const agentAvgWin = histTrades.filter((t) => t.pnl > 0).reduce((s, t) => s + t.pnl, 0) / (agentWins || 1);
             const agentLosses = histTrades.filter((t) => t.pnl <= 0);
             const agentAvgLoss = agentLosses.reduce((s, t) => s + Math.abs(t.pnl), 0) / (agentLosses.length || 1);
+            // Cumulative equity curve — histTrades is newest-first, so walk it in
+            // reverse (chronological) and running-sum the P&L.
+            const equityPoints = (() => {
+              const pts: number[] = [];
+              let run = 0;
+              for (let k = histTrades.length - 1; k >= 0; k--) { run += histTrades[k].pnl; pts.push(run); }
+              return pts;
+            })();
+            const usd = (v: number) => `${v >= 0 ? "" : "-"}$${Math.abs(v).toFixed(2)}`;
+            const stats: { label: string; value: number; fmt: (v: number) => string; color: string }[] = [
+              { label: "TOTAL P&L", value: agentTotalPnl, fmt: (v) => `${v >= 0 ? "+" : "-"}$${Math.abs(v).toFixed(2)}`, color: agentTotalPnl >= 0 ? "#3ecf8e" : "#f7525f" },
+              { label: "WIN RATE", value: parseFloat(agentWinRate), fmt: (v) => `${v.toFixed(1)}%`, color: "#c0c0c0" },
+              { label: "TRADES", value: histTrades.length, fmt: (v) => `${Math.round(v)}`, color: "#c0c0c0" },
+              { label: "AVG WIN", value: agentAvgWin, fmt: usd, color: "#ededf0" },
+              { label: "AVG LOSS", value: agentAvgLoss, fmt: usd, color: "#f7525f" },
+            ];
             return (
-              <div style={agentCardStyle}>
+              <div style={agentCardStyle} className="nx-fade-in">
                 <div style={{ ...agentLabelStyle, display: "flex", alignItems: "center", gap: 8 }}>
                   // AGENT PERFORMANCE
                   {isPaperHist && <span style={{ color: "#d4d4d8", border: "1px solid #d4d4d840", borderRadius: 3, padding: "1px 6px", fontSize: 8 }}>🧪 PAPER</span>}
                 </div>
+                {equityPoints.length >= 2 && (
+                  <div style={{ marginTop: 10, marginBottom: 4 }}>
+                    <div style={{ ...agentLabelStyle, fontSize: 8, marginBottom: 2 }}>CUMULATIVE P&amp;L</div>
+                    <PnlChart points={equityPoints} />
+                  </div>
+                )}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 12, marginTop: 8 }}>
-                  {[
-                    { label: "TOTAL P&L", value: `$${agentTotalPnl.toFixed(2)}`, color: agentTotalPnl >= 0 ? "#3ecf8e" : "#f7525f" },
-                    { label: "WIN RATE", value: `${agentWinRate}%`, color: "#c0c0c0" },
-                    { label: "TRADES", value: `${histTrades.length}`, color: "#c0c0c0" },
-                    { label: "AVG WIN", value: `$${agentAvgWin.toFixed(2)}`, color: "#ededf0" },
-                    { label: "AVG LOSS", value: `$${agentAvgLoss.toFixed(2)}`, color: "#f7525f" },
-                  ].map(({ label, value, color }) => (
+                  {stats.map(({ label, value, fmt, color }) => (
                     <div key={label}>
                       <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
-                      <div style={{ color, fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>{value}</div>
+                      <div style={{ color, fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>
+                        <CountUp value={value} format={fmt} />
+                      </div>
                     </div>
                   ))}
                 </div>

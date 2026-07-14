@@ -177,6 +177,42 @@ html, body {
 .nx-input:focus { border-color: var(--nx-border-accent); box-shadow: 0 0 0 2px #ededf018; }
 .nx-input::placeholder { color: var(--nx-faint); }
 
+/* Expandable trade-history row: hover affordance + smooth progressive disclosure.
+   The 0fr→1fr grid-rows trick animates height without measuring content. */
+.nx-trade-row {
+  border-radius: var(--nx-r-sm);
+  transition: background-color var(--nx-dur) var(--nx-ease);
+}
+.nx-trade-row.is-clickable { cursor: pointer; }
+.nx-trade-row.is-clickable:hover { background: #ffffff06; }
+.nx-trade-row .nx-chevron {
+  display: inline-block; transition: transform var(--nx-dur) var(--nx-ease); color: var(--nx-faint);
+}
+.nx-trade-row.is-open .nx-chevron { transform: rotate(90deg); color: var(--nx-fog); }
+.nx-expand {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows var(--nx-dur) var(--nx-ease);
+}
+.nx-expand.is-open { grid-template-rows: 1fr; }
+.nx-expand > .nx-expand-inner { overflow: hidden; min-height: 0; }
+
+/* Skeleton shimmer — a calmer "loading" than a text line; reads as premium. */
+.nx-skeleton {
+  position: relative; overflow: hidden;
+  background: var(--nx-surface); border-radius: var(--nx-r-sm);
+}
+.nx-skeleton::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, #ffffff0c, transparent);
+  transform: translateX(-100%); animation: nx-shimmer 1.35s var(--nx-ease) infinite;
+}
+@keyframes nx-shimmer { 100% { transform: translateX(100%); } }
+
+/* Entrance fade+rise — for panels/cards appearing after data resolves. */
+.nx-fade-in { animation: nx-fade-in 320ms var(--nx-ease) both; }
+@keyframes nx-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
 @media (prefers-reduced-motion: reduce) {
-  .nx-card, .nx-btn, .nx-input { transition: none; }
+  .nx-card, .nx-btn, .nx-input, .nx-trade-row, .nx-expand, .nx-chevron { transition: none; }
+  .nx-skeleton::after, .nx-fade-in { animation: none; }
 }

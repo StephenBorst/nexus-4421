@@ -1,6 +1,50 @@
 // Shared presentational primitives for The Lab.
 // Extracted from index.tsx (god-file split) — prop-driven presentational pieces.
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+// ─── Count-up number ─────────────────────────────────────
+// Animates from 0 → value once on mount (and on value change) with an ease-out
+// curve. Premium micro-interaction for headline stats (P&L, win rate). Respects
+// prefers-reduced-motion (snaps to the final value). `format` renders each frame.
+export function CountUp({ value, format, durationMs = 620 }: {
+  value: number; format: (v: number) => string; durationMs?: number;
+}) {
+  const [display, setDisplay] = useState(value);
+  const fromRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+  useEffect(() => {
+    const reduce = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || !isFinite(value)) { setDisplay(value); return; }
+    const from = fromRef.current;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / durationMs);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      setDisplay(from + (value - from) * eased);
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
+      else fromRef.current = value;
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [value, durationMs]);
+  return <>{format(display)}</>;
+}
+
+// ─── History skeleton ────────────────────────────────────
+// Shimmer placeholder rows for the trade-history table while state resolves.
+export function TableSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div style={{ marginTop: 8 }}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} style={{ display: "flex", gap: 8, padding: "10px 0", borderBottom: "1px solid #0d1117" }}>
+          {[0.9, 0.4, 0.7, 0.7, 0.6, 0.4, 1].map((f, j) => (
+            <div key={j} className="nx-skeleton" style={{ height: 12, flex: f, opacity: 1 - i * 0.16 }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // ─── PnL Chart ───────────────────────────────────────────
 // Cumulative-P&L equity curve. Measures its container so the line draws to the
