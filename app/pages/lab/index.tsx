@@ -169,18 +169,18 @@ export default function TheLabPage() {
             }}>{isMobile ? tab.short : tab.label}</button>
           ))}
         </div>
-        {!isMobile && (
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, marginLeft: 8 }}>
-            <span
-              title="Command palette"
-              onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
-              style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", border: "1px solid #232327", borderRadius: 3, padding: "2px 6px", cursor: "pointer", letterSpacing: "0.05em" }}
-            >⌘K</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, marginLeft: 8 }}>
+          <span
+            title="Command palette"
+            onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+            style={{ fontFamily: "var(--nx-font-mono)", fontSize: isMobile ? 12 : 9, color: "#52525b", border: "1px solid #232327", borderRadius: 3, padding: isMobile ? "6px 9px" : "2px 6px", cursor: "pointer", letterSpacing: "0.05em", minHeight: isMobile ? 36 : "auto", display: "flex", alignItems: "center" }}
+          >{isMobile ? "⌘" : "⌘K"}</span>
+          {!isMobile && (
             <span style={{ fontSize: 9, fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", color: syncing ? "#fbbf24" : synced ? "#ededf0" : "#3a3a40", textShadow: synced ? "0 0 8px rgba(237,237,240,0.5)" : "none" }}>
               {syncing ? "⟳" : synced ? "●" : rootWalletAddress ? "○" : "○ CONNECT WALLET"}
             </span>
-          </div>
-        )}
+          )}
+        </div>
       </div>
       <div style={{ padding: isMobile ? 12 : 16 }}>
         <div style={{ marginBottom: 12 }}>

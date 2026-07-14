@@ -126,6 +126,7 @@ async function svgToPngBlob(svg: SVGSVGElement): Promise<Blob> {
 export function SharePoster({ data, onClose }: { data: PosterData; onClose: () => void }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const shareText = data.kind === "trade"
     ? `${asset(data.symbol)} ${data.direction} closed ${data.pnlPct != null ? `${data.pnlPct >= 0 ? "+" : ""}${data.pnlPct.toFixed(2)}%` : ""} — autonomous, on-chain-anchored. // Nexus Trading Labs`
@@ -149,6 +150,28 @@ export function SharePoster({ data, onClose }: { data: PosterData; onClose: () =
   const shareX = () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, "_blank", "noopener");
   const shareFc = () => window.open(`https://warpcast.com/~/compose?text=${encodeURIComponent(shareText + " " + shareUrl)}`, "_blank", "noopener");
 
+  // Copy the PNG to the clipboard so it can be pasted straight into the X /
+  // Farcaster composer — closes the "download then re-attach" gap. Falls back to
+  // a plain download where the async Clipboard image API isn't available.
+  const copyImage = async () => {
+    if (!svgRef.current) return;
+    setBusy(true);
+    try {
+      const blob = await svgToPngBlob(svgRef.current);
+      const CI = (window as unknown as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
+      if (CI && navigator.clipboard && "write" in navigator.clipboard) {
+        await navigator.clipboard.write([new CI({ "image/png": blob })]);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = `nexus-${asset(data.symbol).toLowerCase()}-${data.kind}.png`; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+      }
+    } catch { /* fail-soft */ } finally { setBusy(false); }
+  };
+
   const btn: React.CSSProperties = {
     fontFamily: "var(--nx-font-mono)", fontSize: 11, letterSpacing: "0.05em",
     padding: "8px 14px", borderRadius: 4, cursor: "pointer",
@@ -166,6 +189,7 @@ export function SharePoster({ data, onClose }: { data: PosterData; onClose: () =
         </div>
         <div style={{ display: "flex", gap: 8, padding: "0 16px 16px", flexWrap: "wrap", alignItems: "center" }}>
           <button onClick={download} disabled={busy} style={{ ...btn, color: "#ededf0", borderColor: "#ededf0" }}>{busy ? "RENDERING…" : "↓ DOWNLOAD PNG"}</button>
+          <button onClick={copyImage} disabled={busy} style={btn}>{copied ? "✓ COPIED" : "⧉ COPY IMAGE"}</button>
           <button onClick={shareX} style={btn}>SHARE TO 𝕏</button>
           <button onClick={shareFc} style={btn}>SHARE TO FARCASTER</button>
           <button onClick={onClose} style={{ ...btn, marginLeft: "auto", color: "#71717a" }}>CLOSE</button>
