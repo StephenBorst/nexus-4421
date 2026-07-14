@@ -2198,6 +2198,26 @@ export function AgentView() {
                             {rMultiple != null && isFinite(rMultiple) && chip("R", `${rMultiple >= 0 ? "+" : ""}${rMultiple.toFixed(2)}R`, rMultiple >= 0 ? "#3ecf8e" : "#f7525f")}
                             {holdLabel && chip("HELD", holdLabel)}
                           </div>
+                          {/* Outcome micro-viz: a zero-centered bar, length ∝ |P&L%|
+                              (capped), extending right for a win / left for a loss. */}
+                          {trade.pnl_percent != null && (() => {
+                            const cap = 6; // % that maps to a full half-track
+                            const mag = Math.min(1, Math.abs(trade.pnl_percent) / cap);
+                            const winSide = trade.pnl_percent >= 0;
+                            const col = winSide ? "#3ecf8e" : "#f7525f";
+                            return (
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, maxWidth: 320 }}>
+                                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#3f3f46", width: 30 }}>MOVE</span>
+                                <div style={{ position: "relative", flex: 1, height: 6, background: "#141416", borderRadius: 3 }}>
+                                  <div style={{ position: "absolute", left: "50%", top: -2, bottom: -2, width: 1, background: "#33333a" }} />
+                                  <div style={{
+                                    position: "absolute", top: 0, bottom: 0, borderRadius: 3, background: col,
+                                    ...(winSide ? { left: "50%", width: `${mag * 50}%` } : { right: "50%", width: `${mag * 50}%` }),
+                                  }} />
+                                </div>
+                              </div>
+                            );
+                          })()}
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontFamily: "var(--nx-font-mono)", fontSize: 9 }}>
                             {openedMs > 0 && chip("OPENED", new Date(openedMs).toLocaleString(), "#71717a")}
                             {closedMs > 0 && chip("CLOSED", new Date(closedMs).toLocaleString(), "#71717a")}

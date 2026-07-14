@@ -18,6 +18,8 @@ import { AgentView } from "./AgentView";
 import { CopiesView } from "./CopiesView";
 import { MarketIntelView } from "./MarketIntel";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
+import { CommandPalette } from "./CommandPalette";
+import { CountUp } from "./components";
 
 export default function TheLabPage() {
   const [searchParams] = useSearchParams();
@@ -131,17 +133,19 @@ export default function TheLabPage() {
         <div style={isMobile
           ? { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px 6px", width: "100%", marginTop: 4 }
           : { display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
-          {[
-            { label: "OPEN", val: connected ? String(openCount) : "—", color: openCount > 0 ? "#fbbf24" : "#71717a" },
-            { label: "CLOSED", val: connected ? String(processedTrades.length) : "—", color: "#d4d4d8" },
-            { label: "WIN RATE", val: connected && processedTrades.length > 0 ? `${winRate.toFixed(1)}%` : "—", color: connected && processedTrades.length > 0 ? (winRate >= 50 ? "#3ecf8e" : "#f7525f") : "#71717a" },
-            { label: "REALIZED P&L", val: connected && processedTrades.length > 0 ? `${totalPnl >= 0 ? "+" : ""}$${Math.abs(totalPnl).toFixed(2)}` : "—", color: connected && processedTrades.length > 0 ? (totalPnl >= 0 ? "#3ecf8e" : "#f7525f") : "#71717a" },
-            { label: "UNREALIZED", val: connected && openCount > 0 ? `${unrealizedPnl >= 0 ? "+" : ""}$${Math.abs(unrealizedPnl).toFixed(2)}` : "—", color: connected && openCount > 0 ? (unrealizedPnl >= 0 ? "#3ecf8e" : "#f7525f") : "#71717a" },
-            { label: "BALANCE", val: connected && availableBalance != null ? `$${(availableBalance as number).toFixed(2)}` : "—", color: "#f4f4f5" },
-          ].map(({ label, val, color }) => (
+          {([
+            { label: "OPEN", num: connected ? openCount : null, fmt: (v: number) => String(Math.round(v)), color: openCount > 0 ? "#fbbf24" : "#71717a" },
+            { label: "CLOSED", num: connected ? processedTrades.length : null, fmt: (v: number) => String(Math.round(v)), color: "#d4d4d8" },
+            { label: "WIN RATE", num: connected && processedTrades.length > 0 ? winRate : null, fmt: (v: number) => `${v.toFixed(1)}%`, color: connected && processedTrades.length > 0 ? (winRate >= 50 ? "#3ecf8e" : "#f7525f") : "#71717a" },
+            { label: "REALIZED P&L", num: connected && processedTrades.length > 0 ? totalPnl : null, fmt: (v: number) => `${v >= 0 ? "+" : "-"}$${Math.abs(v).toFixed(2)}`, color: connected && processedTrades.length > 0 ? (totalPnl >= 0 ? "#3ecf8e" : "#f7525f") : "#71717a" },
+            { label: "UNREALIZED", num: connected && openCount > 0 ? unrealizedPnl : null, fmt: (v: number) => `${v >= 0 ? "+" : "-"}$${Math.abs(v).toFixed(2)}`, color: connected && openCount > 0 ? (unrealizedPnl >= 0 ? "#3ecf8e" : "#f7525f") : "#71717a" },
+            { label: "BALANCE", num: connected && availableBalance != null ? (availableBalance as number) : null, fmt: (v: number) => `$${v.toFixed(2)}`, color: "#f4f4f5" },
+          ] as { label: string; num: number | null; fmt: (v: number) => string; color: string }[]).map(({ label, num, fmt, color }) => (
             <div key={label} style={{ display: "flex", flexDirection: "column", alignItems: isMobile ? "center" : "flex-start", gap: 1 }}>
               <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.12em" }}>{label}</span>
-              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: isMobile ? 11 : 12, color, fontWeight: "bold", letterSpacing: "0.05em" }}>{val}</span>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: isMobile ? 11 : 12, color, fontWeight: "bold", letterSpacing: "0.05em" }}>
+                {num == null ? "—" : <CountUp value={num} format={fmt} />}
+              </span>
             </div>
           ))}
         </div>
@@ -166,8 +170,15 @@ export default function TheLabPage() {
           ))}
         </div>
         {!isMobile && (
-          <div style={{ fontSize: 9, fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", color: syncing ? "#fbbf24" : synced ? "#ededf0" : "#3a3a40", flexShrink: 0, marginLeft: 8, textShadow: synced ? "0 0 8px rgba(237,237,240,0.5)" : "none" }}>
-            {syncing ? "⟳" : synced ? "●" : rootWalletAddress ? "○" : "○ CONNECT WALLET"}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, marginLeft: 8 }}>
+            <span
+              title="Command palette"
+              onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+              style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", border: "1px solid #232327", borderRadius: 3, padding: "2px 6px", cursor: "pointer", letterSpacing: "0.05em" }}
+            >⌘K</span>
+            <span style={{ fontSize: 9, fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", color: syncing ? "#fbbf24" : synced ? "#ededf0" : "#3a3a40", textShadow: synced ? "0 0 8px rgba(237,237,240,0.5)" : "none" }}>
+              {syncing ? "⟳" : synced ? "●" : rootWalletAddress ? "○" : "○ CONNECT WALLET"}
+            </span>
           </div>
         )}
       </div>
@@ -191,6 +202,9 @@ export default function TheLabPage() {
             onGoAnalytics={() => setActiveTab("analytics")}
           />
         )}
+        {/* key={activeTab} re-mounts the content on tab switch → the .nx-fade-in
+            entrance replays, giving a considered transition instead of a hard swap. */}
+        <div key={activeTab} className="nx-fade-in">
         {activeTab === "analytics" && (
           <AnalyticsView orders={processedTrades} totalPnl={totalPnl} winRate={winRate} collateral={availableBalance ?? 0} />
         )}
@@ -223,7 +237,9 @@ export default function TheLabPage() {
         {activeTab === "agent" && <AgentView />}
         {activeTab === "holders" && <HoldersRoom walletAddress={rootWalletAddress} />}
         {activeTab === "quicktrade" && <QuickTrade />}
+        </div>
       </div>
+      <CommandPalette onSelectTab={setActiveTab} />
     </div>
   );
 }
