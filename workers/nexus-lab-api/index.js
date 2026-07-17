@@ -165,6 +165,77 @@ function normalizeAddress(addr) {
   return addr.toLowerCase().trim();
 }
 
+// ── Smart Money (Phase 1) ─────────────────────────────────────────────────────
+// Curated seed of top Hyperliquid traders (snapshotted from the public HL
+// leaderboard, ranked by 30d PnL, gated on real size + volume + profitability).
+// Auto-refresh from the live leaderboard is Phase 1.5 (the full leaderboard JSON
+// is ~33MB — too heavy for a hot path). r=month ROI, p=month PnL$, v=month vol$.
+const SMART_SEED = [
+  { a: "0xd47587702a91731dc1089b5db0932cf820151a91", r: 0.222, p: 15399366, v: 145317737 },
+  { a: "0xb83de012dba672c76a7dbbbf3e459cb59d7d6e36", r: 0.394, p: 14071694, v: 167764018 },
+  { a: "0x4e23288cee4960f9f962195c22948e4bc7ae20c3", r: 0.974, p: 12498366, v: 2129937212 },
+  { a: "0xf822fa0fd364c573fcdb7009fcf47601bc8be01a", r: 0.141, p: 7557365, v: 171467747 },
+  { a: "0x49e96e255ba418d08e66c35b588e2f2f3766e1d0", r: 0.312, p: 6985881, v: 1845673377 },
+  { a: "0x4c78a97cef589b01bb91dbf893fffa14243d2444", r: 0.447, p: 6815542, v: 74310281 },
+  { a: "0xebe126adabe1a8f08d3ce53b45e7cc994ca14070", r: 0.387, p: 6758750, v: 97628391 },
+  { a: "0x45d26f28196d226497130c4bac709d808fed4029", r: 0.563, p: 6688135, v: 2104367 },
+  { a: "0xfe7ce058edc7cfcde9ef8262ba51f8d4796ab7ae", r: 0.366, p: 6685355, v: 220771995 },
+  { a: "0x5b5d51203a0f9079f8aeb098a6523a13f298c060", r: 0.629, p: 6647371, v: 95008793 },
+  { a: "0xa312114b5795dff9b8db50474dd57701aa78ad1e", r: 0.587, p: 5784246, v: 209753340 },
+  { a: "0xf02d16a272a842f8bac1d9a9e773aba1933454c6", r: 2.317, p: 5393746, v: 170521923 },
+  { a: "0x856c35038594767646266bc7fd68dc26480e910d", r: 0.123, p: 5098872, v: 1336805870 },
+  { a: "0xdfd526409007db0d524a62dedaaba7706736d88e", r: 1.147, p: 4693152, v: 31930324 },
+  { a: "0xfc27136e42af1732ddc9ce2605ea9bff1b959d9d", r: 0.152, p: 4254603, v: 2063810275 },
+  { a: "0x2d23b731e5f04996a2dfdbe434c7d922afdb5e00", r: 1, p: 4189403, v: 200843327 },
+  { a: "0x48d826da83e69844f2f84b2db50703a933d137a2", r: 1.03, p: 4168538, v: 75207656 },
+  { a: "0x469e9a7f624b04c24f0e64edf8d8a277e6bf58a5", r: 0.893, p: 4160121, v: 809778767 },
+  { a: "0x7fba7e745bd97f828c824589680749b55a8c04ab", r: 0.666, p: 4157120, v: 623734104 },
+  { a: "0x9e8b1e51c642f4c8b87c6ba11c53d516a218afc4", r: 0.581, p: 4116404, v: 122554657 },
+  { a: "0x64a4fbb71858f681f3fa10a42b34180a9a48088d", r: 0.27, p: 4006643, v: 228840168 },
+  { a: "0x3dc908374e11623d8eb9f07dfc7a2e5e803a54b0", r: 0.353, p: 3671798, v: 31557331 },
+  { a: "0x6bb971430554e3af58fbd469bce46ab2359a2d23", r: 1.208, p: 3502970, v: 70449619 },
+  { a: "0x484bc1608211d0604bf70bae72792a56884562f8", r: 0.422, p: 3432802, v: 38432293 },
+];
+
+// POST to Hyperliquid's public info API. Same source as the /analyze x-ray.
+async function hlInfo(body) {
+  const res = await fetch("https://api.hyperliquid.xyz/info", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`HL ${res.status}`);
+  return res.json();
+}
+
+// Run tasks in bounded-concurrency batches (mirrors exec's scaling pattern).
+async function batched(items, size, fn) {
+  const out = [];
+  for (let i = 0; i < items.length; i += size) {
+    out.push(...await Promise.all(items.slice(i, i + size).map(fn)));
+  }
+  return out;
+}
+
+// Normalize a clearinghouseState into compact open positions — dust filtered
+// (< $1k notional) and sorted by size so the meaningful conviction shows first.
+function hlPositions(state) {
+  const rows = state?.assetPositions || [];
+  return rows.map((ap) => {
+    const p = ap.position || {};
+    const szi = parseFloat(p.szi || "0");
+    if (!szi) return null;
+    return {
+      coin: p.coin,
+      side: szi > 0 ? "LONG" : "SHORT",
+      szUsd: Math.round(Math.abs(parseFloat(p.positionValue || "0"))),
+      entry: parseFloat(p.entryPx || "0"),
+      lev: parseFloat(p.leverage?.value || p.leverage || "0") || null,
+      uPnl: Math.round(parseFloat(p.unrealizedPnl || "0")),
+    };
+  }).filter((p) => p && p.szUsd >= 1000).sort((a, b) => b.szUsd - a.szUsd);
+}
+
 // ── Agent key encryption at rest (AES-256-GCM via Web Crypto) ──────────────────
 // Trading keys are encrypted before being written to KV so a KV dump alone is
 // useless without the AGENT_ENC_KEY Worker secret. Format: "v1:<b64 iv>:<b64 ct>".
@@ -568,6 +639,64 @@ export default {
     try {
     const url = new URL(request.url);
     const parts = url.pathname.split("/").filter(Boolean);
+
+    // ── GET /smart/board — graded top HL traders + their live positions ─────────
+    // Phase 1 Smart Money. Server-side (HL leaderboard is 33MB → curated seed),
+    // KV-cached 10min so browsers get a light payload. Ranked by 30d PnL.
+    if (parts[0] === "smart" && parts[1] === "board" && request.method === "GET") {
+      const CACHE_KEY = "sm:board:v1";
+      const cached = await env.LAB_STORE.get(CACHE_KEY);
+      if (cached) return json(JSON.parse(cached), request);
+      const traders = await batched(SMART_SEED, 8, async (s) => {
+        try {
+          const state = await hlInfo({ type: "clearinghouseState", user: s.a });
+          return {
+            address: s.a, roiMonth: s.r, pnlMonth: s.p, vlmMonth: s.v,
+            accountValue: Math.round(parseFloat(state?.marginSummary?.accountValue || "0")),
+            positions: hlPositions(state),
+          };
+        } catch {
+          return { address: s.a, roiMonth: s.r, pnlMonth: s.p, vlmMonth: s.v, accountValue: 0, positions: [] };
+        }
+      });
+      traders.sort((a, b) => b.pnlMonth - a.pnlMonth);
+      const payload = { traders, count: traders.length, updatedAt: Date.now() };
+      await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 600 });
+      return json(payload, request);
+    }
+
+    // ── GET /smart/events — recent opens/closes across the tracked set ──────────
+    // Merged, time-sorted signal feed from userFills. KV-cached 3min.
+    if (parts[0] === "smart" && parts[1] === "events" && request.method === "GET") {
+      const CACHE_KEY = "sm:events:v1";
+      const cached = await env.LAB_STORE.get(CACHE_KEY);
+      if (cached) return json(JSON.parse(cached), request);
+      const all = [];
+      await batched(SMART_SEED.slice(0, 12), 6, async (s) => {
+        try {
+          const fills = await hlInfo({ type: "userFills", user: s.a });
+          for (const f of (Array.isArray(fills) ? fills.slice(0, 6) : [])) {
+            const dir = f.dir || "";
+            const isOpen = /^Open/.test(dir), isClose = /^Close/.test(dir);
+            if (!isOpen && !isClose) continue;
+            all.push({
+              addr: s.a, coin: f.coin,
+              side: /Long/.test(dir) ? "LONG" : "SHORT",
+              type: isOpen ? "OPEN" : "CLOSE",
+              price: parseFloat(f.px || "0"),
+              szUsd: Math.round(parseFloat(f.px || "0") * parseFloat(f.sz || "0")),
+              closedPnl: isClose ? Math.round(parseFloat(f.closedPnl || "0")) : null,
+              ts: f.time,
+            });
+          }
+        } catch { /* skip this trader */ }
+        return null;
+      });
+      all.sort((a, b) => b.ts - a.ts);
+      const payload = { events: all.slice(0, 40), updatedAt: Date.now() };
+      await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 180 });
+      return json(payload, request);
+    }
 
     // ── POST /tg/webhook — Telegram bot updates (link a chat ↔ wallet) ──────────
     // The bot deep-link t.me/nexustradinglabs_bot?start=<wallet> sends "/start <wallet>".

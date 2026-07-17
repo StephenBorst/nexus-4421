@@ -17,6 +17,7 @@ import { ThesisView, ThesisAnalyticsView } from "./ThesisView";
 import { AgentView } from "./AgentView";
 import { CopiesView } from "./CopiesView";
 import { MarketIntelView } from "./MarketIntel";
+import { SmartMoneyView } from "./SmartMoneyView";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
 import { CommandPalette } from "./CommandPalette";
 import { CountUp } from "./components";
@@ -107,6 +108,7 @@ export default function TheLabPage() {
   // record → grade. Analytics sits last to close the loop back to the top.
   const tabs: { id: TabId; label: string; short: string }[] = [
     { id: "intel",          label: "[ MARKET INTEL ]",    short: "INTEL" },
+    { id: "smart",          label: "[ SMART MONEY ]",     short: "SMART" },
     { id: "thesis",         label: "[ NEXUS THESIS ENGINE ]", short: "LAB"   },
     { id: "agent",          label: "[ TRADING AGENT ]",   short: "AGENT" },
     { id: "quicktrade",     label: "[ QUICK TRADE ]",     short: "TRADE" },
@@ -234,6 +236,7 @@ export default function TheLabPage() {
         {activeTab === "intel" && (
           connected ? <MarketIntelView /> : <LabWelcome />
         )}
+        {activeTab === "smart" && <SmartMoneyView />}
         {activeTab === "agent" && <AgentView />}
         {activeTab === "holders" && <HoldersRoom walletAddress={rootWalletAddress} />}
         {activeTab === "quicktrade" && <QuickTrade />}
