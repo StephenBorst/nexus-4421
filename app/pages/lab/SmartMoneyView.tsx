@@ -3,12 +3,15 @@
 // the exit and grades the result on-chain). Data comes from lab-api /smart/*
 // (server-side HL indexing, KV-cached). Discovery + context — NOT "front-run the
 // whale": copy is directional (their symbol + side), executed on Nexus/Orderly.
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useIsMobile } from "./useIsMobile";
 import { agentCardStyle, agentLabelStyle } from "./styles";
 import { deployDirectiveFromThesis } from "@/utils/agentPrefill";
-import { EmptyState } from "./components";
+import { EmptyState, Coachmark } from "./components";
+import { SharePoster, type PosterData } from "./SharePoster";
+
+interface SmConsensus { sym: string; side: "LONG" | "SHORT"; count: number; netUsd: number; refPrice: number; }
 
 const AGENT_API = "https://og.nexustradinglabs.com";
 
@@ -34,6 +37,30 @@ export function SmartMoneyView() {
   const [events, setEvents] = useState<SmEvent[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [poster, setPoster] = useState<PosterData | null>(null);
+
+  // Smart-money CONSENSUS — coins where ≥2 tracked traders hold the same side.
+  // The highest-conviction signal: not one whale, but agreement. Derived free
+  // from the board data we already have.
+  const consensus = useMemo<SmConsensus[]>(() => {
+    if (!board) return [];
+    const map = new Map<string, { sym: string; side: "LONG" | "SHORT"; traders: Set<string>; netUsd: number; refPrice: number; maxSz: number }>();
+    for (const t of board) {
+      for (const p of t.positions) {
+        if (!p.tradeable || !p.sym) continue;
+        const key = `${p.sym}|${p.side}`;
+        const e = map.get(key) || { sym: p.sym, side: p.side, traders: new Set<string>(), netUsd: 0, refPrice: 0, maxSz: 0 };
+        e.traders.add(t.address); e.netUsd += p.szUsd;
+        if (p.szUsd > e.maxSz && p.entry > 0) { e.maxSz = p.szUsd; e.refPrice = p.entry; } // ref = biggest holder's entry
+        map.set(key, e);
+      }
+    }
+    return [...map.values()]
+      .filter((e) => e.traders.size >= 2)
+      .map((e) => ({ sym: e.sym, side: e.side, count: e.traders.size, netUsd: e.netUsd, refPrice: e.refPrice }))
+      .sort((a, b) => b.count - a.count || b.netUsd - a.netUsd)
+      .slice(0, 6);
+  }, [board]);
 
   const load = useCallback(async () => {
     try {
@@ -76,8 +103,18 @@ export function SmartMoneyView() {
     </button>
   );
 
+  // ↗ Share a smart-money signal as a branded card (the viral loop on our most
+  // alive surface). Consensus cards carry the trader count.
+  const shareBtn = (d: PosterData) => (
+    <button onClick={() => setPoster(d)} title="Share this signal"
+      style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", background: "none", border: "1px solid #232327", borderRadius: 3, padding: "3px 7px", cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}>
+      ↗
+    </button>
+  );
+
   return (
     <div>
+      {poster && <SharePoster data={poster} onClose={() => setPoster(null)} />}
       {/* Header */}
       <div style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>Scout</div>
@@ -89,10 +126,40 @@ export function SmartMoneyView() {
         </div>
       </div>
 
+      {/* #3 convert-loop framing — one-time */}
+      <Coachmark storageKey="nexus_coach_smart_v1" badge="THE LOOP" title="From watcher to ranked trader">
+        Copy any move → the agent manages the exit → every close joins <strong style={{ color: "#d4d4d8" }}>your</strong> on-chain track record.
+        That's how you go from watching smart money to <strong style={{ color: "#d4d4d8" }}>being</strong> graded next to them — a record nobody can fake.
+      </Coachmark>
+
       {loading && !board && !events && (
         <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 12, padding: 24, textAlign: "center" }}>// indexing Hyperliquid…</div>
       )}
       {error && !board && !events && <EmptyState message={error} />}
+
+      {/* ── SMART MONEY CONSENSUS — the highest-conviction signal ── */}
+      {consensus.length > 0 && (
+        <div style={{ ...agentCardStyle, marginBottom: 12, borderColor: "#1e3a2a" }}>
+          <div style={agentLabelStyle}>◆ SMART MONEY CONSENSUS <span style={{ color: "#52525b" }}>— coins multiple tracked traders agree on</span></div>
+          <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
+            {consensus.map((c) => (
+              <div key={`${c.sym}${c.side}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", border: "1px solid #1a1a1e", borderRadius: 6, background: "#0d140f" }}>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#ededf0", flexShrink: 0 }}>{c.sym}</span>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 700, color: c.side === "LONG" ? "#3ecf8e" : "#f7525f", flexShrink: 0 }}>{c.side === "LONG" ? "↑ LONG" : "↓ SHORT"}</span>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#3ecf8e", flexShrink: 0 }}>{c.count} traders</span>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", flexShrink: 0 }}>{usd(c.netUsd)}</span>
+                <span style={{ marginLeft: "auto", display: "flex", gap: 6, flexShrink: 0 }}>
+                  {shareBtn({ kind: "smart", symbol: c.sym, direction: c.side, szUsd: c.netUsd, consensus: c.count })}
+                  {tradeBtn(() => copy(c.sym, c.side, c.refPrice))}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3f3f46", marginTop: 8 }}>
+            Agreement across independent top traders — stronger than any single whale. ⚡ opens the copy at market (set your own levels).
+          </div>
+        </div>
+      )}
 
       {/* ── LIVE SIGNAL FEED ── */}
       {events && events.length > 0 && (
@@ -113,7 +180,10 @@ export function SmartMoneyView() {
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: e.closedPnl == null ? "#52525b" : e.closedPnl >= 0 ? "#3ecf8e" : "#f7525f", width: 72, flexShrink: 0, textAlign: "right" }}>
                   {e.closedPnl == null ? "" : `${e.closedPnl >= 0 ? "+" : ""}${usd(e.closedPnl)}`}
                 </span>
-                <span style={{ marginLeft: "auto", flexShrink: 0 }}>{e.type === "OPEN" && tradeBtn(() => copy(e.sym, e.side, e.price))}</span>
+                <span style={{ marginLeft: "auto", display: "flex", gap: 6, flexShrink: 0 }}>
+                  {e.type === "OPEN" && shareBtn({ kind: "smart", symbol: e.sym, direction: e.side, szUsd: e.szUsd, trader: short(e.addr) })}
+                  {e.type === "OPEN" && tradeBtn(() => copy(e.sym, e.side, e.price))}
+                </span>
               </div>
             ))}
           </div>

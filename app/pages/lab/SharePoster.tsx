@@ -27,6 +27,12 @@ export type PosterData =
       symbol: string; direction: string;
       entry?: number | null; stop?: number | null; target?: number | null;
       rr?: number | null; author?: string | null; meritGlyph?: string | null; note?: string | null;
+    }
+  | {
+      kind: "smart";
+      symbol: string; direction: string;
+      szUsd?: number | null; trader?: string | null; roi?: number | null;
+      consensus?: number | null; // # of tracked smart-money traders agreeing (consensus card)
     };
 
 const asset = (s: string) => s.replace("PERP_", "").replace("_USDC", "");
@@ -52,6 +58,16 @@ function PosterSVG({ data, svgRef }: { data: PosterData; svgRef: React.Ref<SVGSV
     if (data.leverage != null) rows.push({ label: "LEVERAGE", value: `${data.leverage}x` });
     if (data.reason) rows.push({ label: "EXIT REASON", value: data.reason });
     if (data.held) rows.push({ label: "HELD", value: data.held });
+  } else if (data.kind === "smart") {
+    headline = data.direction;
+    headlineColor = dirColor;
+    subline = data.consensus && data.consensus > 1
+      ? `${data.consensus} smart-money traders agree`
+      : "smart money · Hyperliquid";
+    if (data.szUsd != null && data.szUsd > 0) rows.push({ label: "SIZE", value: money(data.szUsd) });
+    if (data.consensus && data.consensus > 1) rows.push({ label: "CONSENSUS", value: `${data.consensus} traders`, color: GREEN });
+    if (data.trader) rows.push({ label: "TRADER", value: data.trader });
+    if (data.roi != null) rows.push({ label: "30D ROI", value: `${(data.roi * 100).toFixed(0)}%`, color: GREEN });
   } else {
     headline = data.rr != null ? `${data.rr.toFixed(2)}R` : "THESIS";
     headlineColor = data.rr != null ? GREEN : BRIGHT;
@@ -64,7 +80,7 @@ function PosterSVG({ data, svgRef }: { data: PosterData; svgRef: React.Ref<SVGSV
 
   const MONO = "'IBM Plex Mono', ui-monospace, monospace";
   const SANS = "Manrope, Arial, sans-serif";
-  const kindLabel = data.kind === "trade" ? "// AUTONOMOUS TRADE" : "// TRADE THESIS";
+  const kindLabel = data.kind === "trade" ? "// AUTONOMOUS TRADE" : data.kind === "smart" ? "// SMART MONEY SIGNAL" : "// TRADE THESIS";
   // Trade outcome bar: zero-centered, length ∝ |P&L%| (capped), win right / loss left.
   const pnlPct = data.kind === "trade" ? (data.pnlPct ?? 0) : null;
   const barMag = pnlPct != null ? Math.min(1, Math.abs(pnlPct) / 6) : 0;
@@ -152,6 +168,8 @@ export function SharePoster({ data, onClose }: { data: PosterData; onClose: () =
 
   const shareText = data.kind === "trade"
     ? `${asset(data.symbol)} ${data.direction} closed ${data.pnlPct != null ? `${data.pnlPct >= 0 ? "+" : ""}${data.pnlPct.toFixed(2)}%` : ""} — autonomous, on-chain-anchored. // Nexus Trading Labs`
+    : data.kind === "smart"
+    ? `${data.consensus && data.consensus > 1 ? `${data.consensus} smart-money traders are` : "Smart money is"} ${data.direction} ${asset(data.symbol)} — track it + copy to a graded agent on Nexus. // verify, don't trust`
     : `${asset(data.symbol)} ${data.direction} thesis${data.rr != null ? ` · ${data.rr.toFixed(2)}R` : ""} — graded from public price, verify don't trust. // Nexus Trading Labs`;
   const shareUrl = "https://trade.nexustradinglabs.com/lab";
 
