@@ -236,7 +236,7 @@ export default function TheLabPage() {
         {activeTab === "intel" && (
           connected ? <MarketIntelView /> : <LabWelcome />
         )}
-        {activeTab === "smart" && <SmartMoneyView />}
+        {activeTab === "smart" && <SmartMoneyView myPositions={openPositions} />}
         {activeTab === "agent" && <AgentView />}
         {activeTab === "holders" && <HoldersRoom walletAddress={rootWalletAddress} />}
         {activeTab === "quicktrade" && <QuickTrade />}

@@ -271,6 +271,27 @@ async function updateOrderlyFeed(env, orderly) {
   } catch { /* non-fatal */ }
 }
 
+// Store smart-money consensus (coin → dominant side + trader count) to the SHARED
+// NEXUS_AGENT namespace so the agent brain can gate entries that fight it
+// (respectSmartMoney). Keyed by bare coin; 1h TTL (fail-safe stale = no gating).
+async function storeConsensus(env, traders) {
+  try {
+    const byCoin = {};
+    for (const t of traders) for (const p of t.positions) {
+      if (!p.sym) continue;
+      const c = byCoin[p.sym] || (byCoin[p.sym] = { long: new Set(), short: new Set() });
+      (p.side === "LONG" ? c.long : c.short).add(t.address);
+    }
+    const out = {};
+    for (const coin in byCoin) {
+      const l = byCoin[coin].long.size, s = byCoin[coin].short.size;
+      const count = Math.max(l, s);
+      if (count >= 2) out[coin] = { side: l >= s ? "LONG" : "SHORT", count };
+    }
+    await env.NEXUS_AGENT.put("sm:consensus", JSON.stringify(out), { expirationTtl: 3600 });
+  } catch { /* non-fatal */ }
+}
+
 // POST to Hyperliquid's public info API. Same source as the /analyze x-ray.
 async function hlInfo(body) {
   const res = await fetch("https://api.hyperliquid.xyz/info", {
@@ -805,6 +826,7 @@ export default {
       });
       const traders = [...orderly, ...hl]; // Orderly first (primary)
       ctx.waitUntil(updateOrderlyFeed(env, orderly)); // diff → Orderly signal feed
+      ctx.waitUntil(storeConsensus(env, traders)); // → agent respectSmartMoney gate
       const payload = { traders, count: traders.length, orderly: orderly.length, hl: hl.length, updatedAt: Date.now() };
       await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 600 });
       return json(payload, request);

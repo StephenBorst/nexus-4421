@@ -39,7 +39,7 @@ export function computeRegime(rows) {
   return { score, label };
 }
 
-export function deriveSignal(raw, config = {}, regime = null) {
+export function deriveSignal(raw, config = {}, regime = null, smartConsensus = null) {
   const fundingRate = raw.fundingRate || 0;
   const priceChange = raw.priceChange || 0;
   const oiChange = raw.oiChange || 0;
@@ -115,6 +115,14 @@ export function deriveSignal(raw, config = {}, regime = null) {
     if (fightsTape) {
       return { direction: "NONE", confidence: 0, reason: `regime-gated (${regime.label} vs ${direction})` };
     }
+  }
+
+  // Opt-in smart-money filter — skip a NEW entry that fights a STRONG consensus of
+  // top on-chain traders on this symbol. Fail-safe: no consensus data → no gating.
+  // (Smart money is often early AND often wrong — this is a guardrail, not a signal.)
+  if (direction !== "NONE" && config.respectSmartMoney && smartConsensus && smartConsensus.count >= 3
+      && smartConsensus.side !== direction) {
+    return { direction: "NONE", confidence: 0, reason: `smart-money-gated (${smartConsensus.count} traders ${smartConsensus.side})` };
   }
 
   const reason = direction === "NONE"

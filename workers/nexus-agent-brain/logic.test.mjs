@@ -160,3 +160,41 @@ test("fundingPercentileMin: off (0/unset) or no pct → unchanged behavior", () 
   assert.equal(deriveSignal(raw({ fundingRate: 0.0002, fundingPct: 10 }), { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01 }).direction, "SHORT");
   assert.equal(deriveSignal(raw({ fundingRate: 0.0002 }), { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01, fundingPercentileMin: 90 }).direction, "SHORT"); // no pct → skip gate
 });
+
+// ── Smart-money gate (respectSmartMoney) ──────────────────────────────────────
+test("smart-money gate: entry fighting strong consensus → NONE", () => {
+  // FUNDING_ONLY wants SHORT; smart money strongly LONG (5 traders) → gated.
+  const s = deriveSignal(
+    raw({ fundingRate: 0.0002 }),
+    { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01, respectSmartMoney: true },
+    null,
+    { side: "LONG", count: 5 },
+  );
+  assert.equal(s.direction, "NONE");
+  assert.match(s.reason, /smart-money-gated/);
+});
+
+test("smart-money gate: aligned consensus does NOT gate", () => {
+  const s = deriveSignal(
+    raw({ fundingRate: 0.0002 }),
+    { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01, respectSmartMoney: true },
+    null,
+    { side: "SHORT", count: 5 },
+  );
+  assert.equal(s.direction, "SHORT");
+});
+
+test("smart-money gate: weak consensus (<3) does NOT gate", () => {
+  const s = deriveSignal(
+    raw({ fundingRate: 0.0002 }),
+    { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01, respectSmartMoney: true },
+    null,
+    { side: "LONG", count: 2 },
+  );
+  assert.equal(s.direction, "SHORT");
+});
+
+test("smart-money gate: off by default (no opt-in) → not gated", () => {
+  const s = deriveSignal(raw({ fundingRate: 0.0002 }), { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01 }, null, { side: "LONG", count: 9 });
+  assert.equal(s.direction, "SHORT");
+});

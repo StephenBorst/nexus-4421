@@ -1224,6 +1224,29 @@ export function AgentView() {
             </div>
           </div>
 
+          {/* Smart-money consensus gate — opt-in; brain skips NEW entries that fight
+              a strong consensus of top on-chain traders (respectSmartMoney). */}
+          <div style={agentCardStyle}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <div>
+                <div style={agentLabelStyle}>// SMART-MONEY FILTER</div>
+                <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 6, color: "#71717a", letterSpacing: 0 }}>
+                  Skip a NEW entry that fights a strong consensus (3+) of top on-chain traders on that symbol — see it live in
+                  the Smart Money tab. A guardrail, not a signal (smart money is often early AND often wrong). Test in PAPER first.
+                </div>
+              </div>
+              <button onClick={() => setConfig({ ...config, respectSmartMoney: !config.respectSmartMoney })}
+                style={{
+                  flexShrink: 0, cursor: "pointer", fontFamily: "var(--nx-font-mono)", fontSize: 11, borderRadius: 4, padding: "6px 16px",
+                  background: config.respectSmartMoney ? "#3ecf8e15" : "#0a0a0b",
+                  border: `1px solid ${config.respectSmartMoney ? "#3ecf8e" : "#232327"}`,
+                  color: config.respectSmartMoney ? "#3ecf8e" : "#71717a",
+                }}>
+                {config.respectSmartMoney ? "ON" : "OFF"}
+              </button>
+            </div>
+          </div>
+
           <div style={agentCardStyle}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
               <div>

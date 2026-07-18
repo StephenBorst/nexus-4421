@@ -11,6 +11,7 @@ import { agentCardStyle, agentLabelStyle } from "./styles";
 import { deployDirectiveFromThesis } from "@/utils/agentPrefill";
 import { EmptyState, Coachmark } from "./components";
 import { SharePoster, type PosterData } from "./SharePoster";
+import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
 
 interface SmConsensus { sym: string; side: "LONG" | "SHORT"; count: number; netUsd: number; refPrice: number; }
 
@@ -34,7 +35,7 @@ const ago = (ts: number) => {
   return m < 1 ? "now" : m < 60 ? `${m}m` : m < 1440 ? `${(m / 60).toFixed(0)}h` : `${(m / 1440).toFixed(0)}d`;
 };
 
-export function SmartMoneyView() {
+export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: string; position_qty?: number | string }[] }) {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [board, setBoard] = useState<SmTrader[] | null>(null);
@@ -97,6 +98,53 @@ export function SmartMoneyView() {
       .slice(0, 6);
   }, [board]);
 
+  // Net smart-money bias per coin (all board positions, both sources) → the side
+  // with more $ behind it. Powers "You vs Smart Money".
+  const smartBias = useMemo(() => {
+    const m = new Map<string, { longUsd: number; shortUsd: number; traders: number }>();
+    if (!board) return m;
+    for (const t of board) for (const p of t.positions) {
+      if (!p.sym) continue;
+      const e = m.get(p.sym) || { longUsd: 0, shortUsd: 0, traders: 0 };
+      if (p.side === "LONG") e.longUsd += p.szUsd; else e.shortUsd += p.szUsd;
+      e.traders += 1;
+      m.set(p.sym, e);
+    }
+    return m;
+  }, [board]);
+
+  // #1 You vs Smart Money — your live positions vs the net smart bias per coin.
+  const alignment = useMemo(() => {
+    const out: { coin: string; yourSide: "LONG" | "SHORT"; smartSide: "LONG" | "SHORT"; aligned: boolean; traders: number }[] = [];
+    for (const p of (myPositions || [])) {
+      const qty = parseFloat(String(p.position_qty ?? 0));
+      if (!p.symbol || Math.abs(qty) < 1e-9) continue;
+      const coin = p.symbol.replace("PERP_", "").replace("_USDC", "");
+      const bias = smartBias.get(coin);
+      if (!bias || (bias.longUsd === 0 && bias.shortUsd === 0)) continue;
+      const smartSide: "LONG" | "SHORT" = bias.longUsd >= bias.shortUsd ? "LONG" : "SHORT";
+      const yourSide: "LONG" | "SHORT" = qty > 0 ? "LONG" : "SHORT";
+      out.push({ coin, yourSide, smartSide, aligned: yourSide === smartSide, traders: bias.traders });
+    }
+    return out;
+  }, [myPositions, smartBias]);
+
+  // #3 Turn a smart-money move into a reasoned thesis (prefill the Thesis Engine).
+  const openThesis = (sym: string, side: "LONG" | "SHORT", refPrice: number, note: string) => {
+    const p = refPrice > 0 ? refPrice : 0;
+    const isLong = side === "LONG";
+    try {
+      localStorage.setItem(THESIS_DRAFT_KEY, JSON.stringify({
+        symbol: sym, direction: side,
+        entryPrice: p || undefined,
+        stopLoss: p > 0 ? Number((isLong ? p * 0.97 : p * 1.03).toFixed(6)) : undefined,
+        takeProfit1: p > 0 ? Number((isLong ? p * 1.06 : p * 0.94).toFixed(6)) : undefined,
+        notes: note,
+      }));
+    } catch { /* ignore */ }
+    navigate("/lab?tab=thesis");
+  };
+
   const load = useCallback(async () => {
     try {
       const [b, e] = await Promise.all([
@@ -152,6 +200,13 @@ export function SmartMoneyView() {
     </button>
   );
 
+  const thesisBtn = (onClick: () => void) => (
+    <button onClick={onClick} title="Turn this into a reasoned thesis — sized, R:R'd, and gradeable in the Thesis Engine"
+      style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#a1a1aa", background: "none", border: "1px solid #232327", borderRadius: 3, padding: "3px 7px", cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}>
+      ◆
+    </button>
+  );
+
   // ↗ Share a smart-money signal as a branded card (the viral loop on our most
   // alive surface). Consensus cards carry the trader count.
   const shareBtn = (d: PosterData) => (
@@ -191,6 +246,28 @@ export function SmartMoneyView() {
       )}
       {error && !board && !events && <EmptyState message={error} />}
 
+      {/* ── #1 YOU vs SMART MONEY — your positions vs the crowd ── */}
+      {alignment.length > 0 && (
+        <div style={{ ...agentCardStyle, marginBottom: 12 }}>
+          <div style={agentLabelStyle}>◎ YOU vs SMART MONEY <span style={{ color: "#52525b" }}>— your open positions vs where the smart money sits</span></div>
+          <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+            {alignment.map((a) => (
+              <div key={a.coin} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 8px", borderRadius: 4, border: `1px solid ${a.aligned ? "#1e3a2a" : "#3a1e1e"}`, background: a.aligned ? "#0d140f" : "#140d0d", flexWrap: "wrap" }}>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ededf0", width: 56, flexShrink: 0 }}>{a.coin}</span>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", flexShrink: 0 }}>you <span style={{ color: a.yourSide === "LONG" ? "#3ecf8e" : "#f7525f" }}>{a.yourSide}</span></span>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", flexShrink: 0 }}>smart money <span style={{ color: a.smartSide === "LONG" ? "#3ecf8e" : "#f7525f" }}>{a.smartSide}</span> <span style={{ color: "#52525b" }}>({a.traders})</span></span>
+                <span style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 10, fontWeight: 700, color: a.aligned ? "#3ecf8e" : "#fbbf24", flexShrink: 0 }}>
+                  {a.aligned ? "✓ ALIGNED" : "⚠ FIGHTING THE CROWD"}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3f3f46", marginTop: 8 }}>
+            Context, not a signal — smart money is often early AND often wrong. Know which side you're on.
+          </div>
+        </div>
+      )}
+
       {/* ── SMART MONEY CONSENSUS — the highest-conviction signal ── */}
       {consensus.length > 0 && (
         <div style={{ ...agentCardStyle, marginBottom: 12, borderColor: "#1e3a2a" }}>
@@ -204,6 +281,7 @@ export function SmartMoneyView() {
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", flexShrink: 0 }}>{usd(c.netUsd)}</span>
                 <span style={{ marginLeft: "auto", display: "flex", gap: 6, flexShrink: 0 }}>
                   {shareBtn({ kind: "smart", symbol: c.sym, direction: c.side, szUsd: c.netUsd, consensus: c.count })}
+                  {thesisBtn(() => openThesis(c.sym, c.side, c.refPrice, `Smart-money consensus: ${c.count} top traders are ${c.side} ${c.sym}.`))}
                   {tradeBtn(() => copy(c.sym, c.side, c.refPrice))}
                 </span>
               </div>
@@ -242,6 +320,7 @@ export function SmartMoneyView() {
                 </span>
                 <span style={{ marginLeft: "auto", display: "flex", gap: 6, flexShrink: 0 }}>
                   {e.type === "OPEN" && shareBtn({ kind: "smart", symbol: e.sym, direction: e.side, szUsd: e.szUsd, trader: short(e.addr) })}
+                  {e.type === "OPEN" && thesisBtn(() => openThesis(e.sym, e.side, e.price, `${short(e.addr)} (smart money) opened ${e.side} ${e.sym}.`))}
                   {e.type === "OPEN" && tradeBtn(() => copy(e.sym, e.side, e.price))}
                 </span>
               </div>

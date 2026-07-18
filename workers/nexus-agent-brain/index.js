@@ -105,6 +105,15 @@ export default {
         } catch (e) { console.error("[brain] regime fetch error:", e.message); }
       }
 
+      // Smart-money consensus — one KV read per tick, only if someone opted in.
+      // Written by lab-api's Smart Money board build (shared NEXUS_AGENT namespace);
+      // absent/stale → the gate no-ops (fail-safe). Keyed by bare coin.
+      let smartConsensus = null;
+      if (Object.values(userConfigs).some(({ config }) => config.respectSmartMoney)) {
+        try { const c = await env.NEXUS_AGENT.get("sm:consensus"); smartConsensus = c ? JSON.parse(c) : null; }
+        catch (e) { console.error("[brain] consensus fetch error:", e.message); }
+      }
+
       // Assign the best qualifying signal to each user from their watchlist,
       // honoring THEIR strategy config (signalMode + thresholds).
       for (const [address, { config }] of Object.entries(userConfigs)) {
@@ -113,7 +122,9 @@ export default {
           for (const sym of config.symbols || []) {
             const raw = rawBySymbol[sym];
             if (!raw) continue;
-            const sig = deriveSignal(raw, config, config.respectRegime ? regime : null);
+            const coin = sym.replace("PERP_", "").replace("_USDC", "");
+            const cons = (config.respectSmartMoney && smartConsensus) ? smartConsensus[coin] : null;
+            const sig = deriveSignal(raw, config, config.respectRegime ? regime : null, cons);
             if (sig.direction !== "NONE" && sig.confidence > best.confidence) {
               best = { symbol: sym, direction: sig.direction, funding: raw.fundingRate, oi: raw.oi, price: raw.price, confidence: sig.confidence, reason: sig.reason };
             }
