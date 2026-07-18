@@ -11,6 +11,7 @@ import { agentCardStyle, agentLabelStyle } from "./styles";
 import { deployDirectiveFromThesis } from "@/utils/agentPrefill";
 import { EmptyState, Coachmark } from "./components";
 import { SharePoster, type PosterData } from "./SharePoster";
+import { TraderDetail } from "./TraderDetail";
 import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
 
 interface SmConsensus { sym: string; side: "LONG" | "SHORT"; count: number; netUsd: number; refPrice: number; }
@@ -18,7 +19,7 @@ interface SmConsensus { sym: string; side: "LONG" | "SHORT"; count: number; netU
 const AGENT_API = "https://og.nexustradinglabs.com";
 
 interface SmPosition { coin: string; sym: string | null; tradeable: boolean; side: "LONG" | "SHORT"; szUsd: number; entry: number; lev: number | null; uPnl: number; }
-interface SmTrader { source: "orderly" | "hl"; address: string; pnl: number; pnlLabel: string; roi?: number | null; accountValue?: number; positions: SmPosition[]; }
+interface SmTrader { source: "orderly" | "hl"; address: string; accountId?: string; pnl: number; pnlLabel: string; roi?: number | null; accountValue?: number; positions: SmPosition[]; }
 
 const WATCH_KEY = "nexus_sm_watchlist";
 const loadWatch = (): string[] => { try { return JSON.parse(localStorage.getItem(WATCH_KEY) || "[]"); } catch { return []; } };
@@ -43,6 +44,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [poster, setPoster] = useState<PosterData | null>(null);
+  const [detail, setDetail] = useState<{ source: "orderly" | "hl"; address: string; accountId?: string } | null>(null);
   const [watch, setWatch] = useState<string[]>(loadWatch);
   const [watchOnly, setWatchOnly] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -128,6 +130,18 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
     }
     return out;
   }, [myPositions, smartBias]);
+
+  // address → accountId (board traders carry it) so any address in the feed can
+  // open the same unified trader detail.
+  const accountIdByAddr = useMemo(() => {
+    const m = new Map<string, { source: "orderly" | "hl"; accountId?: string }>();
+    if (board) for (const t of board) m.set(t.address, { source: t.source, accountId: t.accountId });
+    return m;
+  }, [board]);
+  const openDetail = (address: string, source?: "orderly" | "hl", accountId?: string) => {
+    const meta = accountIdByAddr.get(address);
+    setDetail({ source: source || meta?.source || "hl", address, accountId: accountId || meta?.accountId });
+  };
 
   // #3 Turn a smart-money move into a reasoned thesis (prefill the Thesis Engine).
   const openThesis = (sym: string, side: "LONG" | "SHORT", refPrice: number, note: string) => {
@@ -219,6 +233,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
   return (
     <div>
       {poster && <SharePoster data={poster} onClose={() => setPoster(null)} />}
+      {detail && <TraderDetail source={detail.source} address={detail.address} accountId={detail.accountId} onClose={() => setDetail(null)} />}
       {toast && (
         <div className="nx-fade-in" style={{ position: "fixed", bottom: 20, left: 20, zIndex: 8000, background: "#0f0f11", border: "1px solid #4a3a00", borderLeft: "3px solid #fbbf24", borderRadius: 6, padding: "10px 14px", fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#fbbf24", boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>
           {toast}
@@ -229,9 +244,9 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
         <div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>Scout</div>
         <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 24, fontWeight: 700, color: "#f4f4f5", lineHeight: 1.1 }}>Smart Money</div>
         <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 11, color: "#71717a", marginTop: 6, lineHeight: 1.5, maxWidth: 660 }}>
-          The top traders on <strong style={{ color: "#a1a1aa" }}>Orderly</strong> (your own venue — copies are native) and Hyperliquid,
-          with what they're holding right now. Turn any move into a <strong style={{ color: "#a1a1aa" }}>risk-managed directive</strong> the
-          agent runs and grades on-chain. Star ★ the wallets you trust to build a watchlist. Discovery + context, not front-running.
+          The top traders on <strong style={{ color: "#a1a1aa" }}>Orderly</strong> and Hyperliquid, and what they're holding right now —
+          indexed live from public on-chain data. Copy any move into a <strong style={{ color: "#a1a1aa" }}>risk-managed trade</strong> the
+          agent manages and grades on-chain, or star ★ the wallets you trust to track them.
         </div>
       </div>
 
@@ -309,7 +324,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
                 <span title={e.source === "orderly" ? "Orderly (native)" : "Hyperliquid"} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: e.source === "orderly" ? "#3ecf8e" : "#52525b", width: 12, flexShrink: 0 }}>{e.source === "orderly" ? "◆" : "H"}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 3, width: 96, flexShrink: 0 }}>
                   {watched && <span style={{ color: "#fbbf24", fontSize: 9 }}>★</span>}
-                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: watched ? "#fbbf24" : "#71717a" }}>{short(e.addr)}</span>
+                  <span onClick={() => openDetail(e.addr, e.source)} title="View trader detail" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: watched ? "#fbbf24" : "#71717a", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#232327" }}>{short(e.addr)}</span>
                 </span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: 700, color: e.type === "OPEN" ? "#3ecf8e" : "#a1a1aa", width: 42, flexShrink: 0 }}>{e.type}</span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ededf0", width: 56, flexShrink: 0 }}>{e.sym}</span>
@@ -358,7 +373,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
                     {starred ? "★" : "☆"}
                   </button>
                   <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.05em", color: t.source === "orderly" ? "#3ecf8e" : "#71717a", border: `1px solid ${t.source === "orderly" ? "#1e3a2a" : "#232327"}`, borderRadius: 3, padding: "1px 5px", flexShrink: 0 }}>{t.source === "orderly" ? "◆ ORDERLY" : "HL"}</span>
-                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ededf0", flexShrink: 0 }}>{short(t.address)}</span>
+                  <span onClick={() => openDetail(t.address, t.source, t.accountId)} title="View trader detail" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ededf0", flexShrink: 0, cursor: "pointer", textDecoration: "underline", textDecorationColor: "#33333a" }}>{short(t.address)}</span>
                   <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: t.pnl >= 0 ? "#3ecf8e" : "#f7525f", flexShrink: 0 }}>{usd(t.pnl)} <span style={{ color: "#52525b" }}>{t.pnlLabel}</span></span>
                   {t.roi != null && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#a1a1aa", flexShrink: 0 }}>{(t.roi * 100).toFixed(0)}% ROI</span>}
                   {t.accountValue != null && t.accountValue > 0 && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", flexShrink: 0 }}>{usd(t.accountValue)} acct</span>}

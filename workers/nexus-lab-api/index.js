@@ -218,7 +218,7 @@ async function buildOrderlyBoard() {
     for (const r of rows) {
       const a = r.address;
       if (!a) continue;
-      const e = byAddr.get(a) || { address: a, realized: 0, posMap: new Map() };
+      const e = byAddr.get(a) || { address: a, accountId: r.account_id, realized: 0, posMap: new Map() };
       e.realized += parseFloat(r.total_realized_pnl || "0");
       const h = parseFloat(r.holding || "0");
       if (Math.abs(h) > 1e-9) {
@@ -235,7 +235,7 @@ async function buildOrderlyBoard() {
     }
     return [...byAddr.values()]
       .map((e) => ({
-        source: "orderly", address: e.address,
+        source: "orderly", address: e.address, accountId: e.accountId,
         pnl: Math.round(e.realized), pnlLabel: "realized", roi: null, accountValue: 0,
         positions: [...e.posMap.values()].filter((p) => p.szUsd >= 1000).sort((a, b) => b.szUsd - a.szUsd),
       }))
@@ -807,7 +807,7 @@ export default {
     // positions copyable) + HYPERLIQUID secondary (wider discovery). Unified shape
     // with a `source` tag. KV-cached 10min so browsers get a light payload.
     if (parts[0] === "smart" && parts[1] === "board" && request.method === "GET") {
-      const CACHE_KEY = "sm:board:v4";
+      const CACHE_KEY = "sm:board:v5";
       const cached = await env.LAB_STORE.get(CACHE_KEY);
       if (cached) return json(JSON.parse(cached), request);
       const [orderly, seed, coinSet] = await Promise.all([buildOrderlyBoard(), smartSeed(env), orderlyPerpCoins(env)]);
@@ -830,6 +830,47 @@ export default {
       const payload = { traders, count: traders.length, orderly: orderly.length, hl: hl.length, updatedAt: Date.now() };
       await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 600 });
       return json(payload, request);
+    }
+
+    // ── GET /smart/trader?account_id= — one unified Orderly trader detail ────────
+    // Per-account realized+unrealized PnL by market + live positions (public
+    // dashboard indexer, by account_id → no broker_id needed). KV-cached 5min.
+    if (parts[0] === "smart" && parts[1] === "trader" && request.method === "GET") {
+      const accountId = url.searchParams.get("account_id");
+      if (!accountId) return json({ error: "account_id required" }, request, 400);
+      const CACHE = `sm:trader:${accountId}`;
+      const cached = await env.LAB_STORE.get(CACHE);
+      if (cached) return json(JSON.parse(cached), request);
+      try {
+        const d = await orderlyDashboard(`/ranking/realized_pnl?account_id=${encodeURIComponent(accountId)}&limit=50`);
+        const rows = d?.data?.rows || [];
+        const coin = (s) => String(s).replace("PERP_", "").replace("_USDC", "");
+        let totalRealized = 0, totalUnrealized = 0, wins = 0, losses = 0;
+        const bySymbol = rows.map((r) => {
+          const realized = Math.round(parseFloat(r.total_realized_pnl || "0"));
+          const unrealized = Math.round(parseFloat(r.un_realized_pnl || "0"));
+          const holding = parseFloat(r.holding || "0");
+          totalRealized += realized; totalUnrealized += unrealized;
+          if (realized > 0) wins++; else if (realized < 0) losses++;
+          return {
+            sym: coin(r.symbol), realized, unrealized,
+            open: Math.abs(holding) > 1e-9,
+            side: holding > 0 ? "LONG" : holding < 0 ? "SHORT" : null,
+            szUsd: Math.round(Math.abs(parseFloat(r.holding_value || "0"))),
+            entry: parseFloat(r.average_entry_price || "0"),
+          };
+        }).sort((a, b) => Math.abs(b.realized) - Math.abs(a.realized));
+        const graded = wins + losses;
+        const payload = {
+          accountId, address: rows[0]?.address || null, totalRealized, totalUnrealized,
+          profitableMarketsPct: graded ? Math.round((wins / graded) * 1000) / 10 : 0,
+          markets: rows.length, wins, losses, bySymbol,
+        };
+        await env.LAB_STORE.put(CACHE, JSON.stringify(payload), { expirationTtl: 300 });
+        return json(payload, request);
+      } catch (e) {
+        return json({ error: String(e) }, request, 502);
+      }
     }
 
     // ── POST /smart/refresh — best-effort auto-refresh of the tracked set ────────
