@@ -781,6 +781,9 @@ export function AgentView() {
                 {isActive ? (hasPosition ? "● TRADING" : "● WATCHING") : "○ INACTIVE"}
               </span>
             </span>
+            <span style={{ display: "block", fontFamily: "var(--nx-font-ui)", fontSize: 11, color: "#71717a", marginTop: 6, lineHeight: 1.5, maxWidth: 520 }}>
+              Runs <strong style={{ color: "#a1a1aa" }}>your</strong> strategy autonomously — every trade it makes is graded on-chain, no self-reporting. The edge is yours; the accountability is built in.
+            </span>
           </span>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1101,11 +1104,14 @@ export function AgentView() {
           {/* Onboarding + key-status panel */}
           <div style={{ ...agentCardStyle, borderColor: tradingKey ? "#232327" : "#4a3a00" }}>
             <div style={agentLabelStyle}>// HOW THE AGENT WORKS</div>
+            <p style={{ margin: "8px 0 0", color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 11, lineHeight: 1.6 }}>
+              The agent is a disciplined operator of <strong style={{ color: "#c0c0c0" }}>your</strong> edge — you choose the strategy and risk limits, it runs them tirelessly and <strong style={{ color: "#c0c0c0" }}>every call is graded objectively on-chain</strong>. It doesn't promise alpha; it proves what actually worked.
+            </p>
             <ol style={{ margin: "8px 0 0", paddingLeft: 18, color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 11, lineHeight: 1.7 }}>
               <li>Place at least one manual trade on Nexus — this generates your Orderly trading key (order-only, <strong style={{ color: "#c0c0c0" }}>cannot withdraw funds</strong>).</li>
               <li>Pick your symbols, risk params, and mode below.</li>
               <li><strong style={{ color: "#c0c0c0" }}>ASSISTED</strong> = the agent surfaces signals for you to place yourself. <strong style={{ color: "#c0c0c0" }}>AUTONOMOUS</strong> = it trades within your risk limits.</li>
-              <li>Activate. You can DEACTIVATE or KILL anytime.</li>
+              <li>Activate. You can DEACTIVATE or KILL anytime — and its record is public and verifiable either way.</li>
             </ol>
             <div style={{
               marginTop: 10, padding: "8px 10px", borderRadius: 3,

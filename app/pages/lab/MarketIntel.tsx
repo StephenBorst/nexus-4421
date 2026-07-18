@@ -41,10 +41,11 @@ function NewsTab() {
   const [countdown, setCountdown] = useState(300);
   const isMob = useIsMobile();
 
-  const TEAL   = "#ededf0", GREEN = "#a1a1aa", RED = "#f7525f", YELLOW = "#fbbf24";
+  const TEAL   = "#ededf0", GREEN = "#a1a1aa", RED = "#f7525f", SKY = "#6cb6ff";
   const DIM    = "rgba(255,255,255,0.35)", MUTED = "rgba(255,255,255,0.60)", BRIGHT = "rgba(255,255,255,0.87)";
   const CATS   = ["ALL", "CRYPTO", "MACRO", "DEFI", "MARKETS", "GEOPOLITICS"];
-  const catClr = (c: string) => c === "MACRO" ? YELLOW : c === "DEFI" ? TEAL : c === "GEOPOLITICS" ? RED : c === "MARKETS" ? MUTED : GREEN;
+  // amber is reserved for CAUTION only — category tags are neutral/info, so MACRO uses sky-blue
+  const catClr = (c: string) => c === "MACRO" ? SKY : c === "DEFI" ? TEAL : c === "GEOPOLITICS" ? RED : c === "MARKETS" ? MUTED : GREEN;
 
   const FEEDS = [
     { url: "https://www.coindesk.com/arc/outboundfeeds/rss/",             name: "COINDESK"      },
