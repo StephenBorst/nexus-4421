@@ -245,6 +245,32 @@ async function buildOrderlyBoard() {
   } catch { return []; }
 }
 
+// Orderly-native signal feed via position DIFF. The dashboard's raw trade/event
+// endpoints are hash-encoded and awkward; instead we snapshot each top trader's
+// live positions (already fetched for the board) and diff vs the last snapshot →
+// clean OPEN/CLOSE events with readable symbols + addresses. Runs on board build.
+async function updateOrderlyFeed(env, orderly) {
+  try {
+    const cur = {};
+    for (const t of orderly) for (const p of t.positions) {
+      cur[`${t.address}|${p.sym}|${p.side}`] = { address: t.address, sym: p.sym, side: p.side, szUsd: p.szUsd, entry: p.entry };
+    }
+    const prevRaw = await env.LAB_STORE.get("sm:ord:snap");
+    await env.LAB_STORE.put("sm:ord:snap", JSON.stringify(cur), { expirationTtl: 7 * 86400 });
+    if (!prevRaw) return; // first run — seed the snapshot, no diff yet
+    const prev = JSON.parse(prevRaw);
+    const now = Date.now();
+    const ev = [];
+    for (const k in cur) if (!prev[k]) ev.push({ source: "orderly", addr: cur[k].address, coin: cur[k].sym, sym: cur[k].sym, side: cur[k].side, type: "OPEN", price: cur[k].entry, szUsd: cur[k].szUsd, closedPnl: null, ts: now });
+    for (const k in prev) if (!cur[k]) ev.push({ source: "orderly", addr: prev[k].address, coin: prev[k].sym, sym: prev[k].sym, side: prev[k].side, type: "CLOSE", price: prev[k].entry, szUsd: prev[k].szUsd, closedPnl: null, ts: now });
+    if (ev.length) {
+      const exRaw = await env.LAB_STORE.get("sm:ord:events");
+      const merged = [...ev, ...(exRaw ? JSON.parse(exRaw) : [])].filter((e) => e.szUsd >= 5000).slice(0, 40);
+      await env.LAB_STORE.put("sm:ord:events", JSON.stringify(merged), { expirationTtl: 3 * 86400 });
+    }
+  } catch { /* non-fatal */ }
+}
+
 // POST to Hyperliquid's public info API. Same source as the /analyze x-ray.
 async function hlInfo(body) {
   const res = await fetch("https://api.hyperliquid.xyz/info", {
@@ -778,6 +804,7 @@ export default {
         }
       });
       const traders = [...orderly, ...hl]; // Orderly first (primary)
+      ctx.waitUntil(updateOrderlyFeed(env, orderly)); // diff → Orderly signal feed
       const payload = { traders, count: traders.length, orderly: orderly.length, hl: hl.length, updatedAt: Date.now() };
       await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 600 });
       return json(payload, request);
@@ -799,7 +826,7 @@ export default {
     // Merged, time-sorted signal feed from userFills. Only Orderly-copyable coins,
     // deduped (partial fills of one move collapse into a single row). KV-cached 3min.
     if (parts[0] === "smart" && parts[1] === "events" && request.method === "GET") {
-      const CACHE_KEY = "sm:events:v2";
+      const CACHE_KEY = "sm:events:v3";
       const cached = await env.LAB_STORE.get(CACHE_KEY);
       if (cached) return json(JSON.parse(cached), request);
       const [seed, coinSet] = await Promise.all([smartSeed(env), orderlyPerpCoins(env)]);
@@ -825,7 +852,7 @@ export default {
               if (f.time > prev.ts) { prev.ts = f.time; prev.price = parseFloat(f.px || "0"); }
             } else {
               byKey.set(key, {
-                addr: s.a, coin: f.coin, sym, side, type,
+                source: "hl", addr: s.a, coin: f.coin, sym, side, type,
                 price: parseFloat(f.px || "0"), szUsd,
                 closedPnl: isClose ? Math.round(parseFloat(f.closedPnl || "0")) : null,
                 ts: f.time,
@@ -835,10 +862,31 @@ export default {
         } catch { /* skip this trader */ }
         return null;
       });
-      const events = [...byKey.values()].sort((a, b) => b.ts - a.ts).slice(0, 30);
+      // Merge the Orderly-native diff feed (primary) with the HL fills feed.
+      const ordRaw = await env.LAB_STORE.get("sm:ord:events");
+      const ordEvents = ordRaw ? JSON.parse(ordRaw) : [];
+      const events = [...ordEvents, ...byKey.values()].sort((a, b) => b.ts - a.ts).slice(0, 30);
       const payload = { events, updatedAt: Date.now() };
       await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 180 });
       return json(payload, request);
+    }
+
+    // ── Smart Money watchlist (v2) — cross-device sync of starred wallets ────────
+    // GET is public (returns a wallet's saved list); POST is owner-authed via the
+    // static walletSig (recovers to the caller → they can only write their own).
+    if (parts[0] === "smart" && parts[1] === "watchlist" && parts[2] && request.method === "GET") {
+      const raw = await env.LAB_STORE.get(`sm:wl:${normalizeAddress(parts[2])}`);
+      return json({ watch: raw ? JSON.parse(raw) : [] }, request);
+    }
+    if (parts[0] === "smart" && parts[1] === "watchlist" && request.method === "POST") {
+      let body = {}; try { body = await request.json(); } catch { /* ignore */ }
+      const caller = typeof body.walletSig === "string" ? recoverEthAddress("nexus-trading-key-v1", body.walletSig) : null;
+      if (!caller) return json({ error: "walletSig_required" }, request, 401);
+      const clean = Array.isArray(body.watch)
+        ? [...new Set(body.watch.filter((x) => typeof x === "string" && /^0x[a-f0-9]{40}$/i.test(x)).map((x) => x.toLowerCase()))].slice(0, 100)
+        : [];
+      await env.LAB_STORE.put(`sm:wl:${caller}`, JSON.stringify(clean), { expirationTtl: 365 * 86400 });
+      return json({ ok: true, watch: clean }, request);
     }
 
     // ── POST /tg/webhook — Telegram bot updates (link a chat ↔ wallet) ──────────

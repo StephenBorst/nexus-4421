@@ -3,8 +3,9 @@
 // the exit and grades the result on-chain). Data comes from lab-api /smart/*
 // (server-side HL indexing, KV-cached). Discovery + context — NOT "front-run the
 // whale": copy is directional (their symbol + side), executed on Nexus/Orderly.
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAccount } from "@orderly.network/hooks";
 import { useIsMobile } from "./useIsMobile";
 import { agentCardStyle, agentLabelStyle } from "./styles";
 import { deployDirectiveFromThesis } from "@/utils/agentPrefill";
@@ -20,7 +21,7 @@ interface SmTrader { source: "orderly" | "hl"; address: string; pnl: number; pnl
 
 const WATCH_KEY = "nexus_sm_watchlist";
 const loadWatch = (): string[] => { try { return JSON.parse(localStorage.getItem(WATCH_KEY) || "[]"); } catch { return []; } };
-interface SmEvent { addr: string; coin: string; sym: string; side: "LONG" | "SHORT"; type: "OPEN" | "CLOSE"; price: number; szUsd: number; closedPnl: number | null; ts: number; }
+interface SmEvent { source?: "orderly" | "hl"; addr: string; coin: string; sym: string; side: "LONG" | "SHORT"; type: "OPEN" | "CLOSE"; price: number; szUsd: number; closedPnl: number | null; ts: number; }
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const usd = (n: number) => {
@@ -43,15 +44,35 @@ export function SmartMoneyView() {
   const [poster, setPoster] = useState<PosterData | null>(null);
   const [watch, setWatch] = useState<string[]>(loadWatch);
   const [watchOnly, setWatchOnly] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const { state: acct } = useAccount();
+  const wallet = (acct as { address?: string })?.address?.toLowerCase() ?? null;
+  const seenRef = useRef<Set<string> | null>(null); // alert dedup across polls
 
-  // Star/unstar a wallet you want to keep an eye on (device-local, zero-friction).
+  // Persist watchlist locally + best-effort to the server (cross-device). Server
+  // write needs the cached wallet signature (from agent/trade use) — if absent we
+  // stay local-only rather than prompting for a signature just to star a wallet.
+  const persistWatch = useCallback((next: string[]) => {
+    try { localStorage.setItem(WATCH_KEY, JSON.stringify(next)); } catch { /* private */ }
+    if (!wallet) return;
+    let sig: string | null = null;
+    try { sig = sessionStorage.getItem(`nexus_agent_sig_${wallet}`); } catch { /* ignore */ }
+    if (!sig) return; // no cached auth → local-only (no forced prompt)
+    fetch(`${AGENT_API}/smart/watchlist`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ walletSig: sig, watch: next }) }).catch(() => {});
+  }, [wallet]);
+
   const toggleWatch = (addr: string) => {
-    setWatch((w) => {
-      const next = w.includes(addr) ? w.filter((x) => x !== addr) : [...w, addr];
-      try { localStorage.setItem(WATCH_KEY, JSON.stringify(next)); } catch { /* private mode */ }
-      return next;
-    });
+    setWatch((w) => { const next = w.includes(addr) ? w.filter((x) => x !== addr) : [...w, addr]; persistWatch(next); return next; });
   };
+
+  // Pull the server watchlist once on connect and union it with local (cross-device).
+  useEffect(() => {
+    if (!wallet) return;
+    fetch(`${AGENT_API}/smart/watchlist/${wallet}`).then((r) => r.json()).then((d) => {
+      if (!Array.isArray(d?.watch)) return;
+      setWatch((local) => { const merged = [...new Set([...local, ...d.watch])]; try { localStorage.setItem(WATCH_KEY, JSON.stringify(merged)); } catch { /* ignore */ } return merged; });
+    }).catch(() => {});
+  }, [wallet]);
 
   // Smart-money CONSENSUS — coins where ≥2 tracked traders hold the same side.
   // The highest-conviction signal: not one whale, but agreement. Derived free
@@ -96,6 +117,20 @@ export function SmartMoneyView() {
     return () => clearInterval(t);
   }, [load]);
 
+  // Watchlist alert — toast when a NEW feed event comes from a watched wallet.
+  // First load seeds the seen-set so we don't alert the whole backlog.
+  useEffect(() => {
+    if (!events) return;
+    const watchSet = new Set(watch);
+    if (seenRef.current === null) { seenRef.current = new Set(events.map((e) => `${e.addr}|${e.sym}|${e.type}|${e.ts}`)); return; }
+    for (const e of events) {
+      const k = `${e.addr}|${e.sym}|${e.type}|${e.ts}`;
+      if (seenRef.current.has(k)) continue;
+      seenRef.current.add(k);
+      if (watchSet.has(e.addr)) { setToast(`★ ${short(e.addr)} ${e.type === "OPEN" ? "opened" : "closed"} ${e.sym} ${e.side}`); setTimeout(() => setToast(null), 6000); }
+    }
+  }, [events, watch]);
+
   // ⚡ Copy a move → directive draft (agent manages exit + grades on-chain). `sym`
   // is the Orderly-copyable coin (already gated tradeable). Default stop 3% /
   // target 6% off the observed price; user reviews + edits in the arm panel.
@@ -129,6 +164,11 @@ export function SmartMoneyView() {
   return (
     <div>
       {poster && <SharePoster data={poster} onClose={() => setPoster(null)} />}
+      {toast && (
+        <div className="nx-fade-in" style={{ position: "fixed", bottom: 20, left: 20, zIndex: 8000, background: "#0f0f11", border: "1px solid #4a3a00", borderLeft: "3px solid #fbbf24", borderRadius: 6, padding: "10px 14px", fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#fbbf24", boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>
+          {toast}
+        </div>
+      )}
       {/* Header */}
       <div style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>Scout</div>
@@ -183,10 +223,16 @@ export function SmartMoneyView() {
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#3ecf8e", boxShadow: "0 0 6px #3ecf8e" }} />
           </div>
           <div style={{ marginTop: 8, display: "flex", flexDirection: "column" }}>
-            {events.slice(0, 20).map((e, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid #0d1117", minWidth: 0, flexWrap: "nowrap", overflowX: "auto" }}>
+            {events.slice(0, 20).map((e, i) => {
+              const watched = watch.includes(e.addr);
+              return (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 6px", borderBottom: "1px solid #0d1117", minWidth: 0, flexWrap: "nowrap", overflowX: "auto", background: watched ? "#1a120610" : "transparent", borderLeft: watched ? "2px solid #fbbf24" : "2px solid transparent" }}>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", width: 34, flexShrink: 0 }}>{ago(e.ts)}</span>
-                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", width: 90, flexShrink: 0 }}>{short(e.addr)}</span>
+                <span title={e.source === "orderly" ? "Orderly (native)" : "Hyperliquid"} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: e.source === "orderly" ? "#3ecf8e" : "#52525b", width: 12, flexShrink: 0 }}>{e.source === "orderly" ? "◆" : "H"}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 3, width: 96, flexShrink: 0 }}>
+                  {watched && <span style={{ color: "#fbbf24", fontSize: 9 }}>★</span>}
+                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: watched ? "#fbbf24" : "#71717a" }}>{short(e.addr)}</span>
+                </span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: 700, color: e.type === "OPEN" ? "#3ecf8e" : "#a1a1aa", width: 42, flexShrink: 0 }}>{e.type}</span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ededf0", width: 56, flexShrink: 0 }}>{e.sym}</span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: e.side === "LONG" ? "#3ecf8e" : "#f7525f", width: 46, flexShrink: 0 }}>{e.side === "LONG" ? "↑ L" : "↓ S"}</span>
@@ -199,7 +245,8 @@ export function SmartMoneyView() {
                   {e.type === "OPEN" && tradeBtn(() => copy(e.sym, e.side, e.price))}
                 </span>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
