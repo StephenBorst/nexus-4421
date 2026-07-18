@@ -10,6 +10,7 @@ const TEAL   = "#ededf0"; // neutral accent (headers, slight-bullish, bars)
 const GREEN  = "#3ecf8e"; // genuine UP/positive: gainers, +change, bullish, greed
 const RED    = "#f7525f";
 const YELLOW = "#fbbf24";
+const SKY = "#6cb6ff"; // neutral/informational (amber reserved for caution: crowding, tension)
 const DIM    = "#71717a";
 const MUTED  = "#a1a1aa";
 const BRIGHT = "#f4f4f5";
@@ -157,8 +158,8 @@ function computeRegime(
 
   if (score >= 68) return { score, label: "BULLISH",          color: GREEN,  description: "Risk-on conditions — momentum favors longs. Stay cautious near extremes." };
   if (score >= 54) return { score, label: "SLIGHTLY BULLISH", color: TEAL,   description: "Mild bullish lean — upside bias with limited conviction." };
-  if (score >= 46) return { score, label: "NEUTRAL",          color: YELLOW, description: "Mixed signals — no clear directional edge. Size down and wait for clarity." };
-  if (score >= 32) return { score, label: "SLIGHTLY BEARISH", color: YELLOW, description: "Mild bearish lean — defensive positioning warranted." };
+  if (score >= 46) return { score, label: "NEUTRAL",          color: SKY, description: "Mixed signals — no clear directional edge. Size down and wait for clarity." };
+  if (score >= 32) return { score, label: "SLIGHTLY BEARISH", color: SKY, description: "Mild bearish lean — defensive positioning warranted." };
   return              { score, label: "BEARISH",           color: RED,    description: "Risk-off — longs crowded or sentiment deteriorating sharply." };
 }
 
