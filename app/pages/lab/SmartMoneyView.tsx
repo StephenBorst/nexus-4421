@@ -16,7 +16,10 @@ interface SmConsensus { sym: string; side: "LONG" | "SHORT"; count: number; netU
 const AGENT_API = "https://og.nexustradinglabs.com";
 
 interface SmPosition { coin: string; sym: string | null; tradeable: boolean; side: "LONG" | "SHORT"; szUsd: number; entry: number; lev: number | null; uPnl: number; }
-interface SmTrader { address: string; roiMonth: number; pnlMonth: number; vlmMonth: number; accountValue: number; positions: SmPosition[]; }
+interface SmTrader { source: "orderly" | "hl"; address: string; pnl: number; pnlLabel: string; roi?: number | null; accountValue?: number; positions: SmPosition[]; }
+
+const WATCH_KEY = "nexus_sm_watchlist";
+const loadWatch = (): string[] => { try { return JSON.parse(localStorage.getItem(WATCH_KEY) || "[]"); } catch { return []; } };
 interface SmEvent { addr: string; coin: string; sym: string; side: "LONG" | "SHORT"; type: "OPEN" | "CLOSE"; price: number; szUsd: number; closedPnl: number | null; ts: number; }
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -38,6 +41,17 @@ export function SmartMoneyView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [poster, setPoster] = useState<PosterData | null>(null);
+  const [watch, setWatch] = useState<string[]>(loadWatch);
+  const [watchOnly, setWatchOnly] = useState(false);
+
+  // Star/unstar a wallet you want to keep an eye on (device-local, zero-friction).
+  const toggleWatch = (addr: string) => {
+    setWatch((w) => {
+      const next = w.includes(addr) ? w.filter((x) => x !== addr) : [...w, addr];
+      try { localStorage.setItem(WATCH_KEY, JSON.stringify(next)); } catch { /* private mode */ }
+      return next;
+    });
+  };
 
   // Smart-money CONSENSUS — coins where ≥2 tracked traders hold the same side.
   // The highest-conviction signal: not one whale, but agreement. Derived free
@@ -119,10 +133,10 @@ export function SmartMoneyView() {
       <div style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>Scout</div>
         <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 24, fontWeight: 700, color: "#f4f4f5", lineHeight: 1.1 }}>Smart Money</div>
-        <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 11, color: "#71717a", marginTop: 6, lineHeight: 1.5, maxWidth: 640 }}>
-          Top Hyperliquid traders by 30-day realized PnL — and what they're holding right now.
-          Turn any move into a <strong style={{ color: "#a1a1aa" }}>risk-managed directive</strong> the agent runs and grades on-chain.
-          Discovery + context, not front-running — copies execute on Nexus in <strong style={{ color: "#a1a1aa" }}>your</strong> direction.
+        <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 11, color: "#71717a", marginTop: 6, lineHeight: 1.5, maxWidth: 660 }}>
+          The top traders on <strong style={{ color: "#a1a1aa" }}>Orderly</strong> (your own venue — copies are native) and Hyperliquid,
+          with what they're holding right now. Turn any move into a <strong style={{ color: "#a1a1aa" }}>risk-managed directive</strong> the
+          agent runs and grades on-chain. Star ★ the wallets you trust to build a watchlist. Discovery + context, not front-running.
         </div>
       </div>
 
@@ -191,21 +205,40 @@ export function SmartMoneyView() {
       )}
 
       {/* ── SMART MONEY BOARD ── */}
-      {board && board.length > 0 && (
+      {board && board.length > 0 && (() => {
+        const shown = watchOnly ? board.filter((t) => watch.includes(t.address)) : board;
+        return (
         <div style={agentCardStyle}>
-          <div style={agentLabelStyle}>// SMART MONEY BOARD <span style={{ color: "#52525b" }}>— ranked by 30d PnL · graded on Hyperliquid</span></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <div style={agentLabelStyle}>// SMART MONEY BOARD <span style={{ color: "#52525b" }}>— ◆ Orderly (native) + Hyperliquid</span></div>
+            <button onClick={() => setWatchOnly((v) => !v)} disabled={watch.length === 0}
+              title={watch.length === 0 ? "Star traders below to build a watchlist" : "Show only your watchlist"}
+              style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.04em", color: watchOnly ? "#fbbf24" : "#71717a", background: watchOnly ? "#1a1206" : "none", border: `1px solid ${watchOnly ? "#4a3a00" : "#232327"}`, borderRadius: 3, padding: "4px 9px", cursor: watch.length === 0 ? "default" : "pointer", opacity: watch.length === 0 ? 0.5 : 1 }}>
+              ★ WATCHLIST{watch.length > 0 ? ` (${watch.length})` : ""}
+            </button>
+          </div>
+          {watchOnly && shown.length === 0 && (
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#71717a", padding: "16px 0", textAlign: "center" }}>No watched traders in the current board. Star ★ any trader to track them.</div>
+          )}
           <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-            {board.map((t, i) => (
+            {shown.map((t, i) => {
+              const starred = watch.includes(t.address);
+              return (
               <div key={t.address} style={{ border: "1px solid #1a1a1e", borderRadius: 6, padding: "10px 12px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#52525b", width: 24, flexShrink: 0 }}>#{i + 1}</span>
+                  <button onClick={() => toggleWatch(t.address)} title={starred ? "Unwatch" : "Add to watchlist"}
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 13, color: starred ? "#fbbf24" : "#3f3f46", flexShrink: 0, lineHeight: 1 }}>
+                    {starred ? "★" : "☆"}
+                  </button>
+                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.05em", color: t.source === "orderly" ? "#3ecf8e" : "#71717a", border: `1px solid ${t.source === "orderly" ? "#1e3a2a" : "#232327"}`, borderRadius: 3, padding: "1px 5px", flexShrink: 0 }}>{t.source === "orderly" ? "◆ ORDERLY" : "HL"}</span>
                   <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ededf0", flexShrink: 0 }}>{short(t.address)}</span>
-                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#3ecf8e", flexShrink: 0 }}>{usd(t.pnlMonth)} <span style={{ color: "#52525b" }}>30d</span></span>
-                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#a1a1aa", flexShrink: 0 }}>{(t.roiMonth * 100).toFixed(0)}% ROI</span>
-                  {t.accountValue > 0 && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", flexShrink: 0 }}>{usd(t.accountValue)} acct</span>}
-                  <a href={`/analyze?address=${t.address}`} target="_blank" rel="noopener noreferrer"
+                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: t.pnl >= 0 ? "#3ecf8e" : "#f7525f", flexShrink: 0 }}>{usd(t.pnl)} <span style={{ color: "#52525b" }}>{t.pnlLabel}</span></span>
+                  {t.roi != null && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#a1a1aa", flexShrink: 0 }}>{(t.roi * 100).toFixed(0)}% ROI</span>}
+                  {t.accountValue != null && t.accountValue > 0 && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", flexShrink: 0 }}>{usd(t.accountValue)} acct</span>}
+                  <a href={t.source === "hl" ? `/analyze?address=${t.address}` : `https://orderly-dashboard.orderly.network/address/${t.address}`} target="_blank" rel="noopener noreferrer"
                     style={{ marginLeft: isMobile ? 0 : "auto", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", textDecoration: "none", border: "1px solid #232327", borderRadius: 3, padding: "3px 8px", flexShrink: 0 }}>
-                    x-ray ↗
+                    {t.source === "hl" ? "x-ray ↗" : "explorer ↗"}
                   </a>
                 </div>
                 {t.positions.length > 0 && (
@@ -226,13 +259,15 @@ export function SmartMoneyView() {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
           <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3f3f46", marginTop: 10, lineHeight: 1.5 }}>
-            Sourced from the public Hyperliquid leaderboard. Copies execute on Nexus/Orderly in your direction — prices differ; the agent manages the exit. Not financial advice.
+            ◆ Orderly traders (public settlement indexer) copy natively; Hyperliquid traders copy directionally on Nexus. The agent manages the exit. Not financial advice.
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

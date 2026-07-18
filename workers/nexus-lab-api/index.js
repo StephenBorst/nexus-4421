@@ -197,6 +197,54 @@ const SMART_SEED = [
   { a: "0x484bc1608211d0604bf70bae72792a56884562f8", r: 0.422, p: 3432802, v: 38432293 },
 ];
 
+// Orderly's PUBLIC dashboard indexer (on-chain settlement → analytics). Unlike the
+// trading API (auth-gated, own-account only), this exposes per-account rankings +
+// positions across the whole Orderly broker network with no auth.
+async function orderlyDashboard(path) {
+  const r = await fetch(`https://orderly-dashboard-query-service.orderly.network${path}`);
+  if (!r.ok) throw new Error(`ord-dash ${r.status}`);
+  return r.json();
+}
+
+// Build the Orderly-native smart-money board from the public realized-PnL ranking.
+// One call returns the ecosystem's top traders + their live positions in Orderly
+// symbols — so copies are NATIVE (no cross-venue mismatch, everything tradeable).
+async function buildOrderlyBoard() {
+  try {
+    const d = await orderlyDashboard("/ranking/realized_pnl?limit=200"); // 200 = endpoint max
+    const rows = d?.data?.rows || [];
+    const coin = (s) => String(s).replace("PERP_", "").replace("_USDC", "");
+    const byAddr = new Map();
+    for (const r of rows) {
+      const a = r.address;
+      if (!a) continue;
+      const e = byAddr.get(a) || { address: a, realized: 0, posMap: new Map() };
+      e.realized += parseFloat(r.total_realized_pnl || "0");
+      const h = parseFloat(r.holding || "0");
+      if (Math.abs(h) > 1e-9) {
+        const side = h > 0 ? "LONG" : "SHORT";
+        const sym = coin(r.symbol);
+        const key = `${sym}|${side}`;
+        const szUsd = Math.round(Math.abs(parseFloat(r.holding_value || h * parseFloat(r.mark_price || "0"))));
+        const uPnl = Math.round(parseFloat(r.un_realized_pnl || "0"));
+        const prev = e.posMap.get(key);
+        if (prev) { prev.szUsd += szUsd; prev.uPnl += uPnl; }
+        else e.posMap.set(key, { coin: sym, sym, tradeable: true, side, szUsd, entry: parseFloat(r.average_entry_price || "0"), lev: null, uPnl });
+      }
+      byAddr.set(a, e);
+    }
+    return [...byAddr.values()]
+      .map((e) => ({
+        source: "orderly", address: e.address,
+        pnl: Math.round(e.realized), pnlLabel: "realized", roi: null, accountValue: 0,
+        positions: [...e.posMap.values()].filter((p) => p.szUsd >= 1000).sort((a, b) => b.szUsd - a.szUsd),
+      }))
+      // Actionable first: traders holding live positions lead, then by realized PnL.
+      .sort((a, b) => (b.positions.length ? 1 : 0) - (a.positions.length ? 1 : 0) || b.pnl - a.pnl)
+      .slice(0, 30);
+  } catch { return []; }
+}
+
 // POST to Hyperliquid's public info API. Same source as the /analyze x-ray.
 async function hlInfo(body) {
   const res = await fetch("https://api.hyperliquid.xyz/info", {
@@ -707,28 +755,30 @@ export default {
     const url = new URL(request.url);
     const parts = url.pathname.split("/").filter(Boolean);
 
-    // ── GET /smart/board — graded top HL traders + their live positions ─────────
-    // Phase 1 Smart Money. Server-side (HL leaderboard is 33MB → curated seed),
-    // KV-cached 10min so browsers get a light payload. Ranked by 30d PnL.
+    // ── GET /smart/board — graded top traders + their live positions ────────────
+    // Multi-source: ORDERLY primary (public dashboard indexer — native venue, all
+    // positions copyable) + HYPERLIQUID secondary (wider discovery). Unified shape
+    // with a `source` tag. KV-cached 10min so browsers get a light payload.
     if (parts[0] === "smart" && parts[1] === "board" && request.method === "GET") {
-      const CACHE_KEY = "sm:board:v2";
+      const CACHE_KEY = "sm:board:v4";
       const cached = await env.LAB_STORE.get(CACHE_KEY);
       if (cached) return json(JSON.parse(cached), request);
-      const [seed, coinSet] = await Promise.all([smartSeed(env), orderlyPerpCoins(env)]);
-      const traders = await batched(seed, 8, async (s) => {
+      const [orderly, seed, coinSet] = await Promise.all([buildOrderlyBoard(), smartSeed(env), orderlyPerpCoins(env)]);
+      // HL secondary — top 10 by 30d PnL, mapped into the unified shape.
+      const hl = await batched(seed.slice(0, 10), 8, async (s) => {
         try {
           const state = await hlInfo({ type: "clearinghouseState", user: s.a });
           return {
-            address: s.a, roiMonth: s.r, pnlMonth: s.p, vlmMonth: s.v,
+            source: "hl", address: s.a, pnl: s.p, pnlLabel: "30d", roi: s.r,
             accountValue: Math.round(parseFloat(state?.marginSummary?.accountValue || "0")),
             positions: hlPositions(state, coinSet),
           };
         } catch {
-          return { address: s.a, roiMonth: s.r, pnlMonth: s.p, vlmMonth: s.v, accountValue: 0, positions: [] };
+          return { source: "hl", address: s.a, pnl: s.p, pnlLabel: "30d", roi: s.r, accountValue: 0, positions: [] };
         }
       });
-      traders.sort((a, b) => b.pnlMonth - a.pnlMonth);
-      const payload = { traders, count: traders.length, updatedAt: Date.now() };
+      const traders = [...orderly, ...hl]; // Orderly first (primary)
+      const payload = { traders, count: traders.length, orderly: orderly.length, hl: hl.length, updatedAt: Date.now() };
       await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 600 });
       return json(payload, request);
     }

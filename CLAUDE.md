@@ -308,8 +308,13 @@ The public agents leaderboard ranks on a risk-adjusted score from live `agent_tr
   call set (proof-of-call fields + createdAt), recomputable, prev-linked chain (`/theses/ledger/chain`),
   `onChain` proof merge. anchor worker `anchorOne()` anchors agents + theses each run (separate roots/events,
   KV-deduped). Frontend: **VERIFIED CALLERS** board atop Feed RANKS (`app/pages/feed/index.tsx`).
-- ⚠️ Honest ceiling: verifying a human's *personal Orderly trades* server-side is NOT possible (position_history
-  is private-auth; no public per-address endpoint) — that's why we grade the CALL vs public price instead.
+- ⚠️ Honest ceiling: the Orderly *trading API* (`/v1/position_history`, `/v1/positions`) is private-auth (own account
+  only) — that's why we grade the CALL vs public price for the caller leaderboard. **BUT that is NOT the only Orderly
+  data source** (corrected 2026-07-17): the **public dashboard indexer** `orderly-dashboard-query-service.orderly.network`
+  exposes per-account rankings + positions + realized/unrealized PnL across the whole broker network with NO auth
+  (`/ranking/realized_pnl`, `/ranking/positions`, `/trades`, `/get_account_volume_statistic`; limit max 200). Smart
+  Money uses it as the PRIMARY source (see below). Don't repeat "Orderly per-address is fully private" — the trading
+  API is; the settlement indexer isn't.
 
 ## Engagement layer — competitor-informed, on the trustless core (2026-06-15) ⭐
 Studied FOMO (fomo.family) + Legend (app.legend.trade) — both win on live-positions feeds + clans/arena +
