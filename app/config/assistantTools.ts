@@ -150,6 +150,42 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "get_smart_money",
+    description:
+      "Get what the top on-chain traders (Smart Money) are doing right now: the highest-conviction CONSENSUS coins (where multiple top traders hold the same side), the top-ranked traders with their live positions, and the most recent opens/closes. Sourced live from Orderly + Hyperliquid public settlement data. Use for 'what is smart money doing', 'are the whales long or short X', 'who's the best trader on-chain', or to sanity-check a directional idea against the crowd.",
+    input_schema: {
+      type: "object",
+      properties: { symbol: { type: "string", description: "Optional ticker (BTC, ETH, SOL…) to focus the answer on." } },
+    },
+    run: async (args) => {
+      const [b, e] = await Promise.all([
+        fetch(`${AGENT_API}/smart/board`).then((r) => r.json()).catch(() => null),
+        fetch(`${AGENT_API}/smart/events`).then((r) => r.json()).catch(() => null),
+      ]);
+      const traders = b?.traders ?? [];
+      if (!traders.length) return JSON.stringify({ error: "smart money data unavailable" });
+      // Consensus: coins where ≥2 top traders share a side (agreement > any one whale).
+      const byCoin = new Map<string, { sym: string; side: string; traders: Set<string>; netUsd: number }>();
+      for (const t of traders) for (const p of (t.positions ?? [])) {
+        if (!p.sym) continue;
+        const k = `${p.sym}|${p.side}`;
+        const c = byCoin.get(k) ?? { sym: p.sym, side: p.side, traders: new Set(), netUsd: 0 };
+        c.traders.add(t.address); c.netUsd += p.szUsd; byCoin.set(k, c);
+      }
+      let consensus = [...byCoin.values()].filter((c) => c.traders.size >= 2)
+        .map((c) => ({ coin: c.sym, side: c.side, traders: c.traders.size, netUsd: Math.round(c.netUsd) }))
+        .sort((a, b) => b.traders - a.traders || b.netUsd - a.netUsd);
+      const focus = String(args.symbol ?? "").replace("PERP_", "").replace("_USDC", "").toUpperCase();
+      if (focus) consensus = consensus.filter((c) => c.coin.toUpperCase() === focus);
+      const topTraders = traders.slice(0, 8).map((t: { address: string; source: string; pnl: number; pnlLabel: string; positions?: { side: string; sym: string; szUsd: number }[] }) => ({
+        address: t.address, source: t.source, pnl: t.pnl, pnlLabel: t.pnlLabel,
+        positions: (t.positions ?? []).slice(0, 4).map((p) => `${p.side} ${p.sym} $${Math.round(p.szUsd / 1000)}k`),
+      }));
+      const recentMoves = (e?.events ?? []).slice(0, 8).map((ev: { sym: string; side: string; type: string; szUsd: number; source?: string }) => ({ coin: ev.sym, side: ev.side, type: ev.type, szUsd: ev.szUsd, source: ev.source ?? "hl" }));
+      return JSON.stringify({ note: "Smart money is context, often early AND often wrong — not a signal.", consensus: consensus.slice(0, 8), topTraders, recentMoves });
+    },
+  },
+  {
     name: "get_trader",
     description:
       "Analyze a specific trader by wallet: their PUBLIC published theses and a win/loss summary (graded by status). Use when the user is viewing or asks about a trader's track record. Only public theses are returned.",
