@@ -12,9 +12,9 @@ import { EmptyState } from "./components";
 
 const AGENT_API = "https://og.nexustradinglabs.com";
 
-interface SmPosition { coin: string; side: "LONG" | "SHORT"; szUsd: number; entry: number; lev: number | null; uPnl: number; }
+interface SmPosition { coin: string; sym: string | null; tradeable: boolean; side: "LONG" | "SHORT"; szUsd: number; entry: number; lev: number | null; uPnl: number; }
 interface SmTrader { address: string; roiMonth: number; pnlMonth: number; vlmMonth: number; accountValue: number; positions: SmPosition[]; }
-interface SmEvent { addr: string; coin: string; side: "LONG" | "SHORT"; type: "OPEN" | "CLOSE"; price: number; szUsd: number; closedPnl: number | null; ts: number; }
+interface SmEvent { addr: string; coin: string; sym: string; side: "LONG" | "SHORT"; type: "OPEN" | "CLOSE"; price: number; szUsd: number; closedPnl: number | null; ts: number; }
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const usd = (n: number) => {
@@ -55,13 +55,14 @@ export function SmartMoneyView() {
     return () => clearInterval(t);
   }, [load]);
 
-  // ⚡ Copy a move → directive draft (agent manages exit + grades on-chain). Default
-  // stop 3% / target 6% off the observed price; user reviews + edits in the arm panel.
-  const copy = (coin: string, side: "LONG" | "SHORT", refPrice: number, lev?: number | null) => {
+  // ⚡ Copy a move → directive draft (agent manages exit + grades on-chain). `sym`
+  // is the Orderly-copyable coin (already gated tradeable). Default stop 3% /
+  // target 6% off the observed price; user reviews + edits in the arm panel.
+  const copy = (sym: string, side: "LONG" | "SHORT", refPrice: number, lev?: number | null) => {
     const p = refPrice > 0 ? refPrice : 0;
     const isLong = side === "LONG";
     deployDirectiveFromThesis({
-      symbol: coin, direction: side, entryPrice: p,
+      symbol: sym, direction: side, entryPrice: p,
       stopLoss: p > 0 ? (isLong ? p * 0.97 : p * 1.03) : 0,
       takeProfit1: p > 0 ? (isLong ? p * 1.06 : p * 0.94) : 0,
       leverage: lev && lev > 0 ? Math.min(20, Math.round(lev)) : undefined,
@@ -106,13 +107,13 @@ export function SmartMoneyView() {
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", width: 34, flexShrink: 0 }}>{ago(e.ts)}</span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", width: 90, flexShrink: 0 }}>{short(e.addr)}</span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: 700, color: e.type === "OPEN" ? "#3ecf8e" : "#a1a1aa", width: 42, flexShrink: 0 }}>{e.type}</span>
-                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ededf0", width: 56, flexShrink: 0 }}>{e.coin}</span>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ededf0", width: 56, flexShrink: 0 }}>{e.sym}</span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: e.side === "LONG" ? "#3ecf8e" : "#f7525f", width: 46, flexShrink: 0 }}>{e.side === "LONG" ? "↑ L" : "↓ S"}</span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#a1a1aa", width: 64, flexShrink: 0, textAlign: "right" }}>{usd(e.szUsd)}</span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: e.closedPnl == null ? "#52525b" : e.closedPnl >= 0 ? "#3ecf8e" : "#f7525f", width: 72, flexShrink: 0, textAlign: "right" }}>
                   {e.closedPnl == null ? "" : `${e.closedPnl >= 0 ? "+" : ""}${usd(e.closedPnl)}`}
                 </span>
-                <span style={{ marginLeft: "auto", flexShrink: 0 }}>{e.type === "OPEN" && tradeBtn(() => copy(e.coin, e.side, e.price))}</span>
+                <span style={{ marginLeft: "auto", flexShrink: 0 }}>{e.type === "OPEN" && tradeBtn(() => copy(e.sym, e.side, e.price))}</span>
               </div>
             ))}
           </div>
@@ -145,7 +146,11 @@ export function SmartMoneyView() {
                         <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: p.side === "LONG" ? "#3ecf8e" : "#f7525f", width: 46, flexShrink: 0 }}>{p.side === "LONG" ? "↑ L" : "↓ S"}{p.lev ? ` ${p.lev}x` : ""}</span>
                         <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#a1a1aa", width: 64, flexShrink: 0, textAlign: "right" }}>{usd(p.szUsd)}</span>
                         <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: p.uPnl >= 0 ? "#3ecf8e" : "#f7525f", width: 68, flexShrink: 0, textAlign: "right" }}>{p.uPnl >= 0 ? "+" : ""}{usd(p.uPnl)}</span>
-                        <span style={{ marginLeft: "auto", flexShrink: 0 }}>{tradeBtn(() => copy(p.coin, p.side, p.entry, p.lev))}</span>
+                        <span style={{ marginLeft: "auto", flexShrink: 0 }}>
+                          {p.tradeable && p.sym
+                            ? tradeBtn(() => copy(p.sym as string, p.side, p.entry, p.lev))
+                            : <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#3f3f46", whiteSpace: "nowrap" }}>HL-only</span>}
+                        </span>
                       </div>
                     ))}
                   </div>

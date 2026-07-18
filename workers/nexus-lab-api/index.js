@@ -217,16 +217,42 @@ async function batched(items, size, fn) {
   return out;
 }
 
+// Map a Hyperliquid coin ticker to the Orderly perp coin, or null if it can't be
+// copied on Nexus. `xyz:`-style prefixes are HL builder/HIP-3 markets (different
+// venue) → skip. HL's lowercase-k prefix means 1000× (kPEPE → 1000PEPE).
+function hlCoinToOrderly(coin) {
+  if (!coin || coin.includes(":")) return null;
+  if (/^k[A-Z]/.test(coin)) return "1000" + coin.slice(1);
+  return coin;
+}
+
+// Set of coins that exist as Orderly perps (PERP_<COIN>_USDC). Cached 1h. Used to
+// gate ⚡ TRADE so a copy never produces a directive on a non-existent market.
+async function orderlyPerpCoins(env) {
+  const CACHE = "sm:orderly_coins";
+  const cached = await env.LAB_STORE.get(CACHE);
+  if (cached) return new Set(JSON.parse(cached));
+  try {
+    const d = await (await fetch("https://api-evm.orderly.org/v1/public/info")).json();
+    const coins = (d.data?.rows || []).map((x) => String(x.symbol).split("_")[1]).filter(Boolean);
+    await env.LAB_STORE.put(CACHE, JSON.stringify(coins), { expirationTtl: 3600 });
+    return new Set(coins);
+  } catch { return new Set(); }
+}
+
 // Normalize a clearinghouseState into compact open positions — dust filtered
-// (< $1k notional) and sorted by size so the meaningful conviction shows first.
-function hlPositions(state) {
+// (< $1k notional), sorted by size, and tagged with the Orderly-copyable symbol.
+function hlPositions(state, coinSet) {
   const rows = state?.assetPositions || [];
   return rows.map((ap) => {
     const p = ap.position || {};
     const szi = parseFloat(p.szi || "0");
     if (!szi) return null;
+    const sym = hlCoinToOrderly(p.coin);
     return {
       coin: p.coin,
+      sym,                                   // Orderly coin to copy, or null
+      tradeable: !!sym && coinSet.has(sym),  // is it a Nexus/Orderly market?
       side: szi > 0 ? "LONG" : "SHORT",
       szUsd: Math.round(Math.abs(parseFloat(p.positionValue || "0"))),
       entry: parseFloat(p.entryPx || "0"),
@@ -234,6 +260,37 @@ function hlPositions(state) {
       uPnl: Math.round(parseFloat(p.unrealizedPnl || "0")),
     };
   }).filter((p) => p && p.szUsd >= 1000).sort((a, b) => b.szUsd - a.szUsd);
+}
+
+// Refresh the tracked set from the live HL leaderboard (Phase 1.5). The full JSON
+// is ~33MB — heavy for a Worker, so this is best-effort: on ANY failure the caller
+// falls back to the static SMART_SEED. Ranks by 30d PnL, gated on real size.
+async function refreshSmartSeed(env) {
+  const res = await fetch("https://stats-data.hyperliquid.xyz/Mainnet/leaderboard");
+  if (!res.ok) throw new Error(`leaderboard ${res.status}`);
+  const data = await res.json();
+  const rows = data?.leaderboardRows || [];
+  const perf = (r, w) => (r.windowPerformances || []).find((x) => x[0] === w)?.[1] || {};
+  const seed = rows.map((r) => {
+    const m = perf(r, "month");
+    return { a: String(r.ethAddress).toLowerCase(), av: parseFloat(r.accountValue || "0"), r: parseFloat(m.roi || "0"), p: parseFloat(m.pnl || "0"), v: parseFloat(m.vlm || "0") };
+  })
+    .filter((x) => x.av > 200000 && x.v > 2000000 && x.r > 0.1 && x.p > 50000)
+    .sort((a, b) => b.p - a.p).slice(0, 24)
+    .map((x) => ({ a: x.a, r: Math.round(x.r * 1000) / 1000, p: Math.round(x.p), v: Math.round(x.v) }));
+  if (seed.length >= 8) {
+    await env.LAB_STORE.put("sm:watch", JSON.stringify({ seed, updatedAt: Date.now() }), { expirationTtl: 7 * 86400 });
+  }
+  return seed.length;
+}
+
+// The active tracked set: freshest auto-refreshed watch, else the static seed.
+async function smartSeed(env) {
+  try {
+    const raw = await env.LAB_STORE.get("sm:watch");
+    if (raw) { const w = JSON.parse(raw); if (Array.isArray(w.seed) && w.seed.length >= 8) return w.seed; }
+  } catch { /* fall through */ }
+  return SMART_SEED;
 }
 
 // ── Agent key encryption at rest (AES-256-GCM via Web Crypto) ──────────────────
@@ -630,6 +687,16 @@ async function getOnChainWallets(env) {
 }
 
 export default {
+  // Cron (wrangler.toml [triggers]) — best-effort refresh of the Smart Money
+  // tracked set from the live HL leaderboard. Fails safe: on error the routes
+  // fall back to the static SMART_SEED, so a heavy/failed parse never breaks the tab.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil((async () => {
+      try { const n = await refreshSmartSeed(env); console.log(`[smart] refreshed tracked set: ${n}`); }
+      catch (e) { console.error("[smart] refresh failed (using static seed):", String(e)); }
+    })());
+  },
+
   async fetch(request, env, ctx) {
     // Preflight
     if (request.method === "OPTIONS") {
@@ -644,16 +711,17 @@ export default {
     // Phase 1 Smart Money. Server-side (HL leaderboard is 33MB → curated seed),
     // KV-cached 10min so browsers get a light payload. Ranked by 30d PnL.
     if (parts[0] === "smart" && parts[1] === "board" && request.method === "GET") {
-      const CACHE_KEY = "sm:board:v1";
+      const CACHE_KEY = "sm:board:v2";
       const cached = await env.LAB_STORE.get(CACHE_KEY);
       if (cached) return json(JSON.parse(cached), request);
-      const traders = await batched(SMART_SEED, 8, async (s) => {
+      const [seed, coinSet] = await Promise.all([smartSeed(env), orderlyPerpCoins(env)]);
+      const traders = await batched(seed, 8, async (s) => {
         try {
           const state = await hlInfo({ type: "clearinghouseState", user: s.a });
           return {
             address: s.a, roiMonth: s.r, pnlMonth: s.p, vlmMonth: s.v,
             accountValue: Math.round(parseFloat(state?.marginSummary?.accountValue || "0")),
-            positions: hlPositions(state),
+            positions: hlPositions(state, coinSet),
           };
         } catch {
           return { address: s.a, roiMonth: s.r, pnlMonth: s.p, vlmMonth: s.v, accountValue: 0, positions: [] };
@@ -665,35 +733,60 @@ export default {
       return json(payload, request);
     }
 
+    // ── POST /smart/refresh — best-effort auto-refresh of the tracked set ────────
+    // From the live HL leaderboard (33MB → best-effort, falls back to static seed).
+    // Also fired on cron. No auth: read-only public-data digest.
+    if (parts[0] === "smart" && parts[1] === "refresh") {
+      try {
+        const n = await refreshSmartSeed(env);
+        return json({ ok: true, tracked: n }, request);
+      } catch (e) {
+        return json({ ok: false, error: String(e), fallback: "static seed" }, request);
+      }
+    }
+
     // ── GET /smart/events — recent opens/closes across the tracked set ──────────
-    // Merged, time-sorted signal feed from userFills. KV-cached 3min.
+    // Merged, time-sorted signal feed from userFills. Only Orderly-copyable coins,
+    // deduped (partial fills of one move collapse into a single row). KV-cached 3min.
     if (parts[0] === "smart" && parts[1] === "events" && request.method === "GET") {
-      const CACHE_KEY = "sm:events:v1";
+      const CACHE_KEY = "sm:events:v2";
       const cached = await env.LAB_STORE.get(CACHE_KEY);
       if (cached) return json(JSON.parse(cached), request);
-      const all = [];
-      await batched(SMART_SEED.slice(0, 12), 6, async (s) => {
+      const [seed, coinSet] = await Promise.all([smartSeed(env), orderlyPerpCoins(env)]);
+      // key → aggregated event; collapses partial fills of the same action.
+      const byKey = new Map();
+      await batched(seed.slice(0, 14), 6, async (s) => {
         try {
           const fills = await hlInfo({ type: "userFills", user: s.a });
-          for (const f of (Array.isArray(fills) ? fills.slice(0, 6) : [])) {
+          for (const f of (Array.isArray(fills) ? fills.slice(0, 12) : [])) {
             const dir = f.dir || "";
             const isOpen = /^Open/.test(dir), isClose = /^Close/.test(dir);
             if (!isOpen && !isClose) continue;
-            all.push({
-              addr: s.a, coin: f.coin,
-              side: /Long/.test(dir) ? "LONG" : "SHORT",
-              type: isOpen ? "OPEN" : "CLOSE",
-              price: parseFloat(f.px || "0"),
-              szUsd: Math.round(parseFloat(f.px || "0") * parseFloat(f.sz || "0")),
-              closedPnl: isClose ? Math.round(parseFloat(f.closedPnl || "0")) : null,
-              ts: f.time,
-            });
+            const sym = hlCoinToOrderly(f.coin);
+            if (!sym || !coinSet.has(sym)) continue;          // Orderly-copyable only
+            const side = /Long/.test(dir) ? "LONG" : "SHORT";
+            const type = isOpen ? "OPEN" : "CLOSE";
+            const key = `${s.a}|${sym}|${side}|${type}`;
+            const szUsd = Math.round(parseFloat(f.px || "0") * parseFloat(f.sz || "0"));
+            const prev = byKey.get(key);
+            if (prev) {
+              prev.szUsd += szUsd;
+              prev.closedPnl = prev.closedPnl == null ? (isClose ? Math.round(parseFloat(f.closedPnl || "0")) : null) : prev.closedPnl + (isClose ? Math.round(parseFloat(f.closedPnl || "0")) : 0);
+              if (f.time > prev.ts) { prev.ts = f.time; prev.price = parseFloat(f.px || "0"); }
+            } else {
+              byKey.set(key, {
+                addr: s.a, coin: f.coin, sym, side, type,
+                price: parseFloat(f.px || "0"), szUsd,
+                closedPnl: isClose ? Math.round(parseFloat(f.closedPnl || "0")) : null,
+                ts: f.time,
+              });
+            }
           }
         } catch { /* skip this trader */ }
         return null;
       });
-      all.sort((a, b) => b.ts - a.ts);
-      const payload = { events: all.slice(0, 40), updatedAt: Date.now() };
+      const events = [...byKey.values()].sort((a, b) => b.ts - a.ts).slice(0, 30);
+      const payload = { events, updatedAt: Date.now() };
       await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 180 });
       return json(payload, request);
     }
