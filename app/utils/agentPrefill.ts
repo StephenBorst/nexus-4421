@@ -109,6 +109,9 @@ export type DirectiveDraft = {
 export function deployDirectiveFromThesis(t: {
   id?: string; symbol: string; direction: "LONG" | "SHORT";
   entryPrice: number; stopLoss: number; takeProfit1: number; takeProfit2?: number; leverage?: number;
+  // Provenance for the Agent tab ("copied from 0xabc…"). Defaults to THESIS so
+  // existing callers are unchanged; the wallet x-ray passes its source wallet.
+  source?: string;
 }, navigate?: (to: string) => void): void {
   const draft: DirectiveDraft = {
     symbol: toPerpSymbol(t.symbol),
@@ -120,7 +123,7 @@ export function deployDirectiveFromThesis(t: {
     tp1SizePct: t.takeProfit2 && t.takeProfit2 > 0 ? 50 : undefined,
     leverage: t.leverage && t.leverage > 0 ? Math.round(t.leverage) : undefined,
     thesisId: t.id,
-    source: "THESIS",
+    source: t.source || "THESIS",
   };
   try { window.localStorage.setItem(DIRECTIVE_PREFILL_KEY, JSON.stringify({ draft, ts: Date.now() })); }
   catch { /* ignore quota/availability */ }

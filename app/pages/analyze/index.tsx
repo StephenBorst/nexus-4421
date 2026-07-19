@@ -12,9 +12,11 @@
 // ⚠️ This page deliberately uses NO Orderly private hooks — only public APIs and
 // our own worker proxy. Keep it that way (see the SWR-key-collision incident).
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { AnalyticsView } from "@/pages/lab/AnalyticsView";
 import type { ProcessedTrade } from "@/pages/lab/types";
+import { deployDirectiveFromThesis } from "@/utils/agentPrefill";
+import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
 
 const GREEN = "#ededf0";
 const mono = "var(--nx-font-mono)";
@@ -40,6 +42,12 @@ const usd = (n: number) => {
   const s = a >= 1e6 ? `${(a / 1e6).toFixed(2)}M` : a >= 1e3 ? `${(a / 1e3).toFixed(1)}K` : a.toFixed(2);
   return `${n < 0 ? "-" : ""}$${s}`;
 };
+const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+
+// Shared with the Lab's Smart Money watchlist, ON PURPOSE — starring a wallet
+// here makes it show up (and alert) over there. Same key, one list.
+const WATCH_KEY = "nexus_sm_watchlist";
+const loadWatch = (): string[] => { try { return JSON.parse(localStorage.getItem(WATCH_KEY) || "[]"); } catch { return []; } };
 
 // Orderly-network record for a wallet, across every broker we probe (ours first).
 async function fetchOrderlyXray(address: string): Promise<XrayResult> {
@@ -94,6 +102,49 @@ export default function AnalyzePage() {
   const [orderly, setOrderly] = useState<XrayResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [watch, setWatch] = useState<string[]>(loadWatch);
+  const navigate = useNavigate();
+
+  const toggleWatch = (addr: string) => {
+    setWatch((prev) => {
+      const next = prev.includes(addr) ? prev.filter((a) => a !== addr) : [...prev, addr];
+      try { localStorage.setItem(WATCH_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  // ⚡ Copy an OPEN position into an agent directive. Same bridge Smart Money uses,
+  // so the agent honors the direction verbatim and manages the exit. Default stop
+  // 3% / target 6% off the observed entry — the user reviews + edits before arming.
+  const copyPosition = (s: XraySymbol, from: string) => {
+    const p = s.entry > 0 ? s.entry : 0;
+    const isLong = s.side === "LONG";
+    deployDirectiveFromThesis({
+      symbol: s.sym,
+      direction: s.side === "SHORT" ? "SHORT" : "LONG",
+      entryPrice: p,
+      stopLoss: p > 0 ? (isLong ? p * 0.97 : p * 1.03) : 0,
+      takeProfit1: p > 0 ? (isLong ? p * 1.06 : p * 0.94) : 0,
+      source: `XRAY ${short(from)}`,
+    }, navigate);
+  };
+
+  // ◆ Draft a thesis from the position instead — plan it yourself before automating.
+  const draftThesis = (s: XraySymbol, from: string) => {
+    const p = s.entry > 0 ? s.entry : 0;
+    const isLong = s.side === "LONG";
+    try {
+      localStorage.setItem(THESIS_DRAFT_KEY, JSON.stringify({
+        symbol: s.sym,
+        direction: s.side,
+        entryPrice: p || undefined,
+        stopLoss: p > 0 ? Number((isLong ? p * 0.97 : p * 1.03).toFixed(6)) : undefined,
+        takeProfit1: p > 0 ? Number((isLong ? p * 1.06 : p * 0.94).toFixed(6)) : undefined,
+        notes: `${short(from)} holds ${s.side} ${s.sym} (${usd(s.szUsd)} open) — seen via wallet x-ray.`,
+      }));
+    } catch { /* ignore */ }
+    navigate("/lab?tab=thesis");
+  };
 
   // Both venues in parallel — one failing must never hide the other, so this uses
   // allSettled and only surfaces an error when NEITHER source returned anything.
@@ -220,6 +271,13 @@ export default function AnalyzePage() {
                 <span title={v.accountId} style={{ fontSize: 9, color: "#52525b", marginLeft: "auto" }}>
                   acct {v.accountId.slice(0, 10)}…{v.accountId.slice(-6)}
                 </span>
+                <button
+                  onClick={() => toggleWatch(orderly.address)}
+                  title={watch.includes(orderly.address) ? "Remove from your Smart Money watchlist" : "Track this wallet in Smart Money"}
+                  style={{ background: "none", border: `1px solid ${watch.includes(orderly.address) ? "#33333a" : "#232327"}`, borderRadius: 3, cursor: "pointer", fontFamily: mono, fontSize: 9, letterSpacing: "0.05em", padding: "3px 8px", color: watch.includes(orderly.address) ? "#ededf0" : "#71717a" }}
+                >
+                  {watch.includes(orderly.address) ? "★ WATCHING" : "☆ WATCH"}
+                </button>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 10, marginBottom: 12 }}>
@@ -247,6 +305,17 @@ export default function AnalyzePage() {
                     </span>
                     <span style={{ color: s.open ? (s.unrealized >= 0 ? POS : NEG) : "#3f3f46", flex: "1 1 90px", minWidth: 90, textAlign: "right" }}>
                       {s.open && s.unrealized ? `${s.unrealized >= 0 ? "+" : ""}${usd(s.unrealized)}` : ""}
+                    </span>
+                    {/* Actions only on LIVE positions — a closed market has nothing to copy. */}
+                    <span style={{ display: "flex", gap: 5, flexShrink: 0, minWidth: 104, justifyContent: "flex-end" }}>
+                      {s.open && s.side && (
+                        <>
+                          <button onClick={() => draftThesis(s, orderly.address)} title="Draft a thesis from this position"
+                            style={{ background: "none", border: "1px solid #232327", borderRadius: 3, color: "#71717a", fontFamily: mono, fontSize: 9, padding: "2px 7px", cursor: "pointer" }}>◆</button>
+                          <button onClick={() => copyPosition(s, orderly.address)} title="Copy this position — the agent enters your direction, manages the exit, and grades it on-chain"
+                            style={{ background: "none", border: "1px solid #33333a", borderRadius: 3, color: GREEN, fontFamily: mono, fontSize: 9, letterSpacing: "0.04em", padding: "2px 7px", cursor: "pointer", whiteSpace: "nowrap" }}>⚡ COPY</button>
+                        </>
+                      )}
                     </span>
                   </div>
                 ))}
