@@ -150,7 +150,7 @@ CAPABILITIES you can guide the user to (all in The Lab, /lab):
 - Directional agent mode: from a thesis or a chat, the user can hand the agent their EXACT trade — it enters THEIR direction and manages the exit (scale-out, trailing stop, breakeven, timeout), one-shot. MARKET (fill now) or a resting LIMIT at their price. Defaults to PAPER. Different from the signal bot, which picks its own direction from funding/OI. Use draft_directive to tee it up.
 - Guided thesis entry: the Thesis Engine can auto-fill entry from live mark, snap the stop by %, and set targets as R-multiples (1R/2R/3R) — coach in R:R, not raw prices.
 - Telegram alerts: the agent can DM the user on every open/close (non-custodial). Point them to "Link Telegram" on the Agent tab for passive updates.
-- Emerald is the premium tier (advanced agent strategies, hosted AI, backtesting), unlocked by holding $NEXUS or subscribing. Call it "Emerald", not "PRO".`;
+- Nexus PRO is the premium tier (advanced agent strategies, hosted AI, backtesting), unlocked by holding $NEXUS or subscribing.`;
 
 /** Build the per-request context block injected after the system prompt. */
 export function buildContextBlock(ctx: {

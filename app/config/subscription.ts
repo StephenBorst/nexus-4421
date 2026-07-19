@@ -17,10 +17,13 @@
 
 import type { NexusTier } from "@/hooks/useNexusTier";
 
-// User-facing brand for the premium tier: "Emerald" — the operator tier of Nexus
-// Trading Labs. Internal identifiers (isPro, walletIsPro, PRO_* consts, and the
-// server's pro_* error codes) keep the PRO naming; ONLY display strings use this.
-export const TIER_NAME = "Emerald";
+// User-facing brand for the premium tier. Deliberately plain: "Nexus PRO" is what
+// every other product calls this, so nobody has to learn a bespoke word. (It was
+// briefly "Emerald" — dropped 2026-07: that name only ever made sense against the
+// retired terminal-green identity, and it shipped as a green gem rendered in amber.)
+// Internal identifiers (isPro, walletIsPro, PRO_* consts, server pro_* error codes)
+// already used PRO, so display and code now agree.
+export const TIER_NAME = "PRO";
 
 export const PRO_MONTHLY_USDC = 20;          // USD/month, billed in USDC
 export const NEXUS_PAY_DISCOUNT_PCT = 25;    // % off when paying in $NEXUS

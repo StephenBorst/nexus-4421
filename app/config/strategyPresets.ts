@@ -83,7 +83,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
   {
     id: "momentum-rider",
     name: "Momentum Rider",
-    tag: "EMERALD · TREND",
+    tag: "PRO · TREND",
     accent: "#3ecf8e",
     pro: true,
     blurb: "Trade WITH a price move above threshold across majors. Rides strength — noisy, test in paper.",
@@ -96,7 +96,7 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
   {
     id: "mean-reversion-fade",
     name: "Mean Reversion Fade",
-    tag: "EMERALD · FADE",
+    tag: "PRO · FADE",
     accent: "#3ecf8e",
     pro: true,
     blurb: "Fade sharp moves on BTC + ETH — buy the dip, sell the rip above your price threshold.",
