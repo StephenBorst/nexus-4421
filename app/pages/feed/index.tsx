@@ -977,7 +977,19 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
             {isExpanded && (
               <div style={{ borderTop: "1px solid #232327", padding: "10px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
                 {/* Profile link */}
-                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 4 }}>
+                  {/* Verify the caller's real venue record before copying them. */}
+                  <a
+                    href={`/analyze?address=${trader.wallet}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    title="X-ray this wallet's actual perp record on Hyperliquid + Orderly"
+                    className="nx-btn nx-btn-icon"
+                    style={{ textDecoration: "none" }}
+                  >
+                    ⌕ X-RAY ↗
+                  </a>
                   <button
                     className="nx-btn nx-btn-icon"
                     onClick={(e) => { e.stopPropagation(); navigate(`/feed/trader/${trader.wallet}`); }}

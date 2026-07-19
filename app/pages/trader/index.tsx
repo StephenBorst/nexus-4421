@@ -696,6 +696,24 @@ export default function TraderPage() {
                   {theses.length} public thesis{theses.length !== 1 ? "es" : ""}
                 </div>
               </div>
+              {/* Cross-check: this board ranks GRADED CALLS, but a caller's real
+                  venue record is separate evidence. New tab on purpose — verifying
+                  shouldn't cost you your place on the profile. */}
+              {wallet && (
+                <a
+                  href={`/analyze?address=${wallet}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="X-ray this wallet's actual perp record on Hyperliquid + Orderly — verify before you copy"
+                  style={{
+                    flexShrink: 0, fontFamily: "var(--nx-font-mono)", fontSize: 10,
+                    color: "#ededf0", textDecoration: "none", border: "1px solid #33333a",
+                    borderRadius: 4, padding: "8px 12px", whiteSpace: "nowrap",
+                  }}
+                >
+                  ⌕ X-RAY ↗
+                </a>
+              )}
               {/* Rep Score badge — Ph26: on-chain value from NexusRepScore contract */}
               {showRepBadge && (
                 <div style={{
