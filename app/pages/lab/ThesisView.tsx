@@ -102,7 +102,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
               { label: "TP1", val: `$${t.takeProfit1.toFixed(2)}`, color: "#ededf0" },
               { label: "SIZE", val: `$${t.positionSize.toFixed(0)}` },
               { label: "R:R", val: `1:${t.riskReward.toFixed(2)}`, color: t.riskReward >= 2 ? "#ededf0" : "#fbbf24" },
-              { label: "72H FUND", val: `$${t.fundingCost72h.toFixed(3)}`, color: "#fbbf24" },
+              { label: "72H FUND", val: `$${t.fundingCost72h.toFixed(3)}`, color: "#a1a1aa" },
             ].map(({ label, val, color }) => (
               <div key={label}>
                 <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
@@ -1126,7 +1126,7 @@ export function ThesisView() {
                   ].map(({ label, val }) => (
                     <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                       <span style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{label}</span>
-                      <span style={{ fontSize: 13, color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>${val.toFixed(3)}</span>
+                      <span style={{ fontSize: 13, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>${val.toFixed(3)}</span>
                     </div>
                   ))}
                 </div>

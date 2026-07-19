@@ -33,8 +33,8 @@ export function CountUp({ value, format, durationMs = 620 }: {
 // ─── Coachmark ───────────────────────────────────────────
 // One-time, dismissible teaching callout — makes a flow legible without a heavy
 // tour lib. Gated by a localStorage key so it shows once per browser. Terminal
-// register: green left-rule, mono, "GOT IT" to dismiss. Renders nothing once
-// dismissed or when `when` is false.
+// register: sky-blue info left-rule (green is reserved for profit; this is info),
+// mono, "GOT IT" to dismiss. Renders nothing once dismissed or when `when` is false.
 export function Coachmark({ storageKey, badge, title, children, when = true }: {
   storageKey: string; badge?: string; title: string; children: React.ReactNode; when?: boolean;
 }) {
@@ -49,14 +49,14 @@ export function Coachmark({ storageKey, badge, title, children, when = true }: {
   return (
     <div className="nx-fade-in" style={{
       display: "flex", gap: 12, alignItems: "flex-start",
-      background: "linear-gradient(90deg, #0d140f, #0f0f11)",
-      border: "1px solid #1e3a2a", borderLeft: "3px solid #3ecf8e",
+      background: "linear-gradient(90deg, #0d1220, #0f0f11)",
+      border: "1px solid #1e2a3a", borderLeft: "3px solid #6cb6ff",
       borderRadius: 6, padding: "12px 14px", marginBottom: 12,
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-          {badge && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.1em", color: "#0a0a0b", background: "#3ecf8e", borderRadius: 3, padding: "2px 6px", fontWeight: 700 }}>{badge}</span>}
-          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#3ecf8e", fontWeight: 700, letterSpacing: "0.03em" }}>{title}</span>
+          {badge && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.1em", color: "#0a0a0b", background: "#6cb6ff", borderRadius: 3, padding: "2px 6px", fontWeight: 700 }}>{badge}</span>}
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#6cb6ff", fontWeight: 700, letterSpacing: "0.03em" }}>{title}</span>
         </div>
         <div style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: 12, color: "#a1a1aa", lineHeight: 1.5 }}>{children}</div>
       </div>

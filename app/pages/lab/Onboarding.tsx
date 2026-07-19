@@ -34,7 +34,7 @@ export function LabWelcome() {
       </div>
       <div style={{ textAlign: "center" }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#52525b", border: "1px solid #232327", borderRadius: 4, padding: "10px 18px", background: "#0a0a0b" }}>
-          <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#fbbf24", boxShadow: "0 0 8px #fbbf24", animation: "pulse 2s infinite" }} />
+          <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#ededf0", boxShadow: "0 0 8px #ededf0", animation: "pulse 2s infinite" }} />
           Connect your wallet (top right) to load your trades and activate The Lab
         </div>
       </div>

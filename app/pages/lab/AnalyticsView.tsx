@@ -249,7 +249,7 @@ function BreakdownRow({ orders }: { orders: ProcessedTrade[] }) {
                 <span style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{b.trades} trades {b.trades ? `${Math.round((b.wins / b.trades) * 100)}%` : ""}</span>
               </div>
               <div style={{ height: 4, background: "#232327", borderRadius: 2 }}>
-                <div style={{ height: 4, background: "#fbbf24", borderRadius: 2, width: `${(b.trades / orders.length) * 100}%` }} />
+                <div style={{ height: 4, background: "#6cb6ff", borderRadius: 2, width: `${(b.trades / orders.length) * 100}%` }} />
               </div>
               <div style={{ fontSize: 10, color: b.pnl >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", marginTop: 3 }}>{formatPnl(b.pnl)}</div>
             </div>
@@ -257,7 +257,7 @@ function BreakdownRow({ orders }: { orders: ProcessedTrade[] }) {
         }
         <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #232327", display: "flex", justifyContent: "space-between" }}>
           <span style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>AVG LEVERAGE</span>
-          <span style={{ fontSize: 16, color: "#fbbf24", fontFamily: "var(--nx-font-mono)" }}>{leverage.avgLev}x</span>
+          <span style={{ fontSize: 16, color: "#ededf0", fontFamily: "var(--nx-font-mono)" }}>{leverage.avgLev}x</span>
         </div>
       </div>
     </div>
@@ -381,7 +381,7 @@ function TimingAndRisk({ orders }: { orders: ProcessedTrade[] }) {
         <div style={{ fontSize: 10, color: "#71717a", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "var(--nx-font-mono)" }}>&#9632; RISK-ADJUSTED</div>
         {gated ? (
           <div style={{ fontSize: 11, color: "#52525b", fontFamily: "var(--nx-font-ui)", lineHeight: 1.7 }}>
-            need <span style={{ color: "#fbbf24" }}>{RISK_SAMPLE_GATE - stats.n}</span> more closed trades<br />
+            need <span style={{ color: "#6cb6ff" }}>{RISK_SAMPLE_GATE - stats.n}</span> more closed trades<br />
             <span style={{ color: "#33333a" }}>ratios are meaningless under {RISK_SAMPLE_GATE} samples — we won&apos;t fake them</span>
           </div>
         ) : (
