@@ -1,3 +1,6 @@
+import { keccak_256 } from "@noble/hashes/sha3.js";
+import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+
 // ═══════════════════════════════════════════════════════════
 // Pure, testable logic for nexus-lab-api.
 // Imported by index.js so tests cover the real deployed behavior.
@@ -387,4 +390,24 @@ export function verifyV2({ record, sig, expected, now, recover, domain = AUTH_V2
     return { ok: false, reason: "signature does not match wallet" };
 
   return { ok: true, wallet: walletL };
+}
+
+// ── Orderly account_id derivation ────────────────────────────────────────────
+// Orderly derives a DETERMINISTIC account id from (wallet, brokerId):
+//   accountId = keccak256(abi.encode(address, keccak256(bytes(brokerId))))
+// abi.encode of (address,bytes32) == 12 zero bytes + 20-byte address + 32-byte hash.
+//
+// This is the whole unlock for a public wallet x-ray on Orderly: the dashboard
+// indexer is keyed by account_id (not address), so without this we could only
+// x-ray wallets that happen to appear in the top-200 PnL ranking. With it, any
+// address can be resolved for any broker — no auth, no ranking dependency.
+// Verified against live indexer rows (see logic.test.mjs vectors).
+export function orderlyAccountId(address, brokerId) {
+  const clean = String(address || "").trim().toLowerCase().replace(/^0x/, "");
+  if (!/^[0-9a-f]{40}$/.test(clean)) throw new Error("invalid address");
+  if (!brokerId) throw new Error("brokerId required");
+  const buf = new Uint8Array(64);
+  buf.set(hexToBytes(clean), 12);                       // left-pad address to 32B
+  buf.set(keccak_256(utf8ToBytes(String(brokerId))), 32); // brokerHash
+  return "0x" + bytesToHex(keccak_256(buf));
 }

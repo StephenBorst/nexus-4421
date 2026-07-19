@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats, orderlyAccountId } from "./logic.mjs";
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./backtest.mjs";
 // Directive level validation lives with the exec's money-path logic (single source);
@@ -205,6 +205,12 @@ async function orderlyDashboard(path) {
   if (!r.ok) throw new Error(`ord-dash ${r.status}`);
   return r.json();
 }
+
+// Brokers probed by the public wallet x-ray. OURS FIRST so a Nexus trader's own
+// venue leads the result, then the highest-volume brokers by ranking presence.
+// One indexer call each (all parallel) — keep this list bounded.
+const NEXUS_BROKER_ID = "nexus_trading";
+const ORDERLY_BROKERS = [NEXUS_BROKER_ID, "orderly", "woofi_pro", "raydium", "btse_dex", "aden", "vooi", "logx"];
 
 // Build the Orderly-native smart-money board from the public realized-PnL ranking.
 // One call returns the ecosystem's top traders + their live positions in Orderly
@@ -871,6 +877,68 @@ export default {
       } catch (e) {
         return json({ error: String(e) }, request, 502);
       }
+    }
+
+    // ── GET /smart/xray?address= — PUBLIC multi-venue Orderly wallet x-ray ───────
+    // The dashboard indexer is keyed by account_id, NOT address — orderlyAccountId()
+    // derives that deterministically per broker, so ANY wallet can be x-rayed across
+    // the Orderly network instead of only the top-200 ranking. Nexus is probed first.
+    // ⚠️ The indexer exposes per-SYMBOL aggregates, not a per-trade tape (/trades is
+    // hash-encoded, /events_v2 empty). So this is a venue + market breakdown — it
+    // CANNOT produce the hold-time/timing analytics the HL fill history supports.
+    // Don't promise per-trade stats off this endpoint. KV-cached 5min.
+    if (parts[0] === "smart" && parts[1] === "xray" && request.method === "GET") {
+      const address = (url.searchParams.get("address") || "").trim();
+      if (!/^0x[a-fA-F0-9]{40}$/.test(address)) return json({ error: "valid 0x address required" }, request, 400);
+      const CACHE = `sm:xray:${address.toLowerCase()}`;
+      const cached = await env.LAB_STORE.get(CACHE);
+      if (cached) return json(JSON.parse(cached), request);
+      const coin = (s) => String(s).replace("PERP_", "").replace("_USDC", "");
+      const probed = await Promise.all(ORDERLY_BROKERS.map(async (brokerId) => {
+        let accountId;
+        try { accountId = orderlyAccountId(address, brokerId); } catch { return null; }
+        try {
+          const d = await orderlyDashboard(`/ranking/realized_pnl?account_id=${accountId}&limit=100`);
+          const rows = d?.data?.rows || [];
+          if (!rows.length) return null;
+          let realized = 0, unrealized = 0, wins = 0, losses = 0;
+          const bySymbol = rows.map((r) => {
+            const rp = parseFloat(r.total_realized_pnl || "0");
+            const up = parseFloat(r.un_realized_pnl || "0");
+            const holding = parseFloat(r.holding || "0");
+            realized += rp; unrealized += up;
+            if (rp > 0) wins++; else if (rp < 0) losses++;
+            return {
+              sym: coin(r.symbol),
+              realized: Math.round(rp), unrealized: Math.round(up),
+              open: Math.abs(holding) > 1e-9,
+              side: holding > 0 ? "LONG" : holding < 0 ? "SHORT" : null,
+              szUsd: Math.round(Math.abs(parseFloat(r.holding_value || "0"))),
+              entry: parseFloat(r.average_entry_price || "0"),
+            };
+          }).sort((a, b) => Math.abs(b.realized) - Math.abs(a.realized));
+          const graded = wins + losses;
+          return {
+            brokerId, accountId, isNexus: brokerId === NEXUS_BROKER_ID,
+            realized: Math.round(realized), unrealized: Math.round(unrealized),
+            markets: rows.length, wins, losses,
+            profitableMarketsPct: graded ? Math.round((wins / graded) * 1000) / 10 : 0,
+            openPositions: bySymbol.filter((s) => s.open).length,
+            bySymbol,
+          };
+        } catch { return null; }
+      }));
+      const venues = probed.filter(Boolean)
+        .sort((a, b) => (b.isNexus ? 1 : 0) - (a.isNexus ? 1 : 0) || b.realized - a.realized);
+      const payload = {
+        address, venues,
+        totalRealized: venues.reduce((s, v) => s + v.realized, 0),
+        totalUnrealized: venues.reduce((s, v) => s + v.unrealized, 0),
+        markets: venues.reduce((s, v) => s + v.markets, 0),
+        brokersChecked: ORDERLY_BROKERS.length,
+      };
+      await env.LAB_STORE.put(CACHE, JSON.stringify(payload), { expirationTtl: 300 });
+      return json(payload, request);
     }
 
     // ── POST /smart/refresh — best-effort auto-refresh of the tracked set ────────

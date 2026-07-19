@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-lab-api/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { gradeCall, resolveAiUpstream, bankrGatewayModel, rankCaller, confluenceSignal } from "./logic.mjs";
+import { gradeCall, resolveAiUpstream, bankrGatewayModel, rankCaller, confluenceSignal, orderlyAccountId } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
 const series = (t0, bars) => ({
@@ -472,4 +472,33 @@ test("oiStats: building flag until minSamples, then funding/oi percentiles", () 
   assert.equal(s.samples, 20);
   assert.equal(s.funding.pct, 100); // last funding is the max → top percentile
   assert.equal(s.oi.value, 119);
+});
+
+// ── orderlyAccountId ─────────────────────────────────────────────────────────
+// Vectors captured from LIVE indexer rows (ranking/realized_pnl), so these lock
+// the derivation against Orderly's real account ids — not our own assumption.
+test("orderlyAccountId matches live Orderly indexer vectors", () => {
+  assert.equal(
+    orderlyAccountId("0x32831ca2efa20ae6340224bc353d4b241b3d2541", "woofi_pro"),
+    "0x85cf9694ff45a0230bb572d9c982126b124036e5bc790c285387d31e4fb482ad",
+  );
+  assert.equal(
+    orderlyAccountId("0x689881d3a1cf1b9863be7ff05c7af8e464c248d0", "woofi_pro"),
+    "0xb7630bddf27ca2e478b13cbe31be2f0c2e52695ed0b64ee6e8a45e1955c97c44",
+  );
+});
+
+test("orderlyAccountId is checksum/prefix agnostic and broker-scoped", () => {
+  const lower = orderlyAccountId("0x32831ca2efa20ae6340224bc353d4b241b3d2541", "woofi_pro");
+  const upper = orderlyAccountId("0x32831CA2EFA20AE6340224BC353D4B241B3D2541", "woofi_pro");
+  const naked = orderlyAccountId("32831ca2efa20ae6340224bc353d4b241b3d2541", "woofi_pro");
+  assert.equal(upper, lower);
+  assert.equal(naked, lower);
+  // same wallet, different broker => different account
+  assert.notEqual(orderlyAccountId("0x32831ca2efa20ae6340224bc353d4b241b3d2541", "nexus_trading"), lower);
+});
+
+test("orderlyAccountId rejects bad input", () => {
+  assert.throws(() => orderlyAccountId("0xnope", "nexus_trading"));
+  assert.throws(() => orderlyAccountId("0x32831ca2efa20ae6340224bc353d4b241b3d2541", ""));
 });

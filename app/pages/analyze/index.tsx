@@ -1,10 +1,16 @@
-// Public "Wallet X-Ray" — paste any Hyperliquid wallet, get the full Nexus Lab
-// analytics on its perp trade history. No login, no wallet connect required.
-// Acquisition wedge: grade a trader who's never touched our DEX, then convert.
+// Public "Wallet X-Ray" — paste any wallet, get its perp record. No login, no
+// wallet connect. Acquisition wedge: grade a trader who's never touched our DEX.
 //
-// ⚠️ This page deliberately uses NO Orderly private hooks — it only hits
-// Hyperliquid's public /info API and renders the pure <AnalyticsView>. Keep it
-// that way (see the SWR-key-collision incident).
+// TWO SOURCES, DELIBERATELY DIFFERENT DEPTH:
+//  • Hyperliquid — public /info `userFills` returns a per-TRADE tape, so we can
+//    render the full <AnalyticsView> (hold time, timing, streaks, per-trade P&L).
+//  • Orderly (incl. OUR venue) — the public dashboard indexer is keyed by
+//    account_id and only exposes per-SYMBOL aggregates; /trades is hash-encoded
+//    and /events_v2 is empty. So Orderly gets a venue/market breakdown, NOT the
+//    per-trade analytics. Don't "upgrade" it to AnalyticsView — the data isn't there.
+//
+// ⚠️ This page deliberately uses NO Orderly private hooks — only public APIs and
+// our own worker proxy. Keep it that way (see the SWR-key-collision incident).
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AnalyticsView } from "@/pages/lab/AnalyticsView";
@@ -12,6 +18,35 @@ import type { ProcessedTrade } from "@/pages/lab/types";
 
 const GREEN = "#ededf0";
 const mono = "var(--nx-font-mono)";
+const AGENT_API = "https://og.nexustradinglabs.com";
+const POS = "#3ecf8e", NEG = "#f7525f";
+
+type XraySymbol = {
+  sym: string; realized: number; unrealized: number;
+  open: boolean; side: "LONG" | "SHORT" | null; szUsd: number; entry: number;
+};
+type XrayVenue = {
+  brokerId: string; accountId: string; isNexus: boolean;
+  realized: number; unrealized: number; markets: number; wins: number; losses: number;
+  profitableMarketsPct: number; openPositions: number; bySymbol: XraySymbol[];
+};
+type XrayResult = {
+  address: string; venues: XrayVenue[];
+  totalRealized: number; totalUnrealized: number; markets: number; brokersChecked: number;
+};
+
+const usd = (n: number) => {
+  const a = Math.abs(n);
+  const s = a >= 1e6 ? `${(a / 1e6).toFixed(2)}M` : a >= 1e3 ? `${(a / 1e3).toFixed(1)}K` : a.toFixed(2);
+  return `${n < 0 ? "-" : ""}$${s}`;
+};
+
+// Orderly-network record for a wallet, across every broker we probe (ours first).
+async function fetchOrderlyXray(address: string): Promise<XrayResult> {
+  const res = await fetch(`${AGENT_API}/smart/xray?address=${encodeURIComponent(address)}`);
+  if (!res.ok) throw new Error(`Orderly x-ray ${res.status}`);
+  return res.json();
+}
 
 type HLFill = {
   coin: string; px: string; sz: string; side: string; time: number;
@@ -56,22 +91,32 @@ export default function AnalyzePage() {
   const [input, setInput] = useState(params.get("address") ?? "");
   const [address, setAddress] = useState<string | null>(params.get("address"));
   const [trades, setTrades] = useState<ProcessedTrade[] | null>(null);
+  const [orderly, setOrderly] = useState<XrayResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Both venues in parallel — one failing must never hide the other, so this uses
+  // allSettled and only surfaces an error when NEITHER source returned anything.
   const run = useCallback(async (addr: string) => {
     if (!isAddress(addr)) { setError("Enter a valid 0x… wallet address"); return; }
-    setLoading(true); setError(null); setTrades(null);
-    try {
-      const fills = await fetchHLFills(addr);
-      const t = fillsToTrades(fills);
-      setTrades(t);
-      if (!t.length) setError("No closed perp trades found for this wallet on Hyperliquid.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to fetch from Hyperliquid");
-    } finally {
-      setLoading(false);
+    setLoading(true); setError(null); setTrades(null); setOrderly(null);
+    const [hl, ord] = await Promise.allSettled([fetchHLFills(addr), fetchOrderlyXray(addr)]);
+
+    const t = hl.status === "fulfilled" ? fillsToTrades(hl.value) : [];
+    setTrades(t);
+    const ox = ord.status === "fulfilled" ? ord.value : null;
+    setOrderly(ox);
+
+    const hasHL = t.length > 0;
+    const hasOrderly = !!ox && ox.venues.length > 0;
+    if (!hasHL && !hasOrderly) {
+      setError(
+        hl.status === "rejected" && ord.status === "rejected"
+          ? "Couldn't reach Hyperliquid or Orderly. Try again."
+          : "No perp trading history found for this wallet on Hyperliquid or the Orderly network.",
+      );
     }
+    setLoading(false);
   }, []);
 
   // Auto-run from a shared ?address= link.
@@ -99,10 +144,10 @@ export default function AnalyzePage() {
       <h1 style={{ fontSize: 26, fontWeight: 800, margin: "0 0 8px", letterSpacing: "-0.01em" }}>
         X-ray any trader. <span style={{ color: GREEN }}>Grade the tape.</span>
       </h1>
-      <p style={{ fontSize: 13, color: "#a1a1aa", maxWidth: 620, lineHeight: 1.6, margin: "0 0 20px" }}>
-        Paste any Hyperliquid wallet and get the full Nexus trading breakdown — score, risk-adjusted
-        ratios, hold-time, leverage, timing, and per-asset edge. No login. Then bring your own edge to
-        Nexus and prove it on-chain.
+      <p style={{ fontSize: 13, color: "#a1a1aa", maxWidth: 660, lineHeight: 1.6, margin: "0 0 20px" }}>
+        Paste any wallet. We read its perp record from <b style={{ color: "#d4d4d8" }}>Hyperliquid</b> and
+        from the <b style={{ color: "#d4d4d8" }}>Orderly network</b> — including Nexus — straight off
+        public data. No login. Then bring your own edge here and prove it on-chain.
       </p>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
@@ -110,7 +155,7 @@ export default function AnalyzePage() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-          placeholder="0x… Hyperliquid wallet address"
+          placeholder="0x… any wallet address"
           spellCheck={false}
           style={{
             flex: "1 1 360px", background: "#0a0a0b", border: `1px solid ${isAddress(input) ? GREEN : "#232327"}`,
@@ -135,7 +180,7 @@ export default function AnalyzePage() {
       )}
 
       {loading && (
-        <div style={{ fontSize: 12, color: "#a1a1aa", fontFamily: mono }}>$ ./xray.sh --wallet {address?.slice(0, 8)}… <span style={{ color: GREEN }}>fetching fills…</span></div>
+        <div style={{ fontSize: 12, color: "#a1a1aa", fontFamily: mono }}>$ ./xray.sh --wallet {address?.slice(0, 8)}… <span style={{ color: GREEN }}>reading hyperliquid + orderly…</span></div>
       )}
 
       {trades && trades.length > 0 && (
@@ -149,6 +194,69 @@ export default function AnalyzePage() {
             <a href="/lab" style={{ background: GREEN, color: "#141416", textDecoration: "none", borderRadius: 6, padding: "10px 20px", fontFamily: mono, fontWeight: 700, fontSize: 12, letterSpacing: "0.06em" }}>OPEN THE LAB →</a>
           </div>
         </>
+      )}
+
+      {/* ── ORDERLY NETWORK RECORD ─────────────────────────────────────────────
+          Per-market aggregates from the public dashboard indexer, resolved by a
+          DERIVED account_id per broker (see worker /smart/xray). Deliberately not
+          fed into <AnalyticsView>: there's no per-trade tape behind it. */}
+      {orderly && orderly.venues.length > 0 && (
+        <div style={{ marginTop: trades && trades.length ? 28 : 0 }}>
+          <div style={{ fontSize: 11, letterSpacing: "0.15em", color: "#71717a", marginBottom: 8 }}>// ORDERLY NETWORK RECORD</div>
+          <p style={{ fontSize: 12, color: "#71717a", lineHeight: 1.6, margin: "0 0 14px", maxWidth: 680 }}>
+            Settled on-chain, read from Orderly&apos;s public indexer — found on{" "}
+            <b style={{ color: "#d4d4d8" }}>{orderly.venues.length}</b> of {orderly.brokersChecked} venues probed.
+            These are per-market totals; Orderly doesn&apos;t publish a per-trade tape, so the
+            hold-time and timing analytics above stay Hyperliquid-only.
+          </p>
+
+          {orderly.venues.map((v) => (
+            <div key={v.brokerId} style={{ border: `1px solid ${v.isNexus ? "#3a3a42" : "#232327"}`, borderRadius: 8, background: "#141416", padding: "14px 16px", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                <span style={{ fontSize: 13, color: "#f4f4f5", fontWeight: 700, letterSpacing: "0.04em" }}>{v.brokerId}</span>
+                {v.isNexus && (
+                  <span style={{ fontSize: 8, letterSpacing: "0.1em", color: "#0a0a0b", background: GREEN, borderRadius: 3, padding: "2px 6px", fontWeight: 700 }}>THIS IS NEXUS</span>
+                )}
+                <span title={v.accountId} style={{ fontSize: 9, color: "#52525b", marginLeft: "auto" }}>
+                  acct {v.accountId.slice(0, 10)}…{v.accountId.slice(-6)}
+                </span>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 10, marginBottom: 12 }}>
+                {[
+                  { l: "REALIZED", v: usd(v.realized), c: v.realized >= 0 ? POS : NEG },
+                  { l: "UNREALIZED", v: v.unrealized ? usd(v.unrealized) : "—", c: v.unrealized === 0 ? "#52525b" : v.unrealized > 0 ? POS : NEG },
+                  { l: "MARKETS", v: String(v.markets), c: "#f4f4f5" },
+                  { l: "PROFITABLE MKTS", v: `${v.profitableMarketsPct}%`, c: "#f4f4f5" },
+                  { l: "OPEN NOW", v: String(v.openPositions), c: v.openPositions ? "#f4f4f5" : "#52525b" },
+                ].map(({ l, v: val, c }) => (
+                  <div key={l}>
+                    <div style={{ fontSize: 8, color: "#52525b", letterSpacing: "0.12em" }}>{l}</div>
+                    <div style={{ fontSize: 15, color: c, fontWeight: 600, marginTop: 2 }}>{val}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ borderTop: "1px solid #232327", paddingTop: 8 }}>
+                {v.bySymbol.slice(0, 12).map((s) => (
+                  <div key={s.sym} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", fontSize: 11 }}>
+                    <span style={{ color: "#e4e4e7", flex: "1 1 70px", minWidth: 70 }}>{s.sym}</span>
+                    <span style={{ color: s.realized >= 0 ? POS : NEG, flex: "1 1 90px", minWidth: 90, textAlign: "right" }}>{usd(s.realized)}</span>
+                    <span style={{ color: "#52525b", flex: "1 1 120px", minWidth: 120, textAlign: "right" }}>
+                      {s.open && s.side ? `${s.side === "LONG" ? "↑" : "↓"} ${usd(s.szUsd)} open` : ""}
+                    </span>
+                    <span style={{ color: s.open ? (s.unrealized >= 0 ? POS : NEG) : "#3f3f46", flex: "1 1 90px", minWidth: 90, textAlign: "right" }}>
+                      {s.open && s.unrealized ? `${s.unrealized >= 0 ? "+" : ""}${usd(s.unrealized)}` : ""}
+                    </span>
+                  </div>
+                ))}
+                {v.bySymbol.length > 12 && (
+                  <div style={{ fontSize: 10, color: "#52525b", paddingTop: 6 }}>+{v.bySymbol.length - 12} more markets</div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Cross-verify on Orderly — the trustless bridge. Shows for any valid address
