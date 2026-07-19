@@ -3,19 +3,26 @@ import { useNavigate } from "react-router-dom";
 import { usePrivateQuery, useAccount } from "@orderly.network/hooks";
 import { deployToAgent } from "@/utils/agentPrefill";
 import { Sparkline } from "@/pages/lab/components";
+import { C } from "@/config/theme";
 
 // ─── Constants ────────────────────────────────────────────────
+// Palette is DERIVED from the shared design tokens, never re-typed as hex — that's
+// how "#ff4c6a instead of #f7525f" drift got in here before. Change a colour in
+// app/config/theme.ts and this follows automatically.
 const REFRESH_INTERVAL = 60; // seconds
-const TEAL   = "#ededf0"; // neutral accent (headers, slight-bullish, bars)
-const GREEN  = "#3ecf8e"; // genuine UP/positive: gainers, +change, bullish, greed
-const RED    = "#f7525f";
-const YELLOW = "#fbbf24";
+// `: string` matters — C is `as const`, so its members are NON-widening literal
+// types; without the annotation `let x = YELLOW` locks to "#fbbf24" and any
+// reassignment fails to compile.
+const TEAL:   string = C.accent; // neutral accent (headers, slight-bullish, bars)
+const GREEN:  string = C.pos;    // genuine UP/positive: gainers, +change, bullish, greed
+const RED:    string = C.neg;    // loss / down
+const YELLOW: string = C.warn;   // CAUTION ONLY — crowding, tension, squeeze risk
 // Regime scale reads by TONE, not hue: the label already says bullish/bearish, so only
 // the extremes take colour (GREEN/RED) and the middle stays neutral. No blue — that is
 // reserved for teaching copy (Coachmark/Telegram) and nothing else.
-const DIM    = "#71717a";
-const MUTED  = "#a1a1aa";
-const BRIGHT = "#f4f4f5";
+const DIM:    string = C.text.muted;
+const MUTED:  string = C.text.fog;
+const BRIGHT: string = C.text.bright;
 
 // ─── Types ────────────────────────────────────────────────────
 interface FearGreedData  { value: number; label: string }

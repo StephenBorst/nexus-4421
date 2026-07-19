@@ -4,9 +4,13 @@ import { cardStyle, navBtnStyle } from "./styles";
 
 // ─── First-run Welcome (disconnected) ────────────────────
 export function LabWelcome() {
+  // Six, not five — a 3-column grid fills evenly at 6 and the second row no longer
+  // looks like an afterthought. Ordered by the trader's lifecycle: scout → plan →
+  // automate → validate → grade → record.
   const features = [
+    { icon: "◎", title: "Smart Money", desc: "See what proven on-chain traders are holding right now across Orderly and Hyperliquid — then copy any move into a risk-managed trade." },
     { icon: "◈", title: "The Nexus Thesis Engine", desc: "Plan every trade — position sizing, R:R, funding cost, live P&L tracking, on-chain proof." },
-    { icon: "⬢", title: "Autonomous Trading Agent", desc: "Run a preset or your own strategy hands-free. Scale-out & trailing exits, DCA, TradingView signals. Hard risk caps, kill switch, order-only keys." },
+    { icon: "⬢", title: "Autonomous Trading Agent", desc: "Runs your strategy hands-free and grades every close on-chain. Scale-out & trailing exits, DCA, TradingView signals. Hard risk caps, kill switch, order-only keys." },
     { icon: "◆", title: "Strategy Workbench", desc: "Build a strategy by trading style, backtest it on real history, then publish it — every result graded on-chain. Verify, don't trust." },
     { icon: "▣", title: "Analytics", desc: "Trading score, win-rate breakdowns, hold-time & leverage analysis — grade yourself like a desk." },
     { icon: "▤", title: "Trade Log", desc: "Full journal of every closed day with notes, filters, and a calendar heatmap." },
@@ -39,6 +43,15 @@ export function LabWelcome() {
         <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#52525b", border: "1px solid #232327", borderRadius: 4, padding: "10px 18px", background: "#0a0a0b" }}>
           <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#ededf0", boxShadow: "0 0 8px #ededf0", animation: "pulse 2s infinite" }} />
           Connect your wallet (top right) to load your trades and activate The Lab
+        </div>
+        {/* This screen is only ever seen DISCONNECTED — so point at the one thing
+            that needs no wallet at all. Best conversion surface we have here. */}
+        <div style={{ marginTop: 12, fontFamily: "var(--nx-font-ui)", fontSize: 12, color: "#71717a" }}>
+          Nothing to connect yet?{" "}
+          <a href="/analyze" style={{ color: "#ededf0", textDecoration: "none", borderBottom: "1px solid #33333a" }}>
+            X-ray any wallet free →
+          </a>{" "}
+          — read any trader&apos;s perp record on Hyperliquid and Orderly, no login.
         </div>
       </div>
     </div>

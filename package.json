@@ -14,6 +14,7 @@
     "dev": "tsx scripts/generate-manifest.ts && vite",
     "generate:manifest": "tsx scripts/generate-manifest.ts",
     "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint .",
+    "check:palette": "node tools/check-palette.mjs",
     "preview": "vite preview",
     "typecheck": "tsc"
   },
