@@ -761,7 +761,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
           {(["BTC", "ETH", "SOL"] as const).map(sym => {
             const ls = lsRatios[sym] ?? null;
             const status = ls === null ? "—" : ls > 1.35 ? "LONG FLUSH" : ls < 0.75 ? "SHORT SQUEEZE" : "BALANCED";
-            const sc = ls === null ? DIM : (ls > 1.35 || ls < 0.75) ? YELLOW : MUTED;
+            const sc = lsColor(ls); // shared helper — was an inline copy that drifted
             const d = getDerivData(sym);
             const oi = d?.oi ?? 0;
             // Estimate liq exposure from OI × typical daily liq rate
@@ -820,7 +820,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
           {(["BTC", "ETH", "SOL"] as const).map(sym => {
             const ls = lsRatios[sym] ?? null;
             const status = ls === null ? "LOADING" : ls > 1.35 ? "LONG FLUSH" : ls < 0.75 ? "SHORT SQUEEZE" : "BALANCED";
-            const sc = ls === null ? DIM : (ls > 1.35 || ls < 0.75) ? YELLOW : MUTED;
+            const sc = lsColor(ls); // shared helper — was an inline copy that drifted
             const longPct  = ls !== null ? Math.min(0.92, ls / (ls + 1)) : 0.5;
             const shortPct = 1 - longPct;
             const desc =
