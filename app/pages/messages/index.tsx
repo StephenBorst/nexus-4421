@@ -449,7 +449,7 @@ function ThreadView({
       </div>
 
       {sendError && (
-        <div style={{ padding: "5px 12px", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ff6b6b" }}>
+        <div style={{ padding: "5px 12px", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#f7525f" }}>
           {sendError}
         </div>
       )}
@@ -659,7 +659,7 @@ export default function MessagesPage() {
             </button>
           </div>
           {dmError && (
-            <div style={{ padding: "6px 10px", borderBottom: "1px solid #232327", fontFamily: "var(--nx-font-ui)", fontSize: 9, color: "#ff6b6b", lineHeight: 1.5 }}>
+            <div style={{ padding: "6px 10px", borderBottom: "1px solid #232327", fontFamily: "var(--nx-font-ui)", fontSize: 9, color: "#f7525f", lineHeight: 1.5 }}>
               {dmError}
             </div>
           )}
@@ -682,11 +682,11 @@ export default function MessagesPage() {
                     readOnly
                     value={inviteLink}
                     onFocus={(e) => e.currentTarget.select()}
-                    style={{ flex: 1, background: "#141416", border: "1px solid #1a3a5a", borderRadius: 3, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 8, padding: "5px 7px", outline: "none" }}
+                    style={{ flex: 1, background: "#141416", border: "1px solid #33333a", borderRadius: 3, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 8, padding: "5px 7px", outline: "none" }}
                   />
                   <button
                     onClick={copy}
-                    style={{ background: "none", border: "1px solid #1a3a5a", borderRadius: 3, color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 8px", cursor: "pointer", whiteSpace: "nowrap" }}
+                    style={{ background: "none", border: "1px solid #33333a", borderRadius: 3, color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 8px", cursor: "pointer", whiteSpace: "nowrap" }}
                   >
                     {inviteCopied ? "COPIED ✓" : "COPY"}
                   </button>

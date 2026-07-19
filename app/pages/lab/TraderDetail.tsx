@@ -78,15 +78,15 @@ export function TraderDetail({ source, address, accountId, onClose }: {
               <div style={{ display: "flex", flexDirection: "column" }}>
                 {d.bySymbol.slice(0, 18).map((s) => (
                   <div key={s.sym} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid #0d1117" }}>
-                    <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#c0c0c0", width: 84, flexShrink: 0 }}>{s.sym}</span>
+                    <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#d4d4d8", width: 84, flexShrink: 0 }}>{s.sym}</span>
                     {s.open && s.side
                       ? <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: s.side === "LONG" ? "#3ecf8e" : "#f7525f", flexShrink: 0 }}>● {s.side} {usd(s.szUsd)}</span>
-                      : <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3f3f46", flexShrink: 0 }}>flat</span>}
+                      : <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", flexShrink: 0 }}>flat</span>}
                     <span style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, color: s.realized >= 0 ? "#3ecf8e" : "#f7525f", flexShrink: 0 }}>{s.realized >= 0 ? "+" : ""}{usd(s.realized)}</span>
                   </div>
                 ))}
               </div>
-              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3f3f46", marginTop: 10 }}>
+              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 10 }}>
                 From the public Orderly settlement indexer. Realized PnL is cumulative; profitable-markets % is the share of markets they're net-green on.
               </div>
             </>

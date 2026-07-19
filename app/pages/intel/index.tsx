@@ -7,7 +7,7 @@ import { C } from "@/config/theme";
 
 // ─── Constants ────────────────────────────────────────────────
 // Palette is DERIVED from the shared design tokens, never re-typed as hex — that's
-// how "#ff4c6a instead of #f7525f" drift got in here before. Change a colour in
+// how "#f7525f instead of #f7525f" drift got in here before. Change a colour in
 // app/config/theme.ts and this follows automatically.
 const REFRESH_INTERVAL = 60; // seconds
 // `: string` matters — C is `as const`, so its members are NON-widening literal
@@ -179,12 +179,14 @@ const fmtPct     = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 
 const lsLabel = (ls: number | null) =>
   ls === null ? "—" : ls > 1.35 ? "LONGS DOM" : ls < 0.75 ? "SHORTS DOM" : "BALANCED";
-// Crowding is squeeze RISK, not direction-good/bad → amber (caution), not red/green.
+// Crowding/dominance are DESCRIPTIVE readings, not warnings — the number and the
+// label already say what they say. Amber here just made the whole panel shout, so
+// these render bone-white (emphasis by TONE) and amber is left for real caution.
 const lsColor = (ls: number | null) =>
-  ls === null ? DIM : (ls > 1.35 || ls < 0.75) ? YELLOW : MUTED;
+  ls === null ? DIM : (ls > 1.35 || ls < 0.75) ? TEAL : MUTED;
 
 const signalColor = (sig: string) =>
-  sig.includes("LONGS") || sig.includes("SHORTS") || sig.includes("CONCENTRATION") || sig.includes("ELEVATED") ? YELLOW : MUTED;
+  sig.includes("LONGS") || sig.includes("SHORTS") || sig.includes("CONCENTRATION") || sig.includes("ELEVATED") ? TEAL : MUTED;
 
 function assetSignalLabel(a: HLAsset): string {
   if (a.signal === "CROWDED LONGS")      return `${a.name} Crowded Longs`;

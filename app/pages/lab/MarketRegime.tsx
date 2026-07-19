@@ -49,7 +49,7 @@ export function MarketRegime() {
     const score = Math.round(breadth * 0.5 + btcScore * 0.4 + fundScore * 0.1);
     const label = score >= 60 ? "RISK-ON" : score >= 42 ? "NEUTRAL" : "RISK-OFF";
     // NEUTRAL is a neutral GREY, not blue — blue is reserved for teaching copy only.
-    // Red normalized to the canonical loss token (#f7525f) instead of drifted #ff4c6a.
+    // Red uses the canonical loss token (was a drifted near-duplicate before).
     const color = score >= 60 ? "#ededf0" : score >= 42 ? "#a1a1aa" : "#f7525f";
     const agentNote =
       label === "RISK-ON"
@@ -84,11 +84,11 @@ export function MarketRegime() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: 8, marginBottom: 10 }}>
             <div>
               <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>BREADTH</div>
-              <div style={{ fontSize: 16, color: regime.breadth >= 50 ? "#ededf0" : "#ff4c6a", fontFamily: "var(--nx-font-mono)" }}>{regime.breadth}% up</div>
+              <div style={{ fontSize: 16, color: regime.breadth >= 50 ? "#ededf0" : "#f7525f", fontFamily: "var(--nx-font-mono)" }}>{regime.breadth}% up</div>
             </div>
             <div>
               <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>BTC 24H</div>
-              <div style={{ fontSize: 16, color: regime.btcChg >= 0 ? "#ededf0" : "#ff4c6a", fontFamily: "var(--nx-font-mono)" }}>{regime.btcChg >= 0 ? "+" : ""}{regime.btcChg.toFixed(2)}%</div>
+              <div style={{ fontSize: 16, color: regime.btcChg >= 0 ? "#ededf0" : "#f7525f", fontFamily: "var(--nx-font-mono)" }}>{regime.btcChg >= 0 ? "+" : ""}{regime.btcChg.toFixed(2)}%</div>
             </div>
             <div>
               <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>FUNDING SKEW</div>

@@ -88,7 +88,7 @@ export default function Desks({ walletAddress }: { walletAddress: string | null 
             <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#a1a1aa", flexShrink: 0 }}>{d.calls} calls · {d.hitRate}% · {d.totalR >= 0 ? "+" : ""}{d.totalR}R</span>
             <span style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", color: d.score > 0 ? green : "#52525b", flexShrink: 0 }}>{d.score || "—"}</span>
             {myDeskId === d.id
-              ? <button onClick={() => leave(d.id)} disabled={busy} style={{ flexShrink: 0, background: "#1a0a0a", color: "#f7525f", border: "1px solid #4a1a1a55", borderRadius: 4, padding: "5px 9px", fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: "bold", cursor: "pointer" }}>LEAVE</button>
+              ? <button onClick={() => leave(d.id)} disabled={busy} style={{ flexShrink: 0, background: "#241012", color: "#f7525f", border: "1px solid #4a1e2255", borderRadius: 4, padding: "5px 9px", fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: "bold", cursor: "pointer" }}>LEAVE</button>
               : <button onClick={() => join(d.id)} disabled={busy} style={{ flexShrink: 0, background: "#1a1a1e", color: green, border: "1px solid #33333a", borderRadius: 4, padding: "5px 9px", fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: "bold", cursor: "pointer" }}>JOIN</button>}
           </div>
         ))}

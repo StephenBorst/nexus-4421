@@ -91,13 +91,13 @@ function AgentTrackRecord({ title, accent, trades, paper, onReset, summary }: {
   const since = sinceMs ? new Date(sinceMs).toLocaleDateString() : null;
 
   return (
-    <div style={{ ...agentCardStyle, borderColor: tr > 0 ? (net >= 0 ? "#33333a" : "#4a1a1a") : "#232327" }}>
+    <div style={{ ...agentCardStyle, borderColor: tr > 0 ? (net >= 0 ? "#33333a" : "#4a1e22") : "#232327" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ ...agentLabelStyle, color: accent }}>{title}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {since && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b" }}>since {since}</span>}
           {onReset && tr > 0 && (
-            <button onClick={onReset} style={{ ...navBtnStyle, fontSize: 9, padding: "3px 10px", color: "#d4d4d8", borderColor: "#1a3a5a" }}>RESET</button>
+            <button onClick={onReset} style={{ ...navBtnStyle, fontSize: 9, padding: "3px 10px", color: "#d4d4d8", borderColor: "#33333a" }}>RESET</button>
           )}
         </div>
       </div>
@@ -113,7 +113,7 @@ function AgentTrackRecord({ title, accent, trades, paper, onReset, summary }: {
             {[
               { label: "NET P&L", value: `${net >= 0 ? "+" : ""}$${Math.abs(net).toFixed(2)}`, color: net >= 0 ? "#3ecf8e" : "#f7525f" },
               { label: "WIN RATE", value: `${wr.toFixed(1)}%`, color: wr >= 50 ? "#3ecf8e" : "#f7525f" },
-              { label: "TRADES", value: String(tr), color: "#c0c0c0" },
+              { label: "TRADES", value: String(tr), color: "#d4d4d8" },
               { label: "AVG WIN", value: `$${avgWin.toFixed(2)}`, color: "#ededf0" },
               { label: "AVG LOSS", value: `$${avgLoss.toFixed(2)}`, color: "#f7525f" },
             ].map(({ label, value, color }) => (
@@ -803,7 +803,7 @@ export function AgentView() {
       </div>
 
       {error && (
-        <div style={{ ...agentCardStyle, borderColor: "#f7525f", background: "#1a0a0a", marginBottom: 12 }}>
+        <div style={{ ...agentCardStyle, borderColor: "#f7525f", background: "#241012", marginBottom: 12 }}>
           <span style={{ color: "#f7525f", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>⚠ {error}</span>
           <span onClick={() => setError(null)} style={{ float: "right", cursor: "pointer", color: "#f7525f" }}>✕</span>
         </div>
@@ -928,14 +928,14 @@ export function AgentView() {
               {(["PAPER", "AUTONOMOUS"] as const).map((m) => (
                 <button key={m} onClick={() => setDirectiveMode(m)} style={{
                   flex: 1, padding: "8px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11, cursor: "pointer", borderRadius: 3,
-                  border: `1px solid ${directiveMode === m ? (m === "PAPER" ? "#d4d4d8" : "#ff6600") : "#232327"}`,
+                  border: `1px solid ${directiveMode === m ? (m === "PAPER" ? "#d4d4d8" : "#fbbf24") : "#232327"}`,
                   background: directiveMode === m ? (m === "PAPER" ? "#1a1a1e" : "#1a0800") : "#0f0f11",
-                  color: directiveMode === m ? (m === "PAPER" ? "#d4d4d8" : "#ff6600") : "#52525b",
+                  color: directiveMode === m ? (m === "PAPER" ? "#d4d4d8" : "#fbbf24") : "#52525b",
                 }}>{m === "PAPER" ? "PAPER (simulated)" : "AUTONOMOUS (real $)"}</button>
               ))}
             </div>
             {live && (
-              <div style={{ fontSize: 10, color: "#ff8800", fontFamily: "var(--nx-font-ui)", lineHeight: 1.5, marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: "#fbbf24", fontFamily: "var(--nx-font-ui)", lineHeight: 1.5, marginBottom: 10 }}>
                 ⚠ REAL FUNDS. This places a live market order on your next tick (~1 min) via your order-only key (cannot withdraw). Confirming = &quot;GO LIVE&quot;.
               </div>
             )}
@@ -947,8 +947,8 @@ export function AgentView() {
               <button onClick={armDirective} disabled={directiveBusy} style={{
                 flex: 2, padding: "9px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", letterSpacing: "0.06em",
                 cursor: directiveBusy ? "wait" : "pointer", borderRadius: 3,
-                border: `1px solid ${live ? "#ff6600" : "#33333a"}`, background: live ? "#1a0800" : "#1a1a1e",
-                color: live ? "#ff6600" : "#ededf0",
+                border: `1px solid ${live ? "#fbbf24" : "#33333a"}`, background: live ? "#1a0800" : "#1a1a1e",
+                color: live ? "#fbbf24" : "#ededf0",
               }}>{directiveBusy ? "ARMING…" : live ? "▶ ARM LIVE — GO LIVE" : "▶ ARM (PAPER)"}</button>
             </div>
           </div>
@@ -984,7 +984,7 @@ export function AgentView() {
             {armed && (
               <button onClick={cancelDirective} disabled={directiveBusy} style={{
                 padding: "7px 16px", fontFamily: "var(--nx-font-mono)", fontSize: 10, cursor: directiveBusy ? "wait" : "pointer",
-                borderRadius: 3, border: "1px solid #4a1a1a", background: "#150a0a", color: "#ff6666",
+                borderRadius: 3, border: "1px solid #4a1e22", background: "#150a0a", color: "#ff6666",
               }}>{directiveBusy ? "…" : "CANCEL DIRECTIVE"}</button>
             )}
             {!armed && (
@@ -1018,7 +1018,7 @@ export function AgentView() {
                     background: active ? "#ededf010" : "#0a0a0b",
                     border: `1px solid ${active ? "#ededf0" : "#232327"}`, borderRadius: 6, padding: "10px 12px",
                   }}>
-                    <div style={{ color: active ? "#ededf0" : "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>{p.label}{active ? " ✓" : ""}</div>
+                    <div style={{ color: active ? "#ededf0" : "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>{p.label}{active ? " ✓" : ""}</div>
                     <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 10, marginTop: 3, lineHeight: 1.4 }}>{p.blurb}</div>
                   </button>
                 );
@@ -1088,7 +1088,7 @@ export function AgentView() {
                     → GO ASSISTED
                   </button>
                   <button onClick={() => { setConfig({ ...config, mode: "AUTONOMOUS" }); setSuccess("Mode → AUTONOMOUS. Needs a trading key — review below."); setTimeout(() => setSuccess(null), 4000); }}
-                    style={{ background: "#ff880015", border: "1px solid #ff8800", borderRadius: 4, color: "#ff8800", fontFamily: "var(--nx-font-mono)", fontSize: 11, padding: "8px 16px", cursor: "pointer" }}>
+                    style={{ background: "#fbbf2415", border: "1px solid #fbbf24", borderRadius: 4, color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontSize: 11, padding: "8px 16px", cursor: "pointer" }}>
                     → GO AUTONOMOUS
                   </button>
                 </div>
@@ -1105,12 +1105,12 @@ export function AgentView() {
           <div style={{ ...agentCardStyle, borderColor: tradingKey ? "#232327" : "#4a3a00" }}>
             <div style={agentLabelStyle}>// HOW THE AGENT WORKS</div>
             <p style={{ margin: "8px 0 0", color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 11, lineHeight: 1.6 }}>
-              The agent is a disciplined operator of <strong style={{ color: "#c0c0c0" }}>your</strong> edge — you choose the strategy and risk limits, it runs them tirelessly and <strong style={{ color: "#c0c0c0" }}>every call is graded objectively on-chain</strong>. It doesn't promise alpha; it proves what actually worked.
+              The agent is a disciplined operator of <strong style={{ color: "#d4d4d8" }}>your</strong> edge — you choose the strategy and risk limits, it runs them tirelessly and <strong style={{ color: "#d4d4d8" }}>every call is graded objectively on-chain</strong>. It doesn't promise alpha; it proves what actually worked.
             </p>
             <ol style={{ margin: "8px 0 0", paddingLeft: 18, color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 11, lineHeight: 1.7 }}>
-              <li>Place at least one manual trade on Nexus — this generates your Orderly trading key (order-only, <strong style={{ color: "#c0c0c0" }}>cannot withdraw funds</strong>).</li>
+              <li>Place at least one manual trade on Nexus — this generates your Orderly trading key (order-only, <strong style={{ color: "#d4d4d8" }}>cannot withdraw funds</strong>).</li>
               <li>Pick your symbols, risk params, and mode below.</li>
-              <li><strong style={{ color: "#c0c0c0" }}>ASSISTED</strong> = the agent surfaces signals for you to place yourself. <strong style={{ color: "#c0c0c0" }}>AUTONOMOUS</strong> = it trades within your risk limits.</li>
+              <li><strong style={{ color: "#d4d4d8" }}>ASSISTED</strong> = the agent surfaces signals for you to place yourself. <strong style={{ color: "#d4d4d8" }}>AUTONOMOUS</strong> = it trades within your risk limits.</li>
               <li>Activate. You can DEACTIVATE or KILL anytime — and its record is public and verifiable either way.</li>
             </ol>
             <div style={{
@@ -1132,7 +1132,7 @@ export function AgentView() {
               {([
                 { mode: "PAPER" as const,      color: "#d4d4d8", desc: "Simulated — no real orders, no key needed. Test risk-free." },
                 { mode: "ASSISTED" as const,   color: "#ededf0", desc: "Agent generates thesis → you review + deploy" },
-                { mode: "AUTONOMOUS" as const, color: "#ff8800", desc: "Agent executes automatically within your risk params" },
+                { mode: "AUTONOMOUS" as const, color: "#fbbf24", desc: "Agent executes automatically within your risk params" },
               ]).map(({ mode, color, desc }) => {
                 const sel = config.mode === mode;
                 return (
@@ -1151,8 +1151,8 @@ export function AgentView() {
               })}
             </div>
             {config.mode === "AUTONOMOUS" && (
-              <div style={{ marginTop: 8, padding: 8, background: "#1a0e00", border: "1px solid #ff880030", borderRadius: 3 }}>
-                <span style={{ color: "#ff8800", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
+              <div style={{ marginTop: 8, padding: 8, background: "#1a0e00", border: "1px solid #fbbf2430", borderRadius: 3 }}>
+                <span style={{ color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
                   ⚠ AUTONOMOUS MODE — Agent will execute trades using your Orderly trading key. Your wallet keys are never stored. The trading key can place orders but CANNOT withdraw funds. You can deactivate at any time.
                 </span>
               </div>
@@ -1519,7 +1519,7 @@ export function AgentView() {
                     </div>
                     <div>
                       <div style={{ ...agentLabelStyle, fontSize: 9 }}>ALERT MESSAGE (paste into TradingView)</div>
-                      <code style={{ display: "block", color: "#c0c0c0", background: "#0a0a0b", border: "1px solid #232327", borderRadius: 3, padding: "8px", fontSize: 10, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                      <code style={{ display: "block", color: "#d4d4d8", background: "#0a0a0b", border: "1px solid #232327", borderRadius: 3, padding: "8px", fontSize: 10, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
                         {`{ "action": "BUY", "symbol": "BTC", "passphrase": "${webhookInfo.passphrase}" }`}
                       </code>
                       <div style={{ color: "#71717a", fontFamily: "var(--nx-font-ui)", fontSize: 9, marginTop: 6, lineHeight: 1.5 }}>
@@ -1604,8 +1604,8 @@ export function AgentView() {
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12 }}>
                       {[
                         { label: "NET P&L (60d)", value: `${backtest.combined.netUsd >= 0 ? "+" : ""}$${backtest.combined.netUsd}`, color: backtest.combined.netUsd >= 0 ? "#3ecf8e" : "#f7525f" },
-                        { label: "WIN RATE", value: `${backtest.combined.winRate}%`, color: "#c0c0c0" },
-                        { label: "TRADES", value: String(backtest.combined.trades), color: "#c0c0c0" },
+                        { label: "WIN RATE", value: `${backtest.combined.winRate}%`, color: "#d4d4d8" },
+                        { label: "TRADES", value: String(backtest.combined.trades), color: "#d4d4d8" },
                       ].map(({ label, value, color }) => (
                         <div key={label}>
                           <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
@@ -1649,7 +1649,7 @@ export function AgentView() {
                             <div style={{ minWidth: 320 }}>
                               {validation.perSymbol.map((s: any) => (
                                 <div key={s.symbol} style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "3px 0", borderTop: "1px solid #141416" }}>
-                                  <span style={{ width: 46, color: "#c0c0c0" }}>{s.symbol.replace("PERP_", "").replace("_USDC", "")}</span>
+                                  <span style={{ width: 46, color: "#d4d4d8" }}>{s.symbol.replace("PERP_", "").replace("_USDC", "")}</span>
                                   <span style={{ width: 66, textAlign: "right", color: s.net >= 0 ? "#3ecf8e" : "#f7525f" }}>{s.net >= 0 ? "+" : ""}${s.net}</span>
                                   <span style={{ width: 54, textAlign: "right", color: "#a1a1aa" }}>{s.foldsPositive}/{validation.folds}f</span>
                                   <span style={{ display: "flex", gap: 2, marginLeft: 6 }}>
@@ -1721,7 +1721,7 @@ export function AgentView() {
                 {strategies.map((s) => (
                   <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: "#0a0a0b", border: "1px solid #232327", borderRadius: 3 }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                      <div style={{ color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
                       <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 9, marginTop: 2 }}>
                         <span style={{ color: "#d4d4d8" }}>{deriveStyle(s.config)}</span> · {s.config.signalMode} · {s.config.mode} · {s.config.leverage}x · TP{s.config.tpPercent}/SL{s.config.slPercent}
                         {s.config.dcaEnabled ? " · DCA" : ""}
@@ -1761,13 +1761,13 @@ export function AgentView() {
                 {community.map((s) => (
                   <div key={s.owner + s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: "#0a0a0b", border: "1px solid #232327", borderRadius: 3 }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <div style={{ color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                         {s.name} <span style={{ color: "#d4d4d8", fontSize: 9 }}>{s.style}</span>
                         {(() => {
                           const v = s.validation;
                           if (!v) return null;
                           if (v.status === "validating") return <span title="Walk-forward validation running" style={{ fontSize: 8, color: "#a1a1aa", border: "1px solid #232327", borderRadius: 3, padding: "1px 5px" }}>⏳ VALIDATING</span>;
-                          if (v.status === "pending_oi") return <span title="Awaiting OI history to validate the confluence signal" style={{ fontSize: 8, color: "#d4d4d8", border: "1px solid #1a3a5a", borderRadius: 3, padding: "1px 5px" }}>⏳ OI PENDING</span>;
+                          if (v.status === "pending_oi") return <span title="Awaiting OI history to validate the confluence signal" style={{ fontSize: 8, color: "#d4d4d8", border: "1px solid #33333a", borderRadius: 3, padding: "1px 5px" }}>⏳ OI PENDING</span>;
                           if (v.status !== "done") return null;
                           const vc = v.verdict === "ROBUST" ? "#3ecf8e" : v.verdict === "FRAGILE" ? "#fbbf24" : "#f7525f";
                           const lbl = v.verdict === "ROBUST" ? "✅ ROBUST" : v.verdict === "FRAGILE" ? "🟨 FRAGILE" : "❌ NOT ROBUST";
@@ -1845,8 +1845,8 @@ export function AgentView() {
           </div>
 
           {!tradingKey && config.mode !== "PAPER" && (
-            <div style={{ marginTop: 12, padding: 10, background: "#1a1a0a", border: "1px solid #ff880030", borderRadius: 3 }}>
-              <span style={{ color: "#ff8800", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>
+            <div style={{ marginTop: 12, padding: 10, background: "#1a1a0a", border: "1px solid #fbbf2430", borderRadius: 3 }}>
+              <span style={{ color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>
                 ⚠ No Orderly trading key detected. Place at least one manual trade on Nexus first — the SDK generates your trading key on first trade. This key allows order placement only and cannot withdraw funds. <strong style={{ color: "#d4d4d8" }}>Or try 🧪 PAPER mode — no key needed.</strong>
               </span>
             </div>
@@ -1860,11 +1860,11 @@ export function AgentView() {
           {/* DEV-only: force a paper signal so the open→close loop can be tested
               in minutes instead of waiting for real funding/OI confluence. */}
           {(import.meta as any).env?.DEV && isActive && config.mode === "PAPER" && (
-            <div style={{ ...agentCardStyle, borderColor: "#1a3a5a", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ ...agentCardStyle, borderColor: "#33333a", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
               <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#d4d4d8" }}>
                 ⚡ DEV — inject a synthetic PAPER signal (refused outside paper mode)
               </span>
-              <button onClick={forceTestSignal} disabled={saving} style={{ ...navBtnStyle, fontSize: 10, padding: "6px 14px", color: "#d4d4d8", borderColor: "#1a3a5a", opacity: saving ? 0.5 : 1 }}>
+              <button onClick={forceTestSignal} disabled={saving} style={{ ...navBtnStyle, fontSize: 10, padding: "6px 14px", color: "#d4d4d8", borderColor: "#33333a", opacity: saving ? 0.5 : 1 }}>
                 FORCE TEST SIGNAL
               </button>
             </div>
@@ -1879,7 +1879,7 @@ export function AgentView() {
                   gap: 12, padding: "10px 0", borderBottom: "1px solid #232327",
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-                    <span style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>
+                    <span style={{ color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>
                       {t.symbol.replace("PERP_", "").replace("_USDC", "")}
                     </span>
                     <span style={{ color: t.direction === "LONG" ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>
@@ -1930,13 +1930,13 @@ export function AgentView() {
               </div>
               <div>
                 <div style={{ ...agentLabelStyle, fontSize: 9 }}>MODE</div>
-                <div style={{ color: config.mode === "AUTONOMOUS" ? "#ff8800" : config.mode === "PAPER" ? "#d4d4d8" : "#ededf0", fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>
+                <div style={{ color: config.mode === "AUTONOMOUS" ? "#fbbf24" : config.mode === "PAPER" ? "#d4d4d8" : "#ededf0", fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>
                   {config.mode === "PAPER" ? "🧪 PAPER" : config.mode}
                 </div>
               </div>
               <div>
                 <div style={{ ...agentLabelStyle, fontSize: 9 }}>TRADES TODAY</div>
-                <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>
+                <div style={{ color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>
                   {agentState?.trades_today ?? 0} / {config.maxTradesPerDay}
                 </div>
               </div>
@@ -1973,7 +1973,7 @@ export function AgentView() {
                       {c.met ? "✓" : "✗"}
                     </span>
                     <div>
-                      <div style={{ color: c.met ? "#c0c0c0" : "#9a9a8a", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>{c.label}</div>
+                      <div style={{ color: c.met ? "#d4d4d8" : "#9a9a8a", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>{c.label}</div>
                       <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
                         {c.key === "profitable"
                           ? `now: ${c.value >= 0 ? "+" : ""}$${c.value.toFixed(2)}`
@@ -2057,7 +2057,7 @@ export function AgentView() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 12, marginTop: 8 }}>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>SYMBOL</div>
-                  <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: 600 }}>
+                  <div style={{ color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: 600 }}>
                     {agentState.current_position.symbol.replace("PERP_", "").replace("_USDC", "")}
                   </div>
                 </div>
@@ -2069,13 +2069,13 @@ export function AgentView() {
                 </div>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>ENTRY</div>
-                  <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 14 }}>
+                  <div style={{ color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 14 }}>
                     ${(agentState.current_position.entry_price ?? 0).toLocaleString()}
                   </div>
                 </div>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>CURRENT</div>
-                  <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 14 }}>
+                  <div style={{ color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 14 }}>
                     ${(agentState.current_position.current_price ?? agentState.current_position.entry_price ?? 0).toLocaleString()}
                   </div>
                 </div>
@@ -2109,7 +2109,7 @@ export function AgentView() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12, marginTop: 8 }}>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>SYMBOL</div>
-                  <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 13 }}>
+                  <div style={{ color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 13 }}>
                     {(agentState.last_signal.symbol || "").replace("PERP_", "").replace("_USDC", "")}
                   </div>
                 </div>
@@ -2121,7 +2121,7 @@ export function AgentView() {
                 </div>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>FUNDING</div>
-                  <div style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 13 }}>
+                  <div style={{ color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 13 }}>
                     {(agentState.last_signal.funding * 100).toFixed(4)}%
                   </div>
                 </div>
@@ -2193,7 +2193,7 @@ export function AgentView() {
                   const entryRef = (trade as unknown as { entry_order_id?: string }).entry_order_id;
                   const closeRef = (trade as unknown as { close_order_id?: string }).close_order_id;
                   const chip = (label: string, value: string, color = "#a1a1aa") => (
-                    <span><span style={{ color: "#3f3f46" }}>{label} </span><span style={{ color }}>{value}</span></span>
+                    <span><span style={{ color: "#52525b" }}>{label} </span><span style={{ color }}>{value}</span></span>
                   );
                   return (
                   <div
@@ -2205,16 +2205,16 @@ export function AgentView() {
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpandedTrade(open ? null : rowId); } }}
                   >
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr 1.3fr", gap: 8, padding: "9px 0" }}>
-                      <span style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>{asset}</span>
+                      <span style={{ color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>{asset}</span>
                       <span style={{ color: trade.direction === "LONG" ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
                         {trade.direction}
                       </span>
-                      <span style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>${trade.entry_price.toLocaleString()}</span>
-                      <span style={{ color: "#c0c0c0", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>${trade.exit_price.toLocaleString()}</span>
+                      <span style={{ color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>${trade.entry_price.toLocaleString()}</span>
+                      <span style={{ color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>${trade.exit_price.toLocaleString()}</span>
                       <span style={{ color: trade.pnl >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600 }}>
                         {trade.pnl >= 0 ? "+" : ""}${trade.pnl.toFixed(2)}
                       </span>
-                      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: trade.reason === "TP" ? "#3ecf8e" : trade.reason === "SL" ? "#f7525f" : trade.reason === "BE" ? "#d4d4d8" : "#ff8800" }}>
+                      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: trade.reason === "TP" ? "#3ecf8e" : trade.reason === "SL" ? "#f7525f" : trade.reason === "BE" ? "#d4d4d8" : "#fbbf24" }}>
                         {trade.reason}
                       </span>
                       <span style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", minWidth: 0 }}>
@@ -2245,7 +2245,7 @@ export function AgentView() {
                             const col = winSide ? "#3ecf8e" : "#f7525f";
                             return (
                               <div style={{ display: "flex", alignItems: "center", gap: 8, maxWidth: 320 }}>
-                                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#3f3f46", width: 30 }}>MOVE</span>
+                                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#52525b", width: 30 }}>MOVE</span>
                                 <div style={{ position: "relative", flex: 1, height: 6, background: "#141416", borderRadius: 3 }}>
                                   <div style={{ position: "absolute", left: "50%", top: -2, bottom: -2, width: 1, background: "#33333a" }} />
                                   <div style={{
@@ -2262,10 +2262,10 @@ export function AgentView() {
                           </div>
                           {(entryRef || closeRef) && (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontFamily: "var(--nx-font-mono)", fontSize: 9 }}>
-                              <span style={{ color: "#3f3f46" }}>ORDERLY REF</span>
+                              <span style={{ color: "#52525b" }}>ORDERLY REF</span>
                               {entryRef && chip("entry", String(entryRef), "#71717a")}
                               {closeRef && chip("close", String(closeRef), "#71717a")}
-                              <span style={{ color: "#3f3f46" }}>· independently exchange-auditable</span>
+                              <span style={{ color: "#52525b" }}>· independently exchange-auditable</span>
                             </div>
                           )}
                           <div>
@@ -2310,8 +2310,8 @@ export function AgentView() {
             const usd = (v: number) => `${v >= 0 ? "" : "-"}$${Math.abs(v).toFixed(2)}`;
             const stats: { label: string; value: number; fmt: (v: number) => string; color: string }[] = [
               { label: "TOTAL P&L", value: agentTotalPnl, fmt: (v) => `${v >= 0 ? "+" : "-"}$${Math.abs(v).toFixed(2)}`, color: agentTotalPnl >= 0 ? "#3ecf8e" : "#f7525f" },
-              { label: "WIN RATE", value: parseFloat(agentWinRate), fmt: (v) => `${v.toFixed(1)}%`, color: "#c0c0c0" },
-              { label: "TRADES", value: histTrades.length, fmt: (v) => `${Math.round(v)}`, color: "#c0c0c0" },
+              { label: "WIN RATE", value: parseFloat(agentWinRate), fmt: (v) => `${v.toFixed(1)}%`, color: "#d4d4d8" },
+              { label: "TRADES", value: histTrades.length, fmt: (v) => `${Math.round(v)}`, color: "#d4d4d8" },
               { label: "AVG WIN", value: agentAvgWin, fmt: usd, color: "#ededf0" },
               { label: "AVG LOSS", value: agentAvgLoss, fmt: usd, color: "#f7525f" },
             ];
@@ -2392,7 +2392,7 @@ export function AgentView() {
               {leaderboard.map((e) => {
                 const isMe = e.wallet.toLowerCase() === (walletAddress ?? "").toLowerCase();
                 const who = e.displayName || `${e.wallet.slice(0, 6)}…${e.wallet.slice(-4)}`;
-                const medal = e.rank === 1 ? "#ffd700" : e.rank === 2 ? "#c0c0c0" : e.rank === 3 ? "#cd7f32" : "#52525b";
+                const medal = e.rank === 1 ? "#ffd700" : e.rank === 2 ? "#d4d4d8" : e.rank === 3 ? "#cd7f32" : "#52525b";
                 return (
                   <div key={e.wallet} style={{ ...agentCardStyle, borderColor: isMe ? "#ededf0" : "#232327", display: "grid", gridTemplateColumns: "34px 1fr repeat(4, auto) 110px", gap: 12, minWidth: 520, alignItems: "center" }}>
                     <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: medal, textAlign: "center" }}>{e.rank}</div>
@@ -2416,8 +2416,8 @@ export function AgentView() {
                     {[
                       { label: "SCORE", val: e.score.toFixed(1), color: "#ededf0" },
                       { label: "NET P&L", val: `+$${e.netPnl.toFixed(0)}`, color: "#3ecf8e" },
-                      { label: "WIN", val: `${e.winRate.toFixed(0)}%`, color: e.winRate >= 50 ? "#3ecf8e" : "#ff8800" },
-                      { label: "PF", val: e.profitFactor.toFixed(2), color: "#c0c0c0" },
+                      { label: "WIN", val: `${e.winRate.toFixed(0)}%`, color: e.winRate >= 50 ? "#3ecf8e" : "#fbbf24" },
+                      { label: "PF", val: e.profitFactor.toFixed(2), color: "#d4d4d8" },
                     ].map(({ label, val, color }) => (
                       <div key={label} style={{ textAlign: "right" }}>
                         <div style={{ ...agentLabelStyle, fontSize: 8 }}>{label}</div>

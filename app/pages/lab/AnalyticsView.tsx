@@ -393,7 +393,7 @@ function TimingAndRisk({ orders }: { orders: ProcessedTrade[] }) {
             ].map((r) => (
               <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <span style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.06em" }}>{r.label}</span>
-                <span style={{ fontSize: 18, color: r.num >= 0 ? "#ededf0" : "#ff4c6a", fontFamily: "var(--nx-font-mono)" }}>{r.value}</span>
+                <span style={{ fontSize: 18, color: r.num >= 0 ? "#ededf0" : "#f7525f", fontFamily: "var(--nx-font-mono)" }}>{r.value}</span>
               </div>
             ))}
           </div>

@@ -721,7 +721,7 @@ export default function MiniApp() {
                   {mark > 0 && <span style={{ fontSize: 8, color: "#a1a1aa", flexShrink: 0 }}>@ {entry.toFixed(entry < 10 ? 4 : 2)}→{mark.toFixed(mark < 10 ? 4 : 2)}</span>}
                   <span style={{ fontSize: 9, color: !hasPnl ? "#a1a1aa" : pnl >= 0 ? green : red, marginLeft: "auto", flexShrink: 0 }}>{hasPnl ? `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : "—"}</span>
                   <button onClick={() => sharePosition(p)} title="Share to cast" style={{ flexShrink: 0, background: "#1a1a1e", color: green, border: "1px solid #33333a", borderRadius: 4, padding: "5px 9px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: "pointer" }}>↗</button>
-                  <button onClick={() => closePosition(p.symbol)} disabled={closingSym === p.symbol} style={{ flexShrink: 0, background: "#1a0a0a", color: red, border: `1px solid ${red}55`, borderRadius: 4, padding: "5px 10px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: closingSym === p.symbol ? "wait" : "pointer", letterSpacing: "0.05em", opacity: closingSym === p.symbol ? 0.6 : 1 }}>{closingSym === p.symbol ? "…" : "CLOSE"}</button>
+                  <button onClick={() => closePosition(p.symbol)} disabled={closingSym === p.symbol} style={{ flexShrink: 0, background: "#241012", color: red, border: `1px solid ${red}55`, borderRadius: 4, padding: "5px 10px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: closingSym === p.symbol ? "wait" : "pointer", letterSpacing: "0.05em", opacity: closingSym === p.symbol ? 0.6 : 1 }}>{closingSym === p.symbol ? "…" : "CLOSE"}</button>
                 </div>
               );
             })}
@@ -823,7 +823,7 @@ export default function MiniApp() {
             <div style={{ fontSize: 8, color: "#71717a", letterSpacing: "0.1em" }}>💰 FUND ACCOUNT (USDC · Arbitrum)</div>
             <div style={{ display: "flex", gap: 8 }}>
               <input type="number" inputMode="decimal" min={1} value={depositAmt} onChange={(e) => setDepositAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4, color: "#f4f4f5", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
-              <button onClick={deposit} disabled={depositing || depositAmt <= 0} style={{ flexShrink: 0, background: "#1a1a1e", color: "#d4d4d8", border: "1px solid #1a3a5a", borderRadius: 4, padding: "8px 16px", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: depositing ? "wait" : "pointer", letterSpacing: "0.05em", opacity: depositing ? 0.6 : 1 }}>{depositing ? "…" : "DEPOSIT"}</button>
+              <button onClick={deposit} disabled={depositing || depositAmt <= 0} style={{ flexShrink: 0, background: "#1a1a1e", color: "#d4d4d8", border: "1px solid #33333a", borderRadius: 4, padding: "8px 16px", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: depositing ? "wait" : "pointer", letterSpacing: "0.05em", opacity: depositing ? 0.6 : 1 }}>{depositing ? "…" : "DEPOSIT"}</button>
             </div>
             {depositMsg && <div style={{ fontSize: 10, color: depositMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{depositMsg.text}</div>}
           </div>
@@ -862,7 +862,7 @@ export default function MiniApp() {
           <div style={{ ...card, display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 9, color: "#71717a", letterSpacing: "0.12em" }}>🤖 AUTONOMOUS AGENT</span>
-              {active && <span style={{ flexShrink: 0, fontSize: 8, color: mode === "AUTONOMOUS" ? "#ff8800" : mode === "ASSISTED" ? green : "#d4d4d8", border: "1px solid #232327", borderRadius: 3, padding: "1px 6px", marginLeft: "auto" }}>{mode}</span>}
+              {active && <span style={{ flexShrink: 0, fontSize: 8, color: mode === "AUTONOMOUS" ? "#fbbf24" : mode === "ASSISTED" ? green : "#d4d4d8", border: "1px solid #232327", borderRadius: 3, padding: "1px 6px", marginLeft: "auto" }}>{mode}</span>}
             </div>
             {active ? (
               <>
@@ -901,7 +901,7 @@ export default function MiniApp() {
           <div key={t.id} style={{ ...card, display: "flex", flexDirection: "column", gap: 7, padding: "10px 12px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ fontSize: 10, color: "#a1a1aa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{t.agent ? "Nexus Agent" : (t.displayName || shortAddr(t.wallet))}</span>
-              {t.agent && <span style={{ flexShrink: 0, fontSize: 8, color: "#d4d4d8", border: "1px solid #1a3a5a", borderRadius: 3, padding: "0 4px" }}>🤖</span>}
+              {t.agent && <span style={{ flexShrink: 0, fontSize: 8, color: "#d4d4d8", border: "1px solid #33333a", borderRadius: 3, padding: "0 4px" }}>🤖</span>}
               <span style={{ flexShrink: 0, fontSize: 8, color: sc, border: `1px solid ${sc}33`, borderRadius: 3, padding: "1px 6px", marginLeft: "auto" }}>{t.status}</span>
               <button onClick={() => shareThesis(t)} title="Share to cast" style={{ flexShrink: 0, background: "none", border: "1px solid #232327", borderRadius: 3, color: "#a1a1aa", fontFamily: mono, fontSize: 10, padding: "2px 7px", cursor: "pointer" }}>↗</button>
             </div>

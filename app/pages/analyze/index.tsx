@@ -295,15 +295,17 @@ export default function AnalyzePage() {
                 ))}
               </div>
 
-              <div style={{ borderTop: "1px solid #232327", paddingTop: 8 }}>
+              {/* Columns total ~474px of minWidth — wider than a phone card, so the
+                  container SCROLLS instead of clipping the right-hand columns off. */}
+              <div style={{ borderTop: "1px solid #232327", paddingTop: 8, overflowX: "auto" }}>
                 {v.bySymbol.slice(0, 12).map((s) => (
-                  <div key={s.sym} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", fontSize: 11 }}>
+                  <div key={s.sym} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", fontSize: 11, minWidth: 474 }}>
                     <span style={{ color: "#e4e4e7", flex: "1 1 70px", minWidth: 70 }}>{s.sym}</span>
                     <span style={{ color: s.realized >= 0 ? POS : NEG, flex: "1 1 90px", minWidth: 90, textAlign: "right" }}>{usd(s.realized)}</span>
                     <span style={{ color: "#52525b", flex: "1 1 120px", minWidth: 120, textAlign: "right" }}>
                       {s.open && s.side ? `${s.side === "LONG" ? "↑" : "↓"} ${usd(s.szUsd)} open` : ""}
                     </span>
-                    <span style={{ color: s.open ? (s.unrealized >= 0 ? POS : NEG) : "#3f3f46", flex: "1 1 90px", minWidth: 90, textAlign: "right" }}>
+                    <span style={{ color: s.open ? (s.unrealized >= 0 ? POS : NEG) : "#52525b", flex: "1 1 90px", minWidth: 90, textAlign: "right" }}>
                       {s.open && s.unrealized ? `${s.unrealized >= 0 ? "+" : ""}${usd(s.unrealized)}` : ""}
                     </span>
                     {/* Actions only on LIVE positions — a closed market has nothing to copy. */}

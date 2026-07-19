@@ -49,9 +49,9 @@ type VerifyResult = {
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  ACTIVE:      { label: "ACTIVE",      color: "#d4d4d8", bg: "#1a1a1e", border: "#1a3a5a" },
+  ACTIVE:      { label: "ACTIVE",      color: "#d4d4d8", bg: "#1a1a1e", border: "#33333a" },
   HIT_TP:      { label: "HIT TP",      color: "#ededf0", bg: "#1a1a1e", border: "#33333a" },
-  STOPPED_OUT: { label: "STOPPED OUT", color: "#f7525f", bg: "#2a0a0a", border: "#4a1a1a" },
+  STOPPED_OUT: { label: "STOPPED OUT", color: "#f7525f", bg: "#241012", border: "#4a1e22" },
   INVALIDATED: { label: "INVALIDATED", color: "#fbbf24", bg: "#2a1a00", border: "#4a3a00" },
   CLOSED:      { label: "CLOSED",      color: "#a1a1aa", bg: "#12161a", border: "#2a3a4a" },
   PENDING:     { label: "PENDING",     color: "#a1a1aa", bg: "#141416", border: "#33333a" },
@@ -335,7 +335,7 @@ export default function ThesisPage() {
             const toSL = distancePct(markPrice, thesis.stopLoss);
             const toTP = distancePct(markPrice, thesis.takeProfit1);
             return (
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(4, minmax(0, 1fr))", gap: "10px 16px", marginBottom: 16, padding: 14, background: "#0f0f11", borderRadius: 4, border: "1px solid #1a3a5a" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(4, minmax(0, 1fr))", gap: "10px 16px", marginBottom: 16, padding: 14, background: "#0f0f11", borderRadius: 4, border: "1px solid #33333a" }}>
                 {[
                   { label: "MARK",       val: `$${markPrice.toFixed(markPrice < 10 ? 4 : 2)}`, color: "#fff" },
                   { label: "UNREALIZED", val: `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)`, color: pnl >= 0 ? "#3ecf8e" : "#f7525f" },

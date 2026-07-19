@@ -574,7 +574,7 @@ export default function NexusAssistant() {
             {loading && !messages[messages.length - 1]?.content && (
               <div style={{ fontFamily: mono, fontSize: 10, color: "#71717a" }}>thinking…</div>
             )}
-            {error && <div style={{ fontFamily: mono, fontSize: 10, color: "#ff6b6b", lineHeight: 1.5 }}>⚠ {error}</div>}
+            {error && <div style={{ fontFamily: mono, fontSize: 10, color: "#f7525f", lineHeight: 1.5 }}>⚠ {error}</div>}
           </div>
 
           {/* Composer */}
@@ -593,7 +593,7 @@ export default function NexusAssistant() {
             />
             {loading ? (
               <button onClick={stop} title="Stop"
-                style={{ background: "#1a0a0a", border: "1px solid #ff6b6b", borderRadius: 4, color: "#ff6b6b", fontFamily: mono, fontSize: 13, padding: "8px 12px", cursor: "pointer" }}>■</button>
+                style={{ background: "#241012", border: "1px solid #f7525f", borderRadius: 4, color: "#f7525f", fontFamily: mono, fontSize: 13, padding: "8px 12px", cursor: "pointer" }}>■</button>
             ) : (
               <button onClick={send} disabled={!input.trim()}
                 style={{

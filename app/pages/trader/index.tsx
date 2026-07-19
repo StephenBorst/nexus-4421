@@ -52,9 +52,9 @@ type FeedThesis = {
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  ACTIVE:      { label: "ACTIVE",      color: "#d4d4d8", bg: "#1a1a1e", border: "#1a3a5a" },
+  ACTIVE:      { label: "ACTIVE",      color: "#d4d4d8", bg: "#1a1a1e", border: "#33333a" },
   HIT_TP:      { label: "HIT TP",      color: "#ededf0", bg: "#1a1a1e", border: "#33333a" },
-  STOPPED_OUT: { label: "STOPPED OUT", color: "#f7525f", bg: "#2a0a0a", border: "#4a1a1a" },
+  STOPPED_OUT: { label: "STOPPED OUT", color: "#f7525f", bg: "#241012", border: "#4a1e22" },
   INVALIDATED: { label: "INVALIDATED", color: "#fbbf24", bg: "#2a1a00", border: "#4a3a00" },
   CLOSED:      { label: "CLOSED",      color: "#a1a1aa", bg: "#12161a", border: "#2a3a4a" },
   PENDING:     { label: "PENDING",     color: "#a1a1aa", bg: "#141416", border: "#33333a" },
@@ -417,12 +417,12 @@ function CopyModal({ thesis, walletAddress, onClose }: { thesis: FeedThesis; wal
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 4 }}>
           <div>
             <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 4 }}>ACCOUNT SIZE ($)</div>
-            <input style={{ ...inputStyle, borderColor: accErr ? "#4a1a1a" : "#232327" }} type="number" placeholder="10000" value={accountSize} onChange={(e) => setAccountSize(e.target.value)} />
+            <input style={{ ...inputStyle, borderColor: accErr ? "#4a1e22" : "#232327" }} type="number" placeholder="10000" value={accountSize} onChange={(e) => setAccountSize(e.target.value)} />
             {accErr && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#f7525f", marginTop: 3 }}>{accErr}</div>}
           </div>
           <div>
             <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 4 }}>RISK %</div>
-            <input style={{ ...inputStyle, borderColor: riskErr ? "#4a1a1a" : "#232327" }} type="number" placeholder="1.5" step="0.1" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} />
+            <input style={{ ...inputStyle, borderColor: riskErr ? "#4a1e22" : "#232327" }} type="number" placeholder="1.5" step="0.1" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} />
             {riskErr && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#f7525f", marginTop: 3 }}>{riskErr}</div>}
           </div>
           <div>
@@ -771,8 +771,8 @@ export default function TraderPage() {
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(80px,1fr))", gap: 12 }}>
                       {[
                         { l: "NET P&L", v: `${agentRec.netPnl >= 0 ? "+" : ""}$${agentRec.netPnl}`, c: agentRec.netPnl >= 0 ? "#3ecf8e" : "#f7525f" },
-                        { l: "WIN RATE", v: `${agentRec.winRate}%`, c: "#c0c0c0" },
-                        { l: "TRADES", v: String(agentRec.trades), c: "#c0c0c0" },
+                        { l: "WIN RATE", v: `${agentRec.winRate}%`, c: "#d4d4d8" },
+                        { l: "TRADES", v: String(agentRec.trades), c: "#d4d4d8" },
                         { l: "SCORE", v: `${agentRec.score}`, c: "#d4d4d8" },
                       ].map((x) => (
                         <div key={x.l}>
@@ -792,7 +792,7 @@ export default function TraderPage() {
                       {pubStrats.map((s) => (
                         <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", background: "#0a0a0b", border: "1px solid #232327", borderRadius: 3 }}>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, color: "#c0c0c0" }}>{s.name} <span style={{ color: "#d4d4d8", fontSize: 9 }}>{deriveStyle(s.config)}</span></div>
+                            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, color: "#d4d4d8" }}>{s.name} <span style={{ color: "#d4d4d8", fontSize: 9 }}>{deriveStyle(s.config)}</span></div>
                             <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#a1a1aa", marginTop: 2 }}>{s.config.signalMode} · {s.config.leverage}x · TP{s.config.tpPercent}/SL{s.config.slPercent}</div>
                           </div>
                           <button onClick={() => deployToAgent(s.config, `${displayName ?? shortAddr}'s "${s.name}"`, undefined, navigate)} style={{ background: "none", border: "1px solid #33333a", color: "#ededf0", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 14px", borderRadius: 3, cursor: "pointer", flexShrink: 0 }}>COPY →</button>

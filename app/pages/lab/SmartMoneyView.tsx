@@ -278,7 +278,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
               </div>
             ))}
           </div>
-          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3f3f46", marginTop: 8 }}>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 8 }}>
             Context, not a signal — smart money is often early AND often wrong. Know which side you're on.
           </div>
         </div>
@@ -303,7 +303,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
               </div>
             ))}
           </div>
-          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3f3f46", marginTop: 8 }}>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 8 }}>
             Agreement across independent top traders — stronger than any single whale. ⚡ opens the copy at market (set your own levels).
           </div>
         </div>
@@ -373,7 +373,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#52525b", width: 24, flexShrink: 0 }}>#{i + 1}</span>
                   <button onClick={() => toggleWatch(t.address)} title={starred ? "Unwatch" : "Add to watchlist"}
-                    style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 13, color: starred ? TRACKED : "#3f3f46", flexShrink: 0, lineHeight: 1 }}>
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 13, color: starred ? TRACKED : "#52525b", flexShrink: 0, lineHeight: 1 }}>
                     {starred ? "★" : "☆"}
                   </button>
                   <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.05em", color: t.source === "orderly" ? "#3ecf8e" : "#71717a", border: `1px solid ${t.source === "orderly" ? "#1e3a2a" : "#232327"}`, borderRadius: 3, padding: "1px 5px", flexShrink: 0 }}>{t.source === "orderly" ? "◆ ORDERLY" : "HL"}</span>
@@ -398,7 +398,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
                         <span style={{ marginLeft: 10, flexShrink: 0 }}>
                           {p.tradeable && p.sym
                             ? tradeBtn(() => copy(p.sym as string, p.side, p.entry, p.lev))
-                            : <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#3f3f46", whiteSpace: "nowrap" }}>HL-only</span>}
+                            : <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#52525b", whiteSpace: "nowrap" }}>HL-only</span>}
                         </span>
                       </div>
                     ))}
@@ -408,7 +408,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
               );
             })}
           </div>
-          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3f3f46", marginTop: 10, lineHeight: 1.5 }}>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 10, lineHeight: 1.5 }}>
             ◆ Orderly traders (public settlement indexer) copy natively; Hyperliquid traders copy directionally on Nexus. The agent manages the exit. Not financial advice.
           </div>
         </div>

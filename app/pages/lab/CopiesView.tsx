@@ -83,7 +83,7 @@ export function CopiesView() {
                       }}
                       onMouseEnter={(e) => {
                         (e.currentTarget as HTMLButtonElement).style.color = "#d4d4d8";
-                        (e.currentTarget as HTMLButtonElement).style.borderColor = "#1a3a5a";
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = "#33333a";
                       }}
                       onMouseLeave={(e) => {
                         (e.currentTarget as HTMLButtonElement).style.color = "#52525b";

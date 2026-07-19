@@ -53,9 +53,9 @@ type FeedThesis = {
 };
 
 const STATUS_CONFIG = {
-  ACTIVE:      { label: "ACTIVE",      color: "#d4d4d8", bg: "#1a1a1e", border: "#1a3a5a" },
+  ACTIVE:      { label: "ACTIVE",      color: "#d4d4d8", bg: "#1a1a1e", border: "#33333a" },
   HIT_TP:      { label: "HIT TP",      color: "#ededf0", bg: "#1a1a1e", border: "#33333a" },
-  STOPPED_OUT: { label: "STOPPED OUT", color: "#f7525f", bg: "#2a0a0a", border: "#4a1a1a" },
+  STOPPED_OUT: { label: "STOPPED OUT", color: "#f7525f", bg: "#241012", border: "#4a1e22" },
   INVALIDATED: { label: "INVALIDATED", color: "#fbbf24", bg: "#2a1a00", border: "#4a3a00" },
   CLOSED:      { label: "CLOSED",      color: "#a1a1aa", bg: "#12161a", border: "#2a3a4a" },
 };
@@ -274,7 +274,7 @@ function CopyModal({
           <div>
             <div style={labelStyle}>ACCOUNT SIZE ($)</div>
             <input
-              style={{ ...inputStyle, borderColor: accErr ? "#4a1a1a" : "#232327" }}
+              style={{ ...inputStyle, borderColor: accErr ? "#4a1e22" : "#232327" }}
               type="number"
               placeholder="10000"
               value={accountSize}
@@ -285,7 +285,7 @@ function CopyModal({
           <div>
             <div style={labelStyle}>RISK %</div>
             <input
-              style={{ ...inputStyle, borderColor: riskErr ? "#4a1a1a" : "#232327" }}
+              style={{ ...inputStyle, borderColor: riskErr ? "#4a1e22" : "#232327" }}
               type="number"
               placeholder="1.5"
               step="0.1"
@@ -470,7 +470,7 @@ function FeedCard({
               {thesis.agent ? "Nexus Agent" : (thesis.displayName ?? shortAddr)}
             </span>
             {thesis.agent ? (
-              <span style={{ flexShrink: 0, fontSize: 8, letterSpacing: "0.08em", padding: "2px 5px", borderRadius: 3, background: "#1a1a1e", border: "1px solid #1a3a5a", color: "#d4d4d8" }}>🤖 AGENT</span>
+              <span style={{ flexShrink: 0, fontSize: 8, letterSpacing: "0.08em", padding: "2px 5px", borderRadius: 3, background: "#1a1a1e", border: "1px solid #33333a", color: "#d4d4d8" }}>🤖 AGENT</span>
             ) : (
               <span style={{ flexShrink: 0 }}><NexusTierBadge address={thesis.wallet} /></span>
             )}
@@ -1223,6 +1223,10 @@ export default function FeedPage() {
   // Ph23: direction filter
   const [dirFilter, setDirFilter] = useState<DirFilter>("ALL");
   const [search, setSearch] = useState("");
+  // Two full rows of chips pushed the actual feed below the fold and read as noise.
+  // Collapsed by default; the trigger carries a summary so an active filter is still
+  // obvious while hidden.
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [copyTarget, setCopyTarget] = useState<FeedThesis | null>(null);
   const [view, setView] = useState<"feed" | "ranks" | "following">("feed");
   const [sortMode, setSortMode] = useState<"latest" | "trending">("latest");
@@ -1505,47 +1509,81 @@ export default function FeedPage() {
             {/* AgentTrackRecord hidden: paper-strat backtest shows the live agent's
                 edge is net-negative/breakeven — don't surface it as social proof
                 until a proven edge returns. Component kept for easy re-enable. */}
-            {/* Filters */}
-            <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-              {(["ALL", "ACTIVE", "HIT_TP", "STOPPED_OUT", "INVALIDATED"] as FilterStatus[]).map((f) => (
-                <button key={f} onClick={() => setFilter(f)} style={navBtnStyle(filter === f)}>
-                  {f === "ALL" ? "ALL" : STATUS_CONFIG[f].label}
-                </button>
-              ))}
-              {/* Ph23: direction filter */}
-              <div style={{ width: 1, height: 18, background: "#232327", margin: "0 2px" }} />
-              {(["ALL", "LONG", "SHORT"] as DirFilter[]).map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setDirFilter(d)}
-                  style={{
-                    ...navBtnStyle(dirFilter === d),
-                    color: dirFilter === d ? (d === "LONG" ? "#3ecf8e" : d === "SHORT" ? "#f7525f" : "#ededf0") : "#71717a",
-                    borderColor: dirFilter === d ? (d === "LONG" ? "#3ecf8e" : d === "SHORT" ? "#f7525f" : "#ededf0") : "#232327",
-                  }}
-                >
-                  {d === "ALL" ? "L+S" : d === "LONG" ? "↑ LONG" : "↓ SHORT"}
-                </button>
-              ))}
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="search symbol / trader..."
-                style={{
-                  marginLeft: "auto",
-                  background: "#0f0f11",
-                  border: "1px solid #232327",
-                  borderRadius: 3,
-                  color: "#ededf0",
-                  fontFamily: "var(--nx-font-mono)",
-                  fontSize: 10,
-                  padding: "5px 10px",
-                  outline: "none",
-                  width: 200,
-                }}
-              />
-            </div>
+            {/* Filters — one-click disclosure. Search stays visible (it's the most-used
+                control); the chip rows hide until asked for. */}
+            {(() => {
+              const activeBits = [
+                filter !== "ALL" ? STATUS_CONFIG[filter].label : null,
+                dirFilter !== "ALL" ? dirFilter : null,
+              ].filter(Boolean) as string[];
+              return (
+                <>
+                  <div style={{ display: "flex", gap: 8, marginBottom: filtersOpen ? 8 : 16, flexWrap: "wrap", alignItems: "center" }}>
+                    <button
+                      onClick={() => setFiltersOpen((v) => !v)}
+                      title={filtersOpen ? "Hide filters" : "Filter by status or direction"}
+                      style={{ ...navBtnStyle(activeBits.length > 0 || filtersOpen), display: "flex", alignItems: "center", gap: 6 }}
+                    >
+                      <span style={{ opacity: 0.7 }}>{filtersOpen ? "▾" : "▸"}</span>
+                      FILTERS
+                      {activeBits.length > 0 && (
+                        <span style={{ color: "#ededf0" }}>· {activeBits.join(" · ")}</span>
+                      )}
+                    </button>
+                    {activeBits.length > 0 && (
+                      <button
+                        onClick={() => { setFilter("ALL"); setDirFilter("ALL"); }}
+                        title="Clear filters"
+                        style={{ ...navBtnStyle(false), color: "#71717a" }}
+                      >
+                        ✕ CLEAR
+                      </button>
+                    )}
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="search symbol / trader..."
+                      style={{
+                        marginLeft: "auto",
+                        background: "#0f0f11",
+                        border: "1px solid #232327",
+                        borderRadius: 3,
+                        color: "#ededf0",
+                        fontFamily: "var(--nx-font-mono)",
+                        fontSize: 10,
+                        padding: "5px 10px",
+                        outline: "none",
+                        width: 200,
+                      }}
+                    />
+                  </div>
+                  {filtersOpen && (
+                    <div className="nx-fade-in" style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+                      {(["ALL", "ACTIVE", "HIT_TP", "STOPPED_OUT", "INVALIDATED"] as FilterStatus[]).map((f) => (
+                        <button key={f} onClick={() => setFilter(f)} style={navBtnStyle(filter === f)}>
+                          {f === "ALL" ? "ALL" : STATUS_CONFIG[f].label}
+                        </button>
+                      ))}
+                      <div style={{ width: 1, height: 18, background: "#232327", margin: "0 2px" }} />
+                      {(["ALL", "LONG", "SHORT"] as DirFilter[]).map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => setDirFilter(d)}
+                          style={{
+                            ...navBtnStyle(dirFilter === d),
+                            color: dirFilter === d ? (d === "LONG" ? "#3ecf8e" : d === "SHORT" ? "#f7525f" : "#ededf0") : "#71717a",
+                            borderColor: dirFilter === d ? (d === "LONG" ? "#3ecf8e" : d === "SHORT" ? "#f7525f" : "#ededf0") : "#232327",
+                          }}
+                        >
+                          {d === "ALL" ? "L+S" : d === "LONG" ? "↑ LONG" : "↓ SHORT"}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
             {loading && (
               <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#33333a" }}>

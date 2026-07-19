@@ -181,7 +181,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
                 navigate,
               )}
               title="Prefill the agent to trade this symbol on funding/OI signals, using this thesis's TP/SL and leverage as risk bounds. The agent is signal-driven — it may enter either direction."
-              style={{ ...navBtnStyle, fontSize: 10, color: "#ff8800", borderColor: "#3a2a0a", minHeight: 36, padding: "6px 12px" }}>
+              style={{ ...navBtnStyle, fontSize: 10, color: "#fbbf24", borderColor: "#3a2a0a", minHeight: 36, padding: "6px 12px" }}>
               ⚡ AUTOMATE
             </button>
             <button onClick={() => deployDirectiveFromThesis({
@@ -334,7 +334,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
             <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>HIT TP</div>
             <div style={{ fontSize: 28, color: "#ededf0", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{hits}</div>
           </div>
-          <div style={{ background: "#150a0a", border: "1px solid #4a1a1a", borderRadius: 4, padding: "10px 12px" }}>
+          <div style={{ background: "#150a0a", border: "1px solid #4a1e22", borderRadius: 4, padding: "10px 12px" }}>
             <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>STOPPED OUT</div>
             <div style={{ fontSize: 28, color: "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{stoppedOut}</div>
           </div>
@@ -342,7 +342,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
             <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>INVALIDATED</div>
             <div style={{ fontSize: 28, color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{invalidated}</div>
           </div>
-          <div style={{ background: "#0a0a0b", border: "1px solid #1a3a5a", borderRadius: 4, padding: "10px 12px" }}>
+          <div style={{ background: "#0a0a0b", border: "1px solid #33333a", borderRadius: 4, padding: "10px 12px" }}>
             <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>WIN RATE</div>
             <div style={{ fontSize: 28, color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{winRate}%</div>
             <div style={{ height: 3, background: "#232327", borderRadius: 2, marginTop: 8 }}>
@@ -352,7 +352,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
         </div>
         {/* TOTAL P&L — its own full-width row so the number matches the count tiles'
             size (congruent, easy on the eye) without ever overflowing a narrow tile. */}
-        <div style={{ background: "#0a0a0b", border: `1px solid ${totalActualPnl >= 0 ? "#33333a" : "#4a1a1a"}`, borderRadius: 4, padding: "10px 14px", marginTop: 8, display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ background: "#0a0a0b", border: `1px solid ${totalActualPnl >= 0 ? "#33333a" : "#4a1e22"}`, borderRadius: 4, padding: "10px 14px", marginTop: 8, display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>TOTAL ACTUAL P&amp;L</div>
             <div style={{ fontSize: 28, color: totalActualPnl >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold", whiteSpace: "nowrap" }}>
@@ -977,7 +977,7 @@ export function ThesisView() {
                     <button key={d} onClick={() => set("direction", d)} style={{
                       flex: 1, padding: "8px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11,
                       cursor: "pointer", borderRadius: 3, border: "1px solid",
-                      background: form.direction === d ? (d === "LONG" ? "#1a1a1e" : "#2a0a0a") : "#0f0f11",
+                      background: form.direction === d ? (d === "LONG" ? "#1a1a1e" : "#241012") : "#0f0f11",
                       borderColor: form.direction === d ? (d === "LONG" ? "#3ecf8e" : "#f7525f") : "#232327",
                       color: form.direction === d ? (d === "LONG" ? "#3ecf8e" : "#f7525f") : "#52525b",
                     }}>{d === "LONG" ? "↑ LONG" : "↓ SHORT"}</button>
@@ -1132,8 +1132,8 @@ export function ThesisView() {
                 </div>
                 {/* Confirmation overlay */}
                 {liveConfirm && calc && (
-                  <div style={{ background: "#1a0a00", border: "1px solid #ff6600", borderRadius: 4, padding: "12px 14px", marginBottom: 8 }}>
-                    <div style={{ fontSize: 10, color: "#ff6600", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 10 }}>
+                  <div style={{ background: "#1a0a00", border: "1px solid #fbbf24", borderRadius: 4, padding: "12px 14px", marginBottom: 8 }}>
+                    <div style={{ fontSize: 10, color: "#fbbf24", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 10 }}>
                       &#9632; CONFIRM LIVE ORDER
                     </div>
                     {[
@@ -1162,8 +1162,8 @@ export function ThesisView() {
                       }}>ABORT</button>
                       <button onClick={deployLive} style={{
                         flex: 2, padding: "8px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11,
-                        cursor: "pointer", borderRadius: 3, border: "1px solid #ff6600",
-                        background: "#1a0800", color: "#ff6600", letterSpacing: "0.08em", fontWeight: "bold",
+                        cursor: "pointer", borderRadius: 3, border: "1px solid #fbbf24",
+                        background: "#1a0800", color: "#fbbf24", letterSpacing: "0.08em", fontWeight: "bold",
                       }}>&#9632; CONFIRM — DEPLOY LIVE</button>
                     </div>
                   </div>
@@ -1171,7 +1171,7 @@ export function ThesisView() {
 
                 {/* Live status feedback */}
                 {liveStatus === "submitting" && (
-                  <div style={{ padding: "10px 0", textAlign: "center", fontSize: 11, color: "#ff6600", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em" }}>
+                  <div style={{ padding: "10px 0", textAlign: "center", fontSize: 11, color: "#fbbf24", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em" }}>
                     &#9632; SUBMITTING TO ORDERLY...
                   </div>
                 )}
@@ -1181,7 +1181,7 @@ export function ThesisView() {
                   </div>
                 )}
                 {liveStatus === "error" && (
-                  <div style={{ padding: "10px 12px", background: "#1a0a0a", border: "1px solid #4a1a1a", borderRadius: 4, marginBottom: 8 }}>
+                  <div style={{ padding: "10px 12px", background: "#241012", border: "1px solid #4a1e22", borderRadius: 4, marginBottom: 8 }}>
                     <div style={{ fontSize: 10, color: "#f7525f", fontFamily: "var(--nx-font-mono)" }}>&#9632; ORDER FAILED</div>
                     {liveError && <div style={{ fontSize: 9, color: "#3a2a2a", fontFamily: "var(--nx-font-mono)", marginTop: 4 }}>{liveError}</div>}
                   </div>
@@ -1211,9 +1211,9 @@ export function ThesisView() {
                       style={{
                         width: "100%", padding: "9px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11,
                         cursor: formValid && isWalletReady ? "pointer" : "not-allowed", borderRadius: 3,
-                        border: `1px solid ${!form.symbol || !isWalletReady ? "#2a1a0a" : "#ff6600"}`,
+                        border: `1px solid ${!form.symbol || !isWalletReady ? "#2a1a0a" : "#fbbf24"}`,
                         background: "#0a0500",
-                        color: !form.symbol || !isWalletReady ? "#2a1a0a" : "#ff6600",
+                        color: !form.symbol || !isWalletReady ? "#2a1a0a" : "#fbbf24",
                         letterSpacing: "0.08em",
                       }}>
                       &#9632; DEPLOY (LIVE)
