@@ -873,7 +873,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               <Avatar pfp={trader.pfp} displayName={trader.displayName} size={32} />
 
               {/* Identity */}
-              <div style={{ flexGrow: 1, flexShrink: 0, flexBasis: 150, minWidth: 150, maxWidth: 240 }}>
+              <div style={{ flexGrow: 1, flexShrink: 0, flexBasis: 150, minWidth: 150, maxWidth: 280 }}>
                 {/* Name line — name truncates with ellipsis, YOU stays put */}
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#a1a1aa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
@@ -904,14 +904,14 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               {/* Cumulative-R equity curve — the trustless track record as a shape,
                   not just a number. Only for graded callers with ≥2 resolved calls. */}
               {trader.graded && trader.graded.rSeries.length >= 2 && (
-                <div style={{ flexShrink: 0, textAlign: "center" }}>
+                <div style={{ flex: "1 1 72px", minWidth: 72, textAlign: "center" }}>
                   <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 2 }}>R CURVE</div>
                   <Sparkline points={trader.graded.rSeries} width={72} height={22} />
                 </div>
               )}
 
               {/* Win rate — hero stat */}
-              <div style={{ textAlign: "center", minWidth: 60, flexShrink: 0 }}>
+              <div style={{ textAlign: "center", flex: "1 1 60px", minWidth: 60 }}>
                 <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>WIN RATE</div>
                 <div style={{
                   fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: "bold",
@@ -922,7 +922,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               </div>
 
               {/* W / L */}
-              <div style={{ textAlign: "center", minWidth: 44, flexShrink: 0 }}>
+              <div style={{ textAlign: "center", flex: "1 1 44px", minWidth: 44 }}>
                 <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>W / L</div>
                 <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
                   <span style={{ color: "#ededf0" }}>{trader.wins}</span>
@@ -932,7 +932,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               </div>
 
               {/* Avg R:R */}
-              <div style={{ textAlign: "center", minWidth: 50, flexShrink: 0 }}>
+              <div style={{ textAlign: "center", flex: "1 1 50px", minWidth: 50 }}>
                 <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>AVG R:R</div>
                 <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: trader.avgRR >= 2 ? "#ededf0" : "#fbbf24" }}>
                   1:{trader.avgRR.toFixed(1)}
@@ -940,7 +940,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               </div>
 
               {/* Active */}
-              <div style={{ textAlign: "center", minWidth: 40, flexShrink: 0 }}>
+              <div style={{ textAlign: "center", flex: "1 1 40px", minWidth: 40 }}>
                 <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>ACTIVE</div>
                 <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: trader.active > 0 ? "#d4d4d8" : "#52525b" }}>
                   {trader.active}
@@ -953,7 +953,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                 const rep = onChain ?? calcRepScore(trader.wins, trader.losses, trader.avgRR);
                 const isOnChain = onChain != null;
                 return (
-                  <div style={{ textAlign: "center", minWidth: 44, flexShrink: 0 }}>
+                  <div style={{ textAlign: "center", flex: "1 1 44px", minWidth: 44 }}>
                     <div style={{ fontSize: 8, color: isOnChain ? "#ededf0" : "#52525b", fontFamily: "var(--nx-font-mono)" }}>
                       {isOnChain ? "⛓REP" : "REP"}
                     </div>
