@@ -25,7 +25,7 @@ const WATCH_KEY = "nexus_sm_watchlist";
 const loadWatch = (): string[] => { try { return JSON.parse(localStorage.getItem(WATCH_KEY) || "[]"); } catch { return []; } };
 interface SmEvent { source?: "orderly" | "hl"; addr: string; coin: string; sym: string; side: "LONG" | "SHORT"; type: "OPEN" | "CLOSE"; price: number; szUsd: number; closedPnl: number | null; ts: number; }
 
-const SKY = "#6cb6ff"; // info/tracked accent (amber reserved for caution only)
+const TRACKED = "#ededf0"; // watchlist/tracked accent — bone, NOT blue (blue is teaching copy only)
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const usd = (n: number) => {
   const a = Math.abs(n);
@@ -236,7 +236,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
       {poster && <SharePoster data={poster} onClose={() => setPoster(null)} />}
       {detail && <TraderDetail source={detail.source} address={detail.address} accountId={detail.accountId} onClose={() => setDetail(null)} />}
       {toast && (
-        <div className="nx-fade-in" style={{ position: "fixed", bottom: 20, left: 20, zIndex: 8000, background: "#0f0f11", border: "1px solid #2a3f52", borderLeft: `3px solid ${SKY}`, borderRadius: 6, padding: "10px 14px", fontFamily: "var(--nx-font-mono)", fontSize: 11, color: SKY, boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>
+        <div className="nx-fade-in" style={{ position: "fixed", bottom: 20, left: 20, zIndex: 8000, background: "#0f0f11", border: "1px solid #33333a", borderLeft: `3px solid ${TRACKED}`, borderRadius: 6, padding: "10px 14px", fontFamily: "var(--nx-font-mono)", fontSize: 11, color: TRACKED, boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>
           {toast}
         </div>
       )}
@@ -320,12 +320,12 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
             {events.slice(0, 20).map((e, i) => {
               const watched = watch.includes(e.addr);
               return (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 6px", borderBottom: "1px solid #0d1117", minWidth: 0, flexWrap: "nowrap", overflowX: "auto", background: watched ? "#6cb6ff10" : "transparent", borderLeft: watched ? `2px solid ${SKY}` : "2px solid transparent" }}>
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 6px", borderBottom: "1px solid #0d1117", minWidth: 0, flexWrap: "nowrap", overflowX: "auto", background: watched ? "#ededf010" : "transparent", borderLeft: watched ? `2px solid ${TRACKED}` : "2px solid transparent" }}>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", width: 34, flexShrink: 0 }}>{ago(e.ts)}</span>
                 <span title={e.source === "orderly" ? "Orderly (native)" : "Hyperliquid"} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: e.source === "orderly" ? "#3ecf8e" : "#52525b", width: 12, flexShrink: 0 }}>{e.source === "orderly" ? "◆" : "H"}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 3, flex: "1 1 96px", minWidth: 96 }}>
-                  {watched && <span style={{ color: SKY, fontSize: 9 }}>★</span>}
-                  <span onClick={() => openDetail(e.addr, e.source)} title="View trader detail" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: watched ? SKY : "#71717a", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#232327" }}>{short(e.addr)}</span>
+                  {watched && <span style={{ color: TRACKED, fontSize: 9 }}>★</span>}
+                  <span onClick={() => openDetail(e.addr, e.source)} title="View trader detail" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: watched ? TRACKED : "#71717a", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#232327" }}>{short(e.addr)}</span>
                 </span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: 700, color: e.type === "OPEN" ? "#3ecf8e" : "#a1a1aa", width: 42, flexShrink: 0 }}>{e.type}</span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ededf0", flex: "1 1 56px", minWidth: 56 }}>{e.sym}</span>
@@ -358,7 +358,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
             <div style={agentLabelStyle}>// SMART MONEY BOARD <span style={{ color: "#52525b" }}>— ◆ Orderly (native) + Hyperliquid</span></div>
             <button onClick={() => setWatchOnly((v) => !v)} disabled={watch.length === 0}
               title={watch.length === 0 ? "Star traders below to build a watchlist" : "Show only your watchlist"}
-              style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.04em", color: watchOnly ? SKY : "#71717a", background: watchOnly ? "#0a1420" : "none", border: `1px solid ${watchOnly ? "#2a3f52" : "#232327"}`, borderRadius: 3, padding: "4px 9px", cursor: watch.length === 0 ? "default" : "pointer", opacity: watch.length === 0 ? 0.5 : 1 }}>
+              style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.04em", color: watchOnly ? TRACKED : "#71717a", background: watchOnly ? "#1a1a1e" : "none", border: `1px solid ${watchOnly ? "#33333a" : "#232327"}`, borderRadius: 3, padding: "4px 9px", cursor: watch.length === 0 ? "default" : "pointer", opacity: watch.length === 0 ? 0.5 : 1 }}>
               ★ WATCHLIST{watch.length > 0 ? ` (${watch.length})` : ""}
             </button>
           </div>
@@ -373,7 +373,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#52525b", width: 24, flexShrink: 0 }}>#{i + 1}</span>
                   <button onClick={() => toggleWatch(t.address)} title={starred ? "Unwatch" : "Add to watchlist"}
-                    style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 13, color: starred ? SKY : "#3f3f46", flexShrink: 0, lineHeight: 1 }}>
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 13, color: starred ? TRACKED : "#3f3f46", flexShrink: 0, lineHeight: 1 }}>
                     {starred ? "★" : "☆"}
                   </button>
                   <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.05em", color: t.source === "orderly" ? "#3ecf8e" : "#71717a", border: `1px solid ${t.source === "orderly" ? "#1e3a2a" : "#232327"}`, borderRadius: 3, padding: "1px 5px", flexShrink: 0 }}>{t.source === "orderly" ? "◆ ORDERLY" : "HL"}</span>

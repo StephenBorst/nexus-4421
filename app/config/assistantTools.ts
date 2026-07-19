@@ -226,6 +226,72 @@ export const TOOLS: ToolDef[] = [
       return JSON.stringify({ criteria: d?.criteria?.grading ?? null, leaderboard: (d?.leaderboard ?? []).slice(0, 10) });
     },
   },
+  {
+    name: "xray_wallet",
+    description:
+      "X-ray ANY wallet's perp record from public data — no login, works on wallets that have never touched Nexus. Reads BOTH Hyperliquid (trade-by-trade history) and the Orderly network incl. Nexus (per-market settled PnL + live open positions). Use when the user pastes a wallet address, asks 'is this trader any good', or wants to vet someone before copying them.",
+    input_schema: {
+      type: "object",
+      properties: { wallet: { type: "string", description: "0x… wallet address." } },
+      required: ["wallet"],
+    },
+    run: async (args) => {
+      const w = String(args.wallet ?? "").trim();
+      if (!/^0x[0-9a-fA-F]{40}$/.test(w)) return JSON.stringify({ error: "invalid wallet address" });
+
+      const [hlRes, ordRes] = await Promise.allSettled([
+        fetch("https://api.hyperliquid.xyz/info", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "userFills", user: w.toLowerCase() }),
+        }).then((r) => r.json()),
+        fetch(`${AGENT_API}/smart/xray?address=${encodeURIComponent(w)}`).then((r) => r.json()),
+      ]);
+
+      // Hyperliquid: closed fills only → count / net pnl / win rate.
+      let hyperliquid: Record<string, unknown> = { closed_trades: 0 };
+      if (hlRes.status === "fulfilled" && Array.isArray(hlRes.value)) {
+        const closed = hlRes.value.filter(
+          (f: { dir?: string; closedPnl?: string }) =>
+            /^Close/.test(String(f.dir ?? "")) || parseFloat(f.closedPnl ?? "0") !== 0,
+        );
+        const pnls = closed.map(
+          (f: { closedPnl?: string; fee?: string }) =>
+            parseFloat(f.closedPnl ?? "0") - Math.abs(parseFloat(f.fee ?? "0")),
+        );
+        const wins = pnls.filter((p: number) => p > 0).length;
+        hyperliquid = {
+          closed_trades: closed.length,
+          net_pnl: Math.round(pnls.reduce((s: number, p: number) => s + p, 0)),
+          win_rate_pct: pnls.length ? Math.round((wins / pnls.length) * 100) : null,
+        };
+      }
+
+      // Orderly: per-market aggregates per broker (ours flagged). NO per-trade tape
+      // exists publicly, so never claim hold-time/timing stats from this side.
+      const ord = ordRes.status === "fulfilled" ? ordRes.value : null;
+      const orderly = ord?.venues?.length
+        ? {
+            venues: ord.venues.map((v: Record<string, unknown>) => ({
+              broker: v.brokerId, is_nexus: v.isNexus, realized: v.realized,
+              unrealized: v.unrealized, markets: v.markets,
+              profitable_markets_pct: v.profitableMarketsPct, open_positions: v.openPositions,
+              top_markets: (v.bySymbol as Record<string, unknown>[] ?? []).slice(0, 5)
+                .map((s) => ({ sym: s.sym, realized: s.realized, open: s.open, side: s.side })),
+            })),
+            total_realized: ord.totalRealized,
+          }
+        : null;
+
+      return JSON.stringify({
+        wallet: w, hyperliquid, orderly,
+        note: orderly
+          ? "Orderly figures are per-MARKET settled totals (no public per-trade tape), so hold-time/timing stats are Hyperliquid-only."
+          : "No Orderly-network history found for this wallet (sub-accounts aren't resolvable from an address).",
+        full_report: `/analyze?address=${w}`,
+      });
+    },
+  },
 ];
 
 // ── ACTION tools (client-side navigation + thesis drafting) ──
@@ -259,6 +325,21 @@ TOOLS.push(
       if (!/^0x[0-9a-fA-F]{40}$/.test(w)) return JSON.stringify({ error: "invalid wallet address" });
       ctx.navigate?.(`/feed/trader/${w}`);
       return JSON.stringify({ navigated: `/feed/trader/${w}` });
+    },
+  },
+  {
+    name: "open_xray",
+    description: "Open the full Wallet X-Ray report page for an address (charts, per-market breakdown, and ⚡ copy-to-agent on any live position). Use after xray_wallet when the user wants the visual breakdown, or when they ask to 'x-ray' a wallet.",
+    input_schema: {
+      type: "object",
+      properties: { wallet: { type: "string", description: "0x… wallet address." } },
+      required: ["wallet"],
+    },
+    run: async (args, ctx) => {
+      const w = String(args.wallet ?? "").trim();
+      if (!/^0x[0-9a-fA-F]{40}$/.test(w)) return JSON.stringify({ error: "invalid wallet address" });
+      ctx.navigate?.(`/analyze?address=${w}`);
+      return JSON.stringify({ navigated: `/analyze?address=${w}` });
     },
   },
   {

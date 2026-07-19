@@ -48,7 +48,9 @@ export function MarketRegime() {
     const fundScore = 100 - Math.abs(fundSkew - 50) * 2; // extreme one-sided funding = lower
     const score = Math.round(breadth * 0.5 + btcScore * 0.4 + fundScore * 0.1);
     const label = score >= 60 ? "RISK-ON" : score >= 42 ? "NEUTRAL" : "RISK-OFF";
-    const color = score >= 60 ? "#ededf0" : score >= 42 ? "#6cb6ff" : "#ff4c6a";
+    // NEUTRAL is a neutral GREY, not blue — blue is reserved for teaching copy only.
+    // Red normalized to the canonical loss token (#f7525f) instead of drifted #ff4c6a.
+    const color = score >= 60 ? "#ededf0" : score >= 42 ? "#a1a1aa" : "#f7525f";
     const agentNote =
       label === "RISK-ON"
         ? "Broad strength — momentum/trend presets favored; funding fades are riskier into strength."
@@ -69,7 +71,7 @@ export function MarketRegime() {
       <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 30, fontWeight: 400, color: regime.color, lineHeight: 1.15, marginTop: 6, textTransform: "capitalize" }}>
         {regime.label.toLowerCase()}
       </div>
-      <div style={{ height: 1, background: "linear-gradient(90deg, #6cb6ff 0%, rgba(108,182,255,0) 55%)", margin: "12px 0 18px", maxWidth: 340 }} />
+      <div style={{ height: 1, background: "linear-gradient(90deg, #ededf0 0%, rgba(237,237,240,0) 55%)", margin: "12px 0 18px", maxWidth: 340 }} />
       <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 16, alignItems: "center" }}>
         <div style={{ textAlign: "center", minWidth: 120 }}>
           <div style={{ fontSize: 40, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: regime.color, lineHeight: 1 }}>{regime.score}</div>
@@ -90,7 +92,7 @@ export function MarketRegime() {
             </div>
             <div>
               <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>FUNDING SKEW</div>
-              <div style={{ fontSize: 16, color: "#6cb6ff", fontFamily: "var(--nx-font-mono)" }}>{regime.fundSkew}% long</div>
+              <div style={{ fontSize: 16, color: "#ededf0", fontFamily: "var(--nx-font-mono)" }}>{regime.fundSkew}% long</div>
             </div>
           </div>
           <div style={{ fontSize: 11, color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", lineHeight: 1.5, borderTop: "1px solid #232327", paddingTop: 8 }}>

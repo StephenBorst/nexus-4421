@@ -10,7 +10,9 @@ const TEAL   = "#ededf0"; // neutral accent (headers, slight-bullish, bars)
 const GREEN  = "#3ecf8e"; // genuine UP/positive: gainers, +change, bullish, greed
 const RED    = "#f7525f";
 const YELLOW = "#fbbf24";
-const SKY = "#6cb6ff"; // neutral/informational (amber reserved for caution: crowding, tension)
+// Regime scale reads by TONE, not hue: the label already says bullish/bearish, so only
+// the extremes take colour (GREEN/RED) and the middle stays neutral. No blue — that is
+// reserved for teaching copy (Coachmark/Telegram) and nothing else.
 const DIM    = "#71717a";
 const MUTED  = "#a1a1aa";
 const BRIGHT = "#f4f4f5";
@@ -158,8 +160,8 @@ function computeRegime(
 
   if (score >= 68) return { score, label: "BULLISH",          color: GREEN,  description: "Risk-on conditions — momentum favors longs. Stay cautious near extremes." };
   if (score >= 54) return { score, label: "SLIGHTLY BULLISH", color: TEAL,   description: "Mild bullish lean — upside bias with limited conviction." };
-  if (score >= 46) return { score, label: "NEUTRAL",          color: SKY, description: "Mixed signals — no clear directional edge. Size down and wait for clarity." };
-  if (score >= 32) return { score, label: "SLIGHTLY BEARISH", color: SKY, description: "Mild bearish lean — defensive positioning warranted." };
+  if (score >= 46) return { score, label: "NEUTRAL",          color: MUTED,  description: "Mixed signals — no clear directional edge. Size down and wait for clarity." };
+  if (score >= 32) return { score, label: "SLIGHTLY BEARISH", color: TEAL,   description: "Mild bearish lean — defensive positioning warranted." };
   return              { score, label: "BEARISH",           color: RED,    description: "Risk-off — longs crowded or sentiment deteriorating sharply." };
 }
 
@@ -378,7 +380,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
   const renderDeriv = (sym: string, data: DerivAsset | null, ls: number | null) => {
     const fc = !data ? DIM : data.funding > 0.02 ? GREEN : data.funding < 0 ? RED : MUTED;
     const sig = !data ? "—" : data.funding > 0.06 ? "[LONGS]" : data.funding < -0.02 ? "[SHORTS]" : "[NEUTRAL]";
-    const sigC = !data ? DIM : data.funding > 0.06 ? GREEN : data.funding < -0.02 ? RED : YELLOW;
+    const sigC = !data ? DIM : data.funding > 0.06 ? GREEN : data.funding < -0.02 ? RED : MUTED;
     return (
       <div key={sym} style={{ marginBottom: "12px", paddingBottom: "12px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
@@ -386,7 +388,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
           <span style={{ color: sigC, fontSize: "11px" }}>{sig}</span>
           <button onClick={() => deployToAgent({ symbols: [`PERP_${sym}_USDC`] }, `the ${sym} funding read`, undefined, navigate)}
             title={`Set the trading agent to watch ${sym} — the same funding/OI edge it trades on`}
-            style={{ marginLeft: "auto", background: "none", border: "1px solid #3a2a0a", color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontSize: "9px", letterSpacing: "0.05em", padding: "3px 8px", borderRadius: "3px", cursor: "pointer" }}>
+            style={{ marginLeft: "auto", background: "none", border: "1px solid #33333a", color: "#ededf0", fontFamily: "var(--nx-font-mono)", fontSize: "9px", letterSpacing: "0.05em", padding: "3px 8px", borderRadius: "3px", cursor: "pointer" }}>
             ⚡ AGENT
           </button>
         </div>
@@ -462,14 +464,14 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
             <div>
               <div style={{ color: DIM, fontSize: "10px", marginBottom: "3px" }}>FEAR / GREED</div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ color: fearGreed ? fearGreed.value > 60 ? GREEN : fearGreed.value < 40 ? RED : YELLOW : DIM, fontWeight: 600, fontSize: "13px" }}>
+                <span style={{ color: fearGreed ? fearGreed.value > 60 ? GREEN : fearGreed.value < 40 ? RED : MUTED : DIM, fontWeight: 600, fontSize: "13px" }}>
                   {fearGreed ? fearGreed.label.toUpperCase() : "—"}
                 </span>
                 {fearGreed && <span style={{ color: DIM, fontSize: "11px" }}>[{fearGreed.value}]</span>}
               </div>
               {fearGreed && (
                 <div style={{ marginTop: "3px" }}>
-                  <BarBlock value={fearGreed.value} total={100} color={fearGreed.value > 60 ? GREEN : fearGreed.value < 40 ? RED : YELLOW} len={14} />
+                  <BarBlock value={fearGreed.value} total={100} color={fearGreed.value > 60 ? GREEN : fearGreed.value < 40 ? RED : MUTED} len={14} />
                 </div>
               )}
             </div>
@@ -482,7 +484,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
                   {globalData ? `${globalData.btcDom.toFixed(1)}%` : "—"}
                 </span>
                 {globalData && (
-                  <span style={{ color: globalData.btcDom > 60 ? RED : globalData.btcDom < 50 ? GREEN : YELLOW, fontSize: "10px" }}>
+                  <span style={{ color: globalData.btcDom > 60 ? RED : globalData.btcDom < 50 ? GREEN : MUTED, fontSize: "10px" }}>
                     {globalData.btcDom > 60 ? "↑ MAJOR DOM" : globalData.btcDom < 50 ? "↓ ALTSEASON" : "MODERATE"}
                   </span>
                 )}
@@ -771,19 +773,19 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
                 <div style={{ marginBottom: "5px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
                     <span style={{ color: DIM }}>LONGS</span>
-                    <span style={{ color: status === "LONG FLUSH" ? YELLOW : MUTED }}>{oi > 0 ? fmtLiq(longLiq) : "—"}</span>
+                    <span style={{ color: BRIGHT }}>{oi > 0 ? fmtLiq(longLiq) : "—"}</span>
                   </div>
                   <div style={{ height: "3px", background: "rgba(255,255,255,0.06)", borderRadius: "1px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.round(longPct * 100)}%`, background: status === "LONG FLUSH" ? YELLOW : MUTED, opacity: 0.8 }} />
+                    <div style={{ height: "100%", width: `${Math.round(longPct * 100)}%`, background: MUTED, opacity: 0.8 }} />
                   </div>
                 </div>
                 <div style={{ marginBottom: "6px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
                     <span style={{ color: DIM }}>SHORTS</span>
-                    <span style={{ color: status === "SHORT SQUEEZE" ? YELLOW : MUTED }}>{oi > 0 ? fmtLiq(shortLiq) : "—"}</span>
+                    <span style={{ color: BRIGHT }}>{oi > 0 ? fmtLiq(shortLiq) : "—"}</span>
                   </div>
                   <div style={{ height: "3px", background: "rgba(255,255,255,0.06)", borderRadius: "1px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.round(shortPct * 100)}%`, background: status === "SHORT SQUEEZE" ? YELLOW : MUTED, opacity: 0.8 }} />
+                    <div style={{ height: "100%", width: `${Math.round(shortPct * 100)}%`, background: MUTED, opacity: 0.8 }} />
                   </div>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: DIM, borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "5px" }}>
@@ -869,7 +871,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
             <div>
               <div style={{ color: DIM, fontSize: "10px", marginBottom: "2px" }}>MARKET</div>
               <div style={{ color: DIM, fontSize: "10px", marginBottom: "2px" }}>NET POSITIONING</div>
-              <div style={{ color: netLongPct > 60 ? GREEN : netLongPct < 40 ? RED : YELLOW, fontWeight: 700, fontSize: "18px" }}>
+              <div style={{ color: netLongPct > 60 ? GREEN : netLongPct < 40 ? RED : MUTED, fontWeight: 700, fontSize: "18px" }}>
                 {netLongPct}% LONG
               </div>
               <div style={{ color: DIM, fontSize: "11px" }}>
@@ -881,7 +883,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
               <div style={{ color: MUTED, fontWeight: 700, fontSize: "18px" }}>
                 {Math.abs(netLongPct - 50) > 20 ? "HIGH" : Math.abs(netLongPct - 50) > 10 ? "MODERATE" : "LOW"}
               </div>
-              <BarBlock value={Math.abs(netLongPct - 50)} total={50} color={netLongPct > 60 ? GREEN : netLongPct < 40 ? RED : YELLOW} len={14} />
+              <BarBlock value={Math.abs(netLongPct - 50)} total={50} color={netLongPct > 60 ? GREEN : netLongPct < 40 ? RED : MUTED} len={14} />
             </div>
             {avgFunding10 !== null && (
               <div>
