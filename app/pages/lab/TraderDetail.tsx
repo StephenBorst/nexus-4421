@@ -54,7 +54,7 @@ export function TraderDetail({ source, address, accountId, onClose }: {
             <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 12, color: "#a1a1aa", lineHeight: 1.6 }}>
               This is a Hyperliquid trader. Open the full wallet x-ray for their complete graded record — trading score, risk-adjusted ratios, hold-time, streaks and per-asset edge.
               <div style={{ marginTop: 12 }}>
-                <a href={`/analyze?address=${address}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#3ecf8e", textDecoration: "none", border: "1px solid #1e3a2a", borderRadius: 4, padding: "8px 14px", display: "inline-block" }}>X-ray this wallet ↗</a>
+                <a href={`/analyze?address=${address}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#ededf0", textDecoration: "none", border: "1px solid #33333a", borderRadius: 4, padding: "8px 14px", display: "inline-block" }}>X-ray this wallet ↗</a>
               </div>
             </div>
           )}

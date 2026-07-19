@@ -41,11 +41,12 @@ function NewsTab() {
   const [countdown, setCountdown] = useState(300);
   const isMob = useIsMobile();
 
-  const TEAL   = "#ededf0", GREEN = "#a1a1aa", SKY = "#6cb6ff";
+  const TEAL   = "#ededf0", GREEN = "#a1a1aa";
   const DIM    = "rgba(255,255,255,0.35)", MUTED = "rgba(255,255,255,0.60)", BRIGHT = "rgba(255,255,255,0.87)";
   const CATS   = ["ALL", "CRYPTO", "MACRO", "DEFI", "MARKETS", "GEOPOLITICS"];
-  // amber (caution) and red (loss) are reserved for state, never category labels — tags are neutral/info
-  const catClr = (c: string) => c === "MACRO" ? SKY : c === "DEFI" ? TEAL : c === "MARKETS" ? MUTED : GREEN;
+  // Category tags carry NO semantic weight — every one renders as the same bone-white
+  // chip. Colour here would imply state (amber=caution, red=loss, green=profit) it doesn't have.
+  const catClr = (_c: string) => TEAL;
 
   const FEEDS = [
     { url: "https://www.coindesk.com/arc/outboundfeeds/rss/",             name: "COINDESK"      },

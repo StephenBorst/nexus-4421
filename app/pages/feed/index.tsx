@@ -1520,8 +1520,8 @@ export default function FeedPage() {
                   onClick={() => setDirFilter(d)}
                   style={{
                     ...navBtnStyle(dirFilter === d),
-                    color: dirFilter === d ? (d === "LONG" ? "#3ecf8e" : d === "SHORT" ? "#f7525f" : "#3ecf8e") : "#71717a",
-                    borderColor: dirFilter === d ? (d === "LONG" ? "#3ecf8e" : d === "SHORT" ? "#f7525f" : "#3ecf8e") : "#232327",
+                    color: dirFilter === d ? (d === "LONG" ? "#3ecf8e" : d === "SHORT" ? "#f7525f" : "#ededf0") : "#71717a",
+                    borderColor: dirFilter === d ? (d === "LONG" ? "#3ecf8e" : d === "SHORT" ? "#f7525f" : "#ededf0") : "#232327",
                   }}
                 >
                   {d === "ALL" ? "L+S" : d === "LONG" ? "↑ LONG" : "↓ SHORT"}
