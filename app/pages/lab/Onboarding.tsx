@@ -7,9 +7,9 @@ export function LabWelcome() {
   const features = [
     { icon: "◈", title: "The Nexus Thesis Engine", desc: "Plan every trade — position sizing, R:R, funding cost, live P&L tracking, on-chain proof." },
     { icon: "⬢", title: "Autonomous Trading Agent", desc: "Run a preset or your own strategy hands-free. Scale-out & trailing exits, DCA, TradingView signals. Hard risk caps, kill switch, order-only keys." },
-    { icon: "◆", title: "STRATEGY WORKBENCH", desc: "Build a strategy by trading style, backtest it on real history, then publish it — every result graded on-chain. Verify, don't trust." },
-    { icon: "▣", title: "ANALYTICS", desc: "Trading score, win-rate breakdowns, hold-time & leverage analysis — grade yourself like a desk." },
-    { icon: "▤", title: "TRADE LOG", desc: "Full journal of every closed day with notes, filters, and a calendar heatmap." },
+    { icon: "◆", title: "Strategy Workbench", desc: "Build a strategy by trading style, backtest it on real history, then publish it — every result graded on-chain. Verify, don't trust." },
+    { icon: "▣", title: "Analytics", desc: "Trading score, win-rate breakdowns, hold-time & leverage analysis — grade yourself like a desk." },
+    { icon: "▤", title: "Trade Log", desc: "Full journal of every closed day with notes, filters, and a calendar heatmap." },
   ];
   return (
     <div style={{ padding: "32px 8px" }}>
@@ -23,7 +23,10 @@ export function LabWelcome() {
           position into a repeatable process. Connect your wallet to load your data and unlock every tool.
         </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, maxWidth: 760, margin: "0 auto 28px" }}>
+      {/* .nx-feature-grid carries grid-auto-rows:1fr so the 2-card second row can't
+          render shorter than the 3-card first row — and drops it at single-column
+          widths where it would just pad short cards. Media query => CSS, not inline. */}
+      <div className="nx-feature-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", alignItems: "stretch", gap: 12, maxWidth: 760, margin: "0 auto 28px" }}>
         {features.map((f) => (
           <div key={f.title} style={{ ...cardStyle, padding: "16px 18px" }}>
             <div style={{ fontSize: 20, color: "#ededf0", marginBottom: 8 }}>{f.icon}</div>

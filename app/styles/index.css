@@ -216,3 +216,12 @@ html, body {
   .nx-card, .nx-btn, .nx-input, .nx-trade-row, .nx-expand, .nx-chevron { transition: none; }
   .nx-skeleton::after, .nx-fade-in { animation: none; }
 }
+
+/* Feature-card grid (Lab welcome). grid-auto-rows:1fr equalizes EVERY row, so a
+   short 2-card second row can't render shorter than the 3-card first row. But at
+   single-column widths each card is its own row, and equalizing would pad short
+   cards to the tallest one's height — wasted vertical scroll on a phone. So the
+   rule is dropped below the 2-column threshold (2*220 + gap). Inline styles can't
+   express this, which is why it lives here. */
+.nx-feature-grid { grid-auto-rows: 1fr; }
+@media (max-width: 480px) { .nx-feature-grid { grid-auto-rows: auto; } }
