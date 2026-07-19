@@ -27,7 +27,7 @@ Interaction states live in the **CSS layer** (`.nx-*` in `app/styles/index.css`)
 | `C.text.faint` | `#3a5a4a` | hints / captions |
 | `C.accent` / `C.pos` | `#00ff88` | ONE CTA per screen · positive |
 | `C.neg` | `#ff4444` | negative / destructive |
-| `C.warn` | `#fbbf24` | warning · PRO |
+| `C.warn` | `#fbbf24` | warning / caution ONLY — never a PRO gate, category or label |
 | `C.info` | `#4a9fff` | info · secondary badge |
 
 ## Type scale (`TYPE`, monospace)

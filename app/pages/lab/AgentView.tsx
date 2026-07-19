@@ -1445,7 +1445,7 @@ export function AgentView() {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div style={agentLabelStyle}>// DCA / SAFETY ORDERS</div>
-                    <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
+                    <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ededf0", border: "1px solid #33333a", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
                   </div>
                   <button onClick={isPro ? toggle : undefined} disabled={!isPro} style={{
                     fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "4px 12px", borderRadius: 3, cursor: isPro ? "pointer" : "not-allowed",
@@ -1491,7 +1491,7 @@ export function AgentView() {
           <div style={agentCardStyle}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
               <div style={agentLabelStyle}>// SIGNAL WEBHOOK</div>
-              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ededf0", border: "1px solid #33333a", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
             </div>
             {!isPro ? (
               <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
@@ -1562,7 +1562,7 @@ export function AgentView() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <div style={agentLabelStyle}>// BACKTEST</div>
-                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#fbbf24", border: "1px solid #fbbf2440", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ededf0", border: "1px solid #33333a", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
               </div>
               {isPro && (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1572,7 +1572,7 @@ export function AgentView() {
                   <button onClick={runConfigSweep} disabled={backtesting || sweeping || validating} style={{ ...navBtnStyle, fontSize: 10, padding: "6px 16px", opacity: (backtesting || sweeping || validating) ? 0.5 : 1 }}>
                     {sweeping ? "SWEEPING…" : "⊞ SWEEP CONFIGS"}
                   </button>
-                  <button onClick={runValidation} disabled={backtesting || sweeping || validating} title="Walk-forward across markets + time — the honest robustness test" style={{ ...navBtnStyle, fontSize: 10, padding: "6px 16px", color: "#fbbf24", borderColor: "#4a3a1a", opacity: (backtesting || sweeping || validating) ? 0.5 : 1 }}>
+                  <button onClick={runValidation} disabled={backtesting || sweeping || validating} title="Walk-forward across markets + time — the honest robustness test" style={{ ...navBtnStyle, fontSize: 10, padding: "6px 16px", color: "#ededf0", borderColor: "#33333a", opacity: (backtesting || sweeping || validating) ? 0.5 : 1 }}>
                     {validating ? "VALIDATING…" : "✓ VALIDATE"}
                   </button>
                 </div>
