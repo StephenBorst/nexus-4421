@@ -70,6 +70,13 @@ public name containing **"Profit"** reads as a performance/return promise — th
 Howey-adjacent signal we've kept out of $NEXUS and everything else. So "Emerald Profit
 Strategies" as a public brand is a liability. Keep the *Emerald*, lose the *Profit*.
 
+> ⚠️ **RATIONALE SUPERSEDED (2026-07 monochrome rebrand).** The argument below rests on
+> "it maps to the terminal-green identity" — that identity is retired. The app is now
+> monochrome (bone-white #ededf0), with green reserved strictly for profit values. The
+> shipped PRO badge already reads `◆ EMERALD` in AMBER, which is a green gem rendered in
+> a caution colour on a colourless brand. Re-decide the name before leaning on it in
+> public copy; don't act on the green rationale.
+
 **Recommended placement — Emerald as the premium sub-brand, not a rename.**
 Nexus Trading Labs stays the parent (the trust brand). "Emerald" becomes the name of the
 PRO/premium layer — aesthetic, aspirational, and it maps perfectly to the terminal-green

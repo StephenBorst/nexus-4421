@@ -7,8 +7,8 @@
 >
 > Format per tab: MAIN POST (the flex) → REPLY (the receipt + soft CTA) → DEMO
 > (a 20–40s screen-record storyboard: shots + on-screen captions).
-> Cadence idea: one tab/day for a 7-day "tour of The Lab" thread series, then loop
-> the 3 new-feature posts as standalone flexes. Lead each week with the Agent post.
+> Cadence idea: one tab/day for an 8-day "tour of The Lab" thread series, then loop
+> the 4 new-feature posts as standalone flexes. Lead each week with the Agent post.
 
 ---
 
@@ -18,7 +18,7 @@
 ```
 Before you take the trade, read the room.
 
-Market Intel scans 90+ perps live:
+Market Intel scans 130+ perps live:
 → funding-rate extremes (who's crowded, who pays)
 → open-interest divergence (is the move real or hollow)
 → market regime + fear/greed, one glance
@@ -37,7 +37,32 @@ Scout → plan → automate. It starts here.
 
 ---
 
-## TAB 2 — NEXUS THESIS ENGINE
+## TAB 2 — SMART MONEY
+
+**MAIN POST**
+```
+The best on-chain traders can't hide their positions.
+
+Smart Money indexes them live across Orderly and Hyperliquid:
+→ who's holding what, right now, at real size
+→ where independent top traders AGREE (consensus beats any single whale)
+→ where YOU are positioned against the crowd
+
+See a move you believe in? ⚡ copies it into a risk-managed trade your agent runs — and grades on-chain.
+
+Not a signal group. Public settlement data, read properly.
+```
+*Reply:* `No paid calls, no alpha chat — this is on-chain settlement data anyone can pull. We index it and make it actionable. → trade.nexustradinglabs.com/lab`
+
+**DEMO (30s)**
+- 0:00 — Smart Money board loading top traders. Caption: `// THEY CAN'T HIDE THEIR POSITIONS`
+- 0:08 — Consensus card: independent traders, same side. Caption: `where independent traders agree`
+- 0:16 — YOU vs SMART MONEY row showing a clash. Caption: `and where you're fighting them`
+- 0:24 — Tap ⚡ TRADE → agent directive pre-filled. Caption: `copy it. the agent grades it.` + URL.
+
+---
+
+## TAB 3 — NEXUS THESIS ENGINE
 
 **MAIN POST**
 ```
@@ -62,18 +87,19 @@ Then publish it on-chain. Timestamped. Un-backdateable.
 
 ---
 
-## TAB 3 — TRADING AGENT  ⭐ (lead post each week)
+## TAB 4 — TRADING AGENT  ⭐ (lead post each week)
 
 **MAIN POST**
 ```
-An autonomous agent that trades funding edges 24/7 — without your keys.
+An autonomous agent that runs YOUR strategy 24/7 — without your keys.
 
 → order-only keys: it can open + close, physically CANNOT withdraw your funds
 → encrypted at rest, hard caps (daily loss, max trades, TP/SL, leverage)
 → one-tap kill switch
 → PAPER mode to prove it at zero risk first
 
-Then it posts every call to the public feed and gets graded like everyone else.
+Every call posts to the public feed and gets graded like everyone else's.
+The edge is yours. The accountability is built in.
 ```
 *Reply:* `"Trading bot" usually means give a stranger your keys and pray. This is the inverse — non-custodial autonomy, enforced at the exchange, not promised in a ToS. → trade.nexustradinglabs.com/lab?tab=agent`
 
@@ -86,7 +112,7 @@ Then it posts every call to the public feed and gets graded like everyone else.
 
 ---
 
-## TAB 4 — COPY TRADES
+## TAB 5 — COPY TRADES
 
 **MAIN POST**
 ```
@@ -107,7 +133,7 @@ Copy what's proven. Bound it to what you can lose.
 
 ---
 
-## TAB 5 — TRADE LOG
+## TAB 6 — TRADE LOG
 
 **MAIN POST**
 ```
@@ -129,7 +155,7 @@ You can't improve a record you never look at.
 
 ---
 
-## TAB 6 — HOLDERS ROOM
+## TAB 7 — HOLDERS ROOM
 
 **MAIN POST**
 ```
@@ -149,7 +175,7 @@ Cosmetic. Cultural. On purpose. For the people who showed up early and get the b
 
 ---
 
-## TAB 7 — ANALYTICS
+## TAB 8 — ANALYTICS
 
 **MAIN POST**
 ```
@@ -174,6 +200,30 @@ Built from what happened, not what you remember.
 
 # NEW-FEATURE FLEXES (freshest ships — post as standalones)
 
+## 🔍 WALLET X-RAY — grade any trader, free, no login
+
+**MAIN POST**
+```
+Paste any wallet. Get its real perp record. No login, no connect, no signup.
+
+Wallet X-Ray reads BOTH:
+→ Hyperliquid — trade by trade (hold time, timing, streaks, per-market edge)
+→ the Orderly network, incl. Nexus — settled on-chain, market by market
+
+It works on wallets that have never touched us.
+
+Then copy any live position straight into your agent — which manages the exit and grades the result on-chain.
+```
+*Reply:* `Every "track record" you scroll past is a screenshot. This one you can recompute yourself from public data — including ours. Verify, don't trust. → trade.nexustradinglabs.com/analyze`
+
+**DEMO (30s)**
+- 0:00 — Empty X-Ray input. Caption: `// PASTE ANY WALLET`
+- 0:07 — Paste an address → full breakdown renders. Caption: `no login. no connect.`
+- 0:16 — Scroll to ORDERLY NETWORK RECORD, market by market. Caption: `both venues. public data.`
+- 0:24 — Tap ⚡ COPY on a live position → agent tab. Caption: `copy it → graded on-chain` + URL.
+
+---
+
 ## ⭐ DIRECTIONAL MODE — "Trade my exact thesis"
 
 **MAIN POST**
@@ -186,7 +236,7 @@ scale-outs, trailing stop, breakeven, timeout.
 
 MARKET now, or a resting LIMIT at your price. One-shot. Then it stops.
 ```
-*Reply:* `Your conviction + our execution rigor + a graded, on-chain record. The signal bot finds edges; this one runs YOURS. PAPER-first, of course. → trade.nexustradinglabs.com/lab?tab=agent`
+*Reply:* `Your conviction + our execution rigor + a graded, on-chain record. Signal mode watches funding/OI; this one runs YOUR exact call, direction honored. PAPER-first, of course. → trade.nexustradinglabs.com/lab?tab=agent`
 
 **DEMO (35s)**
 - 0:00 — A thesis card. Caption: `// AUTOMATE YOUR EXACT THESIS`
@@ -241,13 +291,13 @@ You reason in R:R, not in raw prices. The math was always there — now it fills
 ---
 ---
 
-# THE 7-DAY "TOUR OF THE LAB" THREAD (pin the lead)
+# THE 8-DAY "TOUR OF THE LAB" THREAD (pin the lead)
 
-Post the Agent (Tab 3) main post as the pinned lead, then reply-chain one tab/day
+Post the Agent (Tab 4) main post as the pinned lead, then reply-chain one tab/day
 in lifecycle order so the thread reads as the whole loop:
 
-`Scout (Intel) → Plan (Thesis) → Automate (Agent) → Copy → Record (Trade Log) →
-Room (Holders) → Grade (Analytics)`
+`Scout (Intel) → Follow (Smart Money) → Plan (Thesis) → Automate (Agent) → Copy →
+Record (Trade Log) → Room (Holders) → Grade (Analytics)`
 
 Closer post for the thread:
 ```
@@ -262,7 +312,9 @@ The DEX is a commodity. The Lab is the moat. The proof is on-chain.
 
 ## Production notes
 - Screen-record at phone width (the app is mobile-first now); keep clips ≤40s for X autoplay.
-- Terminal-green (#00ff88) on near-black reads as the brand — don't color-grade it away.
+- Brand is MONOCHROME: bone-white (#ededf0) on near-black. Green (#3ecf8e) appears ONLY
+  on profit/up values and red (#f7525f) only on losses — don't color-grade either onto
+  UI chrome, and don't reintroduce the old terminal-green (#00ff88); it's retired.
 - Caption font: a mono face to match the UI. Keep captions ≤6 words.
 - Always end on the URL card. Put the link in the FIRST REPLY on X, never the main post.
 - Every demo shows a REAL action in the real app. No mockups — that's the whole brand.

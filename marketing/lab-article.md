@@ -27,16 +27,16 @@ Publish that thesis and it's registered **on-chain.** Timestamped. Un-backdateab
 
 Or hand the trade to a machine that doesn't get scared or greedy.
 
-The Nexus Agent hunts funding-rate edges across 90+ markets, around the clock, inside limits you set. "Autonomous trading bot" usually means *give a stranger your keys and pray.* We built the inverse:
+The Nexus Agent runs **your** strategy across 130+ markets, around the clock, inside limits you set. "Autonomous trading bot" usually means *give a stranger your keys and pray.* We built the inverse:
 
 → **Order-only keys.** The agent can open and close. It physically **cannot withdraw or move your funds.** Enforced at the exchange, not promised in fine print.
 → **Keys encrypted at rest.** A leak of the database alone is worthless.
 → **Hard guardrails** — daily-loss cap, max trades/day, TP, SL, max hold, leverage ceiling. The agent stops *itself.*
 → **One-tap kill switch.** And **PAPER mode** to prove the strategy at zero risk before it ever touches capital.
 
-The signal isn't a hunch. The agent only fires when two independent reads agree — a funding-rate extreme **and** an open-interest divergence. One alone is not a trade.
+And here's the part most "trading bots" won't say out loud: **the agent is not the edge. You are.** You pick the strategy — a funding read, momentum, mean-reversion, a TradingView webhook, or your exact directional call — and the agent runs it with a discipline you won't have at 3am. Backtest it against real history first. It won't invent an edge you don't have; it removes the excuses from the one you do.
 
-And when it takes a live position, that call hits the public feed in real time — entry, stop, target — graded like everyone else's. The bot doesn't get to hide its losers either. Nothing here does.
+And when it takes a live position, that call hits the public feed in real time — entry, stop, target — graded like everyone else's. The agent doesn't get to hide its losers either. Nothing here does.
 
 #### Prove it.
 
@@ -101,13 +101,15 @@ Here's how The Lab works 👇
 
 **Variant C — the agent angle (standalone-strong, agent push):**
 ```
-An autonomous bot that trades funding edges 24/7.
+An autonomous agent that runs YOUR strategy 24/7 — and grades every close on-chain.
 
 Order-only keys — it can't touch your funds.
 Encrypted at rest. Hard risk caps. One-tap kill switch.
 Paper mode until you trust it.
 
-Then it posts every call to the public feed and gets graded like everyone else.
+Every call it makes posts to the public feed and gets graded like everyone else's.
+
+It doesn't promise you alpha. It proves what actually worked.
 
 Meet the Nexus Agent 👇
 ```

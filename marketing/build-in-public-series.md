@@ -80,7 +80,7 @@ So new agents start in PAPER mode: same strategy, same live prices, zero capital
 
 Build a track record. Watch it take TP, eat an SL, time out a trade. THEN flip it live — when you're convinced, not when we tell you to.
 ```
-*Reply 1:* `And when it goes live, every call posts to the public feed in real time. The bot doesn't get to hide its losers either. Nobody here does.`
+*Reply 1:* `And when it goes live, every call posts to the public feed in real time. The agent doesn't get to hide its losers either. Nobody here does.`
 
 ---
 
@@ -91,7 +91,7 @@ Edge case we fixed this week:
 
 What if you close the agent's position manually, mid-trade?
 
-Old way: the bot keeps "managing" a ghost it no longer has.
+Old way: the agent keeps "managing" a ghost it no longer has.
 
 Now: before every cycle it reconciles against the live exchange. Position gone? It clears its own record and moves on. No ghost, no bogus trade.
 
