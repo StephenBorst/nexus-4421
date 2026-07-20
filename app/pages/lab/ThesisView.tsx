@@ -1085,9 +1085,22 @@ export function ThesisView() {
           <div style={{ ...cardStyle, border: "1px solid #232327" }}>
             <div style={{ fontSize: 10, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 16 }}>&#9632; CALCULATED OUTPUT</div>
             {!calc ? (
-              <div style={{ fontSize: 11, color: "#33333a", fontFamily: "var(--nx-font-mono)", textAlign: "center", padding: "20px 0" }}>
-                fill in entry, stop, tp1,<br />account size + risk %
-              </div>
+              <>
+                <div style={{ fontSize: 11, color: "#33333a", fontFamily: "var(--nx-font-mono)", textAlign: "center", padding: "20px 0" }}>
+                  fill in entry, stop, tp1,<br />account size + risk %
+                </div>
+                {/* Shown BEFORE the form is valid on purpose — the "I need capital to
+                    post a call" belief stops people before they type anything, so the
+                    correction has to land in the empty state, not just at deploy time. */}
+                <div style={{
+                  fontFamily: "var(--nx-font-ui)", fontSize: 10.5, color: "#a1a1aa", lineHeight: 1.55,
+                  padding: "8px 10px", background: "#0f0f11", border: "1px solid #232327", borderRadius: 3,
+                }}>
+                  <strong style={{ color: "#ededf0" }}>You don&apos;t need capital to build a record here.</strong>{" "}
+                  A public thesis is graded from public price — first touch of your target vs your
+                  stop — whether or not you take the trade.
+                </div>
+              </>
             ) : (
               <>
                 <div style={{ marginBottom: 14 }}>
@@ -1184,6 +1197,26 @@ export function ThesisView() {
                   <div style={{ padding: "10px 12px", background: "#241012", border: "1px solid #4a1e22", borderRadius: 4, marginBottom: 8 }}>
                     <div style={{ fontSize: 10, color: "#f7525f", fontFamily: "var(--nx-font-mono)" }}>&#9632; ORDER FAILED</div>
                     {liveError && <div style={{ fontSize: 9, color: "#3a2a2a", fontFamily: "var(--nx-font-mono)", marginTop: 4 }}>{liveError}</div>}
+                  </div>
+                )}
+
+                {/* The single most misunderstood thing in the product: publishing a
+                    thesis PUBLIC is already the graded call. gradeCall() replays public
+                    candles from createdAt — it never reads a position, fill or balance,
+                    and the leaderboard's only gate is `isPublic && symbol && createdAt`.
+                    So a track record costs nothing to build. Stated here because even
+                    the person who built this assumed calls required capital. */}
+                {!liveConfirm && liveStatus !== "submitting" && (
+                  <div style={{
+                    fontFamily: "var(--nx-font-ui)", fontSize: 10.5, color: "#a1a1aa",
+                    lineHeight: 1.55, marginBottom: 8, padding: "8px 10px",
+                    background: "#0f0f11", border: "1px solid #232327", borderRadius: 3,
+                  }}>
+                    <strong style={{ color: "#ededf0" }}>Publishing this as PUBLIC is already a graded call.</strong>{" "}
+                    It&apos;s scored from public price the moment you post it — first touch of your
+                    target vs your stop. <strong style={{ color: "#ededf0" }}>You don&apos;t have to take
+                    the trade,</strong> and it costs nothing. Deploying below is optional: PAPER
+                    simulates, LIVE uses real funds.
                   </div>
                 )}
 
