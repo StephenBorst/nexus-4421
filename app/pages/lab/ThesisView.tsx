@@ -181,7 +181,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
                 navigate,
               )}
               title="Prefill the agent to trade this symbol on funding/OI signals, using this thesis's TP/SL and leverage as risk bounds. The agent is signal-driven — it may enter either direction."
-              style={{ ...navBtnStyle, fontSize: 10, color: "#fbbf24", borderColor: "#3a2a0a", minHeight: 36, padding: "6px 12px" }}>
+              style={{ ...navBtnStyle, fontSize: 10, color: "#ededf0", borderColor: "#33333a", minHeight: 36, padding: "6px 12px" }}>
               ⚡ AUTOMATE
             </button>
             <button onClick={() => deployDirectiveFromThesis({

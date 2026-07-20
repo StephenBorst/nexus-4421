@@ -19,6 +19,7 @@ import { CopiesView } from "./CopiesView";
 import { MarketIntelView } from "./MarketIntel";
 import { SmartMoneyView } from "./SmartMoneyView";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
+import { LabStanding } from "./LabStanding";
 import { CommandPalette } from "./CommandPalette";
 import { CountUp } from "./components";
 
@@ -187,6 +188,9 @@ export default function TheLabPage() {
         </div>
       </div>
       <div style={{ padding: isMobile ? 12 : 16 }}>
+        {/* The graded record leads — it's the claim the whole product rests on, and it
+            was previously buried two levels deep. Renders nothing when disconnected. */}
+        <LabStanding address={rootWalletAddress} />
         <div style={{ marginBottom: 12 }}>
           <NexusMarket />
         </div>

@@ -39,9 +39,12 @@ function price(n: number | null): string {
   return `$${n.toFixed(decimals)}`;
 }
 
+// Stats GROW to share the strip's width. Without this they cluster hard-left and the
+// actions group's marginLeft:auto opened a ~1250px void on wide screens — on every Lab
+// and Feed tab, since this strip is global. minWidth keeps them legible when wrapped.
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: "1 1 90px", minWidth: 70 }}>
       <span style={{ fontSize: 8, letterSpacing: "0.12em", color: C.text.faint }}>{label}</span>
       <span style={{ fontSize: 14, fontWeight: "bold", color: C.text.bright }}>{value}</span>
     </div>
@@ -83,7 +86,7 @@ export function NexusMarket() {
       <Stat label="MARKET CAP" value={usd(m.marketCap)} />
       <Stat label="24H VOL" value={usd(m.volume24h)} />
       <Stat label="LIQUIDITY" value={usd(m.liquidity)} />
-      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10 }}>
         <a
           href={GT_PAGE}
           target="_blank" rel="noopener noreferrer"
