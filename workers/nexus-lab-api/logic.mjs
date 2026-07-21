@@ -411,3 +411,30 @@ export function orderlyAccountId(address, brokerId) {
   buf.set(keccak_256(utf8ToBytes(String(brokerId))), 32); // brokerHash
   return "0x" + bytesToHex(keccak_256(buf));
 }
+
+// ── Chart image URL gate (SSRF guard) ────────────────────────────────────────
+// The OG card embeds a thesis's chartUrl, which means the WORKER fetches a URL that
+// came from user data. That is a server-side request forgery vector — the frontend's
+// allowlist protects browsers, not us. Everything below runs BEFORE any fetch.
+//
+// Mirrors app/pages/lab/helpers.ts#chartImageSrc. Host match is exact-or-dot-suffix so
+// "s3.tradingview.com.evil.com" cannot pass, which a naive includes() would allow.
+export const CHART_HOSTS = [
+  "s3.tradingview.com",
+  "www.tradingview.com",
+  "tradingview.com",
+  "i.imgur.com",
+  "imgur.com",
+  "pbs.twimg.com",
+];
+
+/** Returns a safe https chart URL, or null. Never throws. */
+export function safeChartUrl(raw) {
+  if (!raw) return null;
+  let u;
+  try { u = new URL(String(raw).trim()); } catch { return null; }
+  if (u.protocol !== "https:") return null;
+  const host = u.hostname.toLowerCase();
+  const ok = CHART_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+  return ok ? u.toString() : null;
+}

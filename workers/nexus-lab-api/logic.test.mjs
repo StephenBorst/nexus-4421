@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-lab-api/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { gradeCall, resolveAiUpstream, bankrGatewayModel, rankCaller, confluenceSignal, orderlyAccountId } from "./logic.mjs";
+import { gradeCall, resolveAiUpstream, bankrGatewayModel, rankCaller, confluenceSignal, orderlyAccountId, safeChartUrl } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
 const series = (t0, bars) => ({
@@ -501,4 +501,26 @@ test("orderlyAccountId is checksum/prefix agnostic and broker-scoped", () => {
 test("orderlyAccountId rejects bad input", () => {
   assert.throws(() => orderlyAccountId("0xnope", "nexus_trading"));
   assert.throws(() => orderlyAccountId("0x32831ca2efa20ae6340224bc353d4b241b3d2541", ""));
+});
+
+// ── safeChartUrl (SSRF guard for the OG card) ────────────────────────────────
+test("safeChartUrl accepts only https allowlisted chart hosts", () => {
+  assert.equal(safeChartUrl("https://s3.tradingview.com/snapshot/a/Ab12.png"),
+               "https://s3.tradingview.com/snapshot/a/Ab12.png");
+  assert.ok(safeChartUrl("https://i.imgur.com/abc.png"));
+  assert.ok(safeChartUrl("https://pbs.twimg.com/media/x.jpg"));
+});
+
+test("safeChartUrl blocks SSRF and spoofing vectors", () => {
+  assert.equal(safeChartUrl("http://s3.tradingview.com/x.png"), null);   // not https
+  assert.equal(safeChartUrl("https://s3.tradingview.com.evil.com/x.png"), null); // suffix spoof
+  assert.equal(safeChartUrl("https://evil.com/x.png"), null);            // not allowlisted
+  assert.equal(safeChartUrl("http://169.254.169.254/latest/meta-data/"), null); // cloud metadata
+  assert.equal(safeChartUrl("http://localhost:8787/admin"), null);       // internal
+  assert.equal(safeChartUrl("file:///etc/passwd"), null);
+  assert.equal(safeChartUrl("javascript:alert(1)"), null);
+  assert.equal(safeChartUrl("not a url"), null);
+  assert.equal(safeChartUrl(""), null);
+  assert.equal(safeChartUrl(null), null);
+  assert.equal(safeChartUrl(undefined), null);
 });

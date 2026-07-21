@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats, orderlyAccountId } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats, orderlyAccountId, safeChartUrl } from "./logic.mjs";
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./backtest.mjs";
 // Directive level validation lives with the exec's money-path logic (single source);
@@ -655,45 +655,98 @@ function buildOgSvg({ displayName, wallet, wins, losses, active, total, avgRR, w
 }
 
 // ── Ph22: Thesis OG SVG ───────────────────────────────────────────────────────
-function buildThesisOgSvg({ displayName, wallet, ticker, direction, entryPrice, stopLoss, takeProfit1, riskReward, status, notes, fontFamily = "'Courier New', Courier, monospace" }) {
+// This card is the most public brand surface we have — it's what unfurls when a call is
+// shared to X. It was still on the RETIRED palette (#0a0e0a green-tinted black, #00ff88
+// terminal green, #4a9fff blue, green-tinted greys). Now monochrome, matching the app:
+// bone/greys for structure, and chroma ONLY where it carries meaning (green=profit/up,
+// red=loss/down, amber=caution).
+//
+// `chartDataUri` is optional and already SSRF-gated + size-capped by fetchChartDataUri().
+// With a chart we run a two-column layout; without one we keep the full-width layout so
+// the card never has a dead half.
+function buildThesisOgSvg({ displayName, wallet, ticker, direction, entryPrice, stopLoss, takeProfit1, riskReward, status, notes, chartDataUri = null, fontFamily = "'Courier New', Courier, monospace" }) {
   const shortAddr = `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
   const name = esc(displayName || shortAddr);
-  const dirColor = direction === "LONG" ? "#00ff88" : "#ff4444";
+  const dirColor = direction === "LONG" ? "#3ecf8e" : "#f7525f";
   const dirArrow = direction === "LONG" ? "↑" : "↓";
-  const rrColor = parseFloat(riskReward) >= 2 ? "#00ff88" : "#fbbf24";
+  const rrColor = parseFloat(riskReward) >= 2 ? "#3ecf8e" : "#ededf0";
   const statusMap = { HIT_TP: "HIT TP ✓", STOPPED_OUT: "STOPPED OUT", ACTIVE: "ACTIVE", INVALIDATED: "INVALIDATED" };
-  const statusColorMap = { HIT_TP: "#00ff88", STOPPED_OUT: "#ff4444", ACTIVE: "#4a9fff", INVALIDATED: "#fbbf24" };
+  const statusColorMap = { HIT_TP: "#3ecf8e", STOPPED_OUT: "#f7525f", ACTIVE: "#d4d4d8", INVALIDATED: "#fbbf24" };
   const statusLabel = statusMap[status] || status;
-  const statusColor = statusColorMap[status] || "#8aaa9a";
-  const notesLine = notes ? esc(String(notes).slice(0, 90)) : "";
+  const statusColor = statusColorMap[status] || "#a1a1aa";
+  const notesLine = notes ? esc(String(notes).slice(0, chartDataUri ? 46 : 90)) : "";
+
+  // Level block — positions differ between the one- and two-column layouts.
+  const lvl = (x, y, label, value, color) => `
+  <text x="${x}" y="${y}" fill="#52525b" font-size="12" letter-spacing="3">${label}</text>
+  <text x="${x}" y="${y + 62}" fill="${color}" font-size="${chartDataUri ? 40 : 52}" font-weight="bold">${value}</text>`;
+
+  const money = (v) => `$${parseFloat(v).toFixed(2)}`;
+
+  const levels = chartDataUri
+    // two-column: 2x2 on the left, chart panel on the right
+    ? lvl(60, 312, "ENTRY", money(entryPrice), "#f4f4f5")
+      + lvl(300, 312, "STOP", money(stopLoss), "#f7525f")
+      + lvl(60, 430, "TP1", money(takeProfit1), "#3ecf8e")
+      + lvl(300, 430, "R:R", `1:${parseFloat(riskReward).toFixed(2)}`, rrColor)
+    // full-width: single row of four
+    : lvl(60, 312, "ENTRY", money(entryPrice), "#f4f4f5")
+      + lvl(360, 312, "STOP", money(stopLoss), "#f7525f")
+      + lvl(660, 312, "TP1", money(takeProfit1), "#3ecf8e")
+      + lvl(960, 312, "R:R", `1:${parseFloat(riskReward).toFixed(2)}`, rrColor);
+
+  const chartPanel = chartDataUri ? `
+  <rect x="596" y="286" width="556" height="330" fill="#0f0f11" stroke="#232327" stroke-width="1" rx="4"/>
+  <image x="604" y="294" width="540" height="314" href="${chartDataUri}" preserveAspectRatio="xMidYMid meet"/>` : "";
 
   return `<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
   <defs><style>text { font-family: ${fontFamily}; }</style></defs>
-  <rect width="1200" height="630" fill="#0a0e0a"/>
-  <rect width="1200" height="3" fill="#00ff88" opacity="0.5"/>
-  <rect y="627" width="1200" height="3" fill="#1a3a1a"/>
-  <text x="48" y="54" fill="#2a4a3a" font-size="13" letter-spacing="3">NEXUS TRADING LABS</text>
-  <text x="1152" y="54" fill="#2a4a3a" font-size="13" text-anchor="end">trade.nexustradinglabs.com</text>
-  <text x="48" y="180" fill="#ffffff" font-size="86" font-weight="bold">${esc(ticker)}</text>
+  <rect width="1200" height="630" fill="#0a0a0b"/>
+  <rect width="1200" height="3" fill="#ededf0" opacity="0.5"/>
+  <rect y="627" width="1200" height="3" fill="#232327"/>
+  <text x="48" y="54" fill="#71717a" font-size="13" letter-spacing="3">NEXUS TRADING LABS</text>
+  <text x="1152" y="54" fill="#71717a" font-size="13" text-anchor="end">trade.nexustradinglabs.com</text>
+  <text x="48" y="180" fill="#f4f4f5" font-size="86" font-weight="bold">${esc(ticker)}</text>
   <text x="48" y="232" fill="${dirColor}" font-size="32" font-weight="bold">${dirArrow} ${esc(direction)}</text>
   <text x="1152" y="180" fill="${statusColor}" font-size="22" font-weight="bold" text-anchor="end">${statusLabel}</text>
-  <text x="1152" y="214" fill="#3a5a4a" font-size="14" text-anchor="end">${name}</text>
-  <text x="1152" y="234" fill="#2a4a3a" font-size="12" text-anchor="end">${esc(shortAddr)}</text>
-  <line x1="48" y1="270" x2="1152" y2="270" stroke="#1a2e1a" stroke-width="1"/>
-  <text x="60" y="312" fill="#3a5a4a" font-size="12" letter-spacing="3">ENTRY</text>
-  <text x="60" y="374" fill="#8aaa9a" font-size="52" font-weight="bold">$${parseFloat(entryPrice).toFixed(2)}</text>
-  <text x="360" y="312" fill="#3a5a4a" font-size="12" letter-spacing="3">STOP</text>
-  <text x="360" y="374" fill="#ff4444" font-size="52" font-weight="bold">$${parseFloat(stopLoss).toFixed(2)}</text>
-  <text x="660" y="312" fill="#3a5a4a" font-size="12" letter-spacing="3">TP1</text>
-  <text x="660" y="374" fill="#00ff88" font-size="52" font-weight="bold">$${parseFloat(takeProfit1).toFixed(2)}</text>
-  <text x="960" y="312" fill="#3a5a4a" font-size="12" letter-spacing="3">R:R</text>
-  <text x="960" y="374" fill="${rrColor}" font-size="52" font-weight="bold">1:${parseFloat(riskReward).toFixed(2)}</text>
-  <line x1="48" y1="420" x2="1152" y2="420" stroke="#1a2e1a" stroke-width="1"/>
-  ${notesLine ? `<text x="48" y="464" fill="#5a8a6a" font-size="16" font-style="italic">"${notesLine}"</text>` : ""}
-  <line x1="48" y1="530" x2="1152" y2="530" stroke="#1a2e1a" stroke-width="1"/>
-  <text x="48" y="572" fill="#2a4a3a" font-size="13" letter-spacing="1">on-chain thesis · arbitrum</text>
-  <text x="1152" y="572" fill="#1a3a1a" font-size="13" text-anchor="end">${esc(wallet)}</text>
+  <text x="1152" y="214" fill="#a1a1aa" font-size="14" text-anchor="end">${name}</text>
+  <text x="1152" y="234" fill="#71717a" font-size="12" text-anchor="end">${esc(shortAddr)}</text>
+  <line x1="48" y1="270" x2="1152" y2="270" stroke="#232327" stroke-width="1"/>
+  ${levels}
+  ${chartPanel}
+  ${notesLine ? `<text x="48" y="${chartDataUri ? 556 : 464}" fill="#a1a1aa" font-size="16" font-style="italic">"${notesLine}"</text>` : ""}
+  ${chartDataUri ? "" : `<line x1="48" y1="530" x2="1152" y2="530" stroke="#232327" stroke-width="1"/>`}
+  <text x="48" y="592" fill="#71717a" font-size="13" letter-spacing="1">graded from public price · anchored on arbitrum</text>
+  <text x="1152" y="592" fill="#52525b" font-size="13" text-anchor="end">${esc(wallet)}</text>
 </svg>`;
+}
+
+// Fetch a thesis chart for embedding in the OG card. Every guard here matters because
+// the URL originates in user data:
+//   • safeChartUrl() blocks non-https, non-allowlisted hosts, and SSRF targets
+//     (169.254.169.254, localhost, file://) BEFORE any network call
+//   • 4s timeout so a slow host can't hang OG rendering
+//   • content-type must be image/*, and we cap at 1.5MB so a huge file can't blow the
+//     worker's memory during base64 + resvg rasterisation
+// Fails soft in every case — the card just renders without a chart.
+const CHART_MAX_BYTES = 1_500_000;
+async function fetchChartDataUri(rawUrl) {
+  const url = safeChartUrl(rawUrl);
+  if (!url) return null;
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(4000), redirect: "follow" });
+    if (!r.ok) return null;
+    const ct = (r.headers.get("content-type") || "").toLowerCase();
+    if (!ct.startsWith("image/")) return null;
+    const len = parseInt(r.headers.get("content-length") || "0", 10);
+    if (len && len > CHART_MAX_BYTES) return null;
+    const buf = await r.arrayBuffer();
+    if (buf.byteLength > CHART_MAX_BYTES) return null;   // covers chunked/no content-length
+    const b = new Uint8Array(buf);
+    let s = "";
+    for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+    return `data:${ct.split(";")[0]};base64,${btoa(s)}`;
+  } catch { return null; }
 }
 
 // ── Ph17: On-chain wallet discovery ──────────────────────────────────────────
@@ -1125,7 +1178,7 @@ export default {
           // Use JetBrains Mono family name since we're loading that font
           const svg = buildOgSvg({ ...statsPayload, fontFamily: "'JetBrains Mono'" });
           const resvg = new Resvg(svg, {
-            font: { loadSystemFonts: false, fontFiles: [font] },
+            font: { loadSystemFonts: false, fontBuffers: [font], defaultFontFamily: "JetBrains Mono" },
           });
           const png = resvg.render().asPng();
           return new Response(png, {
@@ -1223,12 +1276,15 @@ export default {
         stopLoss: thesis.stopLoss, takeProfit1: thesis.takeProfit1,
         riskReward: thesis.riskReward, status: thesis.status, notes: thesis.notes || "",
       };
+      // Chart is fetched ONLY for the PNG path — the SVG path would need the same
+      // inlining anyway (resvg can't pull remote refs), and X/Twitter unfurls the PNG.
       if (isPng) {
         try {
           await ensureResvg();
           const font = await getMonoFont();
-          const svg = buildThesisOgSvg({ ...payload, fontFamily: "'JetBrains Mono'" });
-          const resvg = new Resvg(svg, { font: { loadSystemFonts: false, fontFiles: [font] } });
+          const chartDataUri = await fetchChartDataUri(thesis.chartUrl);
+          const svg = buildThesisOgSvg({ ...payload, chartDataUri, fontFamily: "'JetBrains Mono'" });
+          const resvg = new Resvg(svg, { font: { loadSystemFonts: false, fontBuffers: [font], defaultFontFamily: "JetBrains Mono" } });
           const png = resvg.render().asPng();
           return new Response(png, { headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=300", "Access-Control-Allow-Origin": "*" } });
         } catch (e) { console.error("[OG PNG thesis]", String(e)); }
