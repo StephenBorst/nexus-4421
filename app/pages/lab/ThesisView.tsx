@@ -692,6 +692,8 @@ export function ThesisView() {
 
 
   const [deployed, setDeployed] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [published, setPublished] = useState(false);
   const [filter, setFilter] = useState<ThesisStatus | "ALL">("ALL");
   const [markBusy, setMarkBusy] = useState(false);
 
@@ -800,12 +802,50 @@ export function ThesisView() {
   const resetForm = () =>
     setForm((f) => ({ ...f, symbol: "", entryPrice: "", stopLoss: "", takeProfit1: "", takeProfit2: "", notes: "" }));
 
-  const deployPaper = () => {
+  // Saves the thesis PRIVATELY. Places no order of any kind — it was called
+  // "deployPaper" and labelled "DEPLOY (PAPER)", which read as paper *trading* and
+  // hid the fact that this is simply "save". Renamed to match what it does.
+  const saveThesis = () => {
     if (!formValid) return;
     persist([buildThesisTrade(), ...trades]);
     setDeployed(true);
     setTimeout(() => setDeployed(false), 2500);
     resetForm();
+  };
+
+  // Save AND publish in one step — the missing path. Previously the only way to make
+  // a graded call was: save (via a button named for paper trading) → find the card in
+  // the list → cycle a small visibility chip. buildThesisTrade() never sets isPublic,
+  // so every thesis defaulted to private and was therefore never graded.
+  // Mirrors updateTrade()'s on-chain semantics exactly: a user REJECTION keeps it
+  // private, while an on-chain ERROR still publishes to KV so the feed works.
+  const publishAsCall = async () => {
+    if (!formValid) return;
+    const t = buildThesisTrade();
+    const base = [t, ...trades];
+    persist(base);
+    resetForm();
+    setPublishing(true);
+    const makePublic = (extra: Partial<ThesisTrade> = {}) =>
+      persist(base.map((x) => (x.id === t.id ? { ...x, isPublic: true, ...extra } : x)));
+    try {
+      const result = await registerOnChain({ ...t, isPublic: true });
+      if (result) {
+        makePublic({
+          onChainTxHash: result.hash,
+          ...(result.onChainId !== undefined ? { onChainId: result.onChainId } : {}),
+        });
+        setPublished(true);
+        setTimeout(() => setPublished(false), 2500);
+      }
+      // result == null → user rejected the signature: stays private, same as the card toggle.
+    } catch {
+      makePublic(); // on-chain failed (not rejected) — publish anyway so the feed still works
+      setPublished(true);
+      setTimeout(() => setPublished(false), 2500);
+    } finally {
+      setPublishing(false);
+    }
   };
 
   const deployLive = async () => {
@@ -1212,11 +1252,11 @@ export function ThesisView() {
                     lineHeight: 1.55, marginBottom: 8, padding: "8px 10px",
                     background: "#0f0f11", border: "1px solid #232327", borderRadius: 3,
                   }}>
-                    <strong style={{ color: "#ededf0" }}>Publishing this as PUBLIC is already a graded call.</strong>{" "}
+                    <strong style={{ color: "#ededf0" }}>Publishing makes this a graded call.</strong>{" "}
                     It&apos;s scored from public price the moment you post it — first touch of your
                     target vs your stop. <strong style={{ color: "#ededf0" }}>You don&apos;t have to take
-                    the trade,</strong> and it costs nothing. Deploying below is optional: PAPER
-                    simulates, LIVE uses real funds.
+                    the trade.</strong> Save private if you&apos;d rather not be graded, or DEPLOY (LIVE)
+                    to also place a real order with real funds.
                   </div>
                 )}
 
@@ -1228,7 +1268,22 @@ export function ThesisView() {
                         Enter valid entry, stop &amp; targets — size must be &gt; $0 (check entry ≠ stop and risk % &gt; 0).
                       </div>
                     )}
-                    <button onClick={deployPaper} disabled={!formValid} style={{
+                    {/* PRIMARY action — this is the one that builds a track record. */}
+                    <button onClick={publishAsCall} disabled={!formValid || publishing} style={{
+                      width: "100%", padding: "10px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11,
+                      cursor: formValid && !publishing ? "pointer" : "not-allowed", borderRadius: 3,
+                      border: `1px solid ${formValid ? "#ededf0" : "#33333a"}`,
+                      background: published ? "#1a1a1e" : formValid ? "#ededf0" : "#0f0f11",
+                      color: published ? "#ededf0" : formValid ? "#0a0a0b" : "#33333a",
+                      fontWeight: 700, letterSpacing: "0.08em", marginBottom: 6,
+                    }}>
+                      {published ? "◆ PUBLISHED — NOW GRADED" : publishing ? "PUBLISHING…" : "◆ PUBLISH AS CALL"}
+                    </button>
+                    <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9.5, color: "#52525b", lineHeight: 1.45, marginBottom: 8 }}>
+                      Publishing registers the call on-chain (one wallet signature, no funds moved) and
+                      starts grading it from public price. Reject the signature and it stays private.
+                    </div>
+                    <button onClick={saveThesis} disabled={!formValid} style={{
                       width: "100%", padding: "9px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11,
                       cursor: formValid ? "pointer" : "not-allowed", borderRadius: 3,
                       border: `1px solid ${deployed ? "#ededf0" : "#33333a"}`,
@@ -1236,7 +1291,9 @@ export function ThesisView() {
                       color: deployed ? "#ededf0" : formValid ? "#d4d4d8" : "#33333a",
                       letterSpacing: "0.08em", marginBottom: 6,
                     }}>
-                      {deployed ? "&#9632; DEPLOYED" : "&#9632; DEPLOY (PAPER)"}
+                      {/* NB: "&#9632;" as a JS string is NOT decoded by JSX — it rendered
+                          literally on the old DEPLOY (PAPER) button. Use the character. */}
+                      {deployed ? "■ SAVED (PRIVATE)" : "■ SAVE PRIVATE — NOT GRADED"}
                     </button>
                     <button
                       onClick={() => { if (formValid) setLiveConfirm(true); }}
