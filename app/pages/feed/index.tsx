@@ -19,7 +19,7 @@ import type { ThesisTrade } from "@/pages/lab/types";
 import CommentsPanel from "@/components/CommentsPanel";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { Sparkline } from "@/pages/lab/components";
-import { chartImageSrc } from "@/pages/lab/helpers";
+import { chartImageList } from "@/pages/lab/helpers";
 import LiveNow from "./LiveNow";
 import Desks from "./Desks";
 import WatchOnlyBanner from "./WatchOnlyBanner";
@@ -41,7 +41,8 @@ type FeedThesis = {
   actualPnl: number | null;
   createdAt: number;
   notes: string;
-  chartUrl?: string;   // optional chart image — render via chartImageSrc()
+  chartUrls?: string[];  // optional charts — render via chartImageList()
+  chartUrl?: string;     // legacy single-chart field, still honoured
   wallet: string;
   pfp: string | null;
   displayName: string | null;
@@ -629,16 +630,24 @@ function FeedCard({
         </div>
       )}
 
-      {/* Chart — user-supplied, so ALWAYS through chartImageSrc (fails closed). */}
-      {chartImageSrc(thesis.chartUrl) && (
-        <a href={chartImageSrc(thesis.chartUrl)!} target="_blank" rel="noopener noreferrer"
-           onClick={(e) => e.stopPropagation()} style={{ display: "block", marginTop: 8 }}>
-          <img
-            src={chartImageSrc(thesis.chartUrl)!} alt={`${thesis.symbol} chart`} loading="lazy" referrerPolicy="no-referrer"
-            style={{ width: "100%", maxHeight: 260, objectFit: "contain", borderRadius: 3, border: "1px solid #232327", background: "#0a0a0b" }}
-          />
-        </a>
-      )}
+      {/* Charts — user-supplied, so ALWAYS through chartImageList (fails closed per item). */}
+      {(() => {
+        const charts = chartImageList(thesis);
+        if (!charts.length) return null;
+        return (
+          <div style={{ display: "grid", gridTemplateColumns: charts.length === 1 ? "1fr" : "1fr 1fr", gap: 6, marginTop: 8 }}>
+            {charts.map((src, i) => (
+              <a key={i} href={src} target="_blank" rel="noopener noreferrer"
+                 onClick={(e) => e.stopPropagation()} style={{ display: "block" }}>
+                <img
+                  src={src} alt={`${thesis.symbol} chart ${i + 1}`} loading="lazy" referrerPolicy="no-referrer"
+                  style={{ width: "100%", maxHeight: charts.length === 1 ? 260 : 170, objectFit: "contain", borderRadius: 3, border: "1px solid #232327", background: "#0a0a0b" }}
+                />
+              </a>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Notes */}
       {thesis.notes && (

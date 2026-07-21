@@ -1282,7 +1282,10 @@ export default {
         try {
           await ensureResvg();
           const font = await getMonoFont();
-          const chartDataUri = await fetchChartDataUri(thesis.chartUrl);
+          // Only the FIRST chart goes on the share card — an unfurl needs one legible
+          // image, not four thumbnails. Also keeps the fetch/size budget bounded.
+          const firstChart = (thesis.chartUrls && thesis.chartUrls[0]) || thesis.chartUrl;
+          const chartDataUri = await fetchChartDataUri(firstChart);
           const svg = buildThesisOgSvg({ ...payload, chartDataUri, fontFamily: "'JetBrains Mono'" });
           const resvg = new Resvg(svg, { font: { loadSystemFonts: false, fontBuffers: [font], defaultFontFamily: "JetBrains Mono" } });
           const png = resvg.render().asPng();

@@ -11,7 +11,7 @@ import { useIsMobile } from "./useIsMobile";
 import type { ThesisTrade, ThesisStatus } from "./types";
 import { cardStyle, labelStyle, navBtnStyle, inputStyle, fieldLabelStyle, STATUS_CONFIG, CLOSED_STATUSES } from "./styles";
 import { deployToAgent, thesisToAgentConfig, thesisAgentNotice, deployDirectiveFromThesis } from "@/utils/agentPrefill";
-import { formatPnl, chartImageSrc, CHART_HOST_HINT } from "./helpers";
+import { formatPnl, chartImageSrc, chartImageList, CHART_HOST_HINT, MAX_CHARTS } from "./helpers";
 import { PnlChart, EmptyState, Coachmark } from "./components";
 import { SharePoster, type PosterData } from "./SharePoster";
 
@@ -291,15 +291,24 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
         </div>
       )}
 
-      {/* Chart — validated at RENDER time, so a bad stored URL simply doesn't show. */}
-      {chartImageSrc(t.chartUrl) && (
-        <a href={chartImageSrc(t.chartUrl)!} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginTop: 8 }}>
-          <img
-            src={chartImageSrc(t.chartUrl)!} alt={`${t.symbol} chart`} loading="lazy" referrerPolicy="no-referrer"
-            style={{ width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 3, border: "1px solid #232327", background: "#0a0a0b" }}
-          />
-        </a>
-      )}
+      {/* Charts — validated per-item at RENDER time, so one bad stored URL is dropped
+          and the rest still show. Single chart goes full width; multiples pair up. */}
+      {(() => {
+        const charts = chartImageList(t);
+        if (!charts.length) return null;
+        return (
+          <div style={{ display: "grid", gridTemplateColumns: charts.length === 1 ? "1fr" : "1fr 1fr", gap: 6, marginTop: 8 }}>
+            {charts.map((src, i) => (
+              <a key={i} href={src} target="_blank" rel="noopener noreferrer" style={{ display: "block" }}>
+                <img
+                  src={src} alt={`${t.symbol} chart ${i + 1}`} loading="lazy" referrerPolicy="no-referrer"
+                  style={{ width: "100%", maxHeight: charts.length === 1 ? 220 : 150, objectFit: "contain", borderRadius: 3, border: "1px solid #232327", background: "#0a0a0b" }}
+                />
+              </a>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Notes */}
       {t.notes && (
@@ -698,7 +707,7 @@ export function ThesisView() {
     accountSize: "",
     fundingRate: "0.01",
     notes: "",
-    chartUrl: "",
+    chartUrls: [""] as string[],
   });
 
 
@@ -751,7 +760,8 @@ export function ThesisView() {
   const formValid = !!form.symbol && !!calc
     && Number.isFinite(calc.positionSize) && calc.positionSize > 0
     && Number.isFinite(calc.riskReward) && calc.riskReward > 0;
-  const set = (field: string, value: string) => setForm((f) => ({ ...f, [field]: value }));
+  // string | string[] — chartUrls is a list; every other field is a plain string.
+  const set = (field: string, value: string | string[]) => setForm((f) => ({ ...f, [field]: value }));
 
   // ── Guided-entry helpers (kill the blank-form friction) ──────────────────
   const roundPrice = (n: number) => Number(n.toFixed(n < 1 ? 6 : n < 100 ? 4 : 2));
@@ -799,7 +809,7 @@ export function ThesisView() {
     accountSize: parseFloat(form.accountSize),
     fundingRate: parseFloat(form.fundingRate),
     notes: form.notes,
-    chartUrl: form.chartUrl.trim() || undefined,
+    chartUrls: (() => { const v = form.chartUrls.map((u) => u.trim()).filter(Boolean); return v.length ? v : undefined; })(),
     createdAt: Date.now(),
     positionSize: calc!.positionSize,
     leverage: calc!.leverage,
@@ -812,7 +822,7 @@ export function ThesisView() {
   });
 
   const resetForm = () =>
-    setForm((f) => ({ ...f, symbol: "", entryPrice: "", stopLoss: "", takeProfit1: "", takeProfit2: "", notes: "", chartUrl: "" }));
+    setForm((f) => ({ ...f, symbol: "", entryPrice: "", stopLoss: "", takeProfit1: "", takeProfit2: "", notes: "", chartUrls: [""] }));
 
   // Saves the thesis PRIVATELY. Places no order of any kind — it was called
   // "deployPaper" and labelled "DEPLOY (PAPER)", which read as paper *trading* and
@@ -1130,37 +1140,58 @@ export function ThesisView() {
               value={form.notes} onChange={(e) => set("notes", e.target.value)}
             />
 
-            {/* Chart — the levels are the claim, the chart is the reasoning. */}
-            <div style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", margin: "14px 0 8px" }}>■ CHART <span style={{ color: "#33333a" }}>(optional)</span></div>
-            <input
-              style={inputStyle}
-              placeholder="https://s3.tradingview.com/snapshot/..."
-              value={form.chartUrl}
-              onChange={(e) => set("chartUrl", e.target.value)}
-            />
+            {/* Charts — the levels are the claim, the charts are the reasoning. Traders
+                usually show more than one timeframe, so this takes up to MAX_CHARTS.
+                Inputs grow as you fill them rather than showing four empty boxes. */}
+            <div style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", margin: "14px 0 8px" }}>
+              ■ CHARTS <span style={{ color: "#33333a" }}>(optional · up to {MAX_CHARTS})</span>
+            </div>
             {(() => {
-              const src = chartImageSrc(form.chartUrl);
-              const typed = form.chartUrl.trim().length > 0;
-              if (!typed) {
-                return (
-                  <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9.5, color: "#52525b", marginTop: 5, lineHeight: 1.45 }}>
-                    Paste a {CHART_HOST_HINT}. In TradingView, the camera icon → &ldquo;Copy link to
-                    the chart image&rdquo;. It shows on your call in the public feed.
-                  </div>
-                );
-              }
-              if (!src) {
-                return (
-                  <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9.5, color: "#fbbf24", marginTop: 5, lineHeight: 1.45 }}>
-                    ⚠ Not a supported image link — use a {CHART_HOST_HINT} (https only). It won&apos;t be shown.
-                  </div>
-                );
-              }
+              const urls = form.chartUrls;
+              const filled = urls.filter((u) => u.trim()).length;
+              const shown = Math.min(MAX_CHARTS, Math.max(1, filled + 1));
+              const setAt = (i: number, v: string) => {
+                const next = [...urls];
+                next[i] = v;
+                while (next.length < shown) next.push("");
+                set("chartUrls", next);
+              };
               return (
-                <img
-                  src={src} alt="chart preview" loading="lazy" referrerPolicy="no-referrer"
-                  style={{ width: "100%", maxHeight: 190, objectFit: "contain", marginTop: 8, borderRadius: 3, border: "1px solid #232327", background: "#0a0a0b" }}
-                />
+                <>
+                  {Array.from({ length: shown }).map((_, i) => {
+                    const val = urls[i] ?? "";
+                    const src = chartImageSrc(val);
+                    const typed = val.trim().length > 0;
+                    return (
+                      <div key={i} style={{ marginBottom: 8 }}>
+                        <input
+                          style={inputStyle}
+                          placeholder={i === 0 ? "https://s3.tradingview.com/snapshot/…" : `chart ${i + 1} (optional)`}
+                          value={val}
+                          onChange={(e) => setAt(i, e.target.value)}
+                        />
+                        {typed && !src && (
+                          <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9.5, color: "#fbbf24", marginTop: 4, lineHeight: 1.45 }}>
+                            ⚠ Not a supported image link — use a {CHART_HOST_HINT} (https only). It won&apos;t be shown.
+                          </div>
+                        )}
+                        {src && (
+                          <img
+                            src={src} alt={`chart ${i + 1} preview`} loading="lazy" referrerPolicy="no-referrer"
+                            style={{ width: "100%", maxHeight: 170, objectFit: "contain", marginTop: 6, borderRadius: 3, border: "1px solid #232327", background: "#0a0a0b" }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                  {filled === 0 && (
+                    <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9.5, color: "#52525b", lineHeight: 1.45 }}>
+                      Paste a {CHART_HOST_HINT}. In TradingView, the camera icon → &ldquo;Copy link to
+                      the chart image&rdquo;. Charts show on your call in the public feed; the first one
+                      also goes on the share card.
+                    </div>
+                  )}
+                </>
               );
             })()}
           </div>

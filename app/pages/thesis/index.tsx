@@ -12,7 +12,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
-import { chartImageSrc } from "@/pages/lab/helpers";
+import { chartImageList } from "@/pages/lab/helpers";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 const OG_BASE  = "https://og.nexustradinglabs.com";
@@ -32,7 +32,8 @@ type FeedThesis = {
   actualPnl: number | null;
   createdAt: number;
   notes: string;
-  chartUrl?: string;   // optional chart image — render via chartImageSrc()
+  chartUrls?: string[];  // optional charts — render via chartImageList()
+  chartUrl?: string;     // legacy single-chart field, still honoured
   wallet: string;
   pfp: string | null;
   displayName: string | null;
@@ -360,15 +361,23 @@ export default function ThesisPage() {
             </div>
           )}
 
-          {/* Chart — validated at render time; unsupported hosts simply don't show. */}
-          {chartImageSrc(thesis.chartUrl) && (
-            <a href={chartImageSrc(thesis.chartUrl)!} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginBottom: 12 }}>
-              <img
-                src={chartImageSrc(thesis.chartUrl)!} alt={`${thesis.symbol} chart`} loading="lazy" referrerPolicy="no-referrer"
-                style={{ width: "100%", objectFit: "contain", borderRadius: 4, border: "1px solid #232327", background: "#0a0a0b" }}
-              />
-            </a>
-          )}
+          {/* Charts — validated per item at render time; bad hosts simply don't show. */}
+          {(() => {
+            const charts = chartImageList(thesis);
+            if (!charts.length) return null;
+            return (
+              <div style={{ display: "grid", gridTemplateColumns: charts.length === 1 ? "1fr" : "1fr 1fr", gap: 8, marginBottom: 12 }}>
+                {charts.map((src, i) => (
+                  <a key={i} href={src} target="_blank" rel="noopener noreferrer" style={{ display: "block" }}>
+                    <img
+                      src={src} alt={`${thesis.symbol} chart ${i + 1}`} loading="lazy" referrerPolicy="no-referrer"
+                      style={{ width: "100%", objectFit: "contain", borderRadius: 4, border: "1px solid #232327", background: "#0a0a0b" }}
+                    />
+                  </a>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Notes */}
           {thesis.notes && (

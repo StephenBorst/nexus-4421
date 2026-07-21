@@ -55,3 +55,16 @@ export function chartImageSrc(raw?: string | null): string | null {
 
 /** Hosts we accept, for user-facing hint text. Keep in sync with CHART_HOSTS. */
 export const CHART_HOST_HINT = "TradingView snapshot, imgur, or an X image URL";
+
+/** Max charts per thesis — enough for a multi-timeframe read without becoming a gallery. */
+export const MAX_CHARTS = 4;
+
+// Resolves a thesis's charts to a validated, safe list. Accepts the new chartUrls[]
+// and transparently upgrades the legacy single chartUrl, so older records keep working.
+// Every URL still goes through chartImageSrc(), so this fails closed per-item: one bad
+// entry is dropped, the rest still render.
+export function chartImageList(t?: { chartUrls?: string[]; chartUrl?: string } | null): string[] {
+  if (!t) return [];
+  const raw = t.chartUrls?.length ? t.chartUrls : t.chartUrl ? [t.chartUrl] : [];
+  return raw.map((u) => chartImageSrc(u)).filter((u): u is string => !!u).slice(0, MAX_CHARTS);
+}
