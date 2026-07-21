@@ -21,6 +21,10 @@ export interface ThesisTrade {
   fundingCost72h: number;
   status: ThesisStatus;
   actualPnl: number | null;
+  // Optional chart image (TradingView snapshot etc). Traders reason in charts — the
+  // levels are the claim, the chart is the reasoning. ⚠️ User-supplied URL: ALWAYS
+  // render it through chartImageSrc(), never raw. See helpers.ts for why.
+  chartUrl?: string;
   isPublic?: boolean;
   holdersOnly?: boolean; // shared to the $NEXUS Holders Room only (excluded from public feed)
   pfp?: string;

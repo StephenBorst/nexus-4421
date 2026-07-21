@@ -12,6 +12,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
+import { chartImageSrc } from "@/pages/lab/helpers";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 const OG_BASE  = "https://og.nexustradinglabs.com";
@@ -31,6 +32,7 @@ type FeedThesis = {
   actualPnl: number | null;
   createdAt: number;
   notes: string;
+  chartUrl?: string;   // optional chart image — render via chartImageSrc()
   wallet: string;
   pfp: string | null;
   displayName: string | null;
@@ -356,6 +358,16 @@ export default function ThesisPage() {
             <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, color: thesis.actualPnl >= 0 ? "#3ecf8e" : "#f7525f", marginBottom: 12 }}>
               ACTUAL PnL: {thesis.actualPnl >= 0 ? "+" : ""}${thesis.actualPnl.toFixed(2)}
             </div>
+          )}
+
+          {/* Chart — validated at render time; unsupported hosts simply don't show. */}
+          {chartImageSrc(thesis.chartUrl) && (
+            <a href={chartImageSrc(thesis.chartUrl)!} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginBottom: 12 }}>
+              <img
+                src={chartImageSrc(thesis.chartUrl)!} alt={`${thesis.symbol} chart`} loading="lazy" referrerPolicy="no-referrer"
+                style={{ width: "100%", objectFit: "contain", borderRadius: 4, border: "1px solid #232327", background: "#0a0a0b" }}
+              />
+            </a>
           )}
 
           {/* Notes */}

@@ -19,6 +19,7 @@ import type { ThesisTrade } from "@/pages/lab/types";
 import CommentsPanel from "@/components/CommentsPanel";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { Sparkline } from "@/pages/lab/components";
+import { chartImageSrc } from "@/pages/lab/helpers";
 import LiveNow from "./LiveNow";
 import Desks from "./Desks";
 import WatchOnlyBanner from "./WatchOnlyBanner";
@@ -40,6 +41,7 @@ type FeedThesis = {
   actualPnl: number | null;
   createdAt: number;
   notes: string;
+  chartUrl?: string;   // optional chart image — render via chartImageSrc()
   wallet: string;
   pfp: string | null;
   displayName: string | null;
@@ -625,6 +627,17 @@ function FeedCard({
         <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: thesis.actualPnl >= 0 ? "#3ecf8e" : "#f7525f", marginBottom: 8 }}>
           ACTUAL PnL: {thesis.actualPnl >= 0 ? "+" : ""}${thesis.actualPnl.toFixed(2)}
         </div>
+      )}
+
+      {/* Chart — user-supplied, so ALWAYS through chartImageSrc (fails closed). */}
+      {chartImageSrc(thesis.chartUrl) && (
+        <a href={chartImageSrc(thesis.chartUrl)!} target="_blank" rel="noopener noreferrer"
+           onClick={(e) => e.stopPropagation()} style={{ display: "block", marginTop: 8 }}>
+          <img
+            src={chartImageSrc(thesis.chartUrl)!} alt={`${thesis.symbol} chart`} loading="lazy" referrerPolicy="no-referrer"
+            style={{ width: "100%", maxHeight: 260, objectFit: "contain", borderRadius: 3, border: "1px solid #232327", background: "#0a0a0b" }}
+          />
+        </a>
       )}
 
       {/* Notes */}

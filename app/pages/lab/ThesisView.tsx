@@ -11,7 +11,7 @@ import { useIsMobile } from "./useIsMobile";
 import type { ThesisTrade, ThesisStatus } from "./types";
 import { cardStyle, labelStyle, navBtnStyle, inputStyle, fieldLabelStyle, STATUS_CONFIG, CLOSED_STATUSES } from "./styles";
 import { deployToAgent, thesisToAgentConfig, thesisAgentNotice, deployDirectiveFromThesis } from "@/utils/agentPrefill";
-import { formatPnl } from "./helpers";
+import { formatPnl, chartImageSrc, CHART_HOST_HINT } from "./helpers";
 import { PnlChart, EmptyState, Coachmark } from "./components";
 import { SharePoster, type PosterData } from "./SharePoster";
 
@@ -289,6 +289,16 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
             </div>
           )}
         </div>
+      )}
+
+      {/* Chart — validated at RENDER time, so a bad stored URL simply doesn't show. */}
+      {chartImageSrc(t.chartUrl) && (
+        <a href={chartImageSrc(t.chartUrl)!} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginTop: 8 }}>
+          <img
+            src={chartImageSrc(t.chartUrl)!} alt={`${t.symbol} chart`} loading="lazy" referrerPolicy="no-referrer"
+            style={{ width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 3, border: "1px solid #232327", background: "#0a0a0b" }}
+          />
+        </a>
       )}
 
       {/* Notes */}
@@ -688,6 +698,7 @@ export function ThesisView() {
     accountSize: "",
     fundingRate: "0.01",
     notes: "",
+    chartUrl: "",
   });
 
 
@@ -788,6 +799,7 @@ export function ThesisView() {
     accountSize: parseFloat(form.accountSize),
     fundingRate: parseFloat(form.fundingRate),
     notes: form.notes,
+    chartUrl: form.chartUrl.trim() || undefined,
     createdAt: Date.now(),
     positionSize: calc!.positionSize,
     leverage: calc!.leverage,
@@ -800,7 +812,7 @@ export function ThesisView() {
   });
 
   const resetForm = () =>
-    setForm((f) => ({ ...f, symbol: "", entryPrice: "", stopLoss: "", takeProfit1: "", takeProfit2: "", notes: "" }));
+    setForm((f) => ({ ...f, symbol: "", entryPrice: "", stopLoss: "", takeProfit1: "", takeProfit2: "", notes: "", chartUrl: "" }));
 
   // Saves the thesis PRIVATELY. Places no order of any kind — it was called
   // "deployPaper" and labelled "DEPLOY (PAPER)", which read as paper *trading* and
@@ -1117,6 +1129,40 @@ export function ThesisView() {
               placeholder="Why are you taking this trade? What needs to be true for it to work? What invalidates it?"
               value={form.notes} onChange={(e) => set("notes", e.target.value)}
             />
+
+            {/* Chart — the levels are the claim, the chart is the reasoning. */}
+            <div style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", margin: "14px 0 8px" }}>■ CHART <span style={{ color: "#33333a" }}>(optional)</span></div>
+            <input
+              style={inputStyle}
+              placeholder="https://s3.tradingview.com/snapshot/..."
+              value={form.chartUrl}
+              onChange={(e) => set("chartUrl", e.target.value)}
+            />
+            {(() => {
+              const src = chartImageSrc(form.chartUrl);
+              const typed = form.chartUrl.trim().length > 0;
+              if (!typed) {
+                return (
+                  <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9.5, color: "#52525b", marginTop: 5, lineHeight: 1.45 }}>
+                    Paste a {CHART_HOST_HINT}. In TradingView, the camera icon → &ldquo;Copy link to
+                    the chart image&rdquo;. It shows on your call in the public feed.
+                  </div>
+                );
+              }
+              if (!src) {
+                return (
+                  <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9.5, color: "#fbbf24", marginTop: 5, lineHeight: 1.45 }}>
+                    ⚠ Not a supported image link — use a {CHART_HOST_HINT} (https only). It won&apos;t be shown.
+                  </div>
+                );
+              }
+              return (
+                <img
+                  src={src} alt="chart preview" loading="lazy" referrerPolicy="no-referrer"
+                  style={{ width: "100%", maxHeight: 190, objectFit: "contain", marginTop: 8, borderRadius: 3, border: "1px solid #232327", background: "#0a0a0b" }}
+                />
+              );
+            })()}
           </div>
         </div>
 
