@@ -717,7 +717,7 @@ function buildThesisOgSvg({ displayName, wallet, ticker, direction, entryPrice, 
   ${notesLine ? `<text x="48" y="${chartDataUri ? 556 : 464}" fill="#a1a1aa" font-size="16" font-style="italic">"${notesLine}"</text>` : ""}
   ${chartDataUri ? "" : `<line x1="48" y1="530" x2="1152" y2="530" stroke="#232327" stroke-width="1"/>`}
   <text x="48" y="592" fill="#71717a" font-size="13" letter-spacing="1">graded from public price · anchored on arbitrum</text>
-  <text x="1152" y="592" fill="#52525b" font-size="13" text-anchor="end">${esc(wallet)}</text>
+  ${chartDataUri ? "" : `<text x="1152" y="592" fill="#52525b" font-size="13" text-anchor="end">${esc(wallet)}</text>`}
 </svg>`;
 }
 
