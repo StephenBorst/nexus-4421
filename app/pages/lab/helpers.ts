@@ -68,3 +68,17 @@ export function chartImageList(t?: { chartUrls?: string[]; chartUrl?: string } |
   const raw = t.chartUrls?.length ? t.chartUrls : t.chartUrl ? [t.chartUrl] : [];
   return raw.map((u) => chartImageSrc(u)).filter((u): u is string => !!u).slice(0, MAX_CHARTS);
 }
+
+// The status a thesis card should DISPLAY: the objective grade (stamped from public
+// price by the server) wins over the self-reported status field, so "it grades itself"
+// is true on the card, not just on the leaderboard. INVALIDATED is a real user action
+// (thesis no longer valid) so it's preserved; otherwise an unresolved call is ACTIVE.
+export function effectiveStatus(
+  t?: { gradedOutcome?: "WIN" | "LOSS"; status?: string } | null,
+): "ACTIVE" | "HIT_TP" | "STOPPED_OUT" | "INVALIDATED" {
+  if (t?.gradedOutcome === "WIN") return "HIT_TP";
+  if (t?.gradedOutcome === "LOSS") return "STOPPED_OUT";
+  if (t?.status === "INVALIDATED") return "INVALIDATED";
+  const s = t?.status;
+  return s === "HIT_TP" || s === "STOPPED_OUT" || s === "INVALIDATED" ? s : "ACTIVE";
+}

@@ -12,7 +12,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
-import { chartImageList } from "@/pages/lab/helpers";
+import { chartImageList, effectiveStatus } from "@/pages/lab/helpers";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 const OG_BASE  = "https://og.nexustradinglabs.com";
@@ -220,7 +220,7 @@ export default function ThesisPage() {
     );
   }
 
-  const cfg = STATUS_CONFIG[thesis.status] ?? STATUS_FALLBACK;
+  const cfg = STATUS_CONFIG[effectiveStatus(thesis)] ?? STATUS_FALLBACK;
   const ticker = thesis.symbol.replace("PERP_", "").replace("_USDC", "");
   const shortAddr = `${thesis.wallet.slice(0, 6)}…${thesis.wallet.slice(-4)}`;
   const traderName = thesis.displayName ?? shortAddr;

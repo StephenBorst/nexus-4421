@@ -445,6 +445,60 @@ async function agentSecretFromWalletSig(walletSig) {
 // gradeCall in logic.mjs) and aggregate per wallet → { wallet: {calls,wins,rSum} }.
 // Shared by the human-caller leaderboard AND Desk scoring so the two never drift.
 // PENDING/INVALID are excluded from the record (same rule as the board).
+// gradeCall outcome → the objective card status. Kept trivial + pure so the mapping
+// is obvious: a WIN is first-touch of TP, a LOSS is first-touch of SL (or same-candle,
+// conservatively). PENDING means neither level has been touched yet → still ACTIVE.
+function gradedStatusOf(outcome) {
+  return outcome === "WIN" ? "HIT_TP" : outcome === "LOSS" ? "STOPPED_OUT" : "ACTIVE";
+}
+
+// Fetch 1h OHLC from the thesis's createdAt to now, for gradeCall. Shared by the cron
+// stamper and the on-read permalink grade so both use identical inputs.
+async function fetchGradeHistory(symbol, createdAt) {
+  const now = Math.floor(Date.now() / 1000);
+  const from = Math.max(Math.floor((createdAt || Date.now()) / 1000) - 3600, now - 60 * 86400);
+  try {
+    const r = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${symbol}&resolution=60&from=${from}&to=${now}`);
+    const d = await r.json();
+    if (d && d.s === "ok" && Array.isArray(d.t)) return { t: d.t, h: d.h, l: d.l };
+  } catch (e) { console.error("[grade] history", symbol, e.message); }
+  return null;
+}
+
+// Cron pass: objectively resolve every PUBLIC thesis from public price and STAMP the
+// result onto the stored record — gradedOutcome (WIN/LOSS), gradedR, gradedAt. This is
+// what makes "it grades itself" true on the CARD, not just the leaderboard: the badge
+// reads the stamp, never a self-report. Single writer (cron) = no race with the user's
+// own edits, and we only write a wallet back when something actually changed.
+async function gradePublicTheses(env) {
+  const listed = await env.LAB_STORE.list({ prefix: "lab:" });
+  let graded = 0, walletsWritten = 0;
+  // Cache OHLC per symbol across the whole pass so 50 BTC calls fetch history once.
+  const histCache = new Map();
+  for (const key of listed.keys) {
+    const raw = await env.LAB_STORE.get(key.name);
+    if (!raw) continue;
+    let data; try { data = JSON.parse(raw); } catch { continue; }
+    let changed = false;
+    for (const t of (data.theses || [])) {
+      if (!t.isPublic || !t.symbol || !t.createdAt) continue;
+      if (t.gradedOutcome === "WIN" || t.gradedOutcome === "LOSS") continue; // resolved = final
+      const cacheKey = `${t.symbol}|${t.createdAt}`;
+      if (!histCache.has(cacheKey)) histCache.set(cacheKey, await fetchGradeHistory(t.symbol, t.createdAt));
+      const g = gradeCall(t, histCache.get(cacheKey));
+      if (g.outcome === "WIN" || g.outcome === "LOSS") {
+        t.gradedOutcome = g.outcome;
+        t.gradedR = g.r;
+        t.gradedAt = Date.now();
+        changed = true; graded++;
+      }
+    }
+    if (changed) { await env.LAB_STORE.put(key.name, JSON.stringify(data)); walletsWritten++; }
+  }
+  console.log(`[grade] resolved ${graded} calls across ${walletsWritten} wallets`);
+  return graded;
+}
+
 async function computeCallerStats(env, maxHorizonS = 30 * 86400) {
   const listed = await env.LAB_STORE.list({ prefix: "lab:" });
   const calls = [];
@@ -845,10 +899,19 @@ export default {
   // tracked set from the live HL leaderboard. Fails safe: on error the routes
   // fall back to the static SMART_SEED, so a heavy/failed parse never breaks the tab.
   async scheduled(event, env, ctx) {
+    // Hourly ("17 * * * *"): objectively grade public theses from public price.
+    // Every run also grades (cheap, idempotent) so a fresh deploy resolves immediately.
     ctx.waitUntil((async () => {
-      try { const n = await refreshSmartSeed(env); console.log(`[smart] refreshed tracked set: ${n}`); }
-      catch (e) { console.error("[smart] refresh failed (using static seed):", String(e)); }
+      try { const n = await gradePublicTheses(env); console.log(`[grade] cron resolved ${n} calls`); }
+      catch (e) { console.error("[grade] cron failed:", String(e)); }
     })());
+    // 12h: refresh the Smart Money tracked set.
+    if (event.cron === "0 */12 * * *") {
+      ctx.waitUntil((async () => {
+        try { const n = await refreshSmartSeed(env); console.log(`[smart] refreshed tracked set: ${n}`); }
+        catch (e) { console.error("[smart] refresh failed (using static seed):", String(e)); }
+      })());
+    }
   },
 
   async fetch(request, env, ctx) {
@@ -1270,11 +1333,19 @@ export default {
       if (!thesis) return new Response("not found", { status: 404 });
       const profile = profileRaw ? JSON.parse(profileRaw) : {};
       const ticker = thesis.symbol.replace("PERP_", "").replace("_USDC", "");
+      // Card shows the OBJECTIVE grade, never the self-report — grade live if unresolved.
+      let ogStatus = thesis.gradedOutcome ? gradedStatusOf(thesis.gradedOutcome) : "ACTIVE";
+      if (ogStatus === "ACTIVE" && thesis.gradedOutcome !== "WIN" && thesis.gradedOutcome !== "LOSS") {
+        try {
+          const g = gradeCall(thesis, await fetchGradeHistory(thesis.symbol, thesis.createdAt));
+          if (g.outcome === "WIN" || g.outcome === "LOSS") ogStatus = gradedStatusOf(g.outcome);
+        } catch { /* keep ACTIVE */ }
+      }
       const payload = {
         displayName: profile.displayName || null, wallet, ticker,
         direction: thesis.direction, entryPrice: thesis.entryPrice,
         stopLoss: thesis.stopLoss, takeProfit1: thesis.takeProfit1,
-        riskReward: thesis.riskReward, status: thesis.status, notes: thesis.notes || "",
+        riskReward: thesis.riskReward, status: ogStatus, notes: thesis.notes || "",
       };
       // Chart is fetched ONLY for the PNG path — the SVG path would need the same
       // inlining anyway (resvg can't pull remote refs), and X/Twitter unfurls the PNG.
@@ -1310,7 +1381,25 @@ export default {
       const thesis = (data.theses || []).find((t) => t.id === thesisId && t.isPublic);
       if (!thesis) return json({ error: "not found" }, request, 404);
       const profile = profileRaw ? JSON.parse(profileRaw) : {};
+      // Grade LIVE on read (one symbol) if the cron hasn't resolved it yet — the
+      // permalink + its OG card should never lag the market by up to an hour.
+      if (thesis.gradedOutcome !== "WIN" && thesis.gradedOutcome !== "LOSS") {
+        try {
+          const g = gradeCall(thesis, await fetchGradeHistory(thesis.symbol, thesis.createdAt));
+          if (g.outcome === "WIN" || g.outcome === "LOSS") {
+            thesis.gradedOutcome = g.outcome; thesis.gradedR = g.r; thesis.gradedAt = Date.now();
+          }
+        } catch { /* fall through with the stored value */ }
+      }
       return json({ thesis: { ...thesis, wallet, pfp: profile.pfp || null, displayName: profile.displayName || null } }, request);
+    }
+
+    // ── GET /theses/grade-now — ops trigger for the objective grader (no auth,
+    // read-only-ish: it only stamps objective outcomes, which any observer can
+    // recompute). Returns how many calls resolved this run. ──────────────────────
+    if (parts[0] === "theses" && parts[1] === "grade-now" && request.method === "GET") {
+      try { const n = await gradePublicTheses(env); return json({ graded: n }, request); }
+      catch (e) { return json({ error: String(e) }, request, 500); }
     }
 
     // ── Ph24: /follows/:wallet → follow graph ──────────────

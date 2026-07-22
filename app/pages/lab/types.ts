@@ -19,7 +19,10 @@ export interface ThesisTrade {
   fundingCost8h: number;
   fundingCost24h: number;
   fundingCost72h: number;
-  status: ThesisStatus;
+  status: ThesisStatus;              // self-reported (legacy). Prefer effectiveStatus().
+  gradedOutcome?: "WIN" | "LOSS";    // objective grade from public price (server-stamped)
+  gradedR?: number;
+  gradedAt?: number;
   actualPnl: number | null;
   // Optional chart images (TradingView snapshot, X image, imgur). Traders reason in
   // charts and usually across timeframes — hence a list, capped at MAX_CHARTS.

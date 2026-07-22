@@ -11,7 +11,7 @@ import { useIsMobile } from "./useIsMobile";
 import type { ThesisTrade, ThesisStatus } from "./types";
 import { cardStyle, labelStyle, navBtnStyle, inputStyle, fieldLabelStyle, STATUS_CONFIG, CLOSED_STATUSES } from "./styles";
 import { deployToAgent, thesisToAgentConfig, thesisAgentNotice, deployDirectiveFromThesis } from "@/utils/agentPrefill";
-import { formatPnl, chartImageSrc, chartImageList, CHART_HOST_HINT, MAX_CHARTS } from "./helpers";
+import { formatPnl, chartImageSrc, chartImageList, effectiveStatus, CHART_HOST_HINT, MAX_CHARTS } from "./helpers";
 import { PnlChart, EmptyState, Coachmark } from "./components";
 import { SharePoster, type PosterData } from "./SharePoster";
 
@@ -57,7 +57,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
   const [inputVisible, setInputVisible] = useState(false);
   const [poster, setPoster] = useState<PosterData | null>(null);
   const navigate = useNavigate();
-  const cfg = STATUS_CONFIG[t.status] ?? STATUS_CONFIG.ACTIVE;
+  const cfg = STATUS_CONFIG[effectiveStatus(t)] ?? STATUS_CONFIG.ACTIVE;
   const isClosed = CLOSED_STATUSES.includes(t.status);
 
   const handleStatusClick = (s: ThesisStatus) => {
