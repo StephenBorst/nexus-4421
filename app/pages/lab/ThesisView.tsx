@@ -127,7 +127,10 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
             {t.isPublic && walletAddress && (() => {
               // Share your own public call → pulls external eyes back to the feed.
               const tk = t.symbol.replace("PERP_", "").replace("_USDC", "");
-              const url = `${window.location.origin}/feed/thesis/${walletAddress.toLowerCase()}/${t.id}`;
+              // Share via the worker OG proxy so the per-thesis card unfurls on X/etc
+              // (the SPA's JS-injected OG tags are invisible to crawlers). It redirects
+              // humans straight to the app page.
+              const url = `https://og.nexustradinglabs.com/share/thesis/${walletAddress.toLowerCase()}/${t.id}`;
               const text = `📡 ${tk} ${t.direction} ${t.leverage.toFixed(1)}x\n\nEntry $${t.entryPrice.toFixed(2)} · Stop $${t.stopLoss.toFixed(2)} · TP $${t.takeProfit1.toFixed(2)} (R:R 1:${t.riskReward.toFixed(2)})\n\nGraded on-chain vs public price on Nexus Trading Labs 👇`;
               const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
               return (

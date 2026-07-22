@@ -237,8 +237,10 @@ export default function ThesisPage() {
   const isClosed = thesis.status === "HIT_TP" || thesis.status === "STOPPED_OUT";
 
   // Outbound share — pre-filled X / Farcaster posts that pull external eyes back
-  // into the feed. The page already emits rich OG cards, so the link unfurls.
-  const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+  // Share via the worker OG proxy — crawlers can't see the SPA's JS-injected OG tags,
+  // so a raw app link unfurls as the generic site card. The proxy serves per-thesis
+  // meta and redirects humans back here.
+  const shareUrl = wallet && id ? `https://og.nexustradinglabs.com/share/thesis/${wallet.toLowerCase()}/${id}` : "";
   const shareText =
     `📡 ${ticker} ${thesis.direction} ${thesis.leverage.toFixed(1)}x\n\n` +
     `Entry $${thesis.entryPrice.toFixed(2)} · Stop $${thesis.stopLoss.toFixed(2)} · TP $${thesis.takeProfit1.toFixed(2)} (R:R 1:${thesis.riskReward.toFixed(2)})\n\n` +

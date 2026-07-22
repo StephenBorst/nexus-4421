@@ -1394,6 +1394,52 @@ export default {
       return json({ thesis: { ...thesis, wallet, pfp: profile.pfp || null, displayName: profile.displayName || null } }, request);
     }
 
+    // ── GET /share/thesis/:w/:id — crawler-friendly OG proxy ────────────────────
+    // The app is a SPA: its per-thesis OG tags are injected by JS AFTER load, but
+    // X/Farcaster/Telegram crawlers DON'T run JS — they read static index.html and got
+    // the generic site card. This route returns real per-thesis OG meta a crawler can
+    // read, and redirects humans to the actual app page. Share links point here.
+    if (parts[0] === "share" && parts[1] === "thesis" && parts[2] && parts[3]) {
+      const wallet = normalizeAddress(parts[2]);
+      const thesisId = parts[3];
+      const appUrl = `https://trade.nexustradinglabs.com/feed/thesis/${wallet}/${thesisId}`;
+      const [raw, profileRaw] = await Promise.all([
+        env.LAB_STORE.get(`lab:${wallet}`),
+        env.LAB_STORE.get(`profile:${wallet}`),
+      ]);
+      const data = raw ? JSON.parse(raw) : null;
+      const thesis = data && (data.theses || []).find((t) => t.id === thesisId && t.isPublic);
+      // Unknown/private → just bounce to the app; nothing to preview.
+      if (!thesis) return Response.redirect(appUrl, 302);
+      const profile = profileRaw ? JSON.parse(profileRaw) : {};
+      const ticker = thesis.symbol.replace("PERP_", "").replace("_USDC", "");
+      const name = esc(profile.displayName || `${wallet.slice(0, 6)}…${wallet.slice(-4)}`);
+      const st = thesis.gradedOutcome ? gradedStatusOf(thesis.gradedOutcome) : "ACTIVE";
+      const stWord = st === "HIT_TP" ? "✓ HIT TP" : st === "STOPPED_OUT" ? "STOPPED OUT" : "ACTIVE";
+      const title = `${esc(ticker)} ${esc(thesis.direction)} by ${name} · ${stWord}`;
+      const desc = `Entry $${(+thesis.entryPrice).toFixed(2)} · SL $${(+thesis.stopLoss).toFixed(2)} · TP $${(+thesis.takeProfit1).toFixed(2)} · R:R 1:${(+thesis.riskReward).toFixed(2)} — graded from public price, on-chain.`;
+      const img = `https://og.nexustradinglabs.com/og/thesis/${wallet}/${thesisId}.png`;
+      const shareUrl = `https://og.nexustradinglabs.com/share/thesis/${wallet}/${thesisId}`;
+      const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${title}</title>
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${esc(desc)}">
+<meta property="og:image" content="${img}">
+<meta property="og:url" content="${shareUrl}">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:description" content="${esc(desc)}">
+<meta name="twitter:image" content="${img}">
+<meta http-equiv="refresh" content="0; url=${appUrl}">
+<script>location.replace(${JSON.stringify(appUrl)})</script>
+</head><body style="background:#0a0a0b;color:#a1a1aa;font-family:monospace;padding:40px">
+Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nexus →</a>
+</body></html>`;
+      return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=120", "Access-Control-Allow-Origin": "*" } });
+    }
+
     // ── GET /theses/grade-now — ops trigger for the objective grader (no auth,
     // read-only-ish: it only stamps objective outcomes, which any observer can
     // recompute). Returns how many calls resolved this run. ──────────────────────
