@@ -34,17 +34,11 @@ function htmlTitlePlugin(): Plugin {
   return {
     name: "html-title-transform",
     transformIndexHtml(html) {
-      return html
-  .replace(/<title>.*?<\/title>/, `<title>${title}</title>`)
-  .replace(/<\/title>/, `</title>
-    <meta property="og:title" content="${title}" />
-    <meta property="og:description" content="Perp DEX on Orderly + Arbitrum" />
-    <meta property="og:image" content="https://nexustradinglabs.com/preview.png" />
-    <meta property="og:url" content="https://nexustradinglabs.com" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="${title}" />
-    <meta name="twitter:description" content="Perp DEX on Orderly + Arbitrum" />
-    <meta name="twitter:image" content="https://nexustradinglabs.com/preview.png" />`);
+      // Only sync the <title> from config.js. OG/Twitter/Farcaster meta is
+      // authoritative in index.html (embed-mini.png + Farcaster embed) — do NOT
+      // inject a second og:image/twitter:image here or crawlers get two
+      // conflicting cards (this used to point at the stale preview.png).
+      return html.replace(/<title>.*?<\/title>/, `<title>${title}</title>`);
     },
   };
 }
