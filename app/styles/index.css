@@ -237,14 +237,16 @@ html, body {
     linear-gradient(90deg, var(--nx-border) 1px, transparent 1px);
   background-size: var(--nx-grid-size) var(--nx-grid-size); opacity: var(--nx-grid-op);
   /* Concentrated at the top and dissolving into the content — reads as header
-     atmosphere, not a flat wallpaper. */
+     atmosphere, not a flat wallpaper. Opacity glides so a regime shift is felt,
+     not seen (data-reactivity from useMarketPulse). */
+  transition: opacity 2.5s var(--nx-ease);
   -webkit-mask-image: radial-gradient(125% 82% at 50% -8%, #000 0%, #000 32%, transparent 72%);
           mask-image: radial-gradient(125% 82% at 50% -8%, #000 0%, #000 32%, transparent 72%);
 }
 .nx-ambient::after {
   content: ""; position: absolute; inset: -35% -12% auto -12%; height: 72%;
   background: radial-gradient(ellipse at 50% 0%, rgba(237,237,240,var(--nx-scan-op)), transparent 62%);
-  animation: nx-scan 22s var(--nx-ease) infinite alternate;
+  animation: nx-scan var(--nx-scan-dur, 22s) var(--nx-ease) infinite alternate;
 }
 @keyframes nx-scan { from { transform: translateX(-4%); } to { transform: translateX(4%); } }
 /* App shell renders inside #root; keep it above the ambient layer. */
@@ -254,6 +256,24 @@ html, body {
    hairline, never shadow). Opt in with .nx-card-lift on inline-styled cards. */
 .nx-card-lift { transition: border-color var(--nx-dur) var(--nx-ease), transform var(--nx-dur) var(--nx-ease); }
 .nx-card-lift:hover { border-color: var(--nx-border-strong); transform: translateY(-2px); }
+.nx-card-lift:active { transform: translateY(-1px) scale(0.996); }
+
+/* ── Tactile: cursor spotlight ────────────────────────────────────────────────
+   A faint highlight that tracks the cursor across a surface — the "it responds
+   to you" sheen. --mx/--my are set by AmbientTexture's global pointermove. Pure
+   paint (::before behind content via a stacking context), never blocks clicks. */
+.nx-spotlight { position: relative; }
+.nx-spotlight > * { position: relative; z-index: 1; }
+.nx-spotlight::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: 0;
+  background: radial-gradient(200px circle at var(--mx, 50%) var(--my, -120%), rgba(237,237,240,0.06), transparent 62%);
+  opacity: 0; transition: opacity 0.28s var(--nx-ease); pointer-events: none;
+}
+.nx-spotlight:hover::before { opacity: 1; }
+
+/* Snappier press across the interaction layer — a quick spring on the button. */
+.nx-btn { transition: color var(--nx-dur) var(--nx-ease), border-color var(--nx-dur) var(--nx-ease),
+          background-color var(--nx-dur) var(--nx-ease), transform 90ms cubic-bezier(0.34, 1.56, 0.64, 1); }
 
 /* Breathing "live" — a real-time system signals its liveness. A pulsing dot for
    live-data indicators; .nx-pulse breathes any element (an active status badge). */

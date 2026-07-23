@@ -544,7 +544,7 @@ function YourEdgeCard({ orders }: { orders: ProcessedTrade[] }) {
   };
 
   return (
-    <div className="nx-fade-in" style={{ ...cardStyle, marginBottom: 8 }}>
+    <div className="nx-fade-in nx-spotlight" style={{ ...cardStyle, marginBottom: 8 }}>
       <div style={labelStyle}>&#9670; YOUR EDGE</div>
       <div style={{ fontSize: 10, color: "#71717a", fontFamily: "var(--nx-font-mono)", marginTop: -2, marginBottom: 10 }}>where you actually make money — from your own graded record</div>
       <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8, marginBottom: 8 }}>

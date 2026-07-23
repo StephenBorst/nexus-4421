@@ -218,7 +218,7 @@ function BarBlock({ value, total = 100, color = TEAL, len = 18 }: { value: numbe
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div style={{
+    <div className="nx-spotlight" style={{
       background: "#141416",
       border: "1px solid rgba(255,255,255,0.07)",
       borderRadius: "2px",
