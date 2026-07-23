@@ -9,6 +9,9 @@ export const cardStyle: CSSProperties = {
   border: `1px solid ${C.border}`,
   borderRadius: RADIUS.sm,
   padding: "12px 14px",
+  // Materiality: a 1px top inner-highlight reads as a lit edge — depth without a
+  // drop shadow (the elevation law). Applies app-wide to every inline card.
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
 };
 
 export const labelStyle: CSSProperties = {
@@ -68,6 +71,7 @@ export const agentCardStyle: CSSProperties = {
   borderRadius: RADIUS.md,
   padding: S.lg,
   marginBottom: S.md,
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)", // lit top edge — see cardStyle
 };
 
 export const agentLabelStyle: CSSProperties = {

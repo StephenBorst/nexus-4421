@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import type { ProcessedTrade } from "./types";
 import { cardStyle, labelStyle } from "./styles";
 import { formatPnl } from "./helpers";
-import { PnlChart, PnlBars, EmptyState, CountUp } from "./components";
+import { PnlChart, PnlBars, EmptyState, CountUp, SectionHeader } from "./components";
 import { useIsMobile } from "./useIsMobile";
 import { computeEdge } from "@/config/edge";
 
@@ -588,15 +588,11 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-        <div>
-          <div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>Grade</div>
-          <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 24, fontWeight: 700, color: "#f4f4f5", lineHeight: 1.1, letterSpacing: "-0.01em" }}>Performance Analytics</div>
-        </div>
-        <a href="/analyze" style={{ fontSize: 10, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em", textDecoration: "none", border: "1px solid #232327", borderRadius: 4, padding: "5px 10px" }}>
-          ▶ X-RAY ANY WALLET
-        </a>
-      </div>
+      <SectionHeader
+        eyebrow="Grade · Analytics"
+        title="Performance Analytics"
+        note={<a href="/analyze" style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, letterSpacing: "0.08em", textDecoration: "none", border: "1px solid #232327", borderRadius: 4, padding: "5px 10px" }}>▶ X-RAY ANY WALLET</a>}
+      />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 8 }}>
         <div style={cardStyle}>
           <div style={labelStyle}>TOTAL PNL</div>

@@ -31,6 +31,25 @@ export function CountUp({ value, format, durationMs = 620 }: {
   return <>{format(display)}</>;
 }
 
+// ─── Editorial section header ────────────────────────────
+// The signature header pattern: mono eyebrow → serif headline → bone hairline
+// rule. Gives every surface editorial gravitas without a heavy hero. Drop-in
+// replacement for the ad-hoc header divs across the Lab/Feed.
+export function SectionHeader({ eyebrow, title, note }: { eyebrow: string; title: string; note?: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "#71717a" }}>{eyebrow}</div>
+          <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: "clamp(22px, 3.4vw, 30px)", fontWeight: 400, color: "#f4f4f5", letterSpacing: "-0.01em", lineHeight: 1.12, marginTop: 6 }}>{title}</div>
+        </div>
+        {note && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#52525b", letterSpacing: "0.05em", textAlign: "right" }}>{note}</div>}
+      </div>
+      <div style={{ height: 1, background: "linear-gradient(90deg, #ededf0, rgba(237,237,240,0) 60%)", marginTop: 14, maxWidth: 340 }} />
+    </div>
+  );
+}
+
 // ─── Coachmark ───────────────────────────────────────────
 // One-time, dismissible teaching callout — makes a flow legible without a heavy
 // tour lib. Gated by a localStorage key so it shows once per browser. Terminal
