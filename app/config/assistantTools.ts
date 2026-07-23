@@ -472,14 +472,29 @@ TOOLS.push(
       if (dir === "LONG" && !(stop < entry && tp > entry)) return JSON.stringify({ error: "for a LONG: need stop < entry < takeProfit1" });
       if (dir === "SHORT" && !(stop > entry && tp < entry)) return JSON.stringify({ error: "for a SHORT: need takeProfit1 < entry < stop" });
       const tp2 = Number(args.takeProfit2), lev = Number(args.leverage);
+      const sym = shortTicker(String(args.symbol ?? ""));
       deployDirectiveFromThesis({
-        symbol: shortTicker(String(args.symbol ?? "")),
+        symbol: sym,
         direction: dir as "LONG" | "SHORT",
         entryPrice: entry, stopLoss: stop, takeProfit1: tp,
         takeProfit2: Number.isFinite(tp2) && tp2 > 0 ? tp2 : undefined,
         leverage: Number.isFinite(lev) && lev > 0 ? lev : undefined,
       }, ctx.navigate);
-      return JSON.stringify({ drafted: { symbol: shortTicker(String(args.symbol ?? "")), direction: dir, entry, stop, takeProfit1: tp }, note: "Opened the Agent DIRECTIVE panel pre-filled. The user picks PAPER/live, reviews the levels, and arms it — nothing was placed or armed." });
+      // Edge-aware sizing: surface the user's OWN record on this symbol/direction
+      // so the model can factor it into position size. Analysis, NOT an auto-size —
+      // a small historical sample must never mechanically set risk.
+      let edge_note: string | undefined;
+      const edge = (ctx.performance as { edge?: { by_symbol?: { symbol: string; trades: number; winRatePct: number; pnl: number }[]; by_side?: Record<string, { trades: number; winRatePct: number; pnl: number }> } } | null)?.edge;
+      if (edge) {
+        const row = edge.by_symbol?.find((r) => r.symbol === sym);
+        const sideRow = edge.by_side?.[dir];
+        const fmt = (p: number) => `${p >= 0 ? "+" : "-"}$${Math.abs(p)}`;
+        const parts: string[] = [];
+        if (row && row.trades >= 3) parts.push(`your ${sym} record: ${row.winRatePct}% over ${row.trades} trades (${fmt(row.pnl)})`);
+        if (sideRow && sideRow.trades >= 3) parts.push(`your ${dir.toLowerCase()} record: ${sideRow.winRatePct}% (${fmt(sideRow.pnl)})`);
+        if (parts.length) edge_note = `Edge check — ${parts.join("; ")}. Factor this into size (analysis, not an instruction); a small sample isn't destiny.`;
+      }
+      return JSON.stringify({ drafted: { symbol: sym, direction: dir, entry, stop, takeProfit1: tp }, edge_note, note: "Opened the Agent DIRECTIVE panel pre-filled. The user picks PAPER/live, reviews the levels, and arms it — nothing was placed or armed." });
     },
   },
   {

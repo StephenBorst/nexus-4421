@@ -6,6 +6,7 @@ import { cardStyle, labelStyle } from "./styles";
 import { formatPnl } from "./helpers";
 import { PnlChart, PnlBars, EmptyState } from "./components";
 import { useIsMobile } from "./useIsMobile";
+import { computeEdge } from "@/config/edge";
 
 // ─── Radar Chart ─────────────────────────────────────────
 function RadarChart({ scores }: { scores: { label: string; value: number }[] }) {
@@ -502,6 +503,80 @@ function PerformanceAnalysis({ orders }: { orders: ProcessedTrade[] }) {
 }
 
 // ─── Analytics View ──────────────────────────────────────
+// ─── Your Edge — the makes-you-a-better-trader synthesis ─────────────────────
+// Turns the user's OWN realized record into a coach's read (strongest/weakest
+// symbol, long-vs-short, ready strengths/leaks) via the shared computeEdge, and
+// hands it to the copilot for the human synthesis. Same edge the get_my_edge tool
+// reads — one source of truth. Renders nothing until there are closed trades.
+function YourEdgeCard({ orders }: { orders: ProcessedTrade[] }) {
+  const isMobile = useIsMobile();
+  const edge = useMemo(
+    () => computeEdge(orders.map((o) => ({ symbol: o.symbol, pnl: o.pnl, side: o.side || o.direction }))),
+    [orders]
+  );
+  if (!edge) return null;
+  const { by_side, best_symbol, worst_symbol, better_side, strengths, weaknesses, sample_note } = edge;
+
+  const symTile = (title: string, s: typeof best_symbol, tone: "pos" | "neg") => (
+    <div style={{ flex: 1, minWidth: 0, border: "1px solid #232327", borderRadius: 6, padding: "10px 12px" }}>
+      <div style={{ fontSize: 9, color: "#52525b", letterSpacing: "0.08em", fontFamily: "var(--nx-font-mono)" }}>{title}</div>
+      {s ? (
+        <>
+          <div style={{ fontSize: 18, color: "#f4f4f5", fontFamily: "var(--nx-font-mono)", marginTop: 2 }}>{s.symbol}</div>
+          <div style={{ fontSize: 11, color: tone === "pos" ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", marginTop: 2 }}>
+            {s.winRatePct}% · {s.pnl >= 0 ? "+" : "-"}${Math.abs(s.pnl)} · {s.trades} trades
+          </div>
+        </>
+      ) : <div style={{ fontSize: 13, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginTop: 4 }}>—</div>}
+    </div>
+  );
+
+  const sideTile = (label: "LONG" | "SHORT") => {
+    const se = by_side[label];
+    const on = better_side === label && se.trades > 0;
+    return (
+      <div style={{ flex: 1, minWidth: 0, border: `1px solid ${on ? "#3a3a40" : "#232327"}`, borderRadius: 6, padding: "10px 12px", background: on ? "rgba(237,237,240,0.03)" : "transparent" }}>
+        <div style={{ fontSize: 9, color: on ? "#ededf0" : "#52525b", letterSpacing: "0.08em", fontFamily: "var(--nx-font-mono)" }}>{label}{on ? " ◂ stronger" : ""}</div>
+        <div style={{ fontSize: 18, color: "#f4f4f5", fontFamily: "var(--nx-font-mono)", marginTop: 2 }}>{se.trades ? `${se.winRatePct}%` : "—"}</div>
+        <div style={{ fontSize: 11, color: se.pnl >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", marginTop: 2 }}>{se.trades ? `${se.pnl >= 0 ? "+" : "-"}$${Math.abs(se.pnl)} · ${se.trades} trades` : "no data"}</div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ ...cardStyle, marginBottom: 8 }}>
+      <div style={labelStyle}>&#9670; YOUR EDGE</div>
+      <div style={{ fontSize: 10, color: "#71717a", fontFamily: "var(--nx-font-mono)", marginTop: -2, marginBottom: 10 }}>where you actually make money — from your own graded record</div>
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8, marginBottom: 8 }}>
+        {symTile("STRONGEST SYMBOL", best_symbol, "pos")}
+        {symTile("WEAKEST SYMBOL", worst_symbol, "neg")}
+        {sideTile("LONG")}
+        {sideTile("SHORT")}
+      </div>
+      {(strengths.length > 0 || weaknesses.length > 0) && (
+        <div style={{ borderTop: "1px solid #232327", paddingTop: 8, marginTop: 2, display: "flex", flexDirection: "column", gap: 4 }}>
+          {strengths.map((s, i) => (
+            <div key={`s${i}`} style={{ fontSize: 11, color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", lineHeight: 1.5 }}><span style={{ color: "#3ecf8e" }}>▲</span> {s}</div>
+          ))}
+          {weaknesses.map((w, i) => (
+            <div key={`w${i}`} style={{ fontSize: 11, color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", lineHeight: 1.5 }}><span style={{ color: "#f7525f" }}>▼</span> {w}</div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 10 }}>
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent("nexus:assistant-ask", { detail: { prompt: "Use get_my_edge — break down my edge, tell me exactly what to trade more of, what to cut, and how to fix my weak spots." } }))}
+          style={{ background: "transparent", border: "1px solid #232327", borderRadius: 6, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 11, letterSpacing: "0.04em", padding: "7px 11px", cursor: "pointer" }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "#ededf0"; e.currentTarget.style.borderColor = "#3a3a40"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "#a1a1aa"; e.currentTarget.style.borderColor = "#232327"; }}
+        >◆ ask nexus ai to coach my edge</button>
+        <span style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{sample_note}</span>
+      </div>
+    </div>
+  );
+}
+
 export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { orders: ProcessedTrade[]; totalPnl: number; winRate: number; collateral: number; }) {
   const volume = useMemo(() => orders.reduce((s, o) => s + o.qty * o.price, 0), [orders]);
   const avgWin = useMemo(() => { const w = orders.filter((o) => o.pnl > 0); return w.length ? w.reduce((s, o) => s + o.pnl, 0) / w.length : 0; }, [orders]);
@@ -544,6 +619,8 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
           <div style={{ fontSize: 10, color: "#52525b", marginTop: 4, fontFamily: "var(--nx-font-mono)" }}>usdc</div>
         </div>
       </div>
+
+      <YourEdgeCard orders={orders} />
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 240px", gap: 8, marginBottom: 8 }}>
         <div style={cardStyle}>
