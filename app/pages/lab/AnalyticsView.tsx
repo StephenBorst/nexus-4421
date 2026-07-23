@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import type { ProcessedTrade } from "./types";
 import { cardStyle, labelStyle } from "./styles";
 import { formatPnl } from "./helpers";
-import { PnlChart, PnlBars, EmptyState } from "./components";
+import { PnlChart, PnlBars, EmptyState, CountUp } from "./components";
 import { useIsMobile } from "./useIsMobile";
 import { computeEdge } from "@/config/edge";
 
@@ -108,9 +108,9 @@ function TradingScoreSection({ orders, winRate }: { orders: ProcessedTrade[]; wi
         <RadarChart scores={metrics.scores} />
         <div style={{ width: isMobile ? "100%" : undefined }}>
           <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 4 }}>COMPOSITE SCORE</div>
-          <div style={{ fontSize: 64, fontWeight: "bold", color: "#ededf0", fontFamily: "var(--nx-font-mono)", lineHeight: 1 }}>{metrics.composite}</div>
+          <div style={{ fontSize: 64, fontWeight: "bold", color: "#ededf0", fontFamily: "var(--nx-font-mono)", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}><CountUp value={metrics.composite} format={(v) => `${Math.round(v)}`} /></div>
           <div style={{ height: 4, background: "#232327", borderRadius: 2, margin: "10px 0 16px" }}>
-            <div style={{ height: 4, background: "#ededf0", borderRadius: 2, width: `${metrics.composite}%` }} />
+            <div style={{ height: 4, background: "#ededf0", borderRadius: 2, width: `${metrics.composite}%`, transition: "width 700ms var(--nx-ease)" }} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
             {metrics.details.map((d) => (
@@ -535,7 +535,7 @@ function YourEdgeCard({ orders }: { orders: ProcessedTrade[] }) {
     const se = by_side[label];
     const on = better_side === label && se.trades > 0;
     return (
-      <div style={{ flex: 1, minWidth: 0, border: `1px solid ${on ? "#3a3a40" : "#232327"}`, borderRadius: 6, padding: "10px 12px", background: on ? "rgba(237,237,240,0.03)" : "transparent" }}>
+      <div style={{ flex: 1, minWidth: 0, border: `1px solid ${on ? "#33333a" : "#232327"}`, borderRadius: 6, padding: "10px 12px", background: on ? "rgba(237,237,240,0.03)" : "transparent" }}>
         <div style={{ fontSize: 9, color: on ? "#ededf0" : "#52525b", letterSpacing: "0.08em", fontFamily: "var(--nx-font-mono)" }}>{label}{on ? " ◂ stronger" : ""}</div>
         <div style={{ fontSize: 18, color: "#f4f4f5", fontFamily: "var(--nx-font-mono)", marginTop: 2 }}>{se.trades ? `${se.winRatePct}%` : "—"}</div>
         <div style={{ fontSize: 11, color: se.pnl >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", marginTop: 2 }}>{se.trades ? `${se.pnl >= 0 ? "+" : "-"}$${Math.abs(se.pnl)} · ${se.trades} trades` : "no data"}</div>
@@ -544,7 +544,7 @@ function YourEdgeCard({ orders }: { orders: ProcessedTrade[] }) {
   };
 
   return (
-    <div style={{ ...cardStyle, marginBottom: 8 }}>
+    <div className="nx-fade-in" style={{ ...cardStyle, marginBottom: 8 }}>
       <div style={labelStyle}>&#9670; YOUR EDGE</div>
       <div style={{ fontSize: 10, color: "#71717a", fontFamily: "var(--nx-font-mono)", marginTop: -2, marginBottom: 10 }}>where you actually make money — from your own graded record</div>
       <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8, marginBottom: 8 }}>
@@ -568,7 +568,7 @@ function YourEdgeCard({ orders }: { orders: ProcessedTrade[] }) {
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent("nexus:assistant-ask", { detail: { prompt: "Use get_my_edge — break down my edge, tell me exactly what to trade more of, what to cut, and how to fix my weak spots." } }))}
           style={{ background: "transparent", border: "1px solid #232327", borderRadius: 6, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 11, letterSpacing: "0.04em", padding: "7px 11px", cursor: "pointer" }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "#ededf0"; e.currentTarget.style.borderColor = "#3a3a40"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "#ededf0"; e.currentTarget.style.borderColor = "#33333a"; }}
           onMouseLeave={(e) => { e.currentTarget.style.color = "#a1a1aa"; e.currentTarget.style.borderColor = "#232327"; }}
         >◆ ask nexus ai to coach my edge</button>
         <span style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{sample_note}</span>
@@ -600,22 +600,22 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 8 }}>
         <div style={cardStyle}>
           <div style={labelStyle}>TOTAL PNL</div>
-          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: totalPnl >= 0 ? "#3ecf8e" : "#f7525f" }}>{formatPnl(totalPnl)}</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: totalPnl >= 0 ? "#3ecf8e" : "#f7525f", fontVariantNumeric: "tabular-nums" }}>{orders.length ? <CountUp value={totalPnl} format={formatPnl} /> : "—"}</div>
           <div style={{ fontSize: 10, color: "#52525b", marginTop: 4, fontFamily: "var(--nx-font-mono)" }}>realized</div>
         </div>
         <div style={cardStyle}>
           <div style={labelStyle}>WIN RATE</div>
-          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#d4d4d8" }}>{orders.length ? `${winRate.toFixed(1)}%` : "—"}</div>
-          <div style={{ height: 4, background: "#232327", borderRadius: 2, marginTop: 8 }}><div style={{ height: 4, background: "#d4d4d8", borderRadius: 2, width: `${winRate}%` }} /></div>
+          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#d4d4d8", fontVariantNumeric: "tabular-nums" }}>{orders.length ? <CountUp value={winRate} format={(v) => `${v.toFixed(1)}%`} /> : "—"}</div>
+          <div style={{ height: 4, background: "#232327", borderRadius: 2, marginTop: 8 }}><div style={{ height: 4, background: "#d4d4d8", borderRadius: 2, width: `${winRate}%`, transition: "width 620ms var(--nx-ease)" }} /></div>
         </div>
         <div style={cardStyle}>
           <div style={labelStyle}>TRADES</div>
-          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#f4f4f5" }}>{orders.length}</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#f4f4f5", fontVariantNumeric: "tabular-nums" }}>{orders.length ? <CountUp value={orders.length} format={(v) => `${Math.round(v)}`} /> : 0}</div>
           <div style={{ fontSize: 10, color: "#52525b", marginTop: 4, fontFamily: "var(--nx-font-mono)" }}>closed</div>
         </div>
         <div style={cardStyle}>
           <div style={labelStyle}>BALANCE</div>
-          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#f4f4f5" }}>{collateral > 0 ? `$${collateral.toFixed(2)}` : "—"}</div>
+          <div style={{ fontSize: 22, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: "#f4f4f5", fontVariantNumeric: "tabular-nums" }}>{collateral > 0 ? <CountUp value={collateral} format={(v) => `$${v.toFixed(2)}`} /> : "—"}</div>
           <div style={{ fontSize: 10, color: "#52525b", marginTop: 4, fontFamily: "var(--nx-font-mono)" }}>usdc</div>
         </div>
       </div>

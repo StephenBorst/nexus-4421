@@ -1,6 +1,7 @@
 // Shared presentational primitives for The Lab.
 // Extracted from index.tsx (god-file split) — prop-driven presentational pieces.
 import { useCallback, useEffect, useRef, useState } from "react";
+import { C } from "@/config/theme";
 
 // ─── Count-up number ─────────────────────────────────────
 // Animates from 0 → value once on mount (and on value change) with an ease-out
@@ -149,9 +150,15 @@ export function PnlChart({ points }: { points: number[] }) {
   const x = (i: number) => padX + (i / (points.length - 1)) * iw;
   const y = (v: number) => padY + (1 - (v - min) / range) * (h - padY * 2);
   const up = points[points.length - 1] >= 0;
-  const stroke = up ? "#ededf0" : "#ff5555";
+  // Semantic P&L color: net-up curve draws GREEN (profit), net-down RED — was
+  // bone-white/drifted-red. Green is the one sanctioned chroma; this is its role.
+  const stroke = up ? C.pos : C.neg;
   const line = points.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
   const linePath = "M" + line.join(" L");
+  // Exact polyline length → the dash offset the curve "draws" itself in from.
+  let drawLen = 0;
+  for (let i = 1; i < points.length; i++) drawLen += Math.hypot(x(i) - x(i - 1), y(i) - y(i - 1));
+  drawLen = Math.ceil(drawLen) + 4;
   // Close the fill to the ZERO baseline (not the chart bottom) so a losing curve
   // reads as a band below breakeven, not a giant block filling the whole panel.
   const areaPath = `${linePath} L${x(points.length - 1).toFixed(1)},${y(0).toFixed(1)} L${x(0).toFixed(1)},${y(0).toFixed(1)} Z`;
@@ -191,11 +198,15 @@ export function PnlChart({ points }: { points: number[] }) {
         {showZero && (
           <line x1={0} y1={zeroY} x2={cw - gutter} y2={zeroY} stroke="#33333a" strokeWidth="1" strokeDasharray="2 4" />
         )}
-        <path d={areaPath} fill={`url(#${gid})`} />
+        <path className="nx-area-in" d={areaPath} fill={`url(#${gid})`} />
         {/* glow = a wider, faint underlay stroke (pure paint, NOT an svg filter —
             older wallet-webview WebKit doesn't clip filter output to the box). */}
         <path d={linePath} fill="none" stroke={stroke} strokeOpacity="0.18" strokeWidth="6" strokeLinejoin="round" strokeLinecap="round" />
-        <path d={linePath} fill="none" stroke={stroke} strokeOpacity="0.95" strokeWidth="2.25" strokeLinejoin="round" strokeLinecap="round" />
+        <path
+          className="nx-draw" d={linePath} fill="none" stroke={stroke} strokeOpacity="0.95"
+          strokeWidth="2.25" strokeLinejoin="round" strokeLinecap="round"
+          style={{ strokeDasharray: drawLen, ["--nx-len"]: `${drawLen}` } as React.CSSProperties}
+        />
         <circle cx={lastX} cy={lastY} r="6" fill={stroke} fillOpacity="0.18" />
         <circle cx={lastX} cy={lastY} r="3.2" fill={stroke} />
         <circle cx={lastX} cy={lastY} r="3.2" fill="none" stroke="#0a0a0b" strokeWidth="1" />
@@ -249,8 +260,11 @@ export function PnlBars({ values, labels }: { values: number[]; labels?: string[
           const x = i * (bw + gap);
           const bh = Math.max(1, Math.abs(v) * scale);
           const yy = v >= 0 ? zeroY - bh : zeroY;
-          const col = v >= 0 ? "#ededf0" : "#ff5555";
+          // Semantic P&L color: profit = green (the one sanctioned chroma), loss =
+          // canonical red. Was bone-white/​drifted-red, which contradicted the legend.
+          const col = v >= 0 ? C.pos : C.neg;
           const tip = labels?.[i] ?? `${v >= 0 ? "+" : "-"}$${Math.abs(v).toFixed(2)}`;
+          const delay = Math.round((i / n) * 320); // left→right grow-in sweep
           return (
             <g key={i}>
               {/* full-column transparent hit area so the tooltip triggers anywhere in
@@ -258,7 +272,11 @@ export function PnlBars({ values, labels }: { values: number[]; labels?: string[
               <rect x={(x - gap / 2).toFixed(1)} y={0} width={(bw + gap).toFixed(1)} height={h} fill="transparent">
                 <title>{tip}</title>
               </rect>
-              <rect x={x.toFixed(1)} y={yy.toFixed(1)} width={bw.toFixed(1)} height={bh.toFixed(1)} fill={col} fillOpacity="0.8" style={{ pointerEvents: "none" }} />
+              <rect
+                x={x.toFixed(1)} y={yy.toFixed(1)} width={bw.toFixed(1)} height={bh.toFixed(1)}
+                fill={col} fillOpacity="0.85" className="nx-grow"
+                style={{ pointerEvents: "none", ["--nx-origin"]: v >= 0 ? "bottom" : "top", ["--nx-delay"]: `${delay}ms` } as React.CSSProperties}
+              />
             </g>
           );
         })}

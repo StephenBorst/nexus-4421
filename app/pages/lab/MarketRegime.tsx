@@ -105,7 +105,7 @@ export function MarketRegime() {
         type="button"
         onClick={() => window.dispatchEvent(new CustomEvent("nexus:assistant-ask", { detail: { prompt: `The market regime is ${regime.label} (score ${regime.score}/100). Use get_market_regime and get_my_edge — what's my best play right now given my strengths, and what should I avoid?` } }))}
         style={{ marginTop: 14, width: "100%", background: "transparent", border: "1px solid #232327", borderRadius: 6, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 11, letterSpacing: "0.04em", padding: "8px 10px", cursor: "pointer", textAlign: "left" }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = "#ededf0"; e.currentTarget.style.borderColor = "#3a3a40"; }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = "#ededf0"; e.currentTarget.style.borderColor = "#33333a"; }}
         onMouseLeave={(e) => { e.currentTarget.style.color = "#a1a1aa"; e.currentTarget.style.borderColor = "#232327"; }}
       >
         ◆ ask nexus ai — what's my play in this regime?
