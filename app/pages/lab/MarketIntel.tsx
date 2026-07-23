@@ -20,10 +20,12 @@ function categorizeNews(title: string, desc: string): string {
 
 async function fetchNewsFeed(url: string, sourceName: string): Promise<NewsItem[]> {
   try {
-    const r = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}&count=10`);
+    // NB: rss2json's `count` param requires a paid key (free tier 422s + returns
+    // nothing) — omit it and slice client-side instead, else the News tab is empty.
+    const r = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`);
     const d = await r.json();
     if (d.status !== "ok") return [];
-    return (d.items as any[]).map((item: any) => ({
+    return (d.items as any[]).slice(0, 10).map((item: any) => ({
       title: item.title?.trim() ?? "",
       description: (item.description ?? "").replace(/<[^>]*>/g, "").slice(0, 240).trim(),
       link: item.link ?? "",

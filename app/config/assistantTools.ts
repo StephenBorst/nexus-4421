@@ -70,6 +70,29 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "explain_move",
+    description:
+      "Explain WHY a market may be moving. Returns the live move (24h % change, funding, OI, volume) plus recent NEWS HEADLINES for that specific asset (works for crypto, commodities like CL/WTI crude or GC/gold, and equities). Use for 'why is oil pumping', 'what's moving BTC', 'why is X dumping'. IMPORTANT when you answer: the headlines are CANDIDATE context, not proven causes — synthesize the most likely drivers, CITE the specific headlines you used (by title), and frame it as a hypothesis ('possible drivers'), never as confirmed causation. If nothing relevant is in the headlines, say the move isn't clearly explained by current news rather than inventing a reason. Offer to draft a thesis from the read.",
+    input_schema: {
+      type: "object",
+      properties: { symbol: { type: "string", description: "Ticker like BTC, CL (WTI crude), GC (gold), SOL." } },
+      required: ["symbol"],
+    },
+    run: async (args) => {
+      const t = shortTicker(String(args.symbol ?? ""));
+      if (!t) return JSON.stringify({ error: "symbol required" });
+      const res = await fetch(`${AGENT_API}/intel/catalysts/${t}`);
+      if (!res.ok) return JSON.stringify({ error: `catalyst fetch failed for ${t} (${res.status})` });
+      const d = await res.json();
+      return JSON.stringify({
+        asset: d.name, ticker: d.ticker, assetClass: d.assetClass,
+        move: d.move,
+        headlines: (d.catalysts ?? []).map((c: { title: string; source: string; link: string; pubDate: string }) => ({ title: c.title, source: c.source, link: c.link, pubDate: c.pubDate })),
+        guidance: d.note ?? "Headlines are candidate context, not confirmed causes.",
+      });
+    },
+  },
+  {
     name: "get_agent_status",
     description:
       "Get the connected user's autonomous trading agent: mode (PAPER/ASSISTED/AUTONOMOUS), active flag, current open position, daily counters, and recent trades. Use for 'what is my agent doing', performance, or status questions.",

@@ -412,6 +412,46 @@ export function orderlyAccountId(address, brokerId) {
   return "0x" + bytesToHex(keccak_256(buf));
 }
 
+// ── Catalyst search mapping ("why is X moving") ──────────────────────────────
+// A perp ticker is a poor news query: "CL" pulls nothing about crude oil, "BZ"
+// nothing about Brent, and a bare "SOL" mixes Solana with unrelated noise. This
+// maps a bare ticker → a human search query + a display name + an asset class, so
+// the /intel/catalysts route can pull RELEVANT headlines for commodities, equities,
+// and majors, and bias the query with "crypto" only when the asset actually is.
+// Not exhaustive across 100+ markets by design — the ambiguous TradFi/commodity/
+// meme tickers are named explicitly; everything else falls back to crypto (the vast
+// majority of the book). Pure + tested.
+const ASSET_MAP = {
+  // majors (crypto)
+  BTC: ["Bitcoin", "crypto"], ETH: ["Ethereum", "crypto"], SOL: ["Solana", "crypto"],
+  BNB: ["BNB Binance", "crypto"], XRP: ["XRP Ripple", "crypto"], DOGE: ["Dogecoin", "crypto"],
+  ADA: ["Cardano", "crypto"], AVAX: ["Avalanche", "crypto"], LINK: ["Chainlink", "crypto"],
+  ARB: ["Arbitrum", "crypto"], OP: ["Optimism crypto", "crypto"], SUI: ["Sui crypto", "crypto"],
+  TON: ["Toncoin", "crypto"], TRX: ["Tron crypto", "crypto"], LTC: ["Litecoin", "crypto"],
+  // memes (crypto) — bare tickers are hopeless queries
+  WIF: ["dogwifhat", "crypto"], PEPE: ["Pepe coin", "crypto"], BONK: ["Bonk crypto", "crypto"],
+  TRUMP: ["Official Trump coin", "crypto"], FARTCOIN: ["Fartcoin", "crypto"],
+  // commodities (TradFi)
+  CL: ["WTI crude oil", "commodity"], BZ: ["Brent crude oil", "commodity"],
+  NG: ["natural gas price", "commodity"], GC: ["gold price", "commodity"],
+  SI: ["silver price", "commodity"], HG: ["copper price", "commodity"],
+  // equities / equity-linked
+  MSTR: ["MicroStrategy Strategy stock", "equity"], COIN: ["Coinbase stock", "equity"],
+  HOOD: ["Robinhood stock", "equity"], NVDA: ["Nvidia stock", "equity"],
+  TSLA: ["Tesla stock", "equity"], AAPL: ["Apple stock", "equity"],
+  SPX: ["S&P 500", "equity"], NDX: ["Nasdaq 100", "equity"], WLFI: ["World Liberty Financial", "crypto"],
+};
+
+export function symbolToQuery(ticker) {
+  const t = String(ticker || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "").replace(/[^A-Z0-9]/g, "");
+  if (!t) return null;
+  const hit = ASSET_MAP[t];
+  if (hit) return { ticker: t, name: hit[0], query: hit[0], assetClass: hit[1] };
+  // Fallback: unknown ticker → assume crypto (the book is overwhelmingly crypto).
+  // The "crypto" qualifier keeps a short/ambiguous ticker from pulling equity noise.
+  return { ticker: t, name: t, query: `${t} crypto`, assetClass: "crypto" };
+}
+
 // ── Chart image URL gate (SSRF guard) ────────────────────────────────────────
 // The OG card embeds a thesis's chartUrl, which means the WORKER fetches a URL that
 // came from user data. That is a server-side request forgery vector — the frontend's

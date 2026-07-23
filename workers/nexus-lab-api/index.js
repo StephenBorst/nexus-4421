@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats, orderlyAccountId, safeChartUrl } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery } from "./logic.mjs";
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./backtest.mjs";
 // Directive level validation lives with the exec's money-path logic (single source);
@@ -2483,6 +2483,57 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       }
     }
 
+
+    // ── /intel/catalysts/:symbol — "why is X moving": move context + headlines ─
+    // Powers the explain_move copilot tool + the Market Intel "Why?" chip. Fuses
+    // the Orderly public move (price/funding/OI) with recent headlines for the
+    // ASSET (rss2json → Google News search, keyed by symbolToQuery so "CL" pulls
+    // crude-oil news, not nothing). The copilot does the SYNTHESIS + citation —
+    // this route only supplies grounded data, so there is NO LLM spend here and
+    // it stays public/no-auth. Fail-soft: a news failure still returns the move.
+    // Edge-cached 300s (also protects the rss2json free-tier quota).
+    if (parts[0] === "intel" && parts[1] === "catalysts" && request.method === "GET") {
+      const rawSym = parts[2] || new URL(request.url).searchParams.get("symbol") || "";
+      const meta = symbolToQuery(rawSym);
+      if (!meta) return json({ error: "symbol required — GET /intel/catalysts/BTC" }, request, 400);
+      const perpSym = `PERP_${meta.ticker}_USDC`;
+      // move context (fail-soft)
+      let move = null;
+      try {
+        const d = (await (await fetch(`https://api-evm.orderly.org/v1/public/futures/${perpSym}`)).json())?.data;
+        if (d) {
+          const mark = Number(d.mark_price), open24 = Number(d["24h_open"]);
+          move = {
+            markPrice: d.mark_price,
+            change24hPct: (mark && open24) ? Math.round(((mark - open24) / open24) * 10000) / 100 : null,
+            fundingRate8h: d.last_funding_rate,
+            openInterest: d.open_interest,
+            volume24h: d["24h_amount"] ?? d.volume,
+          };
+        }
+      } catch { /* fail-soft — return catalysts without move */ }
+      // catalysts (fail-soft): recent headlines for the asset, last 3 days
+      let catalysts = [];
+      try {
+        const gnews = `https://news.google.com/rss/search?q=${encodeURIComponent(meta.query + " when:3d")}&hl=en-US&gl=US&ceid=US:en`;
+        // NB: rss2json's `count` param requires a paid key (422s on free tier) —
+        // omit it and slice below. Edge cache (300s) absorbs the free-tier rate limit.
+        const nd = await (await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(gnews)}`, { signal: AbortSignal.timeout(6000) })).json();
+        if (nd?.status === "ok" && Array.isArray(nd.items)) {
+          catalysts = nd.items.slice(0, 6).map((it) => ({
+            title: String(it.title || "").replace(/ - [^-]*$/, ""), // strip trailing " - Source"
+            source: (String(it.title || "").split(" - ").pop() || "").trim() || (nd.feed?.title ?? ""),
+            link: it.link,
+            pubDate: it.pubDate,
+          }));
+        }
+      } catch { /* fail-soft — return move without catalysts */ }
+      return new Response(JSON.stringify({
+        symbol: perpSym, ticker: meta.ticker, name: meta.name, assetClass: meta.assetClass,
+        move, catalysts, asOf: new Date().toISOString(),
+        note: "Headlines are candidate context, not confirmed causes — correlation is not causation.",
+      }), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300", ...cors(request) } });
+    }
 
     // ── /funding-rate — current funding rate for a symbol ────────────────────
     // Public endpoint, no auth. Returns current funding rate + next funding time.

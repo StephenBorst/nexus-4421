@@ -251,6 +251,33 @@ function useIsMobile(bp = 768) {
   return mob;
 }
 
+// A "why?" chip on a mover — opens the Nexus AI copilot and asks it to explain
+// the move (explain_move tool → live move + cited headlines). Lives inside the
+// mover <a>, so it must swallow the click to avoid also opening the chart link.
+function WhyChip({ ticker }: { ticker: string }) {
+  return (
+    <button
+      type="button"
+      title={`Ask Nexus AI why ${ticker} is moving`}
+      onClick={(e) => {
+        e.preventDefault(); e.stopPropagation();
+        window.dispatchEvent(new CustomEvent("nexus:assistant-ask", {
+          detail: { prompt: `Why is ${ticker} moving right now? Use explain_move and cite the headlines.` },
+        }));
+      }}
+      style={{
+        flexShrink: 0, background: "transparent", border: "1px solid rgba(255,255,255,0.14)",
+        color: MUTED, fontSize: "9px", letterSpacing: "0.05em", padding: "1px 5px",
+        borderRadius: 4, cursor: "pointer", fontFamily: "inherit", lineHeight: 1.4,
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.color = "#ededf0"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.35)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.color = MUTED; e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)"; }}
+    >
+      why?
+    </button>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────
 export default function IntelPage({ embedded = false }: { embedded?: boolean }) {
   const isMobile = useIsMobile();
@@ -665,6 +692,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
               >
                 <span style={{ color: MUTED, fontSize: "12px", flexShrink: 0 }}>{g.symbol}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <WhyChip ticker={g.symbol} />
                   <Sparkline points={g.spark} color="#3ecf8e" />
                   <span style={{ color: GREEN, fontSize: "12px", fontWeight: 600, width: 52, textAlign: "right" }}>+{g.change24h.toFixed(1)}%</span>
                 </span>
@@ -686,6 +714,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
               >
                 <span style={{ color: MUTED, fontSize: "12px", flexShrink: 0 }}>{l.symbol}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <WhyChip ticker={l.symbol} />
                   <Sparkline points={l.spark} color="#f7525f" />
                   <span style={{ color: RED, fontSize: "12px", fontWeight: 600, width: 52, textAlign: "right" }}>{l.change24h.toFixed(1)}%</span>
                 </span>

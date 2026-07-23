@@ -161,6 +161,24 @@ export default function NexusAssistant() {
     if (!seen) { setSeen(true); try { window.localStorage.setItem("nexus_ai_seen", "1"); } catch { /* ignore */ } }
   };
 
+  // Let other surfaces (e.g. the Market Intel "Why?" chip) open the copilot and
+  // ask a question directly — dispatch `nexus:assistant-ask` with { prompt }.
+  // send() is re-created each render, so route through a ref to always hit the
+  // latest closure. (send is a hoisted function declaration below.)
+  const sendRef = useRef<(t?: string) => void>(() => {});
+  sendRef.current = (t?: string) => { void send(t); };
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      const prompt = (e as CustomEvent).detail?.prompt;
+      if (!prompt || typeof prompt !== "string") return;
+      openPanel();
+      setTimeout(() => sendRef.current(prompt), 60); // let the panel mount, then ask
+    };
+    window.addEventListener("nexus:assistant-ask", onAsk as EventListener);
+    return () => window.removeEventListener("nexus:assistant-ask", onAsk as EventListener);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Draggable launcher ──
   // The bubble can be press-and-dragged anywhere; a tap (no real movement) still
   // opens the panel. Position (top-left px) is persisted so it stays put.
@@ -352,8 +370,8 @@ export default function NexusAssistant() {
     return ["What's BTC's funding rate right now?", "What's my agent doing right now?", "Who are the top agents on the leaderboard?"];
   })();
 
-  async function send() {
-    const text = input.trim();
+  async function send(explicit?: string) {
+    const text = (explicit ?? input).trim();
     if (!text || loading) return;
     if (!ready) { setView("settings"); return; }
 
@@ -595,7 +613,7 @@ export default function NexusAssistant() {
               <button onClick={stop} title="Stop"
                 style={{ background: "#241012", border: "1px solid #f7525f", borderRadius: 4, color: "#f7525f", fontFamily: mono, fontSize: 13, padding: "8px 12px", cursor: "pointer" }}>■</button>
             ) : (
-              <button onClick={send} disabled={!input.trim()}
+              <button onClick={() => send()} disabled={!input.trim()}
                 style={{
                   background: input.trim() ? "#141416" : "#0c0c0d",
                   border: `1px solid ${input.trim() ? GREEN : "#232327"}`,

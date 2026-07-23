@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-lab-api/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { gradeCall, resolveAiUpstream, bankrGatewayModel, rankCaller, confluenceSignal, orderlyAccountId, safeChartUrl } from "./logic.mjs";
+import { gradeCall, resolveAiUpstream, bankrGatewayModel, rankCaller, confluenceSignal, orderlyAccountId, safeChartUrl, symbolToQuery } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
 const series = (t0, bars) => ({
@@ -523,4 +523,40 @@ test("safeChartUrl blocks SSRF and spoofing vectors", () => {
   assert.equal(safeChartUrl(""), null);
   assert.equal(safeChartUrl(null), null);
   assert.equal(safeChartUrl(undefined), null);
+});
+
+// ── symbolToQuery (catalyst search mapping) ──────────────────────────────────
+test("symbolToQuery: commodity ticker → named query, not the raw ticker", () => {
+  const cl = symbolToQuery("CL");
+  assert.equal(cl.name, "WTI crude oil");
+  assert.equal(cl.assetClass, "commodity");
+  assert.equal(cl.query, "WTI crude oil");
+});
+
+test("symbolToQuery: crypto major mapped by name", () => {
+  const btc = symbolToQuery("BTC");
+  assert.equal(btc.name, "Bitcoin");
+  assert.equal(btc.assetClass, "crypto");
+});
+
+test("symbolToQuery: meme ticker resolves to real name", () => {
+  assert.equal(symbolToQuery("WIF").name, "dogwifhat");
+});
+
+test("symbolToQuery: normalizes PERP_ / _USDC / casing", () => {
+  assert.equal(symbolToQuery("perp_eth_usdc").name, "Ethereum");
+  assert.equal(symbolToQuery("Sol").name, "Solana");
+});
+
+test("symbolToQuery: unknown ticker falls back to crypto with qualifier", () => {
+  const x = symbolToQuery("ZZZZ");
+  assert.equal(x.assetClass, "crypto");
+  assert.equal(x.query, "ZZZZ crypto");
+  assert.equal(x.ticker, "ZZZZ");
+});
+
+test("symbolToQuery: empty/garbage → null", () => {
+  assert.equal(symbolToQuery(""), null);
+  assert.equal(symbolToQuery("___"), null);
+  assert.equal(symbolToQuery(null), null);
 });
