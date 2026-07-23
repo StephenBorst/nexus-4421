@@ -313,8 +313,8 @@ const RISK_SAMPLE_GATE = 20;
 function hourWinColor(wr: number, trades: number) {
   if (!trades) return "#141416";
   if (wr >= 60) return "#33333a";
-  if (wr >= 40) return "#3a3a1a";
-  return "#3a1a1a";
+  if (wr >= 40) return "#4a3a00";
+  return "#4a1e22";
 }
 function TimingAndRisk({ orders }: { orders: ProcessedTrade[] }) {
   const isMobile = useIsMobile();
@@ -465,7 +465,7 @@ function PerformanceAnalysis({ orders }: { orders: ProcessedTrade[] }) {
         </div>
         <div>
           <div style={{ fontSize: 9, color: "#f7525f", fontFamily: "var(--nx-font-mono)", marginBottom: 4 }}>Worst Trade</div>
-          <div style={{ background: "#150a0a", border: "1px solid #3a1a1a", borderRadius: 4, padding: "10px 12px" }}>
+          <div style={{ background: "#241012", border: "1px solid #4a1e22", borderRadius: 4, padding: "10px 12px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <span style={{ fontSize: 14, color: "#fff", fontWeight: "bold", fontFamily: "var(--nx-font-mono)" }}>{worstSym} {data.worst.direction.toLowerCase()}</span>
               <span style={{ fontSize: 16, color: "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{formatPnl(data.worst.pnl)}</span>

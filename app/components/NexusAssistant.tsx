@@ -518,7 +518,7 @@ export default function NexusAssistant() {
       style={{
         position: "fixed", right: isMobile ? 0 : 16, bottom: isMobile ? 0 : 16, zIndex: 99999,
         width: panelW, height: panelH, maxWidth: "100vw",
-        background: "#0c0c0d", border: `1px solid ${GREEN}`,
+        background: "#0f0f11", border: `1px solid ${GREEN}`,
         borderRadius: isMobile ? "10px 10px 0 0" : 8, overflow: "hidden",
         display: "flex", flexDirection: "column",
         boxShadow: "0 0 24px rgba(0,0,0,0.6)",
@@ -563,12 +563,12 @@ export default function NexusAssistant() {
                     onClick={() => ready && setInput(personalInsight.prompt)}
                     style={{
                       marginTop: 12, padding: "9px 11px", borderRadius: 5,
-                      background: "#1a1206", border: "1px solid #4a3a00",
+                      background: "#2a1a00", border: "1px solid #4a3a00",
                       cursor: ready ? "pointer" : "default",
                     }}
                   >
                     <div style={{ fontFamily: mono, fontSize: 9, color: "#fbbf24", fontWeight: "bold", letterSpacing: "0.04em", marginBottom: 2 }}>⚠ TRADING INSIGHT</div>
-                    <div style={{ fontFamily: mono, fontSize: 10, color: "#d8c89a", lineHeight: 1.5 }}>{personalInsight.text}</div>
+                    <div style={{ fontFamily: mono, fontSize: 10, color: "#a1a1aa", lineHeight: 1.5 }}>{personalInsight.text}</div>
                   </div>
                 )}
                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -626,7 +626,7 @@ export default function NexusAssistant() {
             ) : (
               <button onClick={() => send()} disabled={!input.trim()}
                 style={{
-                  background: input.trim() ? "#141416" : "#0c0c0d",
+                  background: input.trim() ? "#141416" : "#0f0f11",
                   border: `1px solid ${input.trim() ? GREEN : "#232327"}`,
                   borderRadius: 4, color: input.trim() ? GREEN : "#52525b",
                   fontFamily: mono, fontSize: 14, padding: "8px 12px", cursor: input.trim() ? "pointer" : "default",

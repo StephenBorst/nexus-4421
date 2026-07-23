@@ -268,7 +268,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
           <div style={agentLabelStyle}>◎ YOU vs SMART MONEY <span style={{ color: "#52525b" }}>— your open positions vs where the smart money sits</span></div>
           <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
             {alignment.map((a) => (
-              <div key={a.coin} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 8px", borderRadius: 4, border: `1px solid ${a.aligned ? "#1e3a2a" : "#3a1e1e"}`, background: a.aligned ? "#0d140f" : "#140d0d", flexWrap: "wrap" }}>
+              <div key={a.coin} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 8px", borderRadius: 4, border: `1px solid ${a.aligned ? "#33333a" : "#4a1e22"}`, background: a.aligned ? "#0f0f11" : "#0f0f11", flexWrap: "wrap" }}>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ededf0", width: 56, flexShrink: 0 }}>{a.coin}</span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", flexShrink: 0 }}>you <span style={{ color: a.yourSide === "LONG" ? "#3ecf8e" : "#f7525f" }}>{a.yourSide}</span></span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", flexShrink: 0 }}>smart money <span style={{ color: a.smartSide === "LONG" ? "#3ecf8e" : "#f7525f" }}>{a.smartSide}</span> <span style={{ color: "#52525b" }}>({a.traders})</span></span>
@@ -286,11 +286,11 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
 
       {/* ── SMART MONEY CONSENSUS — the highest-conviction signal ── */}
       {consensus.length > 0 && (
-        <div style={{ ...agentCardStyle, marginBottom: 12, borderColor: "#1e3a2a" }}>
+        <div style={{ ...agentCardStyle, marginBottom: 12, borderColor: "#33333a" }}>
           <div style={agentLabelStyle}>◆ SMART MONEY CONSENSUS <span style={{ color: "#52525b" }}>— coins multiple tracked traders agree on</span></div>
           <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
             {consensus.map((c) => (
-              <div key={`${c.sym}${c.side}`} style={{ display: "flex", alignItems: "center", gap: 10, rowGap: 6, flexWrap: "wrap", padding: "8px 10px", border: "1px solid #1a1a1e", borderRadius: 6, background: "#0d140f" }}>
+              <div key={`${c.sym}${c.side}`} style={{ display: "flex", alignItems: "center", gap: 10, rowGap: 6, flexWrap: "wrap", padding: "8px 10px", border: "1px solid #1a1a1e", borderRadius: 6, background: "#0f0f11" }}>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#ededf0", flexShrink: 0 }}>{c.sym}</span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 700, color: c.side === "LONG" ? "#3ecf8e" : "#f7525f", flexShrink: 0 }}>{c.side === "LONG" ? "↑ LONG" : "↓ SHORT"}</span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#a1a1aa", flexShrink: 0 }}>{c.count} traders</span>
@@ -328,7 +328,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
             {events.slice(0, 20).map((e, i) => {
               const watched = watch.includes(e.addr);
               return (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 6px", borderBottom: "1px solid #0d1117", minWidth: 0, flexWrap: "nowrap", overflowX: "auto", background: watched ? "#ededf010" : "transparent", borderLeft: watched ? `2px solid ${TRACKED}` : "2px solid transparent" }}>
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 6px", borderBottom: "1px solid #232327", minWidth: 0, flexWrap: "nowrap", overflowX: "auto", background: watched ? "#ededf010" : "transparent", borderLeft: watched ? `2px solid ${TRACKED}` : "2px solid transparent" }}>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", width: 34, flexShrink: 0 }}>{ago(e.ts)}</span>
                 <span title={e.source === "orderly" ? "Orderly (native)" : "Hyperliquid"} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: e.source === "orderly" ? "#3ecf8e" : "#52525b", width: 12, flexShrink: 0 }}>{e.source === "orderly" ? "◆" : "H"}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 3, flex: "1 1 96px", minWidth: 96 }}>
@@ -384,7 +384,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
                     style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 13, color: starred ? TRACKED : "#52525b", flexShrink: 0, lineHeight: 1 }}>
                     {starred ? "★" : "☆"}
                   </button>
-                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.05em", color: t.source === "orderly" ? "#3ecf8e" : "#71717a", border: `1px solid ${t.source === "orderly" ? "#1e3a2a" : "#232327"}`, borderRadius: 3, padding: "1px 5px", flexShrink: 0 }}>{t.source === "orderly" ? "◆ ORDERLY" : "HL"}</span>
+                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.05em", color: t.source === "orderly" ? "#3ecf8e" : "#71717a", border: `1px solid ${t.source === "orderly" ? "#33333a" : "#232327"}`, borderRadius: 3, padding: "1px 5px", flexShrink: 0 }}>{t.source === "orderly" ? "◆ ORDERLY" : "HL"}</span>
                   <span onClick={() => openDetail(t.address, t.source, t.accountId)} title="View trader detail" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ededf0", flexShrink: 0, cursor: "pointer", textDecoration: "underline", textDecorationColor: "#33333a" }}>{short(t.address)}</span>
                   <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: t.pnl >= 0 ? "#3ecf8e" : "#f7525f", flexShrink: 0 }}>{usd(t.pnl)} <span style={{ color: "#52525b" }}>{t.pnlLabel}</span></span>
                   {t.roi != null && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#a1a1aa", flexShrink: 0 }}>{(t.roi * 100).toFixed(0)}% ROI</span>}
@@ -398,7 +398,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
                   <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
                     {t.positions.slice(0, 5).map((p, j) => (
                       <div key={j} style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 0", flexWrap: "nowrap", overflowX: "auto" }}>
-                        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#e4e4e7", flex: "1 1 72px", minWidth: 72 }}>{p.coin}</span>
+                        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#f4f4f5", flex: "1 1 72px", minWidth: 72 }}>{p.coin}</span>
                         <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, color: p.side === "LONG" ? "#3ecf8e" : "#f7525f", width: 78, flexShrink: 0 }}>{p.side === "LONG" ? "↑ LONG" : "↓ SHORT"}{p.lev ? ` ${p.lev}x` : ""}</span>
                         <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#a1a1aa", flex: "1 1 88px", minWidth: 88, textAlign: "right" }}>{usd(p.szUsd)}</span>
                         <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#52525b", flex: "1 1 92px", minWidth: 92, textAlign: "right" }}>{p.entry > 0 ? `@ $${p.entry.toLocaleString(undefined, { maximumFractionDigits: p.entry < 10 ? 4 : 2 })}` : ""}</span>

@@ -183,7 +183,7 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
                 style={{ fontFamily: mono, fontSize: 10, color: "#141416", background: subStatus === "ok" ? "#33333a" : "#ededf0", border: "none", borderRadius: 3, padding: "7px 10px", cursor: subStatus === "verifying" ? "default" : "pointer", fontWeight: "bold", opacity: subStatus === "verifying" ? 0.6 : 1 }}>
                 {subStatus === "verifying" ? "VERIFYING…" : subStatus === "ok" ? "✓ ACTIVATED" : `ACTIVATE ${TIER_NAME.toUpperCase()}`}
               </button>
-              {subMsg && <div style={{ fontFamily: mono, fontSize: 8.5, color: subStatus === "ok" ? "#ededf0" : "#ff6a6a", lineHeight: 1.4 }}>{subMsg}</div>}
+              {subMsg && <div style={{ fontFamily: mono, fontSize: 8.5, color: subStatus === "ok" ? "#ededf0" : "#f7525f", lineHeight: 1.4 }}>{subMsg}</div>}
             </div>
           )}
         </div>

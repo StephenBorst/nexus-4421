@@ -40,7 +40,7 @@ export function TraderDetail({ source, address, accountId, onClose }: {
       <div className="nx-fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "min(620px, 96vw)", maxHeight: "88vh", overflowY: "auto", background: "#0f0f11", border: "1px solid #33333a", borderRadius: 10 }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderBottom: "1px solid #232327", position: "sticky", top: 0, background: "#0f0f11" }}>
-          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.05em", color: source === "orderly" ? "#3ecf8e" : "#71717a", border: `1px solid ${source === "orderly" ? "#1e3a2a" : "#232327"}`, borderRadius: 3, padding: "1px 5px" }}>{source === "orderly" ? "◆ ORDERLY" : "HL"}</span>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.05em", color: source === "orderly" ? "#3ecf8e" : "#71717a", border: `1px solid ${source === "orderly" ? "#33333a" : "#232327"}`, borderRadius: 3, padding: "1px 5px" }}>{source === "orderly" ? "◆ ORDERLY" : "HL"}</span>
           <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#f4f4f5" }}>{short(address)}</span>
           <a href={source === "hl" ? `/analyze?address=${address}` : `https://orderly-dashboard.orderly.network/address/${address}`} target="_blank" rel="noopener noreferrer"
             style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", textDecoration: "none", border: "1px solid #232327", borderRadius: 3, padding: "3px 8px" }}>
@@ -77,7 +77,7 @@ export function TraderDetail({ source, address, accountId, onClose }: {
               <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase", marginBottom: 6 }}>Realized P&amp;L by market</div>
               <div style={{ display: "flex", flexDirection: "column" }}>
                 {d.bySymbol.slice(0, 18).map((s) => (
-                  <div key={s.sym} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid #0d1117" }}>
+                  <div key={s.sym} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid #232327" }}>
                     <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#d4d4d8", width: 84, flexShrink: 0 }}>{s.sym}</span>
                     {s.open && s.side
                       ? <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: s.side === "LONG" ? "#3ecf8e" : "#f7525f", flexShrink: 0 }}>● {s.side} {usd(s.szUsd)}</span>

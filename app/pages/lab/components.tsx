@@ -50,8 +50,8 @@ export function Coachmark({ storageKey, badge, title, children, when = true }: {
   return (
     <div className="nx-fade-in" style={{
       display: "flex", gap: 12, alignItems: "flex-start",
-      background: "linear-gradient(90deg, #0d1220, #0f0f11)",
-      border: "1px solid #1e2a3a", borderLeft: "3px solid #6cb6ff",
+      background: "linear-gradient(90deg, #0f0f11, #0f0f11)",
+      border: "1px solid #232327", borderLeft: "3px solid #6cb6ff",
       borderRadius: 6, padding: "12px 14px", marginBottom: 12,
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -99,7 +99,7 @@ export function TableSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div style={{ marginTop: 8 }}>
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} style={{ display: "flex", gap: 8, padding: "10px 0", borderBottom: "1px solid #0d1117" }}>
+        <div key={i} style={{ display: "flex", gap: 8, padding: "10px 0", borderBottom: "1px solid #232327" }}>
           {[0.9, 0.4, 0.7, 0.7, 0.6, 0.4, 1].map((f, j) => (
             <div key={j} className="nx-skeleton" style={{ height: 12, flex: f, opacity: 1 - i * 0.16 }} />
           ))}

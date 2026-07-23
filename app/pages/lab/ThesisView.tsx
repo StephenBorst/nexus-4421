@@ -119,7 +119,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
                 href={`https://t.me/nexustradinglabs_bot?start=${walletAddress.toLowerCase()}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ ...navBtnStyle, fontSize: 10, color: "#29b6f6", borderColor: "#1a1a1e", textDecoration: "none", display: "inline-block", textAlign: "center", minHeight: 36, lineHeight: "22px", padding: "6px 12px" }}
+                style={{ ...navBtnStyle, fontSize: 10, color: "#6cb6ff", borderColor: "#1a1a1e", textDecoration: "none", display: "inline-block", textAlign: "center", minHeight: 36, lineHeight: "22px", padding: "6px 12px" }}
               >
                 🔔 ALERTS
               </a>
@@ -196,7 +196,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
               style={{ ...navBtnStyle, fontSize: 10, color: "#ededf0", borderColor: "#33333a", minHeight: 36, padding: "6px 12px" }}>
               ▶ TRADE
             </button>
-            <button onClick={() => onRemove(t.id)} style={{ ...navBtnStyle, fontSize: 10, color: "#f7525f", borderColor: "#2a1a1a", minHeight: 36, padding: "6px 12px" }}>REMOVE</button>
+            <button onClick={() => onRemove(t.id)} style={{ ...navBtnStyle, fontSize: 10, color: "#f7525f", borderColor: "#4a1e22", minHeight: 36, padding: "6px 12px" }}>REMOVE</button>
           </div>
         </div>
       </div>
@@ -356,11 +356,11 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
             <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>HIT TP</div>
             <div style={{ fontSize: 28, color: "#ededf0", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{hits}</div>
           </div>
-          <div style={{ background: "#150a0a", border: "1px solid #4a1e22", borderRadius: 4, padding: "10px 12px" }}>
+          <div style={{ background: "#241012", border: "1px solid #4a1e22", borderRadius: 4, padding: "10px 12px" }}>
             <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>STOPPED OUT</div>
             <div style={{ fontSize: 28, color: "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{stoppedOut}</div>
           </div>
-          <div style={{ background: "#150e00", border: "1px solid #4a3a00", borderRadius: 4, padding: "10px 12px" }}>
+          <div style={{ background: "#2a1a00", border: "1px solid #4a3a00", borderRadius: 4, padding: "10px 12px" }}>
             <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 6 }}>INVALIDATED</div>
             <div style={{ fontSize: 28, color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{invalidated}</div>
           </div>
@@ -421,7 +421,7 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
             <div style={{ fontSize: 10, color: "#71717a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; WORST THESIS</div>
             {worstThesis ? (
               <>
-                <div style={{ background: "#150a0a", border: "1px solid #3a1a1a", borderRadius: 4, padding: "10px 12px", marginBottom: 8 }}>
+                <div style={{ background: "#241012", border: "1px solid #4a1e22", borderRadius: 4, padding: "10px 12px", marginBottom: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
                     <span style={{ fontSize: 15, color: "#fff", fontWeight: "bold", fontFamily: "var(--nx-font-mono)" }}>{worstThesis.symbol}</span>
                     <span style={{ fontSize: 16, color: "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{formatPnl(worstThesis.actualPnl ?? 0)}</span>
@@ -1064,7 +1064,7 @@ export function ThesisView() {
                 <div key={key}>
                   <span style={fieldLabelStyle}>{label}</span>
                   <input
-                    style={{ ...inputStyle, borderColor: key === "stopLoss" ? "#2a1a1a" : key.startsWith("take") ? "#232327" : "#232327" }}
+                    style={{ ...inputStyle, borderColor: key === "stopLoss" ? "#4a1e22" : key.startsWith("take") ? "#232327" : "#232327" }}
                     type="number" placeholder={placeholder}
                     value={form[key as keyof typeof form] as string}
                     onChange={(e) => set(key, e.target.value)}
@@ -1085,14 +1085,14 @@ export function ThesisView() {
                   <>
                     <button onClick={fillEntryFromMark} disabled={!form.symbol || markBusy}
                       title="Fill entry with the current mark price"
-                      style={chip({ color: form.symbol ? "#d4d4d8" : "#33333a", borderColor: "#12324a", cursor: form.symbol ? "pointer" : "not-allowed" })}>
+                      style={chip({ color: form.symbol ? "#d4d4d8" : "#33333a", borderColor: "#33333a", cursor: form.symbol ? "pointer" : "not-allowed" })}>
                       {markBusy ? "…" : "⟳ ENTRY = MARK"}
                     </button>
                     <span style={{ fontSize: 8, color: "#33333a", fontFamily: "var(--nx-font-mono)", marginLeft: 4 }}>STOP</span>
                     {[1, 2, 5].map((p) => (
                       <button key={p} onClick={() => applyStopPct(p)} disabled={!hasEntry}
                         title={`Stop ${p}% ${form.direction === "LONG" ? "below" : "above"} entry`}
-                        style={chip({ color: hasEntry ? "#ff7a7a" : "#3a2a2a", borderColor: "#2a1a1a", cursor: hasEntry ? "pointer" : "not-allowed" })}>
+                        style={chip({ color: hasEntry ? "#f7525f" : "#52525b", borderColor: "#4a1e22", cursor: hasEntry ? "pointer" : "not-allowed" })}>
                         −{p}%
                       </button>
                     ))}
@@ -1124,7 +1124,7 @@ export function ThesisView() {
               <div>
                 <span style={fieldLabelStyle}>FUNDING RATE (% per 8h)</span>
                 <input
-                  style={{ ...inputStyle, borderColor: fundingIsPositive ? "#232327" : "#2a1a1a", color: fundingIsPositive ? "#3ecf8e" : "#f7525f" }}
+                  style={{ ...inputStyle, borderColor: fundingIsPositive ? "#232327" : "#4a1e22", color: fundingIsPositive ? "#3ecf8e" : "#f7525f" }}
                   type="number" placeholder="0.01" step="0.001"
                   value={form.fundingRate} onChange={(e) => set("fundingRate", e.target.value)}
                 />
@@ -1265,7 +1265,7 @@ export function ThesisView() {
                 </div>
                 {/* Confirmation overlay */}
                 {liveConfirm && calc && (
-                  <div style={{ background: "#1a0a00", border: "1px solid #fbbf24", borderRadius: 4, padding: "12px 14px", marginBottom: 8 }}>
+                  <div style={{ background: "#2a1a00", border: "1px solid #fbbf24", borderRadius: 4, padding: "12px 14px", marginBottom: 8 }}>
                     <div style={{ fontSize: 10, color: "#fbbf24", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 10 }}>
                       &#9632; CONFIRM LIVE ORDER
                     </div>
@@ -1290,13 +1290,13 @@ export function ThesisView() {
                     <div style={{ display: "flex", gap: 6 }}>
                       <button onClick={() => setLiveConfirm(false)} style={{
                         flex: 1, padding: "8px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11,
-                        cursor: "pointer", borderRadius: 3, border: "1px solid #2a2a2a",
-                        background: "#0a0a0a", color: "#52525b", letterSpacing: "0.06em",
+                        cursor: "pointer", borderRadius: 3, border: "1px solid #232327",
+                        background: "#0a0a0b", color: "#52525b", letterSpacing: "0.06em",
                       }}>ABORT</button>
                       <button onClick={deployLive} style={{
                         flex: 2, padding: "8px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11,
                         cursor: "pointer", borderRadius: 3, border: "1px solid #fbbf24",
-                        background: "#1a0800", color: "#fbbf24", letterSpacing: "0.08em", fontWeight: "bold",
+                        background: "#2a1a00", color: "#fbbf24", letterSpacing: "0.08em", fontWeight: "bold",
                       }}>&#9632; CONFIRM — DEPLOY LIVE</button>
                     </div>
                   </div>
@@ -1316,7 +1316,7 @@ export function ThesisView() {
                 {liveStatus === "error" && (
                   <div style={{ padding: "10px 12px", background: "#241012", border: "1px solid #4a1e22", borderRadius: 4, marginBottom: 8 }}>
                     <div style={{ fontSize: 10, color: "#f7525f", fontFamily: "var(--nx-font-mono)" }}>&#9632; ORDER FAILED</div>
-                    {liveError && <div style={{ fontSize: 9, color: "#3a2a2a", fontFamily: "var(--nx-font-mono)", marginTop: 4 }}>{liveError}</div>}
+                    {liveError && <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginTop: 4 }}>{liveError}</div>}
                   </div>
                 )}
 
@@ -1381,15 +1381,15 @@ export function ThesisView() {
                       style={{
                         width: "100%", padding: "9px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11,
                         cursor: formValid && isWalletReady ? "pointer" : "not-allowed", borderRadius: 3,
-                        border: `1px solid ${!form.symbol || !isWalletReady ? "#2a1a0a" : "#fbbf24"}`,
-                        background: "#0a0500",
-                        color: !form.symbol || !isWalletReady ? "#2a1a0a" : "#fbbf24",
+                        border: `1px solid ${!form.symbol || !isWalletReady ? "#52525b" : "#fbbf24"}`,
+                        background: "#0a0a0b",
+                        color: !form.symbol || !isWalletReady ? "#52525b" : "#fbbf24",
                         letterSpacing: "0.08em",
                       }}>
                       &#9632; DEPLOY (LIVE)
                     </button>
                     {!form.symbol && <div style={{ fontSize: 9, color: "#33333a", fontFamily: "var(--nx-font-mono)", textAlign: "center", marginTop: 6 }}>enter symbol to deploy</div>}
-                    {form.symbol && !isWalletReady && <div style={{ fontSize: 9, color: "#3a2a1a", fontFamily: "var(--nx-font-mono)", textAlign: "center", marginTop: 6 }}>connect wallet to deploy live</div>}
+                    {form.symbol && !isWalletReady && <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", textAlign: "center", marginTop: 6 }}>connect wallet to deploy live</div>}
                   </>
                 )}
               </>

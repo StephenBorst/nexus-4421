@@ -69,7 +69,7 @@ export function ErrorBoundary() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#101014',
+      background: '#0f0f11',
       color: '#fff',
       display: 'flex',
       flexDirection: 'column',
@@ -90,13 +90,13 @@ export function ErrorBoundary() {
           fontSize: '1.5rem', 
           fontWeight: 'bold', 
           marginBottom: '1rem',
-          color: '#ff4444',
+          color: '#f7525f',
         }}>
           Unexpected Application Error!
         </h1>
         
         <div style={{
-          background: '#0a0a0e',
+          background: '#0a0a0b',
           padding: '1rem',
           borderRadius: '4px',
           marginBottom: '1rem',
@@ -105,7 +105,7 @@ export function ErrorBoundary() {
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
         }}>
-          <div style={{ color: '#ff8888', marginBottom: '0.5rem' }}>
+          <div style={{ color: '#f7525f', marginBottom: '0.5rem' }}>
             {errorMessage}
           </div>
           
@@ -137,11 +137,11 @@ export function ErrorBoundary() {
             <div style={{
               marginTop: '1rem',
               padding: '0.75rem',
-              background: '#2a2a1e',
-              borderLeft: '3px solid #ffaa00',
+              background: '#2a1a00',
+              borderLeft: '3px solid #fbbf24',
               borderRadius: '4px',
             }}>
-              <strong style={{ color: '#ffaa00' }}>Module Import Error Detected</strong>
+              <strong style={{ color: '#fbbf24' }}>Module Import Error Detected</strong>
               <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#ccc' }}>
                 This appears to be a dynamic module import failure. This can happen after a deployment when the service worker cache is out of sync. Try refreshing the page or clearing your browser cache.
               </div>
@@ -161,7 +161,7 @@ export function ErrorBoundary() {
             <pre style={{
               margin: '0.5rem 0',
               padding: '0.5rem',
-              background: '#0a0a0e',
+              background: '#0a0a0b',
               borderRadius: '4px',
               overflow: 'auto',
               fontSize: '0.8rem',

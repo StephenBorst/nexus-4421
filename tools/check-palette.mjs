@@ -30,6 +30,8 @@ const APPROVED_EXTRAS = {
   "#ffffff": "pure white — occasional hard contrast",
   "#000000": "pure black",
   "#0a0a0f": "PWA manifest background",
+  "#ffd700": "leaderboard rank medal — 1st place gold (universal ranking metaphor)",
+  "#cd7f32": "leaderboard rank medal — 3rd place bronze (universal ranking metaphor)",
 };
 
 const hexes = (s) => (s.match(/#[0-9a-fA-F]{6}\b/g) ?? []).map((h) => h.toLowerCase());

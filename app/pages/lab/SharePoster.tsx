@@ -129,9 +129,9 @@ function PosterSVG({ data, svgRef }: { data: PosterData; svgRef: React.Ref<SVGSV
       <line x1="830" y1="150" x2="830" y2="470" stroke={GREEN} strokeOpacity="0.3" strokeWidth="2" />
       <text x={RX} y="228" textAnchor="end" fontFamily={MONO} fontSize="15" letterSpacing="5" fill={GREEN} fillOpacity="0.85">// OMNICHAIN TRADING</text>
       <text x={RX} y="300" textAnchor="end" fontFamily={SANS} fontSize="56" fontWeight="700" fill={BRIGHT}>Nexus</text>
-      <text x={RX} y="358" textAnchor="end" fontFamily={SANS} fontSize="56" fontWeight="700" fill="#6b6b70">Trading</text>
+      <text x={RX} y="358" textAnchor="end" fontFamily={SANS} fontSize="56" fontWeight="700" fill="#71717a">Trading</text>
       <text x={RX} y="416" textAnchor="end" fontFamily={SANS} fontSize="56" fontWeight="700" fill={BRIGHT}>Labs</text>
-      <text x={RX} y="458" textAnchor="end" fontFamily={MONO} fontSize="16" fill="#8a8a90">Perp DEX · Arbitrum · Orderly</text>
+      <text x={RX} y="458" textAnchor="end" fontFamily={MONO} fontSize="16" fill="#a1a1aa">Perp DEX · Arbitrum · Orderly</text>
 
       {/* Footer */}
       <line x1="60" y1="560" x2={W - 60} y2="560" stroke="#1a1a1e" strokeWidth="1" />

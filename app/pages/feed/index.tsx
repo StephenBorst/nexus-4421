@@ -60,7 +60,7 @@ const STATUS_CONFIG = {
   HIT_TP:      { label: "HIT TP",      color: "#ededf0", bg: "#1a1a1e", border: "#33333a" },
   STOPPED_OUT: { label: "STOPPED OUT", color: "#f7525f", bg: "#241012", border: "#4a1e22" },
   INVALIDATED: { label: "INVALIDATED", color: "#fbbf24", bg: "#2a1a00", border: "#4a3a00" },
-  CLOSED:      { label: "CLOSED",      color: "#a1a1aa", bg: "#12161a", border: "#2a3a4a" },
+  CLOSED:      { label: "CLOSED",      color: "#a1a1aa", bg: "#1a1a1e", border: "#33333a" },
 };
 
 // ─── Calc helper (mirrors lab/index.tsx calcThesis) ─────────────────────────
@@ -565,8 +565,8 @@ function FeedCard({
         )}
         {(thesis.copyCount ?? 0) >= 3 && (
           <span style={{
-            fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#f97316",
-            background: "#1a0800", border: "1px solid #3a1800",
+            fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#fbbf24",
+            background: "#2a1a00", border: "1px solid #4a3a00",
             borderRadius: 3, padding: "2px 6px",
           }}>
             🔥 HOT
@@ -908,7 +908,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                   {trader.graded && <span title="Calls graded from public price — trustless" style={{ fontSize: 8, color: "#ededf0", border: "1px solid #33333a", borderRadius: 2, padding: "1px 4px", background: "#1a1a1e" }}>✓ VERIFIED</span>}
                   {trader.graded?.meritRank && <span title={`${trader.graded.meritRank.title} — merit rank earned from your graded calls (not bought)`} style={{ fontSize: 8, color: "#141416", fontWeight: "bold", border: "1px solid #ededf0", borderRadius: 2, padding: "1px 5px", background: "#ededf0", letterSpacing: "0.04em" }}>{trader.graded.meritRank.glyph} {trader.graded.meritRank.title.toUpperCase()}</span>}
                   {!trader.graded && emerging.has(trader.wallet.toLowerCase()) && (
-                    <span title="Resolved public-price-graded calls — 5 needed to become a Verified Caller" style={{ fontSize: 8, color: "#fbbf24", border: "1px solid #4a3a00", borderRadius: 2, padding: "1px 4px", background: "#1a1206" }}>
+                    <span title="Resolved public-price-graded calls — 5 needed to become a Verified Caller" style={{ fontSize: 8, color: "#fbbf24", border: "1px solid #4a3a00", borderRadius: 2, padding: "1px 4px", background: "#2a1a00" }}>
                       ◆ EMERGING · {emerging.get(trader.wallet.toLowerCase())!.toQualify} to verify
                     </span>
                   )}

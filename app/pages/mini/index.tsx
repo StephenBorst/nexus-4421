@@ -836,7 +836,7 @@ export default function MiniApp() {
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <input type="number" inputMode="decimal" min={1} value={withdrawAmt} onChange={(e) => setWithdrawAmt(Math.max(0, parseFloat(e.target.value) || 0))} style={{ flex: 1, minWidth: 0, background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4, color: "#f4f4f5", fontFamily: mono, fontSize: 13, padding: "8px 9px" }} />
-              <button onClick={withdraw} disabled={withdrawing || withdrawAmt <= 0} style={{ flexShrink: 0, background: "#1a140a", color: "#fbbf24", border: "1px solid #4a3a1a", borderRadius: 4, padding: "8px 16px", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: withdrawing ? "wait" : "pointer", letterSpacing: "0.05em", opacity: withdrawing ? 0.6 : 1 }}>{withdrawing ? "…" : "WITHDRAW"}</button>
+              <button onClick={withdraw} disabled={withdrawing || withdrawAmt <= 0} style={{ flexShrink: 0, background: "#2a1a00", color: "#fbbf24", border: "1px solid #4a3a00", borderRadius: 4, padding: "8px 16px", fontFamily: mono, fontSize: 12, fontWeight: "bold", cursor: withdrawing ? "wait" : "pointer", letterSpacing: "0.05em", opacity: withdrawing ? 0.6 : 1 }}>{withdrawing ? "…" : "WITHDRAW"}</button>
             </div>
             {withdrawMsg && <div style={{ fontSize: 10, color: withdrawMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{withdrawMsg.text}</div>}
           </div>
@@ -880,7 +880,7 @@ export default function MiniApp() {
                 <div style={{ fontSize: 11, color: "#a1a1aa", lineHeight: 1.5 }}>
                   Try the <span style={{ color: "#fbbf24" }}>BTC Funding Fade</span> — a selective funding-fade with a breakeven risk-free stop. <span style={{ color: "#fff" }}>Experimental, PAPER only</span> (it doesn't yet pass our cross-market validation). No funds, no key.
                 </div>
-                <button onClick={deployPaperAgent} disabled={agentBusy} style={{ background: "#1a140a", color: "#fbbf24", border: "1px solid #4a3a1a", borderRadius: 5, padding: "10px 0", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: agentBusy ? "wait" : "pointer", letterSpacing: "0.04em", opacity: agentBusy ? 0.6 : 1 }}>{agentBusy ? "DEPLOYING…" : "🧪 PAPER-TEST BTC FUNDING FADE"}</button>
+                <button onClick={deployPaperAgent} disabled={agentBusy} style={{ background: "#2a1a00", color: "#fbbf24", border: "1px solid #4a3a00", borderRadius: 5, padding: "10px 0", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: agentBusy ? "wait" : "pointer", letterSpacing: "0.04em", opacity: agentBusy ? 0.6 : 1 }}>{agentBusy ? "DEPLOYING…" : "🧪 PAPER-TEST BTC FUNDING FADE"}</button>
               </>
             )}
             {agentMsg && <div style={{ fontSize: 10, color: agentMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{agentMsg.text}</div>}

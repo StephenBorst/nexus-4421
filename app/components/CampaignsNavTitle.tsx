@@ -42,9 +42,9 @@ function CampaignsFlameIcon(props: SVGProps<SVGSVGElement>) {
       />
       <defs>
         <linearGradient id={gradientId} x1={15.224} y1={15.37} x2={5.383} y2={15.341} gradientUnits="userSpaceOnUse">
-          <stop stopColor="#48bdff" />
-          <stop offset={0.479} stopColor="#786cff" />
-          <stop offset={1} stopColor="#bd00ff" />
+          <stop stopColor="#ededf0" />
+          <stop offset={0.479} stopColor="#a1a1aa" />
+          <stop offset={1} stopColor="#52525b" />
         </linearGradient>
       </defs>
     </svg>

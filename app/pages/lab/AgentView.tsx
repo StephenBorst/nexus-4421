@@ -814,9 +814,9 @@ export function AgentView() {
         </div>
       )}
       {prefillNotice && (
-        <div style={{ ...agentCardStyle, borderColor: "#fbbf24", background: "#1a1400", marginBottom: 12, display: "flex", gap: 10, alignItems: "flex-start" }}>
+        <div style={{ ...agentCardStyle, borderColor: "#fbbf24", background: "#2a1a00", marginBottom: 12, display: "flex", gap: 10, alignItems: "flex-start" }}>
           <span style={{ color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontSize: 13, flexShrink: 0 }}>⚠</span>
-          <span style={{ color: "#e8d59a", fontFamily: "var(--nx-font-ui)", fontSize: 12, lineHeight: 1.5, flex: 1 }}>{prefillNotice}</span>
+          <span style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 12, lineHeight: 1.5, flex: 1 }}>{prefillNotice}</span>
           <span onClick={() => setPrefillNotice(null)} title="Dismiss" style={{ cursor: "pointer", color: "#fbbf24", flexShrink: 0 }}>✕</span>
         </div>
       )}
@@ -835,7 +835,7 @@ export function AgentView() {
             </span>
             <a href={`https://t.me/${TG_BOT}?start=${walletAddress.toLowerCase()}`} target="_blank" rel="noopener noreferrer"
               style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, fontWeight: "bold", letterSpacing: "0.05em", textDecoration: "none",
-                color: "#29b6f6", border: "1px solid #12324a", background: "#0f0f11", borderRadius: 3, padding: "7px 14px", flexShrink: 0 }}>
+                color: "#6cb6ff", border: "1px solid #33333a", background: "#0f0f11", borderRadius: 3, padding: "7px 14px", flexShrink: 0 }}>
               {tgLinked ? "MANAGE ↗" : "LINK TELEGRAM ↗"}
             </a>
           </div>
@@ -929,7 +929,7 @@ export function AgentView() {
                 <button key={m} onClick={() => setDirectiveMode(m)} style={{
                   flex: 1, padding: "8px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11, cursor: "pointer", borderRadius: 3,
                   border: `1px solid ${directiveMode === m ? (m === "PAPER" ? "#d4d4d8" : "#fbbf24") : "#232327"}`,
-                  background: directiveMode === m ? (m === "PAPER" ? "#1a1a1e" : "#1a0800") : "#0f0f11",
+                  background: directiveMode === m ? (m === "PAPER" ? "#1a1a1e" : "#2a1a00") : "#0f0f11",
                   color: directiveMode === m ? (m === "PAPER" ? "#d4d4d8" : "#fbbf24") : "#52525b",
                 }}>{m === "PAPER" ? "PAPER (simulated)" : "AUTONOMOUS (real $)"}</button>
               ))}
@@ -942,12 +942,12 @@ export function AgentView() {
             <div style={{ display: "flex", gap: 6 }}>
               <button onClick={() => setDirectiveDraft(null)} disabled={directiveBusy} style={{
                 flex: 1, padding: "9px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11, cursor: "pointer", borderRadius: 3,
-                border: "1px solid #2a2a2a", background: "#0a0a0a", color: "#52525b",
+                border: "1px solid #232327", background: "#0a0a0b", color: "#52525b",
               }}>DISMISS</button>
               <button onClick={armDirective} disabled={directiveBusy} style={{
                 flex: 2, padding: "9px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", letterSpacing: "0.06em",
                 cursor: directiveBusy ? "wait" : "pointer", borderRadius: 3,
-                border: `1px solid ${live ? "#fbbf24" : "#33333a"}`, background: live ? "#1a0800" : "#1a1a1e",
+                border: `1px solid ${live ? "#fbbf24" : "#33333a"}`, background: live ? "#2a1a00" : "#1a1a1e",
                 color: live ? "#fbbf24" : "#ededf0",
               }}>{directiveBusy ? "ARMING…" : live ? "▶ ARM LIVE — GO LIVE" : "▶ ARM (PAPER)"}</button>
             </div>
@@ -984,7 +984,7 @@ export function AgentView() {
             {armed && (
               <button onClick={cancelDirective} disabled={directiveBusy} style={{
                 padding: "7px 16px", fontFamily: "var(--nx-font-mono)", fontSize: 10, cursor: directiveBusy ? "wait" : "pointer",
-                borderRadius: 3, border: "1px solid #4a1e22", background: "#150a0a", color: "#ff6666",
+                borderRadius: 3, border: "1px solid #4a1e22", background: "#241012", color: "#f7525f",
               }}>{directiveBusy ? "…" : "CANCEL DIRECTIVE"}</button>
             )}
             {!armed && (
@@ -1115,7 +1115,7 @@ export function AgentView() {
             </ol>
             <div style={{
               marginTop: 10, padding: "8px 10px", borderRadius: 3,
-              background: tradingKey ? "#1a1a1e" : "#1a1400",
+              background: tradingKey ? "#1a1a1e" : "#2a1a00",
               border: `1px solid ${tradingKey ? "#33333a" : "#4a3a00"}`,
               fontFamily: "var(--nx-font-mono)", fontSize: 11,
               color: tradingKey ? "#ededf0" : "#fbbf24",
@@ -1151,7 +1151,7 @@ export function AgentView() {
               })}
             </div>
             {config.mode === "AUTONOMOUS" && (
-              <div style={{ marginTop: 8, padding: 8, background: "#1a0e00", border: "1px solid #fbbf2430", borderRadius: 3 }}>
+              <div style={{ marginTop: 8, padding: 8, background: "#2a1a00", border: "1px solid #fbbf2430", borderRadius: 3 }}>
                 <span style={{ color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
                   ⚠ AUTONOMOUS MODE — Agent will execute trades using your Orderly trading key. Your wallet keys are never stored. The trading key can place orders but CANNOT withdraw funds. You can deactivate at any time.
                 </span>
@@ -1827,10 +1827,10 @@ export function AgentView() {
                   ■ DEACTIVATE
                 </button>
                 <button onClick={killSwitch} disabled={saving} style={{
-                  background: "#ff000020",
-                  border: "1px solid #ff0000",
+                  background: "#f7525f20",
+                  border: "1px solid #f7525f",
                   borderRadius: 4,
-                  color: "#ff0000",
+                  color: "#f7525f",
                   fontFamily: "var(--nx-font-mono)",
                   fontSize: 11,
                   padding: "8px 16px",
@@ -1845,7 +1845,7 @@ export function AgentView() {
           </div>
 
           {!tradingKey && config.mode !== "PAPER" && (
-            <div style={{ marginTop: 12, padding: 10, background: "#1a1a0a", border: "1px solid #fbbf2430", borderRadius: 3 }}>
+            <div style={{ marginTop: 12, padding: 10, background: "#2a1a00", border: "1px solid #fbbf2430", borderRadius: 3 }}>
               <span style={{ color: "#fbbf24", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>
                 ⚠ No Orderly trading key detected. Place at least one manual trade on Nexus first — the SDK generates your trading key on first trade. This key allows order placement only and cannot withdraw funds. <strong style={{ color: "#d4d4d8" }}>Or try 🧪 PAPER mode — no key needed.</strong>
               </span>
@@ -1957,7 +1957,7 @@ export function AgentView() {
 
           {/* ── LEADERBOARD STANDING — why this agent is / isn't on TOP AGENTS ── */}
           {standing && standing.stats && standing.stats.trades > 0 && (
-            <div style={{ ...agentCardStyle, borderColor: standing.eligible ? "#232327" : "#2a2a1a" }}>
+            <div style={{ ...agentCardStyle, borderColor: standing.eligible ? "#232327" : "#33333a" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                 <div style={{ ...agentLabelStyle, color: standing.eligible ? "#ededf0" : "#fbbf24" }}>
                   ◆ LEADERBOARD STANDING
@@ -1969,11 +1969,11 @@ export function AgentView() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginTop: 12 }}>
                 {standing.criteria.map((c) => (
                   <div key={c.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ color: c.met ? "#ededf0" : "#ff6644", fontFamily: "var(--nx-font-mono)", fontSize: 13 }}>
+                    <span style={{ color: c.met ? "#ededf0" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontSize: 13 }}>
                       {c.met ? "✓" : "✗"}
                     </span>
                     <div>
-                      <div style={{ color: c.met ? "#d4d4d8" : "#9a9a8a", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>{c.label}</div>
+                      <div style={{ color: c.met ? "#d4d4d8" : "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>{c.label}</div>
                       <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
                         {c.key === "profitable"
                           ? `now: ${c.value >= 0 ? "+" : ""}$${c.value.toFixed(2)}`
@@ -2199,7 +2199,7 @@ export function AgentView() {
                   <div
                     key={rowId}
                     className={`nx-trade-row is-clickable${open ? " is-open" : ""}`}
-                    style={{ minWidth: 580, borderBottom: "1px solid #0d1117" }}
+                    style={{ minWidth: 580, borderBottom: "1px solid #232327" }}
                     onClick={() => setExpandedTrade(open ? null : rowId)}
                     role="button" tabIndex={0}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpandedTrade(open ? null : rowId); } }}

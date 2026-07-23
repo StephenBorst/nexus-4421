@@ -204,7 +204,7 @@ export function TradeLogAllView({
                 gridTemplateColumns: "180px 1fr repeat(4, 90px) 28px",
                 minWidth: isMobile ? 620 : undefined,
                 alignItems: "center", gap: 12,
-                borderColor: g.pnl >= 0 ? "#232327" : "#3a1a1a",
+                borderColor: g.pnl >= 0 ? "#232327" : "#4a1e22",
                 transition: "background 0.15s",
               }}
               onMouseEnter={e => (e.currentTarget.style.background = "#141416")}
@@ -275,8 +275,8 @@ export function TradeLogView({ dayKey, data, onBack, initialNote, onSaveNote }: 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 9, color: "#52525b", background: "#141416", border: "1px solid #232327", padding: "3px 8px", borderRadius: 3, fontFamily: "var(--nx-font-mono)" }}>{data.trades} TRADES</span>
           <div style={{ display: "flex", gap: 4 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#ff5f57" }} />
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#febc2e" }} />
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f7525f" }} />
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#fbbf24" }} />
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#3ecf8e" }} />
           </div>
         </div>

@@ -56,7 +56,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   HIT_TP:      { label: "HIT TP",      color: "#ededf0", bg: "#1a1a1e", border: "#33333a" },
   STOPPED_OUT: { label: "STOPPED OUT", color: "#f7525f", bg: "#241012", border: "#4a1e22" },
   INVALIDATED: { label: "INVALIDATED", color: "#fbbf24", bg: "#2a1a00", border: "#4a3a00" },
-  CLOSED:      { label: "CLOSED",      color: "#a1a1aa", bg: "#12161a", border: "#2a3a4a" },
+  CLOSED:      { label: "CLOSED",      color: "#a1a1aa", bg: "#1a1a1e", border: "#33333a" },
   PENDING:     { label: "PENDING",     color: "#a1a1aa", bg: "#141416", border: "#33333a" },
 };
 

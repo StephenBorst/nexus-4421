@@ -42,7 +42,7 @@ function PositionRow({ position }: { position: Record<string, unknown> }) {
       <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#a1a1aa" }}>{Math.abs(qty)} @ ${entry.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
       <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", color: uPnl >= 0 ? "#3ecf8e" : "#f7525f" }}>{uPnl >= 0 ? "+" : ""}${uPnl.toFixed(2)}</span>
       <button onClick={close} disabled={isMutating} style={{
-        marginLeft: "auto", background: "#241012", color: "#ff7a7a", border: "1px solid #4a1e22", borderRadius: 3,
+        marginLeft: "auto", background: "#241012", color: "#f7525f", border: "1px solid #4a1e22", borderRadius: 3,
         padding: "5px 12px", cursor: isMutating ? "wait" : "pointer", fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: "bold", letterSpacing: "0.06em",
       }}>{isMutating ? "CLOSING…" : "CLOSE"}</button>
       {err && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#f7525f", width: "100%" }}>{err}</span>}
@@ -248,7 +248,7 @@ export function QuickTrade() {
           fontSize: 14, fontWeight: "bold", letterSpacing: "0.08em", opacity: busy === "SELL" ? 0.4 : 1,
         }}>{busy === "BUY" ? "PLACING…" : confirmSide === "BUY" ? "TAP TO CONFIRM ✓" : "↑ LONG"}</button>
         <button onClick={() => tap("SELL")} disabled={tooSmall || !!busy || isMutating} style={{
-          background: tooSmall ? "#241012" : "#f7525f", color: tooSmall ? "#6a3a3a" : "#fff", border: "1px solid #f7525f",
+          background: tooSmall ? "#241012" : "#f7525f", color: tooSmall ? "#52525b" : "#fff", border: "1px solid #f7525f",
           borderRadius: 4, padding: "14px 0", cursor: tooSmall ? "not-allowed" : "pointer", fontFamily: "var(--nx-font-mono)",
           fontSize: 14, fontWeight: "bold", letterSpacing: "0.08em", opacity: busy === "BUY" ? 0.4 : 1,
         }}>{busy === "SELL" ? "PLACING…" : confirmSide === "SELL" ? "TAP TO CONFIRM ✓" : "↓ SHORT"}</button>

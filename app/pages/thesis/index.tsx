@@ -56,7 +56,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   HIT_TP:      { label: "HIT TP",      color: "#ededf0", bg: "#1a1a1e", border: "#33333a" },
   STOPPED_OUT: { label: "STOPPED OUT", color: "#f7525f", bg: "#241012", border: "#4a1e22" },
   INVALIDATED: { label: "INVALIDATED", color: "#fbbf24", bg: "#2a1a00", border: "#4a3a00" },
-  CLOSED:      { label: "CLOSED",      color: "#a1a1aa", bg: "#12161a", border: "#2a3a4a" },
+  CLOSED:      { label: "CLOSED",      color: "#a1a1aa", bg: "#1a1a1e", border: "#33333a" },
   PENDING:     { label: "PENDING",     color: "#a1a1aa", bg: "#141416", border: "#33333a" },
 };
 
@@ -266,7 +266,7 @@ export default function ThesisPage() {
         <a
           href={shareFc} target="_blank" rel="noopener noreferrer"
           title="Share on Farcaster"
-          style={{ textDecoration: "none", border: "1px solid #232327", borderRadius: 3, color: "#8a7aff", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 9px", letterSpacing: "0.05em" }}
+          style={{ textDecoration: "none", border: "1px solid #232327", borderRadius: 3, color: "#6cb6ff", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 9px", letterSpacing: "0.05em" }}
         >✦ CAST</a>
         <button
           onClick={handleShare}
@@ -447,7 +447,7 @@ export default function ThesisPage() {
                       </div>
                     </div>
                     {!verifyResult.verified && (
-                      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#5a3a1a" }}>
+                      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a" }}>
                         price data does not confirm recorded outcome — outcome may have been manually set
                       </div>
                     )}
