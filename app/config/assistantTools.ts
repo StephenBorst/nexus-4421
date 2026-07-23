@@ -155,6 +155,17 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "get_my_edge",
+    description:
+      "Get the user's PERSONALIZED EDGE — a coach's read derived purely from their own realized results: which symbols and which direction (long vs short) they actually make money on, and where they bleed, with per-symbol win rate + avg PnL. Use for 'what am I good at', 'where's my edge', 'what should I stop trading', or to ground any coaching in the user's real record (not vibes). Respect the sample_note (small samples are directional, not conclusive), and keep to analysis — never a 'trade this now' instruction.",
+    input_schema: { type: "object", properties: {} },
+    run: async (_args, ctx) => {
+      const edge = (ctx.performance as { edge?: unknown } | null)?.edge;
+      if (!edge) return JSON.stringify({ error: "no closed trades yet — an edge readout needs a realized record (or wallet not authenticated to Orderly)" });
+      return JSON.stringify(edge);
+    },
+  },
+  {
     name: "get_top_agents",
     description:
       "Get the public TRUSTLESS autonomous-agent leaderboard: agents ranked by risk-adjusted score over their real on-chain-anchored trade ledger. Use to compare agent strategies or answer 'who are the top agents'.",

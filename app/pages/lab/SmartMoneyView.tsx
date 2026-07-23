@@ -296,6 +296,14 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#a1a1aa", flexShrink: 0 }}>{c.count} traders</span>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", flexShrink: 0 }}>{usd(c.netUsd)}</span>
                 <span style={{ marginLeft: "auto", display: "flex", gap: 6, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    title="Ask Nexus AI to analyze this consensus"
+                    onClick={() => window.dispatchEvent(new CustomEvent("nexus:assistant-ask", { detail: { prompt: `${c.count} tracked smart-money traders are ${c.side} ${c.sym}. Use get_smart_money and explain_move — is this consensus worth following, what's driving it, and how does it fit my edge?` } }))}
+                    style={{ background: "transparent", border: "1px solid #232327", borderRadius: 4, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "2px 6px", cursor: "pointer" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#ededf0"; e.currentTarget.style.borderColor = "#3a3a40"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "#a1a1aa"; e.currentTarget.style.borderColor = "#232327"; }}
+                  >◆ ask</button>
                   {shareBtn({ kind: "smart", symbol: c.sym, direction: c.side, szUsd: c.netUsd, consensus: c.count })}
                   {thesisBtn(() => openThesis(c.sym, c.side, c.refPrice, `Smart-money consensus: ${c.count} top traders are ${c.side} ${c.sym}.`))}
                   {tradeBtn(() => copy(c.sym, c.side, c.refPrice))}

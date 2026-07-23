@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAccount, usePrivateQuery, usePositionStream } from "@orderly.network/hooks";
 import { useLabStorage } from "@/hooks/useLabStorage";
+import { computeEdge } from "@/config/edge";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { useSubscription } from "@/hooks/useSubscription";
 import {
@@ -126,7 +127,7 @@ export default function NexusAssistant() {
     const rows = Array.isArray(histData) ? histData : ((histData as { rows?: unknown[] })?.rows ?? []);
     const trades = (rows as Record<string, unknown>[])
       .filter((o) => o.position_status === "closed")
-      .map((o) => ({ symbol: String(o.symbol ?? ""), pnl: parseFloat(String(o.realized_pnl ?? 0)) }));
+      .map((o) => ({ symbol: String(o.symbol ?? ""), pnl: parseFloat(String(o.realized_pnl ?? 0)), side: String(o.side ?? "") }));
     if (!trades.length) return null;
     const wins = trades.filter((t) => t.pnl > 0).length;
     const losses = trades.filter((t) => t.pnl < 0).length;
@@ -147,6 +148,8 @@ export default function NexusAssistant() {
       best_trade: best ? { symbol: clean(best.symbol), pnl: +best.pnl.toFixed(2) } : null,
       worst_trade: worst ? { symbol: clean(worst.symbol), pnl: +worst.pnl.toFixed(2) } : null,
       by_symbol: Object.entries(bySym).map(([s, v]) => ({ symbol: s, trades: v.trades, pnl: +v.pnl.toFixed(2) })).sort((a, b) => b.trades - a.trades).slice(0, 8),
+      // Personalized edge readout (per-symbol win rate + long/short) for get_my_edge.
+      edge: computeEdge(trades),
     };
   }, [histData]);
   const navigate = useNavigate();
@@ -341,6 +344,14 @@ export default function NexusAssistant() {
   // Locally-computed (no API call) personalized hook — drives the first
   // conversation by surfacing a real leak the moment the panel opens.
   const personalInsight = (() => {
+    // Edge-derived insight is the strongest signal — lead with it when present.
+    const edge = performance?.edge as { strengths: string[]; weaknesses: string[] } | null | undefined;
+    if (edge?.weaknesses?.length) {
+      return { text: `${edge.weaknesses[0]} Ask me how to fix it.`, prompt: "Use get_my_edge — where am I losing money, and exactly how do I fix it?" };
+    }
+    if (edge?.strengths?.length) {
+      return { text: `${edge.strengths[0]} Ask me how to lean into it.`, prompt: "Use get_my_edge — what am I best at, and how do I trade to my strengths?" };
+    }
     const wr = performance?.win_rate_pct as number | null | undefined;
     const pnl = performance?.total_pnl as number | undefined;
     const worst = performance?.worst_trade as { symbol: string; pnl: number } | null | undefined;
@@ -365,9 +376,9 @@ export default function NexusAssistant() {
     const trader = p.match(/\/feed\/trader\/(0x[0-9a-fA-F]{40})/);
     if (trader) return ["Analyze this trader's track record", "How do they compare to the top callers?", "What's their best setup?"];
     const sym = p.match(/\/perp\/PERP_([A-Z0-9]+)_USDC/i);
-    if (sym) { const s = sym[1].toUpperCase(); return [`What's ${s}'s funding & OI right now?`, `Draft me a thesis on ${s}`, `Is now a risky time to trade ${s}?`]; }
-    if (p.startsWith("/lab")) return ["How's my track record?", "Draft me a thesis on BTC", "What's my agent doing right now?"];
-    return ["What's BTC's funding rate right now?", "What's my agent doing right now?", "Who are the top agents on the leaderboard?"];
+    if (sym) { const s = sym[1].toUpperCase(); return [`Why is ${s} moving right now?`, `Draft me a thesis on ${s}`, `What's ${s}'s funding & OI right now?`]; }
+    if (p.startsWith("/lab")) return ["Where's my edge — what am I best at?", "Why is BTC moving right now?", "What's my agent doing right now?"];
+    return ["Why is BTC moving right now?", "Where's my edge — what am I best at?", "Who are the top agents on the leaderboard?"];
   })();
 
   async function send(explicit?: string) {
