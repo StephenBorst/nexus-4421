@@ -453,7 +453,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
 
   // ── JSX ─────────────────────────────────────────────────────
   return (
-    <div style={page}>
+    <div className="nx-stagger" style={page}>
 
       {/* ── Header ─────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "6px" }}>

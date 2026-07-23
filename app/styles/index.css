@@ -216,22 +216,37 @@ html, body {
    A hairline grid + a slow radial scan of light, fixed behind everything. This
    is the ownable atmosphere — kept faint enough to feel, not read. It sits at
    z-index 0; page content paints above wherever it sets its own surface. */
-.nx-ambient { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.nx-ambient {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  /* ── Texture intensity — tune here, one place. ──────────────────────────────
+     --nx-grid-op : hairline grid strength (0 = off; 0.06 whisper · 0.14 present)
+     --nx-grid-size: grid pitch (smaller = denser, more "engineered")
+     --nx-scan-op : moving light strength · --nx-vignette: edge falloff depth */
+  --nx-grid-op: 0.09;
+  --nx-grid-size: 44px;
+  --nx-scan-op: 0.045;
+  --nx-vignette: 0.22;
+  /* Edge vignette — only shows on exposed canvas (behind content), adds depth to
+     the margins without touching readability. */
+  background: radial-gradient(135% 105% at 50% -5%, transparent 58%, rgba(0,0,0,var(--nx-vignette)));
+}
 .nx-ambient::before {
   content: ""; position: absolute; inset: 0;
   background-image:
     linear-gradient(var(--nx-border) 1px, transparent 1px),
     linear-gradient(90deg, var(--nx-border) 1px, transparent 1px);
-  background-size: 48px 48px; opacity: 0.10;
-  -webkit-mask-image: radial-gradient(ellipse 92% 65% at 50% 0%, #000 18%, transparent 78%);
-          mask-image: radial-gradient(ellipse 92% 65% at 50% 0%, #000 18%, transparent 78%);
+  background-size: var(--nx-grid-size) var(--nx-grid-size); opacity: var(--nx-grid-op);
+  /* Concentrated at the top and dissolving into the content — reads as header
+     atmosphere, not a flat wallpaper. */
+  -webkit-mask-image: radial-gradient(125% 82% at 50% -8%, #000 0%, #000 32%, transparent 72%);
+          mask-image: radial-gradient(125% 82% at 50% -8%, #000 0%, #000 32%, transparent 72%);
 }
 .nx-ambient::after {
-  content: ""; position: absolute; inset: -35% -10% auto -10%; height: 70%;
-  background: radial-gradient(ellipse at 50% 0%, rgba(237,237,240,0.04), transparent 60%);
-  animation: nx-scan 16s var(--nx-ease) infinite alternate;
+  content: ""; position: absolute; inset: -35% -12% auto -12%; height: 72%;
+  background: radial-gradient(ellipse at 50% 0%, rgba(237,237,240,var(--nx-scan-op)), transparent 62%);
+  animation: nx-scan 22s var(--nx-ease) infinite alternate;
 }
-@keyframes nx-scan { from { transform: translateX(-5%); } to { transform: translateX(5%); } }
+@keyframes nx-scan { from { transform: translateX(-4%); } to { transform: translateX(4%); } }
 /* App shell renders inside #root; keep it above the ambient layer. */
 #root { position: relative; z-index: 1; }
 

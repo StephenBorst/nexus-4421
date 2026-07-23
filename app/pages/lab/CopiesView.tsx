@@ -22,7 +22,7 @@ export function CopiesView() {
   );
 
   return (
-    <div>
+    <div className="nx-stagger">
       <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #232327" }}>
         <div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>
           Follow
