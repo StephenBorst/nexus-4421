@@ -240,6 +240,31 @@ html, body {
 .nx-card-lift { transition: border-color var(--nx-dur) var(--nx-ease), transform var(--nx-dur) var(--nx-ease); }
 .nx-card-lift:hover { border-color: var(--nx-border-strong); transform: translateY(-2px); }
 
+/* Breathing "live" — a real-time system signals its liveness. A pulsing dot for
+   live-data indicators; .nx-pulse breathes any element (an active status badge). */
+.nx-live-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #3ecf8e;
+  box-shadow: 0 0 0 0 rgba(62,207,142,0.5); animation: nx-breathe 2.4s var(--nx-ease) infinite;
+}
+@keyframes nx-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(62,207,142,0.45); opacity: 1; }
+  50% { box-shadow: 0 0 0 5px rgba(62,207,142,0); opacity: 0.6; }
+}
+.nx-pulse { animation: nx-pulse 2.6s var(--nx-ease) infinite; }
+@keyframes nx-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+/* Staggered entrance — a surface arrives, it doesn't just appear. Direct children
+   cascade up on mount. Put .nx-stagger on a container whose children are sections. */
+.nx-stagger > * { animation: nx-fade-in 400ms var(--nx-ease) both; }
+.nx-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.nx-stagger > *:nth-child(2) { animation-delay: 45ms; }
+.nx-stagger > *:nth-child(3) { animation-delay: 90ms; }
+.nx-stagger > *:nth-child(4) { animation-delay: 135ms; }
+.nx-stagger > *:nth-child(5) { animation-delay: 180ms; }
+.nx-stagger > *:nth-child(6) { animation-delay: 225ms; }
+.nx-stagger > *:nth-child(7) { animation-delay: 270ms; }
+.nx-stagger > *:nth-child(n+8) { animation-delay: 315ms; }
+
 /* Chart entrances — data viz that draws itself in reads as crafted, not static.
    Applied to SVG marks; each carries per-element vars (origin/delay/length). */
 .nx-draw { animation: nx-draw 900ms var(--nx-ease) both; }
@@ -250,7 +275,8 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
   .nx-card, .nx-btn, .nx-input, .nx-trade-row, .nx-expand, .nx-chevron { transition: none; }
-  .nx-skeleton::after, .nx-fade-in, .nx-draw, .nx-grow, .nx-area-in, .nx-ambient::after { animation: none; }
+  .nx-skeleton::after, .nx-fade-in, .nx-draw, .nx-grow, .nx-area-in, .nx-ambient::after,
+  .nx-live-dot, .nx-pulse, .nx-stagger > * { animation: none; }
   .nx-card-lift { transition: none; }
 }
 

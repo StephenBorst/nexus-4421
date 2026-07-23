@@ -63,7 +63,7 @@ export default function LiveNow() {
           {positions.length} position{positions.length !== 1 ? "s" : ""} open · live PnL from public price
         </span>
         <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: green, boxShadow: `0 0 6px ${green}` }} />
+          <span className="nx-live-dot" style={{ width: 6, height: 6 }} />
           <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#52525b" }}>live</span>
         </span>
       </div>

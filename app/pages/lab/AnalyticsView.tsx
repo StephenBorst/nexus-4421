@@ -587,7 +587,7 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
   const isMobile = useIsMobile();
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+    <div className="nx-stagger" style={{ display: "flex", flexDirection: "column", gap: 0 }}>
       <SectionHeader
         eyebrow="Grade · Analytics"
         title="Performance Analytics"

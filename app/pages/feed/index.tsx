@@ -1470,7 +1470,7 @@ export default function FeedPage() {
         <NexusTreasuryStack />
       </div>
 
-      <div style={{ padding: 16, maxWidth: 860, margin: "0 auto" }}>
+      <div className="nx-stagger" style={{ padding: 16, maxWidth: 860, margin: "0 auto" }}>
 
         {/* 👁 Watch-only framing for disconnected visitors (cold-start friction) */}
         {!walletAddress && <WatchOnlyBanner />}

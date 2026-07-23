@@ -4,6 +4,7 @@
 // agent-linked readout (act on it, don't just display it). No content treadmill.
 import { useEffect, useMemo, useState } from "react";
 import { cardStyle } from "./styles";
+import { CountUp } from "./components";
 
 const PROXY = "https://orderly-proxy.stephenpatrick24.workers.dev";
 
@@ -65,8 +66,8 @@ export function MarketRegime() {
   return (
     <div style={{ ...cardStyle, marginBottom: 14 }}>
       {/* Editorial header — mono eyebrow + serif headline + amber rule (Noodles-style). */}
-      <div style={{ fontSize: 9, color: "#71717a", letterSpacing: "0.18em", fontFamily: "var(--nx-font-mono)", textTransform: "uppercase" }}>
-        Market Regime · Live
+      <div style={{ fontSize: 9, color: "#71717a", letterSpacing: "0.18em", fontFamily: "var(--nx-font-mono)", textTransform: "uppercase", display: "flex", alignItems: "center", gap: 7 }}>
+        <span className="nx-live-dot" style={{ width: 5, height: 5 }} /> Market Regime · Live
       </div>
       <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 30, fontWeight: 400, color: regime.color, lineHeight: 1.15, marginTop: 6, textTransform: "capitalize" }}>
         {regime.label.toLowerCase()}
@@ -74,7 +75,7 @@ export function MarketRegime() {
       <div style={{ height: 1, background: "linear-gradient(90deg, #ededf0 0%, rgba(237,237,240,0) 55%)", margin: "12px 0 18px", maxWidth: 340 }} />
       <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 16, alignItems: "center" }}>
         <div style={{ textAlign: "center", minWidth: 120 }}>
-          <div style={{ fontSize: 40, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: regime.color, lineHeight: 1 }}>{regime.score}</div>
+          <div style={{ fontSize: 40, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: regime.color, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}><CountUp value={regime.score} format={(v) => `${Math.round(v)}`} /></div>
           <div style={{ fontSize: 9, fontFamily: "var(--nx-font-mono)", color: "#52525b", letterSpacing: "0.12em", marginTop: 4 }}>SCORE / 100</div>
           <div style={{ height: 4, background: "#232327", borderRadius: 2, marginTop: 8 }}>
             <div style={{ height: 4, background: regime.color, borderRadius: 2, width: `${regime.score}%` }} />

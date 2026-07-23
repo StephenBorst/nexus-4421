@@ -771,7 +771,7 @@ export function AgentView() {
             <span style={{ display: "block", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 3 }}>Automate</span>
             <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ fontFamily: "var(--nx-font-serif)", fontSize: 22, fontWeight: 700, color: "#f4f4f5", lineHeight: 1, letterSpacing: "-0.01em" }}>Autonomous Trading Agent</span>
-              <span style={{
+              <span className={isActive ? "nx-pulse" : undefined} style={{
                 fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "3px 10px", borderRadius: 3,
                 background: isActive ? "#3ecf8e15" : "#f7525f15",
                 border: `1px solid ${isActive ? "#3ecf8e40" : "#f7525f40"}`,
