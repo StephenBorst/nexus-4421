@@ -84,10 +84,29 @@ export const TOOLS: ToolDef[] = [
       const res = await fetch(`${AGENT_API}/intel/catalysts/${t}`);
       if (!res.ok) return JSON.stringify({ error: `catalyst fetch failed for ${t} (${res.status})` });
       const d = await res.json();
+      type HL = { title: string; source: string; link: string; pubDate: string };
+      const mapItems = (items: { title?: string; link?: string; pubDate?: string }[]): HL[] =>
+        (items ?? []).slice(0, 6).map((it) => ({
+          title: String(it.title ?? "").replace(/ - [^-]*$/, ""), // strip trailing " - Source"
+          source: (String(it.title ?? "").split(" - ").pop() ?? "").trim(),
+          link: it.link ?? "", pubDate: it.pubDate ?? "",
+        }));
+      let headlines: HL[] = (d.catalysts ?? []).map((c: HL) => ({ title: c.title, source: c.source, link: c.link, pubDate: c.pubDate }));
+      // The worker's shared Cloudflare egress IP gets rate-limited/blocked by
+      // rss2json (same cloud-IP problem as CoinGecko/GeckoTerminal). If it came
+      // back empty, fetch headlines from the BROWSER (per-user IP, no shared
+      // limit — this is why NewsTab fetches client-side) as a fallback.
+      if (!headlines.length && d.name) {
+        try {
+          const q = d.assetClass === "crypto" && d.name === d.ticker ? `${d.name} crypto` : String(d.name);
+          const gnews = `https://news.google.com/rss/search?q=${encodeURIComponent(q + " when:3d")}&hl=en-US&gl=US&ceid=US:en`;
+          const nd = await (await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(gnews)}`)).json();
+          if (nd?.status === "ok" && Array.isArray(nd.items)) headlines = mapItems(nd.items);
+        } catch { /* ignore — return move-only */ }
+      }
       return JSON.stringify({
         asset: d.name, ticker: d.ticker, assetClass: d.assetClass,
-        move: d.move,
-        headlines: (d.catalysts ?? []).map((c: { title: string; source: string; link: string; pubDate: string }) => ({ title: c.title, source: c.source, link: c.link, pubDate: c.pubDate })),
+        move: d.move, headlines,
         guidance: d.note ?? "Headlines are candidate context, not confirmed causes.",
       });
     },
