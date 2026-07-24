@@ -65,9 +65,15 @@ export default function TheLabPage() {
         direction: (String(o.side ?? "").toUpperCase() === "LONG" ? "LONG" : "SHORT") as "LONG" | "SHORT",
         side: String(o.side ?? ""),
         pnl: parseFloat(String(o.realized_pnl ?? 0)),
-        qty: parseFloat(String(o.closed_position_qty ?? 0)),
-        price: parseFloat(String(o.avg_close_price ?? 0)),
-        entryPrice: parseFloat(String(o.avg_open_price ?? 0)),
+        // ⚠️ Orderly SIGNS the price fields by direction — avg_open_price and
+        // avg_close_price come back NEGATIVE on shorts (verified on prod: 91 of 136
+        // rows negative, exactly the 91 short trades). A price is never negative;
+        // direction already lives in `side`/`direction`. Without abs(), volume summed
+        // to −$20,087 and rendered "—" instead of $42,464, and every short showed a
+        // negative entry/exit price.
+        qty: Math.abs(parseFloat(String(o.closed_position_qty ?? 0))),
+        price: Math.abs(parseFloat(String(o.avg_close_price ?? 0))),
+        entryPrice: Math.abs(parseFloat(String(o.avg_open_price ?? 0))),
         timestamp: Number(o.close_timestamp ?? Date.now()),
         openTimestamp: Number(o.open_timestamp ?? 0),
         leverage: parseFloat(String(o.leverage ?? 0)),
