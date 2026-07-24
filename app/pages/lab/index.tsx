@@ -194,20 +194,12 @@ export default function TheLabPage() {
         </div>
       </div>
       <div style={{ padding: isMobile ? 12 : 16 }}>
-        {/* The graded record leads — it's the claim the whole product rests on, and it
-            was previously buried two levels deep. Renders nothing when disconnected. */}
+        {/* Information hierarchy: the graded record (the moat claim) + onboarding
+            lead, then the active tab — the task the user came for. The ambient promo/
+            status chrome (market, network-verify, PRO badge) used to stack ~415px
+            ABOVE the content (≈43% of the fold); it now lives in a context strip
+            below. Renders nothing when disconnected. */}
         <LabStanding address={rootWalletAddress} />
-        <div style={{ marginBottom: 12 }}>
-          <NexusMarket />
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <NexusBrokerStats />
-        </div>
-        {connected && (
-          <div style={{ marginBottom: 12 }}>
-            <NexusPro walletAddress={rootWalletAddress} />
-          </div>
-        )}
         {connected && (
           <OnboardingChecklist
             hasThesis={theses.length > 0}
@@ -252,6 +244,14 @@ export default function TheLabPage() {
         {activeTab === "agent" && <AgentView />}
         {activeTab === "holders" && <HoldersRoom walletAddress={rootWalletAddress} />}
         {activeTab === "quicktrade" && <QuickTrade />}
+        </div>
+        {/* Ambient context — token flywheel, network verification, PRO status. Real
+            signal, but not the task, so it sits below the fold instead of in front
+            of it. Hairline rule separates it from the working surface above. */}
+        <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #232327", display: "flex", flexDirection: "column", gap: 12 }}>
+          <NexusMarket />
+          <NexusBrokerStats />
+          {connected && <NexusPro walletAddress={rootWalletAddress} />}
         </div>
       </div>
       <CommandPalette onSelectTab={setActiveTab} />
