@@ -97,9 +97,17 @@ export function computeEdge(trades: EdgeTrade[]): EdgeReadout | null {
   const best_symbol = (sampled[0] ?? by_symbol[0]) ?? null;
   const worst_symbol = (sampled.length ? sampled[sampled.length - 1] : by_symbol[by_symbol.length - 1]) ?? null;
 
+  // ⚠️ PROFITABILITY decides the stronger side — NOT hit rate. A high win rate that
+  // bleeds money (small wins, big losses) is not a strength. Caught on live data:
+  // SHORT 54% / −$25.60 was being labelled "stronger" over LONG 53% / +$11.89 —
+  // i.e. the card was telling the trader to lean into their losing side.
   let better_side: "LONG" | "SHORT" | null = null;
   if (by_side.LONG.trades >= MIN_SAMPLE && by_side.SHORT.trades >= MIN_SAMPLE) {
-    better_side = by_side.LONG.winRatePct >= by_side.SHORT.winRatePct ? "LONG" : "SHORT";
+    const avg = (s: SideEdge) => (s.trades ? s.pnl / s.trades : 0);
+    const top = avg(by_side.LONG) >= avg(by_side.SHORT) ? "LONG" : "SHORT";
+    // Only claim a strength if that side actually makes money. If both bleed,
+    // neither is a strength and we say nothing rather than crown a loser.
+    if (by_side[top].pnl > 0) better_side = top;
   }
 
   const strengths: string[] = [];
@@ -113,7 +121,15 @@ export function computeEdge(trades: EdgeTrade[]): EdgeReadout | null {
   if (better_side) {
     const w = by_side[better_side];
     const l = by_side[better_side === "LONG" ? "SHORT" : "LONG"];
-    strengths.push(`Better ${better_side.toLowerCase()}: ${w.winRatePct}% win rate (${money(w.pnl)}) vs ${l.winRatePct}% the other way (${money(l.pnl)}).`);
+    // Lead with the money, not the hit rate — that's what actually decided it.
+    strengths.push(`Stronger ${better_side.toLowerCase()}: ${money(w.pnl)} over ${w.trades} trades (${w.winRatePct}%) vs ${money(l.pnl)} the other way.`);
+  }
+  // A side that bleeds despite a decent hit rate is the most actionable leak there
+  // is (it's a sizing/exit problem, not a direction problem) — call it out.
+  const bleedSide: "LONG" | "SHORT" = by_side.LONG.pnl <= by_side.SHORT.pnl ? "LONG" : "SHORT";
+  const bleed = by_side[bleedSide];
+  if (bleed.trades >= MIN_SAMPLE && bleed.pnl < 0) {
+    weaknesses.push(`Bleeding ${bleedSide.toLowerCase()}: ${money(bleed.pnl)} over ${bleed.trades} trades at a ${bleed.winRatePct}% hit rate — the losses are outsizing the wins.`);
   }
 
   const closed = trades.length;

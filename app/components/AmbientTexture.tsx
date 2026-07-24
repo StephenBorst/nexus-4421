@@ -29,7 +29,9 @@ export default function AmbientTexture() {
   const t = score == null ? 0.5 : Math.max(0, Math.min(1, score / 100));
   const lerp = (a: number, b: number) => a + (b - a) * t;
   const style: CSSProperties | undefined = score == null ? undefined : {
-    ["--nx-grid-op" as string]: lerp(0.07, 0.115).toFixed(3),
+    // Range tuned against the WHITE hairline (see .nx-ambient in index.css) — the
+    // old 0.07–0.115 was calibrated for a dark line and rendered invisible on prod.
+    ["--nx-grid-op" as string]: lerp(0.025, 0.055).toFixed(3),
     ["--nx-scan-op" as string]: lerp(0.03, 0.06).toFixed(3),
     ["--nx-scan-dur" as string]: `${Math.round(lerp(30, 15))}s`,
   } as CSSProperties;

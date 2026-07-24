@@ -103,6 +103,12 @@ export function OnboardingChecklist({
           {allDone ? "DISMISS" : "SKIP"}
         </button>
       </div>
+      {/* Once every step is done the checklist has served its purpose — collapse to
+          the single "you're set up" line. Rendering four struck-through rows forever
+          is standing noise for an established trader (seen on prod: 136 closed
+          trades, still carrying a 4/4 block). The DISMISS above still clears it. */}
+      {allDone ? null : (
+      <>
       <div style={{ height: 4, background: "#0a0a0b", borderRadius: 2, marginBottom: 14, overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${pct}%`, background: "#ededf0", transition: "width 0.4s", boxShadow: "0 0 8px rgba(237,237,240,0.5)" }} />
       </div>
@@ -128,6 +134,8 @@ export function OnboardingChecklist({
           </div>
         ))}
       </div>
+      </>
+      )}
     </div>
   );
 }

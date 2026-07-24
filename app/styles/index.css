@@ -219,10 +219,14 @@ html, body {
 .nx-ambient {
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
   /* ── Texture intensity — tune here, one place. ──────────────────────────────
-     --nx-grid-op : hairline grid strength (0 = off; 0.06 whisper · 0.14 present)
+     --nx-grid-op : hairline grid strength (0 = off; 0.025 whisper · 0.055 present)
+                    ⚠️ The line is WHITE, not --nx-border. A dark line on a near-black
+                    ground is mathematically invisible (#232327 @0.09 over #0a0a0b is a
+                    ~2/255 delta — verified imperceptible on prod). Light line + low
+                    alpha is the only way a grid reads here.
      --nx-grid-size: grid pitch (smaller = denser, more "engineered")
      --nx-scan-op : moving light strength · --nx-vignette: edge falloff depth */
-  --nx-grid-op: 0.09;
+  --nx-grid-op: 0.035;
   --nx-grid-size: 44px;
   --nx-scan-op: 0.045;
   --nx-vignette: 0.22;
@@ -233,8 +237,8 @@ html, body {
 .nx-ambient::before {
   content: ""; position: absolute; inset: 0;
   background-image:
-    linear-gradient(var(--nx-border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--nx-border) 1px, transparent 1px);
+    linear-gradient(rgba(255,255,255,1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px);
   background-size: var(--nx-grid-size) var(--nx-grid-size); opacity: var(--nx-grid-op);
   /* Concentrated at the top and dissolving into the content — reads as header
      atmosphere, not a flat wallpaper. Opacity glides so a regime shift is felt,
