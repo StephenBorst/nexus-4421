@@ -36,10 +36,34 @@ const APPROVED_EXTRAS = {
 
 const hexes = (s) => (s.match(/#[0-9a-fA-F]{6}\b/g) ?? []).map((h) => h.toLowerCase());
 
-// Allowlist is PARSED from the tokens so it can never disagree with them.
+// ⚠️ rgb()/rgba() literals bypass a hex-only scan — that is exactly how the legacy
+// teal (rgba(56,210,199,…)) survived the 69→0 collapse. So scan them too, but only
+// HUED ones: grayscale/white/black rgba are legitimate scrims and overlays.
+const CHROMA_MIN = 7; // max-min channel spread before we call it a colour
+function rgbLiterals(s) {
+  const out = [];
+  const re = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/g;
+  let m;
+  while ((m = re.exec(s)) !== null) {
+    const r = +m[1], g = +m[2], b = +m[3];
+    if (Math.max(r, g, b) - Math.min(r, g, b) < CHROMA_MIN) continue; // grayscale — fine
+    out.push(`rgb(${r},${g},${b})`);
+  }
+  return out;
+}
+const hexToRgbKey = (h) => {
+  const n = parseInt(h.slice(1), 16);
+  return `rgb(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255})`;
+};
+// Every colour on a line, in both notations, normalized for comparison.
+const colorsIn = (s) => [...hexes(s), ...rgbLiterals(s)];
+
+// Allowlist is PARSED from the tokens so it can never disagree with them. Each
+// token is allowed in BOTH notations (#3ecf8e and rgb(62,207,142)).
 function allowedFromTheme() {
   const src = readFileSync(THEME, "utf8");
-  return new Set(hexes(src));
+  const hs = hexes(src);
+  return new Set([...hs, ...hs.map(hexToRgbKey)]);
 }
 
 function walk(dir, out = []) {
@@ -53,7 +77,7 @@ function walk(dir, out = []) {
 }
 
 const allowed = allowedFromTheme();
-for (const h of Object.keys(APPROVED_EXTRAS)) allowed.add(h);
+for (const h of Object.keys(APPROVED_EXTRAS)) { allowed.add(h); allowed.add(hexToRgbKey(h)); }
 
 let baseline = {};
 try { baseline = JSON.parse(readFileSync(BASELINE, "utf8")); } catch { /* first run */ }
@@ -62,7 +86,7 @@ const found = new Map(); // hex -> [{file,line}]
 for (const file of walk(SCAN_DIR)) {
   const rel = relative(ROOT, file).replace(/\\/g, "/");
   readFileSync(file, "utf8").split("\n").forEach((line, i) => {
-    for (const h of hexes(line)) {
+    for (const h of colorsIn(line)) {
       if (allowed.has(h)) continue;
       if (!found.has(h)) found.set(h, []);
       found.get(h).push(`${rel}:${i + 1}`);

@@ -97,7 +97,7 @@ function NewsTab() {
       <div style={{ display: "flex", gap: 4, marginBottom: 12, flexWrap: "wrap" }}>
         {CATS.map(c => (
           <button key={c} onClick={() => setFilter(c)} style={{
-            background: filter === c ? "rgba(56,210,199,0.08)" : "none",
+            background: filter === c ? "rgba(237,237,240,0.08)" : "none",
             border: `1px solid ${filter === c ? TEAL : "rgba(255,255,255,0.08)"}`,
             color: filter === c ? TEAL : DIM,
             fontFamily: "var(--nx-font-mono)", fontSize: 10,
@@ -121,7 +121,7 @@ function NewsTab() {
           <a key={i} href={item.link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", display: "block" }}>
             <div
               style={{ padding: "10px 12px", background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer" }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(56,210,199,0.28)")}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(237,237,240,0.28)")}
               onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)")}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5, gap: 8 }}>

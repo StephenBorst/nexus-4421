@@ -594,7 +594,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
 
         const longBarPct = Math.round(netLong);
         return (
-          <Card style={{ marginBottom: "10px", border: `1px solid ${tensionColor === RED ? "rgba(245,97,139,0.25)" : tensionColor === GREEN ? "rgba(41,233,169,0.18)" : "rgba(255,209,70,0.15)"}` }}>
+          <Card style={{ marginBottom: "10px", border: `1px solid ${tensionColor === RED ? "rgba(247,82,95,0.25)" : tensionColor === GREEN ? "rgba(62,207,142,0.18)" : "rgba(251,191,36,0.15)"}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
               <SectionTitle style={{ marginBottom: 0 }}>// YOUR POSITION CONTEXT</SectionTitle>
               <span style={{ color: tensionColor, fontSize: "10px", letterSpacing: "0.07em", fontWeight: 700 }}>{tensionLabel}</span>

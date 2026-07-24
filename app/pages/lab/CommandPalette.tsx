@@ -129,7 +129,24 @@ export function CommandPalette({ onSelectTab }: { onSelectTab: (t: TabId) => voi
               color: "#f4f4f5", fontFamily: "var(--nx-font-mono)", fontSize: 14,
             }}
           />
-          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", border: "1px solid #232327", borderRadius: 3, padding: "2px 6px" }}>ESC</span>
+          {/* A real button — it LOOKED clickable but was a decorative span, so the
+              on-screen affordance did nothing (the Esc key always worked). */}
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Close command palette"
+            title="Close (Esc)"
+            style={{
+              fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b",
+              background: "none", border: "1px solid #232327", borderRadius: 3,
+              padding: "2px 6px", cursor: "pointer",
+              transition: "color 170ms var(--nx-ease), border-color 170ms var(--nx-ease)",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "#a1a1aa"; e.currentTarget.style.borderColor = "#33333a"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "#52525b"; e.currentTarget.style.borderColor = "#232327"; }}
+          >
+            ESC
+          </button>
         </div>
         <div style={{ maxHeight: 340, overflowY: "auto", padding: 6 }}>
           {results.length === 0 ? (
