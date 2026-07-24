@@ -44,7 +44,12 @@ export default function App() {
             localStorage.setItem('ntl_onboarded', 'true');
             setShowOnboarding(false);
           }}
-          onSkip={() => setShowOnboarding(false)}
+          onSkip={() => {
+            // Skip must PERSIST — this only set state before, so the wallet modal
+            // returned on every page load for anyone who skipped it (hit on prod).
+            localStorage.setItem('ntl_onboarded', 'true');
+            setShowOnboarding(false);
+          }}
         />
       )}
       <OrderlyProvider>

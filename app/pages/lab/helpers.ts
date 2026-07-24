@@ -2,7 +2,11 @@
 // Extracted from index.tsx (god-file split) — no behavior change.
 
 export function formatPnl(val: number) {
-  return `${val >= 0 ? "+" : ""}$${Math.abs(val).toFixed(2)}`;
+  // ⚠️ The negative branch used to emit "" and then Math.abs() — so a LOSS rendered
+  // as "$13.70", sign destroyed, with only colour carrying the meaning. Spotted on
+  // prod: Analytics read "$13.70" while the header read "-$13.70". Never let a P&L
+  // figure lose its sign; colour is reinforcement, not the source of truth.
+  return `${val >= 0 ? "+" : "-"}$${Math.abs(val).toFixed(2)}`;
 }
 
 export function getDayKey(ts: number) {
