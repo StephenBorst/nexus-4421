@@ -609,7 +609,7 @@ export function ThesisAnalyticsView() {
           },
           {
             label: "TOTAL P&L",
-            val: closed.length > 0 ? `${summaryStats.totalPnl >= 0 ? "+" : ""}$${Math.abs(summaryStats.totalPnl).toFixed(2)}` : "—",
+            val: closed.length > 0 ? `${summaryStats.totalPnl >= 0 ? "+" : "-"}$${Math.abs(summaryStats.totalPnl).toFixed(2)}` : "—",
             color: (closed.length > 0 ? (summaryStats.totalPnl >= 0 ? "#3ecf8e" : "#f7525f") : "#52525b") as string,
           },
         ].map(({ label, val, color }) => (
@@ -626,7 +626,7 @@ export function ThesisAnalyticsView() {
           <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", letterSpacing: "0.1em" }}>◆ EQUITY CURVE</span>
           {equityPoints.length >= 2 && (
             <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: "bold", color: lineColor }}>
-              {summaryStats.totalPnl >= 0 ? "+" : ""}${Math.abs(summaryStats.totalPnl).toFixed(2)}
+              {summaryStats.totalPnl >= 0 ? "+" : "-"}${Math.abs(summaryStats.totalPnl).toFixed(2)}
             </span>
           )}
         </div>

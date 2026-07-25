@@ -15,15 +15,25 @@ export function CountUp({ value, format, durationMs = 620 }: {
   const rafRef = useRef<number | null>(null);
   useEffect(() => {
     const reduce = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce || !isFinite(value)) { setDisplay(value); return; }
     const from = fromRef.current;
+    // Snap (no animation) when there's nothing to animate: reduced-motion, a non-
+    // finite value, or no actual change. ⚠️ The `from === value` guard matters — the
+    // old code fired a pointless 0→0 rAF on a stat that mounts at 0 (e.g. the header
+    // CLOSED count before position_history loads), and that no-op animation's
+    // lifecycle stopped the real 0→N transition from ever rendering (value=45 arrived
+    // but `display` stayed frozen at 0 — caught live on prod).
+    if (reduce || !isFinite(value) || from === value) { fromRef.current = value; setDisplay(value); return; }
     const start = performance.now();
     const tick = (now: number) => {
       const t = Math.min(1, (now - start) / durationMs);
       const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
-      setDisplay(from + (value - from) * eased);
-      if (t < 1) rafRef.current = requestAnimationFrame(tick);
-      else fromRef.current = value;
+      if (t < 1) {
+        setDisplay(from + (value - from) * eased);
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        fromRef.current = value;
+        setDisplay(value); // guarantee the final frame lands exactly on value
+      }
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };

@@ -111,7 +111,7 @@ function AgentTrackRecord({ title, accent, trades, paper, onReset, summary }: {
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(108px, 1fr))", gap: 12, marginTop: 8 }}>
             {[
-              { label: "NET P&L", value: `${net >= 0 ? "+" : ""}$${Math.abs(net).toFixed(2)}`, color: net >= 0 ? "#3ecf8e" : "#f7525f" },
+              { label: "NET P&L", value: `${net >= 0 ? "+" : "-"}$${Math.abs(net).toFixed(2)}`, color: net >= 0 ? "#3ecf8e" : "#f7525f" },
               { label: "WIN RATE", value: `${wr.toFixed(1)}%`, color: wr >= 50 ? "#3ecf8e" : "#f7525f" },
               { label: "TRADES", value: String(tr), color: "#d4d4d8" },
               { label: "AVG WIN", value: `$${avgWin.toFixed(2)}`, color: "#ededf0" },

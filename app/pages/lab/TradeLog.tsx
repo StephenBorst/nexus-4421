@@ -159,7 +159,7 @@ export function TradeLogAllView({
       {/* ── Summary bar ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8, marginBottom: 16 }}>
         {[
-          { label: "TOTAL PNL",   value: `${totalPnl >= 0 ? "+" : ""}$${Math.abs(totalPnl).toFixed(2)}`, color: totalPnl >= 0 ? "#3ecf8e" : "#f7525f" },
+          { label: "TOTAL PNL",   value: `${totalPnl >= 0 ? "+" : "-"}$${Math.abs(totalPnl).toFixed(2)}`, color: totalPnl >= 0 ? "#3ecf8e" : "#f7525f" },
           { label: "TRADING DAYS", value: String(sortedDays.length),  color: "#f4f4f5" },
           { label: "WIN DAYS",    value: `${winDays} / ${sortedDays.length}`, color: "#ededf0" },
           { label: "TOTAL TRADES", value: String(totalTrades),         color: "#f4f4f5" },
@@ -224,7 +224,7 @@ export function TradeLogAllView({
               {/* stats */}
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>PNL</div>
-                <div style={{ fontSize: 14, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: g.pnl >= 0 ? "#3ecf8e" : "#f7525f" }}>{g.pnl >= 0 ? "+" : ""}${Math.abs(g.pnl).toFixed(2)}</div>
+                <div style={{ fontSize: 14, fontWeight: "bold", fontFamily: "var(--nx-font-mono)", color: g.pnl >= 0 ? "#3ecf8e" : "#f7525f" }}>{g.pnl >= 0 ? "+" : "-"}${Math.abs(g.pnl).toFixed(2)}</div>
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>TRADES</div>
