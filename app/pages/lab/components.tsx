@@ -22,7 +22,12 @@ export function CountUp({ value, format, durationMs = 620 }: {
     // CLOSED count before position_history loads), and that no-op animation's
     // lifecycle stopped the real 0→N transition from ever rendering (value=45 arrived
     // but `display` stayed frozen at 0 — caught live on prod).
-    if (reduce || !isFinite(value) || from === value) { fromRef.current = value; setDisplay(value); return; }
+    // Snap (no animation) when animating is pointless or impossible: reduced-motion,
+    // a non-finite value, no actual change, OR a hidden tab (rAF is paused in
+    // background tabs, so without this a stat that loads while hidden would freeze
+    // at its mount value — correctness must never depend on rAF firing).
+    const hidden = typeof document !== "undefined" && document.hidden;
+    if (reduce || hidden || !isFinite(value) || from === value) { fromRef.current = value; setDisplay(value); return; }
     const start = performance.now();
     const tick = (now: number) => {
       const t = Math.min(1, (now - start) / durationMs);
