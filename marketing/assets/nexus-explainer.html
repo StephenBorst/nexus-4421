@@ -1,0 +1,174 @@
+<title>Nexus — Plan · Automate · Prove (looping explainer)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --canvas:#0a0a0b; --surface:#141416; --surface-alt:#0f0f11;
+    --border:#232327; --border-strong:#33333a;
+    --bright:#f4f4f5; --fog:#a1a1aa; --muted:#71717a; --faint:#52525b;
+    --accent:#ededf0; --pos:#3ecf8e; --neg:#f7525f; --warn:#fbbf24;
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    --sans:'Manrope',system-ui,-apple-system,sans-serif;
+    --serif:'Libre Baskerville','Iowan Old Style',Georgia,serif;
+    --ease:cubic-bezier(.4,0,.2,1);
+  }
+  *{box-sizing:border-box;margin:0;}
+  html,body{background:#000;height:100%;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:var(--sans);}
+  /* 16:9 stage — records clean */
+  .stage{position:relative;width:min(96vw,1120px);aspect-ratio:16/9;background:var(--canvas);border:1px solid var(--border);border-radius:12px;overflow:hidden;color:var(--fog);}
+  .grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,1) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,1) 1px,transparent 1px);background-size:40px 40px;opacity:.04;-webkit-mask-image:radial-gradient(120% 80% at 50% -10%,#000 0%,#000 30%,transparent 74%);mask-image:radial-gradient(120% 80% at 50% -10%,#000 0%,#000 30%,transparent 74%);}
+  .scan{position:absolute;inset:-30% -10% auto -10%;height:70%;background:radial-gradient(ellipse at 50% 0%,rgba(237,237,240,.05),transparent 60%);animation:scan 8s var(--ease) infinite alternate;}
+  @keyframes scan{from{transform:translateX(-5%)}to{transform:translateX(5%)}}
+
+  .topbar{position:absolute;top:0;left:0;right:0;height:44px;display:flex;align-items:center;gap:12px;padding:0 22px;border-bottom:1px solid var(--border);background:rgba(10,10,11,.6);z-index:5;}
+  .mark{font-family:var(--mono);font-weight:700;font-size:13px;color:var(--bright);letter-spacing:.02em;}
+  .mark .s{color:var(--pos);}
+  .live{margin-left:auto;display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--pos);box-shadow:0 0 0 0 rgba(62,207,142,.5);animation:breathe 2.2s var(--ease) infinite;}
+  @keyframes breathe{0%,100%{box-shadow:0 0 0 0 rgba(62,207,142,.45);opacity:1}50%{box-shadow:0 0 0 5px rgba(62,207,142,0);opacity:.6}}
+
+  .scene{position:absolute;inset:44px 0 0 0;display:flex;flex-direction:column;justify-content:center;padding:0 clamp(28px,6%,72px);opacity:0;transform:translateY(14px);transition:opacity .6s var(--ease),transform .6s var(--ease);pointer-events:none;}
+  .scene.on{opacity:1;transform:none;}
+  .num{font-family:var(--mono);font-size:12px;letter-spacing:.3em;color:var(--faint);}
+  .num b{color:var(--accent);}
+  h2{font-family:var(--serif);font-weight:400;color:var(--bright);font-size:clamp(30px,5.4vw,56px);line-height:1.02;letter-spacing:-.01em;margin:12px 0 6px;}
+  .sub{font-size:clamp(13px,1.7vw,17px);color:var(--fog);max-width:44ch;}
+  .rule{height:1px;background:linear-gradient(90deg,var(--accent),transparent 60%);margin:16px 0;max-width:280px;transform:scaleX(0);transform-origin:left;transition:transform .6s var(--ease) .15s;}
+  .scene.on .rule{transform:scaleX(1);}
+
+  /* mini thesis card (Plan) */
+  .thesis{margin-top:22px;display:grid;grid-template-columns:repeat(5,auto);gap:22px;font-family:var(--mono);}
+  .thesis .f{opacity:0;transform:translateY(6px);}
+  .scene.on .thesis .f{animation:rise .5s var(--ease) forwards;}
+  .scene.on .thesis .f:nth-child(1){animation-delay:.3s}.scene.on .thesis .f:nth-child(2){animation-delay:.5s}.scene.on .thesis .f:nth-child(3){animation-delay:.7s}.scene.on .thesis .f:nth-child(4){animation-delay:.9s}.scene.on .thesis .f:nth-child(5){animation-delay:1.1s}
+  @keyframes rise{to{opacity:1;transform:none}}
+  .thesis .k{font-size:9px;letter-spacing:.1em;color:var(--faint);}
+  .thesis .v{font-size:19px;color:var(--bright);margin-top:3px;font-variant-numeric:tabular-nums;}
+  .thesis .v.pos{color:var(--pos);}.thesis .v.neg{color:var(--neg);}
+  .stamp{margin-top:20px;display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--pos);opacity:0;}
+  .scene.on .stamp{animation:rise .5s var(--ease) 1.4s forwards;}
+
+  /* equity curve (Automate) */
+  .agentrow{margin-top:20px;display:flex;align-items:center;gap:14px;font-family:var(--mono);}
+  .badge{font-size:11px;padding:4px 12px;border-radius:4px;background:rgba(62,207,142,.09);border:1px solid rgba(62,207,142,.35);color:var(--pos);letter-spacing:.1em;text-transform:uppercase;}
+  .badge .dot{display:inline-block;margin-right:6px;vertical-align:middle;}
+  svg.curve{margin-top:18px;width:min(560px,74%);height:120px;display:block;}
+  .draw{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);}
+  .scene.on .draw{animation:draw 1.6s var(--ease) .4s forwards;}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  .scene.on .area{animation:fade 1s var(--ease) .8s both;}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+
+  /* leaderboard row (Prove) */
+  .lb{margin-top:22px;display:flex;flex-direction:column;gap:8px;font-family:var(--mono);}
+  .lbrow{display:flex;align-items:center;gap:16px;padding:12px 16px;border:1px solid var(--border);border-radius:8px;background:var(--surface);box-shadow:inset 0 1px 0 rgba(255,255,255,.03);opacity:0;transform:translateX(-10px);}
+  .scene.on .lbrow{animation:slidein .5s var(--ease) forwards;}
+  .scene.on .lbrow:nth-child(1){animation-delay:.35s}.scene.on .lbrow:nth-child(2){animation-delay:.55s}
+  @keyframes slidein{to{opacity:1;transform:none}}
+  .lbrow .rank{color:var(--warn);font-weight:700;}
+  .lbrow .name{color:var(--bright);}
+  .lbrow .stat{color:var(--fog);font-size:13px;}
+  .lbrow .stat .pos{color:var(--pos);}
+  .lbrow .chk{margin-left:auto;display:flex;align-items:center;gap:8px;color:var(--pos);font-size:11px;}
+  .lbrow .hash{color:var(--faint);font-size:10px;}
+
+  /* end card */
+  .end{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;opacity:0;transform:scale(.98);transition:opacity .7s var(--ease),transform .7s var(--ease);pointer-events:none;background:radial-gradient(120% 90% at 50% 40%,rgba(237,237,240,.03),transparent 60%);}
+  .end.on{opacity:1;transform:none;}
+  .end .wm{font-family:var(--mono);font-weight:700;font-size:clamp(20px,3vw,30px);color:var(--bright);letter-spacing:.02em;}
+  .end .wm .s{color:var(--pos);}
+  .end .tag{font-family:var(--serif);font-style:italic;font-size:clamp(22px,3.4vw,34px);color:var(--fog);}
+  .end .url{font-family:var(--mono);font-size:clamp(12px,1.6vw,15px);color:var(--accent);letter-spacing:.06em;border:1px solid var(--border-strong);border-radius:8px;padding:10px 18px;background:rgba(237,237,240,.05);}
+  .end .steps{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase;}
+
+  .progress{position:absolute;bottom:0;left:0;height:2px;background:var(--accent);width:0;box-shadow:0 0 8px rgba(237,237,240,.5);}
+
+  @media(prefers-reduced-motion:reduce){.scan,.dot{animation:none}}
+</style>
+
+<div class="stage" id="stage">
+  <div class="grid"></div><div class="scan"></div>
+  <div class="topbar">
+    <span class="mark"><span class="s">//</span> NEXUS TRADING LABS</span>
+    <span class="live"><span class="dot"></span> The terminal that makes you a better trader</span>
+  </div>
+
+  <!-- 01 PLAN -->
+  <div class="scene" id="s1">
+    <div class="num"><b>01</b> — PLAN</div>
+    <h2>Plan the trade.</h2>
+    <div class="rule"></div>
+    <div class="sub">Size it like a pro — entry, stop and targets by R-multiple, funding, live P&amp;L. Then publish it.</div>
+    <div class="thesis">
+      <div class="f"><div class="k">SYMBOL</div><div class="v">BTC · LONG</div></div>
+      <div class="f"><div class="k">ENTRY</div><div class="v">$64,180</div></div>
+      <div class="f"><div class="k">STOP</div><div class="v neg">$62,900</div></div>
+      <div class="f"><div class="k">TP1</div><div class="v pos">$67,400</div></div>
+      <div class="f"><div class="k">R:R</div><div class="v">1 : 2.5</div></div>
+    </div>
+    <div class="stamp">◆ published — timestamped on-chain, un-backdateable</div>
+  </div>
+
+  <!-- 02 AUTOMATE -->
+  <div class="scene" id="s2">
+    <div class="num"><b>02</b> — AUTOMATE</div>
+    <h2>Hand it to your agent.</h2>
+    <div class="rule"></div>
+    <div class="sub">Non-custodial. Order-only keys that can't withdraw. It runs your edge 24/7 — you keep the accountability.</div>
+    <div class="agentrow"><span class="badge"><span class="dot"></span>● Watching</span><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">paper &amp; live · hard risk caps · kill switch</span></div>
+    <svg class="curve" viewBox="0 0 560 120" preserveAspectRatio="none">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3ecf8e" stop-opacity=".22"/><stop offset="100%" stop-color="#3ecf8e" stop-opacity="0"/></linearGradient></defs>
+      <path class="area" d="M0,96 L60,88 L120,92 L180,74 L240,80 L300,58 L360,64 L420,42 L480,36 L540,20 L540,120 L0,120 Z" fill="url(#g)"/>
+      <path class="draw" d="M0,96 L60,88 L120,92 L180,74 L240,80 L300,58 L360,64 L420,42 L480,36 L540,20" fill="none" stroke="#3ecf8e" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" style="--len:640"/>
+    </svg>
+  </div>
+
+  <!-- 03 PROVE -->
+  <div class="scene" id="s3">
+    <div class="num"><b>03</b> — PROVE</div>
+    <h2>Prove it. Trustlessly.</h2>
+    <div class="rule"></div>
+    <div class="sub">Every call and every agent trade graded from public price — and anchored on-chain. No self-reported PnL.</div>
+    <div class="lb">
+      <div class="lbrow"><span class="rank">✦ APEX</span><span class="name">nexus_trading</span><span class="stat">58% hit · <span class="pos">+2.1R</span> avg · 47 graded</span><span class="chk">✓ verified <span class="hash">0x1fa8…d3</span> ⛓</span></div>
+      <div class="lbrow"><span class="rank">◆ SHARP</span><span class="name">0x9a30…cb28</span><span class="stat">54% hit · <span class="pos">+1.4R</span> avg · 22 graded</span><span class="chk">✓ verified <span class="hash">0x7c4b…9e</span> ⛓</span></div>
+    </div>
+  </div>
+
+  <!-- END -->
+  <div class="end" id="end">
+    <div class="wm"><span class="s">//</span> NEXUS TRADING LABS</div>
+    <div class="steps">Plan it · Automate it · Prove it</div>
+    <div class="tag">verify, don't trust.</div>
+    <div class="url">trade.nexustradinglabs.com</div>
+  </div>
+
+  <div class="progress" id="prog"></div>
+</div>
+
+<script>
+  const scenes = [
+    { el: 's1', ms: 5200 },
+    { el: 's2', ms: 5200 },
+    { el: 's3', ms: 5200 },
+    { el: 'end', ms: 4200, end: true },
+  ];
+  const total = scenes.reduce((a,s)=>a+s.ms,0);
+  const prog = document.getElementById('prog');
+  function run(){
+    // reset
+    scenes.forEach(s=>document.getElementById(s.el).classList.remove('on'));
+    let t = 0;
+    prog.style.transition='none'; prog.style.width='0%';
+    requestAnimationFrame(()=>{ prog.style.transition='width '+total+'ms linear'; prog.style.width='100%'; });
+    scenes.forEach((s)=>{
+      setTimeout(()=>{
+        scenes.forEach(x=>document.getElementById(x.el).classList.remove('on'));
+        document.getElementById(s.el).classList.add('on');
+      }, t);
+      t += s.ms;
+    });
+    setTimeout(run, total); // loop
+  }
+  run();
+</script>

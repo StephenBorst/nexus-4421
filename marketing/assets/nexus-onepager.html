@@ -1,0 +1,151 @@
+<title>Nexus Trading Labs — One-Pager</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --canvas:#0a0a0b; --surface:#141416; --surface-alt:#0f0f11;
+    --border:#232327; --border-strong:#33333a;
+    --bright:#f4f4f5; --fog:#a1a1aa; --muted:#71717a; --faint:#52525b;
+    --accent:#ededf0; --pos:#3ecf8e; --neg:#f7525f;
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    --sans:'Manrope',system-ui,-apple-system,'Segoe UI',sans-serif;
+    --serif:'Libre Baskerville','Iowan Old Style',Georgia,serif;
+    --ease:cubic-bezier(.4,0,.2,1); --gut:clamp(20px,5vw,60px);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--canvas);color:var(--fog);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+  .amb{position:fixed;inset:0;z-index:0;pointer-events:none;}
+  .amb::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,1) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,1) 1px,transparent 1px);background-size:46px 46px;opacity:.035;-webkit-mask-image:radial-gradient(125% 80% at 50% -8%,#000 0%,#000 30%,transparent 72%);mask-image:radial-gradient(125% 80% at 50% -8%,#000 0%,#000 30%,transparent 72%);}
+  .wrap{position:relative;z-index:1;max-width:940px;margin:0 auto;padding:0 var(--gut);}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:var(--muted);}
+  h1{font-family:var(--serif);font-weight:400;color:var(--bright);font-size:clamp(34px,6.5vw,62px);line-height:1.03;letter-spacing:-.015em;margin:16px 0 0;text-wrap:balance;max-width:16ch;}
+  h1 em{font-style:italic;color:var(--fog);}
+  .rule{height:1px;background:linear-gradient(90deg,var(--accent),transparent 60%);margin:22px 0;max-width:360px;}
+  .lede{font-size:clamp(15px,2vw,19px);color:var(--fog);max-width:62ch;}
+  .lede b{color:var(--bright);font-weight:600;}
+
+  header{padding:clamp(52px,10vh,104px) 0 34px;}
+  .brandbar{display:flex;align-items:center;gap:14px;height:56px;border-bottom:1px solid var(--border);}
+  .mark{font-family:var(--mono);font-weight:700;color:var(--bright);font-size:15px;letter-spacing:.02em;}
+  .mark .s{color:var(--pos);}
+  .brandbar .site{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.06em;}
+
+  section{padding:clamp(34px,6vh,64px) 0;border-top:1px solid var(--border);}
+  .sec-eyebrow{margin-bottom:10px;}
+  h2{font-family:var(--serif);font-weight:400;color:var(--bright);font-size:clamp(22px,3.4vw,30px);margin:0 0 18px;letter-spacing:-.01em;}
+
+  .process{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+  .step{background:var(--surface-alt);padding:22px;position:relative;}
+  .step::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.05),transparent);}
+  .step .k{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--faint);}
+  .step .t{font-family:var(--serif);font-size:22px;color:var(--bright);margin:10px 0 6px;}
+  .step .d{font-size:13.5px;color:var(--muted);line-height:1.6;}
+  @media(max-width:700px){.process{grid-template-columns:1fr;}}
+
+  .moat{border:1px solid var(--border-strong);border-radius:10px;padding:26px;background:var(--surface);box-shadow:inset 0 1px 0 rgba(255,255,255,.035);}
+  .moat p{margin:0;font-size:clamp(15px,2vw,18px);color:var(--fog);}
+  .moat b{color:var(--bright);}
+  .moat .pos{color:var(--pos);}
+
+  .feat{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+  @media(max-width:640px){.feat{grid-template-columns:1fr;}}
+  .card{border:1px solid var(--border);border-radius:8px;padding:16px 18px;box-shadow:inset 0 1px 0 rgba(255,255,255,.03);}
+  .card .h{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--bright);text-transform:uppercase;}
+  .card .p{font-size:13px;color:var(--muted);margin-top:6px;line-height:1.55;}
+
+  .stats{display:flex;flex-wrap:wrap;gap:28px;margin-top:6px;}
+  .stat .v{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--bright);font-variant-numeric:tabular-nums;}
+  .stat .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--faint);text-transform:uppercase;margin-top:3px;}
+
+  .cta{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:8px;}
+  .btn{font-family:var(--mono);font-size:13px;letter-spacing:.03em;padding:13px 22px;border-radius:8px;text-decoration:none;border:1px solid var(--border-strong);color:var(--accent);background:rgba(237,237,240,.06);transition:background .2s var(--ease),border-color .2s var(--ease);}
+  .btn:hover{background:rgba(237,237,240,.14);border-color:var(--accent);}
+  .btn.ghost{background:transparent;color:var(--fog);}
+  .cta .note{font-family:var(--mono);font-size:11px;color:var(--faint);}
+
+  footer{padding:36px 0 64px;border-top:1px solid var(--border);}
+  .foot{font-family:var(--mono);font-size:11px;color:var(--faint);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;letter-spacing:.04em;}
+  .pos{color:var(--pos);}
+</style>
+
+<div class="amb" aria-hidden="true"></div>
+<div class="wrap">
+  <div class="brandbar">
+    <span class="mark"><span class="s">//</span> NEXUS TRADING LABS</span>
+    <span class="site">trade.nexustradinglabs.com</span>
+  </div>
+
+  <header>
+    <div class="eyebrow">Non-custodial perp terminal · powered by Orderly</div>
+    <h1>The terminal that makes you a <em>better trader.</em></h1>
+    <div class="rule"></div>
+    <p class="lede">Most apps just let you trade. <b>Nexus turns every position into a process</b> — plan it, automate it, and prove it on leaderboards graded from public data that's anchored on-chain. Over 130 perp markets underneath, fully non-custodial. No login to look around.</p>
+  </header>
+
+  <section>
+    <div class="eyebrow sec-eyebrow">The loop</div>
+    <h2>Plan it. Automate it. Prove it.</h2>
+    <div class="process">
+      <div class="step">
+        <div class="k">01 — PLAN</div>
+        <div class="t">The Thesis Engine</div>
+        <div class="d">Size every trade like a pro: entry off live price, stops &amp; targets by R-multiple, funding cost, live P&amp;L. Publish a thesis and it's timestamped on-chain — an un-backdateable call.</div>
+      </div>
+      <div class="step">
+        <div class="k">02 — AUTOMATE</div>
+        <div class="t">Your Autonomous Agent</div>
+        <div class="d">Hand your strategy to an agent that runs it 24/7 — non-custodial, order-only keys that can't withdraw. Paper mode, hard risk caps, kill switch. It runs your edge; the accountability is built in.</div>
+      </div>
+      <div class="step">
+        <div class="k">03 — PROVE</div>
+        <div class="t">Trustless Leaderboards</div>
+        <div class="d">Every call and every agent trade is graded objectively from public price and anchored on-chain. No self-reported PnL. A track record you literally cannot fake.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow sec-eyebrow">Why it's different</div>
+    <h2>The moat isn't the DEX. It's the proof.</h2>
+    <div class="moat">
+      <p>Anyone can clone a trading front-end. What can't be cloned is a <b>social graph of verifiable track records</b>. Nexus grades everything — human calls and autonomous agents — against public data and writes the receipts on-chain. The whole product runs on one principle: <span class="pos"><b>verify, don't trust.</b></span> Every stat on the site is something you can check yourself.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow sec-eyebrow">What's inside</div>
+    <h2>A full terminal, not a swap box.</h2>
+    <div class="feat">
+      <div class="card"><div class="h">Smart Money X-Ray</div><div class="p">Track the top on-chain traders across Orderly &amp; Hyperliquid, see where they agree, and x-ray any wallet's record — free, no login.</div></div>
+      <div class="card"><div class="h">// Nexus AI Copilot</div><div class="p">An assistant that reads your live book, explains why a market is moving, and coaches you toward your own proven edge.</div></div>
+      <div class="card"><div class="h">Strategy Workbench</div><div class="p">Build, backtest and walk-forward-validate strategies on the real engine, then deploy a curated preset in one click.</div></div>
+      <div class="card"><div class="h">Your Edge, Graded</div><div class="p">Analytics that turn your own record into a coach's read — which symbols and which direction you actually make money on.</div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow sec-eyebrow">The numbers</div>
+    <div class="stats">
+      <div class="stat"><div class="v">130+</div><div class="l">perp markets</div></div>
+      <div class="stat"><div class="v">0%</div><div class="l">custody · your keys</div></div>
+      <div class="stat"><div class="v">On-chain</div><div class="l">graded · anchored</div></div>
+      <div class="stat"><div class="v">Arbitrum</div><div class="l">CEX-grade settlement</div></div>
+    </div>
+  </section>
+
+  <section style="border-top:1px solid var(--border-strong)">
+    <h2 style="margin-bottom:14px">See it for yourself.</h2>
+    <p class="lede" style="margin-bottom:22px">The whole terminal is open to explore before you connect — the feed, the leaderboards, the wallet x-ray. Bring your edge and prove it.</p>
+    <div class="cta">
+      <a class="btn" href="https://trade.nexustradinglabs.com">Launch The Lab →</a>
+      <a class="btn ghost" href="https://x.com/nexustradinglab">Follow on 𝕏</a>
+      <span class="note">non-custodial · no KYC · no login to browse</span>
+    </div>
+  </section>
+
+  <footer>
+    <div class="foot">
+      <span>NEXUS TRADING LABS — plan it · automate it · prove it</span>
+      <span>trade.nexustradinglabs.com</span>
+    </div>
+  </footer>
+</div>
