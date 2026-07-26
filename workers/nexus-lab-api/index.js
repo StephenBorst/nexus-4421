@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, REGIME, classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge, planQuality, planSummary } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, REGIME, classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge, planQuality, planSummary, expectancyStats, callerScore, convictionCalibration } from "./logic.mjs";
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./backtest.mjs";
 // Directive level validation lives with the exec's money-path logic (single source);
@@ -567,11 +567,17 @@ async function computeCallerStats(env, maxHorizonS = 30 * 86400, opts = {}) {
     const cd = history[t.symbol];
     const g = gradeCall(t, cd);
     if (g.outcome === "PENDING" || g.outcome === "INVALID") continue;
-    const a = byWallet[wallet] || (byWallet[wallet] = { calls: 0, wins: 0, rSum: 0, resolved: [], regimeRows: [], planScored: [] });
+    const a = byWallet[wallet] || (byWallet[wallet] = { calls: 0, wins: 0, rSum: 0, resolved: [], regimeRows: [], planScored: [], expRows: [] });
     a.calls += 1; if (g.outcome === "WIN") a.wins += 1; a.rSum += g.r;
     // Track (time, R) so the leaderboard can emit a cumulative-R equity curve —
     // the same trustless grade, just as a series instead of an aggregate.
     a.resolved.push({ at: t.createdAt || 0, r: g.r });
+    // Expectancy + conviction-calibration input. conviction = the trader's own size
+    // proxy: how much of the account they put at risk (riskPercent), falling back to
+    // the planned asymmetry (riskReward). Lets us ask "did the bigger bets win?".
+    const conviction = Number(t.riskPercent) > 0 ? Number(t.riskPercent)
+      : (Number(t.riskReward) > 0 ? Number(t.riskReward) : NaN);
+    a.expRows.push({ r: g.r, win: g.outcome === "WIN", conviction });
 
     // Attribute the SAME graded R to the regime the call was posted into. Same
     // candles, same first-touch outcome — this only asks "in which market?".
@@ -594,7 +600,10 @@ async function computeCallerStats(env, maxHorizonS = 30 * 86400, opts = {}) {
     };
     a.plan = planSummary(a.planScored);
     a.regimeAttributed = a.regimeRows.length;
-    delete a.resolved; delete a.regimeRows; delete a.planScored; // internal only — keep the shape lean
+    // Expectancy-forward ranking + the conviction-calibration read.
+    a.expectancy = expectancyStats(a.expRows);
+    a.calibration = convictionCalibration(a.expRows);
+    delete a.resolved; delete a.regimeRows; delete a.planScored; delete a.expRows; // internal only — keep the shape lean
   }
   return byWallet;
 }
@@ -5038,7 +5047,7 @@ document.getElementById("btn").addEventListener("click",go);
     if (parts[0] === "theses" && parts[1] === "leaderboard") {
       if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
 
-      const MIN_CALLS = 5, FULL_CONF = 20, TOP_N = 25, MAX_HORIZON_S = 30 * 86400;
+      const MIN_CALLS = 5, TOP_N = 25, MAX_HORIZON_S = 30 * 86400;
 
       // First-touch grade per wallet (shared helper — same source as Desk scoring).
       const byWallet = await computeCallerStats(env, MAX_HORIZON_S);
@@ -5049,28 +5058,34 @@ document.getElementById("btn").addEventListener("click",go);
         const hitRate = a.wins / a.calls;
         const avgR = a.rSum / a.calls;
         if (avgR <= 0) continue; // top board = traders net-positive by R
-        const rScore = Math.max(0, Math.min(avgR, 3)) / 3;
-        const conf = Math.min(1, a.calls / FULL_CONF);
-        const score = Math.round((0.5 * hitRate + 0.5 * rScore) * conf * 1000) / 10;
+        // ⭐ Ranked on EXPECTANCY, not hit rate. The old score was 0.5·hitRate +
+        // 0.5·rScore, which ranked a scalper booking +0.2R fifteen times above a
+        // trader who's 40% hit-rate with a fat right tail — i.e. it ranked the wrong
+        // thing. callerScore weights shrunk expectancy + profit factor and drops hit
+        // rate from the formula entirely (it stays a DISPLAYED stat below). avgR ==
+        // expectancy, so the net-positive gate above is unchanged.
+        const score = callerScore({ ...a.expectancy, calls: a.calls });
         eligible.push({
           wallet, calls: a.calls,
           hitRate: Math.round(hitRate * 1000) / 10,
           avgR: Math.round(avgR * 100) / 100,
           totalR: Math.round(a.rSum * 100) / 100,
           score,
+          expectancy: a.expectancy,   // { expectancy, profitFactor, tailRatio, avgWinR, avgLossR }
+          calibration: a.calibration, // { calibrated, inverted, gap, ... } or null
           meritRank: rankCaller(a), // earned identity rank (SIGNAL/SHARP/APEX) or null
           rSeries: a.rSeries || [],  // cumulative-R equity curve (chronological)
-          // PROCESS, alongside the outcome. Outcome grading can't separate a
-          // disciplined operator from a lucky gunslinger — both book +R. This is the
-          // publicly-verifiable half of that: were the calls well-formed when posted?
-          // Reported, NOT folded into `score` (changing the ranking formula is its own
-          // decision — see the expectancy rework).
+          // PROCESS, alongside the outcome — the publicly-verifiable half of "was this
+          // a disciplined operator or a lucky gunslinger": were the calls well-formed
+          // when posted? Reported next to the score, not folded into it.
           discipline: a.plan ? { score: a.plan.score, scored: a.plan.scored, topFlag: a.plan.topFlag } : null,
           // "Where does this trader's edge live" — the single strongest cut.
           regimeEdge: a.regimeEdges?.trend || a.regimeEdges?.align || null,
         });
       }
-      eligible.sort((x, y) => y.score - x.score || y.avgR - x.avgR);
+      // Tie-break on profit factor then sample — reward the sturdier record, not the
+      // luckier one, when scores round equal.
+      eligible.sort((x, y) => y.score - x.score || (y.expectancy?.profitFactor ?? 0) - (x.expectancy?.profitFactor ?? 0) || y.calls - x.calls);
       const top = eligible.slice(0, TOP_N);
 
       const enriched = await Promise.all(top.map(async (e, i) => {
@@ -5132,6 +5147,11 @@ document.getElementById("btn").addEventListener("click",go);
         avgR: Math.round((a.rSum / a.calls) * 100) / 100,
         totalR: Math.round(a.rSum * 100) / 100,
         meritRank: rankCaller(a),
+        // Expectancy view: what an average call is WORTH + whether the wins carry
+        // the losses + how concentrated the record is in a few fat tails.
+        expectancy: a.expectancy,
+        // Conviction calibration: when they bet bigger, were they more right?
+        calibration: a.calibration,
         // How many calls had enough prior history to classify (< calls near the
         // horizon edge). Stated so a thin breakdown reads as thin, not as fact.
         attributed: a.regimeAttributed,

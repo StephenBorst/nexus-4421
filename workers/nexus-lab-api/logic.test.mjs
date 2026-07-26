@@ -7,6 +7,7 @@ import {
   orderlyAccountId, safeChartUrl, symbolToQuery,
   classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge,
   planQuality, planSummary,
+  expectancyStats, callerScore, convictionCalibration,
 } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
@@ -815,4 +816,111 @@ test("planSummary: mean score plus the most common leak", () => {
   assert.equal(s.topFlag.count, 2);
   assert.equal(s.topFlag.rate, 50);
   assert.equal(planSummary([]), null);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Expectancy, ranking score, conviction calibration
+// ═══════════════════════════════════════════════════════════════════
+
+const wins = (n, r) => Array.from({ length: n }, () => ({ r, win: true }));
+const losses = (n) => Array.from({ length: n }, () => ({ r: -1, win: false }));
+
+test("expectancyStats: mean R per call is the headline number", () => {
+  // 4 wins at +2, 6 losses at -1 → (8-6)/10 = +0.2 expectancy despite 40% hit rate
+  const s = expectancyStats([...wins(4, 2), ...losses(6)]);
+  assert.equal(s.expectancy, 0.2);
+  assert.equal(s.avgWinR, 2);
+  assert.equal(s.avgLossR, 1);
+});
+
+test("expectancyStats: profit factor = R won per R lost, capped and Infinity-guarded", () => {
+  assert.equal(expectancyStats([...wins(4, 2), ...losses(4)]).profitFactor, 2); // 8/4
+  assert.equal(expectancyStats(wins(3, 2)).profitFactor, 99); // no losses → capped, not Infinity
+  assert.equal(expectancyStats(losses(3)).profitFactor, 0);
+});
+
+test("expectancyStats: tail ratio captures fat-tail concentration", () => {
+  // one +10 monster among four +1 wins → top 20% (1 of 5) is 10/14 of winning R
+  const s = expectancyStats([{ r: 10, win: true }, ...wins(4, 1)]);
+  assert.ok(s.tailRatio > 0.7);
+  // evenly-sized wins → low concentration
+  assert.ok(expectancyStats(wins(5, 2)).tailRatio < 0.3);
+});
+
+test("expectancyStats: empty / all-invalid input → null", () => {
+  assert.equal(expectancyStats([]), null);
+  assert.equal(expectancyStats([{ win: true }]), null); // no finite r
+});
+
+test("callerScore: a low-hit-rate fat-tail trader beats a high-hit-rate scalper", () => {
+  // The whole point of the rework. Both have 20 calls.
+  const fatTail = { ...expectancyStats([...wins(8, 3), ...losses(12)]), calls: 20 };   // 40% hit, +0.6 exp
+  const scalper = { ...expectancyStats([...wins(15, 0.4), ...losses(5)]), calls: 20 }; // 75% hit, +0.05 exp
+  assert.ok(callerScore(fatTail) > callerScore(scalper));
+});
+
+test("callerScore: sample confidence shrinks a hot short streak below a proven book", () => {
+  const streak = { ...expectancyStats(wins(5, 2)), calls: 5 };                 // +2 exp, tiny sample
+  const proven = { ...expectancyStats([...wins(24, 2), ...losses(16)]), calls: 40 }; // +0.8 exp, big sample
+  assert.ok(callerScore(proven) > callerScore(streak));
+  // ...but a hot streak still outranks a large-sample MEDIOCRE book — thin evidence
+  // of a real edge should beat thick evidence of a marginal one.
+  const marginal = { ...expectancyStats([...wins(11, 1), ...losses(29)]), calls: 40 }; // ~ -0.45 exp
+  assert.ok(callerScore(streak) > callerScore(marginal));
+});
+
+test("callerScore: hit rate does NOT enter the ranking", () => {
+  // The invariant: callerScore reads expectancy, profitFactor, calls — nothing else.
+  // A hitRate field on the stats object must not move the score by a hair.
+  const base = { expectancy: 0.2, profitFactor: 1.4, calls: 20 };
+  assert.equal(callerScore({ ...base, hitRate: 20 }), callerScore({ ...base, hitRate: 75 }));
+});
+
+test("callerScore: 0 for non-positive expectancy or missing stats", () => {
+  assert.equal(callerScore({ expectancy: -0.3, profitFactor: 0.5, calls: 20 }), 0);
+  assert.equal(callerScore(null), 0);
+});
+
+test("convictionCalibration: rewards sizing UP on the calls that worked", () => {
+  // big bets (conviction 3) win, small bets (conviction 1) lose
+  const rows = [
+    ...Array(5).fill(0).map(() => ({ r: 2, win: true, conviction: 3 })),
+    ...Array(5).fill(0).map(() => ({ r: -1, win: false, conviction: 1 })),
+  ];
+  const c = convictionCalibration(rows);
+  assert.equal(c.calibrated, true);
+  assert.equal(c.inverted, false);
+  assert.ok(c.gap > 0);
+});
+
+test("convictionCalibration: flags the costly inversion (big bets on the worst calls)", () => {
+  const rows = [
+    ...Array(5).fill(0).map(() => ({ r: -1, win: false, conviction: 3 })),
+    ...Array(5).fill(0).map(() => ({ r: 2, win: true, conviction: 1 })),
+  ];
+  const c = convictionCalibration(rows);
+  assert.equal(c.inverted, true);
+  assert.equal(c.calibrated, false);
+});
+
+test("convictionCalibration: silent when sizing doesn't vary or sample is thin", () => {
+  // everything sized the same → nothing to calibrate
+  assert.equal(convictionCalibration(Array(10).fill(0).map(() => ({ r: 1, conviction: 2 }))), null);
+  // too few per half
+  assert.equal(convictionCalibration([
+    ...Array(3).fill(0).map(() => ({ r: 2, conviction: 3 })),
+    ...Array(3).fill(0).map(() => ({ r: -1, conviction: 1 })),
+  ]), null);
+  // no conviction data at all
+  assert.equal(convictionCalibration([...wins(6, 2), ...losses(6)]), null);
+});
+
+test("convictionCalibration: a small gap is not called calibrated", () => {
+  const rows = [
+    ...Array(5).fill(0).map(() => ({ r: 1.0, conviction: 3 })),
+    ...Array(5).fill(0).map(() => ({ r: 0.9, conviction: 1 })),
+  ];
+  const c = convictionCalibration(rows);
+  assert.equal(c.calibrated, false); // gap 0.1 < 0.25 minimum
+  assert.equal(c.inverted, false);
 });

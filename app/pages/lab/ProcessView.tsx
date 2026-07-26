@@ -48,9 +48,15 @@ const PLAN_FLAG_LABEL: Record<string, string> = {
 type FetchState = "idle" | "loading" | "error";
 type Bucket = { bucket: string; calls: number; wins: number; rSum: number; avgR: number; hitRate: number };
 type Edge = { dimension: string; best: Bucket; worst: Bucket; gapR: number } | null;
+type Expectancy = { expectancy: number; profitFactor: number; tailRatio: number; avgWinR: number; avgLossR: number };
+type Calibration = { highR: number; lowR: number; gap: number; highN: number; lowN: number; calibrated: boolean; inverted: boolean };
 type ProcessData = {
   calls: number;
+  hitRate?: number;
+  avgR?: number;
   attributed?: number;
+  expectancy?: Expectancy | null;
+  calibration?: Calibration | null;
   regime?: Record<string, Bucket>;
   regimeEdges?: { trend: Edge; vol: Edge; align: Edge };
   discipline?: { score: number; scored: number; flagCounts: Record<string, number>; topFlag: { flag: string; count: number; rate: number } | null } | null;
@@ -183,6 +189,68 @@ export function PlanQualityCard({ discipline }: { discipline: ProcessData["disci
   );
 }
 
+// ── EXPECTANCY (public) ──────────────────────────────────────────────
+// What the leaderboard now RANKS on — surfaced so the number is legible, not a
+// black box. Expectancy (what an average call is worth) + profit factor + tail
+// concentration + the conviction-calibration read.
+function Stat({ label, value, tone, sub }: { label: string; value: string; tone?: string; sub?: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 9, letterSpacing: "0.12em", color: C.text.faint, fontFamily: MONO, textTransform: "uppercase" }}>{label}</div>
+      <div style={{ fontFamily: MONO, fontSize: 18, fontWeight: 700, color: tone ?? C.text.bright, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>{value}</div>
+      {sub && <div style={{ ...hint, marginTop: 1 }}>{sub}</div>}
+    </div>
+  );
+}
+
+export function ExpectancyCard({ data }: { data: ProcessData | null }) {
+  const e = data?.expectancy;
+  const cal = data?.calibration;
+  if (!e || !data?.calls) return null;
+  const expTone = e.expectancy > 0 ? C.pos : e.expectancy < 0 ? C.neg : C.text.fog;
+  const pfTone = e.profitFactor >= 1 ? C.pos : C.neg;
+
+  return (
+    <div style={{ ...cardStyle, marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+        <div style={labelStyle}>&#9632; EXPECTANCY</div>
+        <div style={{ ...hint, letterSpacing: "0.08em" }}>what the board ranks on — not hit rate</div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))", gap: 14, marginTop: 10 }}>
+        <Stat label="Expectancy" value={`${e.expectancy > 0 ? "+" : ""}${e.expectancy}R`} tone={expTone} sub="per call" />
+        <Stat label="Profit factor" value={e.profitFactor >= 99 ? "∞" : `${e.profitFactor}`} tone={pfTone} sub="R won ÷ R lost" />
+        <Stat label="Avg win / loss" value={`+${e.avgWinR} / −${e.avgLossR}`} sub="in R" />
+        <Stat label="Tail" value={`${Math.round(e.tailRatio * 100)}%`} sub="from top 20% of wins" />
+      </div>
+
+      {/* The expectancy lesson, said plainly — this is why hit rate was the wrong
+          thing to rank on. */}
+      <div style={{ ...hint, marginTop: 10 }}>
+        {data.hitRate != null && (
+          <>Hit rate {data.hitRate}% — {data.hitRate < 50
+            ? "below half, yet net-positive: the wins are big enough to carry the misses. That's the profile hit-rate ranking hides."
+            : "and each call carries positive expectancy."} </>
+        )}
+      </div>
+
+      {/* Conviction calibration — the "when you bet bigger, were you more right?" read. */}
+      {cal && (cal.calibrated || cal.inverted) && (
+        <div style={{ marginTop: 10, padding: "10px 12px", background: C.inset, border: `1px solid ${cal.inverted ? "#4a3a00" : C.borderStrong}`, borderRadius: RADIUS.sm }}>
+          <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 13, color: C.text.bright, lineHeight: 1.5 }}>
+            {cal.calibrated ? (
+              <>◎ <strong>Calibrated.</strong> Your higher-conviction calls average <strong style={{ color: C.pos }}>+{cal.gap}R more</strong> than your smaller ones — you size up on the right ideas.</>
+            ) : (
+              <>⚠ <strong style={{ color: C.warn }}>Inverted sizing.</strong> Your bigger bets average <strong style={{ color: C.neg }}>{cal.gap}R</strong> vs your smaller ones — conviction is pointing the wrong way, and it's expensive.</>
+            )}
+          </div>
+          <div style={{ ...hint, marginTop: 6 }}>{cal.highN} high-conviction vs {cal.lowN} low, split at your median position size</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── PLAN ADHERENCE (private) ─────────────────────────────────────────
 export function PlanAdherenceCard({ theses, orders }: { theses: ThesisTrade[]; orders: ProcessedTrade[] }) {
   const isMobile = useIsMobile();
@@ -274,6 +342,7 @@ export function ProcessSection({ wallet, theses, orders }: { wallet: string | nu
 
   return (
     <div style={{ marginTop: S.lg }}>
+      {state === "idle" && <ExpectancyCard data={data} />}
       <RegimeEdgeCard wallet={wallet} data={data} state={state} />
       {state === "idle" && <PlanQualityCard discipline={data?.discipline ?? null} />}
       <PlanAdherenceCard theses={theses} orders={orders} />

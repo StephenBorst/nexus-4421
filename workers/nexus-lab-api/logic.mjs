@@ -311,6 +311,106 @@ export function planSummary(scored) {
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPECTANCY  (rank on how much an average call is WORTH, not how often it wins)
+// ═══════════════════════════════════════════════════════════════════════════
+// The old board ranked on 0.5·hitRate + 0.5·rScore. That quietly teaches the wrong
+// lesson: most genuinely great traders sit around 40% hit rate with a fat right
+// tail, and would rank BELOW a scalper who books +0.2R fifteen times. Hit rate is a
+// vanity number — what pays rent is expectancy (mean R per call) and whether the
+// wins are big enough to carry the losses (profit factor). We keep hit rate as a
+// DISPLAYED stat, but it no longer gates or dominates the ranking.
+//
+// rows = [{ r:number, win:boolean, conviction?:number }] — the same graded R the
+// leaderboard already trusts, so this stays trustless.
+
+export function expectancyStats(rows) {
+  const list = (rows || []).filter((x) => x && Number.isFinite(x.r));
+  const n = list.length;
+  if (!n) return null;
+  const expectancy = list.reduce((s, x) => s + x.r, 0) / n;         // mean R per call
+  let grossWin = 0, grossLoss = 0;
+  const winRs = [];
+  for (const x of list) {
+    if (x.r > 0) { grossWin += x.r; winRs.push(x.r); }
+    else grossLoss += Math.abs(x.r);
+  }
+  // Profit factor: R won per R lost. Capped, and Infinity-guarded (no losses yet).
+  const profitFactor = grossLoss > 0 ? Math.min(grossWin / grossLoss, 99) : (grossWin > 0 ? 99 : 0);
+  // Tail concentration: what share of all winning-R came from the top 20% of wins.
+  // High = a few fat tails carry the record (the elite-trader signature); it's a
+  // description, not a demerit — but it tells a copier what they're really buying.
+  winRs.sort((a, b) => b - a);
+  const topN = Math.max(1, Math.ceil(winRs.length * 0.2));
+  const topSum = winRs.slice(0, topN).reduce((s, r) => s + r, 0);
+  const tailRatio = grossWin > 0 ? topSum / grossWin : 0;
+  return {
+    expectancy: round(expectancy, 3),
+    profitFactor: round(profitFactor, 2),
+    tailRatio: round(tailRatio, 2),
+    avgWinR: winRs.length ? round(grossWin / winRs.length, 2) : 0,
+    avgLossR: (n - winRs.length) ? round(grossLoss / (n - winRs.length), 2) : 0,
+  };
+}
+
+// Expectancy-forward ranking score. Primary term is expectancy; a minority
+// profit-factor term rewards making the wins actually pay for the losses. Hit rate
+// is deliberately absent.
+//
+// The expectancy estimate is SHRUNK toward 0 (the null "no edge" hypothesis) by a
+// prior of `priorCount` pseudo-calls: shrunk = exp · n/(n+priorCount). This is a
+// Bayesian shrinkage, not a flat confidence multiply — the difference matters. A
+// 5-of-5 streak of pure +2R maxes out a plain expectancy term, and a multiply-at-
+// the-end can't pull it under a proven 40-call book; shrinking the ESTIMATE does,
+// because 5 samples barely move it off zero while 40 samples nearly fully credit it.
+// Returns 0..100.
+export const CALLER_SCORE = { priorCount: 12, expCap: 1.5, pfSpan: 2 };
+export function callerScore(stats, cfg = CALLER_SCORE) {
+  const exp = Number(stats?.expectancy);
+  const pf = Number(stats?.profitFactor);
+  const calls = Number(stats?.calls) || 0;
+  if (!Number.isFinite(exp)) return 0;
+  const shrunkExp = exp * (calls / (calls + cfg.priorCount));                 // toward 0 by sample
+  const rScore = Math.max(0, Math.min(shrunkExp, cfg.expCap)) / cfg.expCap;
+  const pfScore = Math.max(0, Math.min((pf - 1) / cfg.pfSpan, 1));            // PF 1→0, PF 1+span→1
+  return Math.round((0.75 * rScore + 0.25 * pfScore) * 1000) / 10;
+}
+
+// ── Conviction calibration ───────────────────────────────────────────────────
+// The question no P&L number answers: when you bet BIGGER, were you actually more
+// right? A trader whose largest-conviction calls are their best has an edge they
+// can lean into; one whose sizing is uncorrelated (or inverted) is leaving money on
+// the table — or worse, sizing up on hope. conviction = the trader's own size proxy
+// (riskPercent, else planned riskReward). We split at the median and compare avg R.
+// Withheld unless conviction actually VARIES and both halves have a real sample —
+// a "calibrated" badge earned by luck would be exactly the noise we refuse to ship.
+export const CALIBRATION = { minPerHalf: 4, minGapR: 0.25 };
+export function convictionCalibration(rows, cfg = CALIBRATION) {
+  const list = (rows || []).filter((x) => x && Number.isFinite(x.r) && Number.isFinite(x.conviction));
+  if (list.length < cfg.minPerHalf * 2) return null;
+  const convs = list.map((x) => x.conviction).sort((a, b) => a - b);
+  if (convs[convs.length - 1] - convs[0] <= 0) return null; // sized everything the same → nothing to calibrate
+  // TRUE median value (interpolated for even n) as the threshold — NOT a single
+  // element. On a two-valued distribution (e.g. all conviction ∈ {1,3}) picking an
+  // element lands the split ON a value and empties a half; the interpolated median
+  // (2) cleanly separates the groups. Ties (== median) go low.
+  const n = convs.length;
+  const median = n % 2 ? convs[(n - 1) / 2] : (convs[n / 2 - 1] + convs[n / 2]) / 2;
+  const high = list.filter((x) => x.conviction > median);
+  const low = list.filter((x) => x.conviction <= median);
+  if (high.length < cfg.minPerHalf || low.length < cfg.minPerHalf) return null;
+  const mean = (a) => a.reduce((s, x) => s + x.r, 0) / a.length;
+  const highR = mean(high), lowR = mean(low);
+  const gap = highR - lowR;
+  return {
+    highR: round(highR, 2), lowR: round(lowR, 2), gap: round(gap, 2),
+    highN: high.length, lowN: low.length,
+    // Calibrated = the bigger bets genuinely did better, by a margin worth trusting.
+    calibrated: gap >= cfg.minGapR,
+    inverted: gap <= -cfg.minGapR, // sized up on the WORSE calls — the costly anti-signal
+  };
+}
+
 // ── PRO subscription payment verification ───────────────────────────────────
 // Pure: given an eth_getTransactionReceipt result, decide whether it contains a
 // qualifying ERC-20 (USDC) Transfer to the subscription receiver, and who paid.
