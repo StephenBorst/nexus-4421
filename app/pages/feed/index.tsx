@@ -23,6 +23,7 @@ import { chartImageList, effectiveStatus } from "@/pages/lab/helpers";
 import LiveNow from "./LiveNow";
 import Contested from "./Contested";
 import LeakReport from "./LeakReport";
+import { lifecycleState, describeUpdate, updateKind } from "@/lib/lifecycle.mjs";
 import Desks from "./Desks";
 import WatchOnlyBanner from "./WatchOnlyBanner";
 
@@ -68,6 +69,9 @@ type FeedThesis = {
   onChainTxHash?: string;
   copyCount?: number;
   agent?: boolean; // autonomous-agent call (surfaced from agent:feed:* by lab-api)
+  // Append-only lifecycle timeline (app/lib/lifecycle.mjs). Rides the feed payload
+  // via the wholesale thesis spread. Narrative only — never affects the grade.
+  updates?: { at: number; kind: string; price?: number; sizePct?: number; note?: string }[];
 };
 
 const STATUS_CONFIG = {
@@ -674,6 +678,31 @@ function FeedCard({
           {thesis.notes}
         </div>
       )}
+
+      {/* ── LIVE UPDATES — the call as an unfolding story, not a frozen post.
+          Shows the most recent couple of updates + how much is still on. This is
+          also the cheapest cold-start content: one call yields many posts.
+          Self-reported narrative — the graded outcome still comes from the
+          originally-posted levels. */}
+      {(() => {
+        const st = lifecycleState(thesis as unknown as Record<string, unknown>);
+        if (!st.count) return null;
+        const recent = st.timeline.slice(-2);
+        return (
+          <div style={{ borderTop: "1px solid #232327", paddingTop: 8, marginTop: 6 }}>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#52525b", letterSpacing: "0.1em", marginBottom: 5 }}>
+              UPDATES · {st.count}{!st.closed && <span style={{ color: "#33333a" }}> · {st.size}% still on</span>}{st.closed && <span style={{ color: "#33333a" }}> · closed</span>}
+            </div>
+            {recent.map((u: { at: number; kind: string; note?: string }, i: number) => (
+              <div key={`${u.at}-${i}`} style={{ display: "flex", gap: 6, alignItems: "baseline", marginBottom: 2 }}>
+                <span style={{ flexShrink: 0, fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a" }}>{updateKind(u.kind)?.glyph}</span>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#d4d4d8" }}>{describeUpdate(u)}</span>
+                {u.note && <span style={{ fontFamily: "var(--nx-font-ui)", fontSize: 10, color: "#a1a1aa", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>— {u.note}</span>}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
       </div>
       <CommentsPanel
         thesisId={thesis.id}

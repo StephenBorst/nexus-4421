@@ -13,6 +13,7 @@ import { cardStyle, labelStyle, navBtnStyle, inputStyle, fieldLabelStyle, STATUS
 import { deployToAgent, thesisToAgentConfig, thesisAgentNotice, deployDirectiveFromThesis } from "@/utils/agentPrefill";
 import { formatPnl, chartImageSrc, chartImageList, effectiveStatus, CHART_HOST_HINT, MAX_CHARTS } from "./helpers";
 import { LOSS_REASONS, lossReason } from "@/lib/postmortem.mjs";
+import { ThesisTimeline } from "./ThesisTimeline";
 import { PnlChart, EmptyState, Coachmark } from "./components";
 import { SharePoster, type PosterData } from "./SharePoster";
 
@@ -219,6 +220,11 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
           );
         })}
       </div>
+
+      {/* ── LIFECYCLE TIMELINE — a call is a story, not a frozen post.
+          Editable while the thesis is open; read-only once it's closed (the story
+          ended). Additive only — never re-grades. */}
+      <ThesisTimeline t={t} onUpdate={onUpdate} canEdit={!isClosed} />
 
       {/* ── POSTMORTEM — appears the moment a thesis becomes a loss ──
           The highest-value 5 seconds a trader can spend, and a fixed taxonomy means

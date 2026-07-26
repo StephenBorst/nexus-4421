@@ -1,5 +1,14 @@
 export type ThesisStatus = "ACTIVE" | "HIT_TP" | "STOPPED_OUT" | "INVALIDATED";
 
+/** One append-only entry on a thesis's lifecycle timeline (app/lib/lifecycle.mjs). */
+export interface ThesisUpdate {
+  at: number;
+  kind: "ADD" | "TRIM" | "STOP_MOVED" | "TARGET_MOVED" | "FLIP" | "CLOSED" | "NOTE";
+  price?: number;
+  sizePct?: number;
+  note?: string;
+}
+
 export interface ThesisTrade {
   id: string;
   symbol: string;
@@ -24,6 +33,10 @@ export interface ThesisTrade {
   gradedR?: number;
   gradedAt?: number;
   actualPnl: number | null;
+  // Append-only lifecycle timeline (add/trim/move stop/flip/close/note). See
+  // app/lib/lifecycle.mjs. ⚠️ ADDITIVE ONLY — grading and the anchored call ledger
+  // read the ORIGINAL levels above, never these, so an update can't re-grade a call.
+  updates?: ThesisUpdate[];
   // Loss postmortem — WHY it lost, from the fixed taxonomy in app/lib/postmortem.mjs.
   // Self-reported introspection, so it never feeds the trustless leaderboard; it
   // powers the private leak profile + the anonymous community leak report.
