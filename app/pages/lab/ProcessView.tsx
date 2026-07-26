@@ -16,6 +16,7 @@ import { cardStyle, labelStyle } from "./styles";
 import { useIsMobile } from "./useIsMobile";
 import { C, MONO, S, RADIUS } from "@/config/theme";
 import { adherenceReport, ADHERENCE_LABELS } from "@/lib/adherence.mjs";
+import { leakProfile, needsPostmortem, lossReason } from "@/lib/postmortem.mjs";
 
 const AGENT_API = "https://og.nexustradinglabs.com";
 
@@ -323,6 +324,65 @@ export function PlanAdherenceCard({ theses, orders }: { theses: ThesisTrade[]; o
   );
 }
 
+// ── LEAK PROFILE (private) ───────────────────────────────────────────
+// The postmortem payoff: across every loss you tagged, which failure mode is
+// actually costing you? Ranked by dollars where recorded (a score is abstract; a
+// dollar figure changes behavior). Self-reported → private, never ranked.
+export function LeakProfileCard({ theses }: { theses: ThesisTrade[] }) {
+  const profile = useMemo(() => leakProfile(theses || []), [theses]);
+  const pending = useMemo(() => needsPostmortem(theses || []).length, [theses]);
+
+  if (!profile.tagged && !pending) return null;
+  const money = (n: number) => `$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const top = profile.top ? lossReason(profile.top.reason) : null;
+
+  return (
+    <div style={{ ...cardStyle, marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+        <div style={labelStyle}>&#9632; LEAK PROFILE</div>
+        <div style={{ ...hint, letterSpacing: "0.08em" }}>private · your own postmortems</div>
+      </div>
+
+      {!profile.tagged ? (
+        <div style={{ ...hint, padding: "10px 0" }}>
+          {pending} losing {pending === 1 ? "thesis" : "theses"} untagged. Tag why each one lost (one tap on the thesis card) and the pattern shows up here — the failure mode costing you the most.
+        </div>
+      ) : (
+        <>
+          {top && profile.top && (
+            <div style={{ margin: "10px 0", padding: "10px 12px", background: C.inset, border: `1px solid ${C.borderStrong}`, borderRadius: RADIUS.sm }}>
+              <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 13, color: C.text.bright, lineHeight: 1.5 }}>
+                Your costliest pattern is <strong>{top.label.toLowerCase()}</strong>
+                {profile.top.costUsd
+                  ? <> — <strong style={{ color: C.neg }}>{money(profile.top.costUsd)}</strong> across {profile.top.count} {profile.top.count === 1 ? "trade" : "trades"}.</>
+                  : <> — {profile.top.count} {profile.top.count === 1 ? "time" : "times"}.</>}
+              </div>
+              <div style={{ ...hint, marginTop: 6 }}>{top.fix}</div>
+            </div>
+          )}
+
+          {Object.entries(profile.counts).sort((a, b) => (b[1] as number) - (a[1] as number)).map(([key, count]) => {
+            const r = lossReason(key);
+            const cost = profile.costUsd[key];
+            return (
+              <div key={key} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "5px 0", borderBottom: `1px solid ${C.border}` }}>
+                <span style={{ fontFamily: "var(--nx-font-ui)", fontSize: 12, color: C.text.fog, minWidth: 0 }}>{r?.label ?? key}</span>
+                <span style={{ flexShrink: 0, fontFamily: MONO, fontSize: 11, color: C.text.faint }}>
+                  {count as number}× {cost ? <span style={{ color: C.neg }}>· −{money(cost)}</span> : null}
+                </span>
+              </div>
+            );
+          })}
+
+          <div style={{ ...hint, marginTop: 10 }}>
+            {profile.tagged} tagged{pending > 0 && <> · {pending} still untagged</>} · dollar totals only count losses where you recorded a P&L
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── section wrapper ──────────────────────────────────────────────────
 export function ProcessSection({ wallet, theses, orders }: { wallet: string | null; theses: ThesisTrade[]; orders: ProcessedTrade[] }) {
   // ONE fetch for both public cards — they read different slices of the same payload.
@@ -346,6 +406,7 @@ export function ProcessSection({ wallet, theses, orders }: { wallet: string | nu
       <RegimeEdgeCard wallet={wallet} data={data} state={state} />
       {state === "idle" && <PlanQualityCard discipline={data?.discipline ?? null} />}
       <PlanAdherenceCard theses={theses} orders={orders} />
+      <LeakProfileCard theses={theses} />
     </div>
   );
 }

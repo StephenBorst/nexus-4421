@@ -12,6 +12,7 @@ import type { ThesisTrade, ThesisStatus } from "./types";
 import { cardStyle, labelStyle, navBtnStyle, inputStyle, fieldLabelStyle, STATUS_CONFIG, CLOSED_STATUSES } from "./styles";
 import { deployToAgent, thesisToAgentConfig, thesisAgentNotice, deployDirectiveFromThesis } from "@/utils/agentPrefill";
 import { formatPnl, chartImageSrc, chartImageList, effectiveStatus, CHART_HOST_HINT, MAX_CHARTS } from "./helpers";
+import { LOSS_REASONS, lossReason } from "@/lib/postmortem.mjs";
 import { PnlChart, EmptyState, Coachmark } from "./components";
 import { SharePoster, type PosterData } from "./SharePoster";
 
@@ -218,6 +219,51 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
           );
         })}
       </div>
+
+      {/* ── POSTMORTEM — appears the moment a thesis becomes a loss ──
+          The highest-value 5 seconds a trader can spend, and a fixed taxonomy means
+          it aggregates into a real leak profile instead of unsearchable notes.
+          Optional, one tap, self-reported → never touches the graded record. */}
+      {(t.gradedOutcome === "LOSS" || t.status === "STOPPED_OUT") && (() => {
+        const picked = lossReason(t.lossReason ?? "");
+        return (
+          <div style={{ borderTop: "1px solid #232327", paddingTop: 10, marginBottom: 10 }}>
+            {picked ? (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+                  <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 3 }}>WHY IT LOST</div>
+                  <div style={{ fontSize: 12, color: "#d4d4d8", fontFamily: "var(--nx-font-ui)" }}>{picked.label}</div>
+                  <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginTop: 3, lineHeight: 1.5 }}>{picked.fix}</div>
+                </div>
+                <button
+                  onClick={() => onUpdate(t.id, { lossReason: undefined })}
+                  style={{ ...navBtnStyle, fontSize: 9, minHeight: 28, padding: "4px 10px", flexShrink: 0 }}
+                >CHANGE</button>
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 6 }}>
+                  WHY DID IT LOSE? <span style={{ color: "#33333a" }}>· optional · private · never affects your graded record</span>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                  {LOSS_REASONS.map((r) => (
+                    <button
+                      key={r.key}
+                      title={r.hint}
+                      onClick={() => onUpdate(t.id, { lossReason: r.key })}
+                      style={{
+                        fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 10px",
+                        cursor: "pointer", borderRadius: 3, letterSpacing: "0.04em", minHeight: 30,
+                        border: "1px solid #232327", background: "transparent", color: "#71717a",
+                      }}
+                    >{r.label}</button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Live P&L — only shown for ACTIVE theses with a mark price */}
       {t.status === "ACTIVE" && markPrice != null && (() => {

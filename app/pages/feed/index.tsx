@@ -22,6 +22,7 @@ import { Sparkline } from "@/pages/lab/components";
 import { chartImageList, effectiveStatus } from "@/pages/lab/helpers";
 import LiveNow from "./LiveNow";
 import Contested from "./Contested";
+import LeakReport from "./LeakReport";
 import Desks from "./Desks";
 import WatchOnlyBanner from "./WatchOnlyBanner";
 
@@ -1568,6 +1569,7 @@ export default function FeedPage() {
               <LeaderboardView feed={feed} walletAddress={walletAddress} onCopy={setCopyTarget} />
             )}
             {!loading && !error && <Desks walletAddress={walletAddress} />}
+            {!loading && !error && <LeakReport />}
           </>
         )}
 

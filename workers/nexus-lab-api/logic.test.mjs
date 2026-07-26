@@ -8,6 +8,7 @@ import {
   classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge,
   planQuality, planSummary,
   expectancyStats, callerScore, convictionCalibration, contestedBoard,
+  LOSS_REASONS, isLossReason, postmortemSummary,
 } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
@@ -1009,4 +1010,44 @@ test("contestedBoard: wallet identity is case-insensitive", () => {
     E("0xD", "BTC", "SHORT"),
   ]);
   assert.equal(board.length, 0);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Loss postmortems (taxonomy + aggregation)
+// ═══════════════════════════════════════════════════════════════════
+
+test("LOSS_REASONS: keys are the exact pinned set (drift guard vs the client copy)", () => {
+  // ⚠️ Must stay identical to LOSS_REASONS in app/lib/postmortem.mjs — the client
+  // writes these keys, this side aggregates them. Divergence = silently split data.
+  assert.deepEqual(
+    LOSS_REASONS.map((r) => r.key).sort(),
+    ["CHASED", "EARLY", "NO_STOP", "OVERSIZED", "REVENGE", "THESIS_WRONG"],
+  );
+});
+
+test("isLossReason: enum-guarded (self-reported field arrives from client storage)", () => {
+  assert.equal(isLossReason("REVENGE"), true);
+  assert.equal(isLossReason("revenge"), false);
+  assert.equal(isLossReason("__proto__"), false);
+  assert.equal(isLossReason(42), false);
+});
+
+test("postmortemSummary: tallies counts and names the most common reason", () => {
+  const s = postmortemSummary(["OVERSIZED", "EARLY", "OVERSIZED", "CHASED"]);
+  assert.equal(s.tagged, 4);
+  assert.equal(s.counts.OVERSIZED, 2);
+  assert.equal(s.top.reason, "OVERSIZED");
+  assert.equal(s.top.rate, 50);
+});
+
+test("postmortemSummary: silently drops junk/injected values", () => {
+  const s = postmortemSummary(["EARLY", "NOT_A_REASON", null, "EARLY"]);
+  assert.equal(s.tagged, 2);
+  assert.deepEqual(Object.keys(s.counts), ["EARLY"]);
+});
+
+test("postmortemSummary: nothing valid → null (no empty artifact)", () => {
+  assert.equal(postmortemSummary([]), null);
+  assert.equal(postmortemSummary(["GARBAGE"]), null);
+  assert.equal(postmortemSummary(null), null);
 });

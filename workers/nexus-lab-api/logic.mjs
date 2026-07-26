@@ -481,6 +481,47 @@ export function contestedBoard(entries, cfg = CONTESTED) {
   return out;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LOSS POSTMORTEMS  (why did it lose — from a FIXED taxonomy, so it aggregates)
+// ═══════════════════════════════════════════════════════════════════════════
+// Grading tells a trader THAT a call lost; it can't tell them WHY, and "why" is
+// where improvement lives. A free-text note doesn't aggregate; a FIXED taxonomy
+// does — which turns one trader's honesty into a community artifact ("the #1 leak
+// this week is oversizing"). Six mutually-exclusive reasons, each a distinct,
+// fixable failure mode. Self-reported (it's introspection, not a price fact) — so
+// it NEVER touches the trustless leaderboard; it's a coaching + culture surface.
+//
+// ⚠️ Mirrored on the client in app/lib/postmortem.mjs (LOSS_REASONS) — keep the KEY
+// set identical. The pinned key-set tests on both sides catch drift.
+export const LOSS_REASONS = [
+  { key: "THESIS_WRONG", label: "Thesis was wrong",  hint: "The idea itself failed — the market did the opposite for real reasons." },
+  { key: "EARLY",        label: "Entered too early", hint: "Right idea, wrong time — stopped out before it worked." },
+  { key: "OVERSIZED",    label: "Position too big",  hint: "Sizing, not analysis — a normal loss hurt more than it should have." },
+  { key: "NO_STOP",      label: "Ignored my stop",   hint: "Moved or abandoned the stop — the one unforgivable one." },
+  { key: "CHASED",       label: "Chased the entry",  hint: "Bought the move instead of the level — paid up, no edge left." },
+  { key: "REVENGE",      label: "Revenge trade",     hint: "Traded to win money back, not because the setup was there." },
+];
+const LOSS_REASON_KEYS = new Set(LOSS_REASONS.map((r) => r.key));
+export function isLossReason(x) { return typeof x === "string" && LOSS_REASON_KEYS.has(x); }
+
+/**
+ * Tally a set of postmortem reasons (junk/injected values ignored via the enum).
+ * @param {string[]} reasons
+ * @returns {{tagged:number, counts:Record<string,number>, top:{reason,count,rate}|null}|null}
+ */
+export function postmortemSummary(reasons) {
+  const valid = (reasons || []).filter(isLossReason);
+  if (!valid.length) return null;
+  const counts = {};
+  for (const r of valid) counts[r] = (counts[r] || 0) + 1;
+  const [topReason, topCount] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  return {
+    tagged: valid.length,
+    counts,
+    top: { reason: topReason, count: topCount, rate: round((topCount / valid.length) * 100, 1) },
+  };
+}
+
 // ── PRO subscription payment verification ───────────────────────────────────
 // Pure: given an eth_getTransactionReceipt result, decide whether it contains a
 // qualifying ERC-20 (USDC) Transfer to the subscription receiver, and who paid.

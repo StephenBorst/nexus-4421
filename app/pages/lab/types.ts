@@ -24,6 +24,10 @@ export interface ThesisTrade {
   gradedR?: number;
   gradedAt?: number;
   actualPnl: number | null;
+  // Loss postmortem — WHY it lost, from the fixed taxonomy in app/lib/postmortem.mjs.
+  // Self-reported introspection, so it never feeds the trustless leaderboard; it
+  // powers the private leak profile + the anonymous community leak report.
+  lossReason?: string;
   // Optional chart images (TradingView snapshot, X image, imgur). Traders reason in
   // charts and usually across timeframes — hence a list, capped at MAX_CHARTS.
   // ⚠️ User-supplied URLs: ALWAYS render via chartImageList()/chartImageSrc(), never

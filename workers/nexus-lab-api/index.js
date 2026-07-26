@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, REGIME, classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge, planQuality, planSummary, expectancyStats, callerScore, convictionCalibration, contestedBoard } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, REGIME, classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge, planQuality, planSummary, expectancyStats, callerScore, convictionCalibration, contestedBoard, LOSS_REASONS, isLossReason, postmortemSummary } from "./logic.mjs";
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./backtest.mjs";
 // Directive level validation lives with the exec's money-path logic (single source);
@@ -5256,6 +5256,48 @@ document.getElementById("btn").addEventListener("click",go);
         contested: enriched,
         criteria: {
           note: "Symbols where credible callers hold OPPOSING directions right now, from open positions + active (unresolved, <14d) public calls. Ranked by tension = weight balance × total weight; participants weighted by earned merit tier (Apex 3 / Sharp 2 / Signal 1). A wallet on both sides of a symbol is voided there.",
+        },
+      }, request);
+    }
+
+    // ── /theses/postmortems — the community's shared leak report ──
+    // One trader's honesty about WHY a trade lost is useful to them; the aggregate is
+    // useful to everyone, and it's culture-setting (it makes admitting a process
+    // error normal). Fixed taxonomy → it actually aggregates.
+    // ⚠️ ANONYMOUS BY CONSTRUCTION: reasons are tallied across all wallets and the
+    // wallet is never attached to a reason in the response. Self-reported, so this
+    // never feeds the trustless leaderboard — it's a mirror, not a ranking.
+    if (parts[0] === "theses" && parts[1] === "postmortems") {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+      const WINDOW_MS = 30 * 86400 * 1000;
+      const since = Date.now() - WINDOW_MS;
+      const reasons = [];
+      let contributors = 0;
+      try {
+        const listed = await env.LAB_STORE.list({ prefix: "lab:" });
+        for (const key of listed.keys) {
+          const raw = await env.LAB_STORE.get(key.name);
+          if (!raw) continue;
+          let data; try { data = JSON.parse(raw); } catch { continue; }
+          let anyFromWallet = 0;
+          for (const t of (data.theses || [])) {
+            if (!t || !isLossReason(t.lossReason)) continue;
+            if ((t.createdAt || 0) < since) continue;
+            reasons.push(t.lossReason);
+            anyFromWallet++;
+          }
+          if (anyFromWallet) contributors++;
+        }
+      } catch (e) { console.error("[postmortems]", e.message); }
+
+      const summary = postmortemSummary(reasons);
+      return json({
+        windowDays: 30,
+        contributors,
+        taxonomy: LOSS_REASONS,
+        summary, // { tagged, counts, top } or null until the habit exists
+        criteria: {
+          note: "Self-reported reasons on losing calls, from a fixed taxonomy, tallied anonymously across all wallets over 30 days. Never attached to a wallet, never part of any ranking — grading stays objective and price-based.",
         },
       }, request);
     }
