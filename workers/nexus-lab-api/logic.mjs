@@ -41,6 +41,276 @@ export function gradeCall(t, cd) {
   return { outcome: "PENDING", r: 0 };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// REGIME ATTRIBUTION
+// ═══════════════════════════════════════════════════════════════════════════
+// Outcome grading answers "was the call right". Regime attribution answers the
+// far more useful question: "in WHICH market does this trader's edge live". Every
+// good discretionary trader knows the answer for themselves; almost no retail
+// trader does, because nobody breaks their record down this way.
+//
+// Deliberately computed from the SAME public /tv/history OHLC that gradeCall uses:
+// - trustless (anyone can recompute it from public candles, like the grade itself)
+// - historical + universal (works on every symbol, any date) — unlike the brain's
+//   live computeRegime, which only knows *now*, and unlike oi:hist, which only
+//   covers watchlisted symbols and only since we started recording.
+// So this adds ZERO new data dependency. It reads the candles BEFORE the call was
+// posted — the regime the trader chose to trade into, not the one that followed
+// (which would be hindsight, and would leak the outcome into the label).
+
+// ⚠️ CALIBRATED ON REAL DATA, not chosen by feel. Measured over 60d of hourly
+// candles across BTC/ETH/SOL/DOGE/HYPE (tools/calibrate-regime.mjs):
+//   ER_TREND  0.35 → 6% of windows trend · 0.30 → 11% · 0.25 → 20% · 0.20 → 31%
+//   vol       0.75/1.50 → 33/62/5 (CALM/NORMAL/VOLATILE) · 0.80/1.35 → 42/49/9
+// The first cut used 0.35 and labelled 27 of 28 BTC windows CHOP — a dimension that
+// answers the same way every time produces no comparison, so regimeEdge could never
+// speak. These values put ~31% of windows in a trend (stable at 25-35% per symbol)
+// and keep every bucket populated enough to actually reach the 5-call minimum.
+export const REGIME = {
+  LOOKBACK: 48,     // candles of context before the call (1h bars → 2 days)
+  MIN_SAMPLES: 12,  // below this the window can't describe a regime → null
+  ER_TREND: 0.20,   // efficiency ratio above which price is going somewhere
+  MIN_MOVE_PCT: 1,  // ...and it has to have actually moved, not drifted
+  VOL_CALM: 0.80,   // ATR% vs the symbol's own baseline
+  VOL_HOT: 1.35,
+};
+
+const round = (n, dp) => Math.round(n * 10 ** dp) / 10 ** dp;
+
+/** Index of the last candle at or before `atSec`, or -1. Candles ascend by t. */
+function candleIndexAt(cd, atSec) {
+  let idx = -1;
+  for (let i = 0; i < cd.t.length; i++) {
+    if (cd.t[i] <= atSec) idx = i; else break;
+  }
+  return idx;
+}
+
+/**
+ * Classify the market a call was posted INTO, from the candles preceding it.
+ *
+ * trend  — TREND_UP / TREND_DOWN / CHOP via the efficiency ratio (net move ÷ total
+ *          path). ER near 1 = a straight line; near 0 = the same ground covered
+ *          over and over. A big move that backed and filled is still chop, which
+ *          is exactly the distinction a % change can't make.
+ * vol    — CALM / NORMAL / VOLATILE: window ATR% against the symbol's own longer
+ *          baseline, so "volatile" means volatile *for this asset* (a 3% day is
+ *          calm for a memecoin and a crisis for BTC).
+ *
+ * @param {{t:number[],h:number[],l:number[],c:number[]}} cd candles (needs closes)
+ * @param {number} atSec  when the call was posted (seconds)
+ * @returns {{trend,vol,er,movePct,atrPct,baselineAtrPct,samples}|null} null when history is too thin
+ */
+export function classifyRegime(cd, atSec, opts = {}) {
+  const { LOOKBACK, MIN_SAMPLES, ER_TREND, MIN_MOVE_PCT, VOL_CALM, VOL_HOT } = { ...REGIME, ...opts };
+  if (!cd || !Array.isArray(cd.t) || !Array.isArray(cd.c)) return null;
+  const at = candleIndexAt(cd, atSec);
+  if (at < MIN_SAMPLES - 1) return null; // not enough PRIOR context to describe
+
+  const from = Math.max(0, at - LOOKBACK + 1);
+  const closes = cd.c.slice(from, at + 1).map(Number).filter(Number.isFinite);
+  if (closes.length < MIN_SAMPLES) return null;
+
+  // Efficiency ratio: how much of the distance travelled was actually progress.
+  let path = 0;
+  for (let i = 1; i < closes.length; i++) path += Math.abs(closes[i] - closes[i - 1]);
+  const net = closes[closes.length - 1] - closes[0];
+  const er = path > 0 ? Math.abs(net) / path : 0;
+  const movePct = closes[0] ? (net / closes[0]) * 100 : 0;
+
+  const trend = (er >= ER_TREND && Math.abs(movePct) >= MIN_MOVE_PCT)
+    ? (net > 0 ? "TREND_UP" : "TREND_DOWN")
+    : "CHOP";
+
+  // Volatility, relative to this symbol's own history (not an absolute threshold).
+  const atrOf = (a, b) => {
+    let sum = 0, n = 0;
+    for (let i = a; i <= b; i++) {
+      const h = Number(cd.h[i]), l = Number(cd.l[i]), c = Number(cd.c[i]);
+      if (!Number.isFinite(h) || !Number.isFinite(l) || !c) continue;
+      sum += ((h - l) / Math.abs(c)) * 100; n++;
+    }
+    return n ? sum / n : null;
+  };
+  const atrPct = atrOf(from, at);
+  const baselineAtrPct = atrOf(0, at);
+  let vol = "NORMAL";
+  if (atrPct != null && baselineAtrPct) {
+    const ratio = atrPct / baselineAtrPct;
+    if (ratio <= VOL_CALM) vol = "CALM";
+    else if (ratio >= VOL_HOT) vol = "VOLATILE";
+  }
+
+  return {
+    trend, vol, er: round(er, 3), movePct: round(movePct, 2),
+    atrPct: atrPct == null ? null : round(atrPct, 3),
+    baselineAtrPct: baselineAtrPct == null ? null : round(baselineAtrPct, 3),
+    samples: closes.length,
+  };
+}
+
+/**
+ * Was the call WITH the prevailing trend, AGAINST it, or in chop? This is the cut
+ * that most often produces the "stop doing that" insight — a trader can be a fine
+ * trend-follower and a reliable donor when they fight the tape, and a blended
+ * hit-rate hides both facts.
+ */
+export function callAlignment(direction, regime) {
+  if (!regime || regime.trend === "CHOP") return "CHOP";
+  const up = regime.trend === "TREND_UP";
+  const long = String(direction).toUpperCase() === "LONG";
+  return up === long ? "WITH_TREND" : "AGAINST_TREND";
+}
+
+/** Bucket keys a call is attributed to. Kept flat + few so samples stay meaningful. */
+export function regimeBucketsOf(direction, regime) {
+  if (!regime) return [];
+  return [`trend:${regime.trend}`, `vol:${regime.vol}`, `align:${callAlignment(direction, regime)}`];
+}
+
+/**
+ * Aggregate graded calls into per-bucket records.
+ * @param {{buckets:string[], r:number, win:boolean}[]} rows
+ */
+export function regimeBuckets(rows) {
+  const out = {};
+  for (const row of rows || []) {
+    for (const b of row.buckets || []) {
+      const a = out[b] || (out[b] = { bucket: b, calls: 0, wins: 0, rSum: 0 });
+      a.calls++; if (row.win) a.wins++; a.rSum += Number(row.r) || 0;
+    }
+  }
+  for (const a of Object.values(out)) {
+    a.avgR = round(a.rSum / a.calls, 2);
+    a.rSum = round(a.rSum, 2);
+    a.hitRate = round((a.wins / a.calls) * 100, 1);
+  }
+  return out;
+}
+
+// A verdict is only worth showing when it's likely to be real: both sides need a
+// minimum sample AND the gap has to be big enough to act on. Otherwise we say
+// nothing — a confident-sounding insight drawn from 3 calls is worse than silence,
+// because the trader will actually change their behavior on it.
+export const REGIME_EDGE = { minSample: 5, minGapR: 0.4 };
+
+/**
+ * The single actionable sentence's worth of data: within one dimension (trend, vol
+ * or alignment), which regime is this trader best and worst in?
+ * @returns {{dimension,best,worst,gapR}|null}
+ */
+export function regimeEdge(buckets, dimension = "trend", cfg = REGIME_EDGE) {
+  const rows = Object.values(buckets || {})
+    .filter((b) => b.bucket.startsWith(`${dimension}:`) && b.calls >= cfg.minSample);
+  if (rows.length < 2) return null;
+  rows.sort((x, y) => y.avgR - x.avgR);
+  const best = rows[0], worst = rows[rows.length - 1];
+  const gapR = round(best.avgR - worst.avgR, 2);
+  if (gapR < cfg.minGapR) return null; // no separation worth acting on
+  return { dimension, best, worst, gapR };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PLAN QUALITY  (the trustless half of process grading)
+// ═══════════════════════════════════════════════════════════════════════════
+// Outcome grading can't tell a disciplined operator from a lucky gunslinger — both
+// book +R. Process is what separates them, but a HUMAN's actual fills are private
+// (Orderly publishes only per-symbol aggregates — there is no public per-trade
+// tape), so we cannot verify execution server-side and must not pretend to.
+//
+// What IS publicly verifiable is whether the PLAN was well-formed at the moment it
+// was posted, judged against the public price at that moment:
+//   LATE_ENTRY   the market had already run most of the way to target before the
+//                call went up — the stated entry was never obtainable, so the R
+//                being claimed is fiction (this is the main way a board gets gamed)
+//   STOP_IN_NOISE  the stop sits inside a single bar's normal range → the outcome
+//                is a coin flip on noise regardless of whether the idea was right
+//   STOP_TOO_WIDE  "stop" so far away it isn't risk control
+//   RR_MISMATCH  the claimed R:R disagrees with the trader's own levels — and the
+//                claimed R is what gradeCall pays out on a win, so this matters
+//   BAD_LEVELS   target on the wrong side of entry — malformed, not a real call
+// Every one of these is recomputable by anyone from the same public candles, which
+// is why it can legitimately sit next to the trustless grade on the leaderboard.
+
+export const PLAN_PENALTY = { LATE_ENTRY: 30, STOP_IN_NOISE: 25, STOP_TOO_WIDE: 15, RR_MISMATCH: 20, BAD_LEVELS: 50 };
+export const PLAN = { lateEntryR: 0.5, stopNoiseAtr: 0.5, stopWideAtr: 6, rrTolerance: 0.5, rrRelTolerance: 0.25 };
+
+/**
+ * Score how well-formed a call was, from public price at post time.
+ * @param {object} t   thesis { direction, entryPrice, stopLoss, takeProfit1, riskReward, createdAt }
+ * @param {object} cd  candles { t,h,l,c }
+ * @returns {{score:number, flags:string[], components:object}|null} null if unscoreable
+ */
+export function planQuality(t, cd, cfg = PLAN) {
+  if (!t || !t.entryPrice || !t.stopLoss || !t.takeProfit1) return null;
+  const long = String(t.direction).toUpperCase() === "LONG";
+  const riskDist = Math.abs(t.entryPrice - t.stopLoss);
+  if (!riskDist) return null;
+
+  const flags = [];
+  const components = { riskDist: round(riskDist, 8) };
+
+  // Malformed geometry: stop must sit on the losing side, target on the winning side.
+  const stopWrongSide = long ? t.stopLoss >= t.entryPrice : t.stopLoss <= t.entryPrice;
+  const tpWrongSide = long ? t.takeProfit1 <= t.entryPrice : t.takeProfit1 >= t.entryPrice;
+  if (stopWrongSide || tpWrongSide) flags.push("BAD_LEVELS");
+
+  // Stated vs geometric R:R. gradeCall pays +riskReward on a win, so an inflated
+  // claim is a direct overstatement of the record.
+  const rrGeom = Math.abs(t.takeProfit1 - t.entryPrice) / riskDist;
+  components.rrGeom = round(rrGeom, 2);
+  if (typeof t.riskReward === "number" && t.riskReward > 0) {
+    components.rrStated = t.riskReward;
+    const abs = Math.abs(t.riskReward - rrGeom);
+    if (abs > cfg.rrTolerance && abs / Math.max(rrGeom, 0.01) > cfg.rrRelTolerance) flags.push("RR_MISMATCH");
+  }
+
+  // Where was the market when the call was posted?
+  const atSec = Math.floor((t.createdAt || 0) / 1000);
+  const idx = cd ? candleIndexAt(cd, atSec) : -1;
+  if (idx >= 0) {
+    const mark = Number(cd.c?.[idx]);
+    if (Number.isFinite(mark) && mark) {
+      // Signed in the direction of the trade: positive = the move already happened.
+      const favourable = long ? mark - t.entryPrice : t.entryPrice - mark;
+      const driftR = favourable / riskDist;
+      components.markAtPost = round(mark, 8);
+      components.entryDriftR = round(driftR, 2);
+      if (driftR > cfg.lateEntryR) flags.push("LATE_ENTRY");
+    }
+    // Stop distance vs what a single bar routinely does.
+    const regime = classifyRegime(cd, atSec);
+    if (regime?.atrPct != null) {
+      const atrAbs = (regime.atrPct / 100) * Math.abs(Number(cd.c[idx]) || t.entryPrice);
+      if (atrAbs > 0) {
+        const stopAtr = riskDist / atrAbs;
+        components.stopAtr = round(stopAtr, 2);
+        if (stopAtr < cfg.stopNoiseAtr) flags.push("STOP_IN_NOISE");
+        else if (stopAtr > cfg.stopWideAtr) flags.push("STOP_TOO_WIDE");
+      }
+    }
+  }
+
+  let score = 100;
+  for (const f of flags) score -= PLAN_PENALTY[f] || 0;
+  return { score: Math.max(0, Math.min(100, score)), flags, components };
+}
+
+/** Mean plan score + how often each flag fired, across a set of scored calls. */
+export function planSummary(scored) {
+  const rows = (scored || []).filter((s) => s && typeof s.score === "number");
+  if (!rows.length) return null;
+  const flagCounts = {};
+  for (const r of rows) for (const f of r.flags) flagCounts[f] = (flagCounts[f] || 0) + 1;
+  const worst = Object.entries(flagCounts).sort((a, b) => b[1] - a[1])[0] || null;
+  return {
+    scored: rows.length,
+    score: Math.round(rows.reduce((s, r) => s + r.score, 0) / rows.length),
+    flagCounts,
+    topFlag: worst ? { flag: worst[0], count: worst[1], rate: round((worst[1] / rows.length) * 100, 1) } : null,
+  };
+}
+
 // ── PRO subscription payment verification ───────────────────────────────────
 // Pure: given an eth_getTransactionReceipt result, decide whether it contains a
 // qualifying ERC-20 (USDC) Transfer to the subscription receiver, and who paid.

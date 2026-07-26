@@ -2,7 +2,12 @@
 // Run: node --test workers/nexus-lab-api/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { gradeCall, resolveAiUpstream, bankrGatewayModel, rankCaller, confluenceSignal, orderlyAccountId, safeChartUrl, symbolToQuery } from "./logic.mjs";
+import {
+  gradeCall, resolveAiUpstream, bankrGatewayModel, rankCaller, confluenceSignal,
+  orderlyAccountId, safeChartUrl, symbolToQuery,
+  classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge,
+  planQuality, planSummary,
+} from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
 const series = (t0, bars) => ({
@@ -559,4 +564,255 @@ test("symbolToQuery: empty/garbage → null", () => {
   assert.equal(symbolToQuery(""), null);
   assert.equal(symbolToQuery("___"), null);
   assert.equal(symbolToQuery(null), null);
+});
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Regime attribution + plan quality
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+// Candle builder that carries closes (regime needs them; gradeCall doesn't).
+const rSeries = (start, closes, rangePct = 1) => ({
+  t: closes.map((_, i) => start + i * 3600),
+  c: closes.slice(),
+  h: closes.map((c) => c * (1 + rangePct / 200)),
+  l: closes.map((c) => c * (1 - rangePct / 200)),
+});
+
+const rampUp = (n, from = 100, step = 1) => Array.from({ length: n }, (_, i) => from + i * step);
+const zigzag = (n, from = 100, amp = 2) => Array.from({ length: n }, (_, i) => from + (i % 2 ? amp : 0));
+
+test("classifyRegime: a straight run up is TREND_UP (high efficiency ratio)", () => {
+  const cd = rSeries(t0, rampUp(48));
+  const reg = classifyRegime(cd, t0 + 47 * 3600);
+  assert.equal(reg.trend, "TREND_UP");
+  assert.equal(reg.er, 1); // pure trend â€” every step was progress
+  assert.ok(reg.movePct > 1);
+});
+
+test("classifyRegime: mirror case is TREND_DOWN", () => {
+  const cd = rSeries(t0, rampUp(48, 200, -2));
+  assert.equal(classifyRegime(cd, t0 + 47 * 3600).trend, "TREND_DOWN");
+});
+
+test("classifyRegime: same ground covered repeatedly is CHOP, not a trend", () => {
+  const cd = rSeries(t0, zigzag(48));
+  const reg = classifyRegime(cd, t0 + 47 * 3600);
+  assert.equal(reg.trend, "CHOP");
+  assert.ok(reg.er < 0.35);
+});
+
+test("classifyRegime: a big move that backs and fills is still CHOP", () => {
+  // travels 100 up to ~130 then back to ~101: large path, no net progress
+  const closes = [...rampUp(24, 100, 1.25), ...rampUp(24, 130, -1.2)];
+  const reg = classifyRegime(rSeries(t0, closes), t0 + 47 * 3600);
+  assert.equal(reg.trend, "CHOP");
+});
+
+test("classifyRegime: drift below MIN_MOVE_PCT is CHOP even at perfect efficiency", () => {
+  const cd = rSeries(t0, rampUp(48, 100, 0.001)); // er == 1, move ~0.05%
+  const reg = classifyRegime(cd, t0 + 47 * 3600);
+  assert.equal(reg.er, 1);
+  assert.equal(reg.trend, "CHOP");
+});
+
+test("classifyRegime: vol is relative to the symbol's own baseline", () => {
+  // 60 calm bars then 48 with 5x the bar range: the recent window reads VOLATILE
+  const calm = rSeries(t0, rampUp(60), 1);
+  const hotCloses = rampUp(48, 160);
+  const cd = {
+    t: [...calm.t, ...hotCloses.map((_, i) => t0 + (60 + i) * 3600)],
+    c: [...calm.c, ...hotCloses],
+    h: [...calm.h, ...hotCloses.map((c) => c * 1.025)],
+    l: [...calm.l, ...hotCloses.map((c) => c * 0.975)],
+  };
+  assert.equal(classifyRegime(cd, t0 + 107 * 3600).vol, "VOLATILE");
+  // ...and the calm stretch alone is not flagged hot
+  assert.notEqual(classifyRegime(calm, t0 + 59 * 3600).vol, "VOLATILE");
+});
+
+test("classifyRegime: too little PRIOR history gives null (never guesses)", () => {
+  const cd = rSeries(t0, rampUp(48));
+  assert.equal(classifyRegime(cd, t0 + 3 * 3600), null); // only 4 bars precede
+  assert.equal(classifyRegime(cd, t0 - 86400), null);    // call predates the series
+  assert.equal(classifyRegime(null, t0), null);
+});
+
+test("classifyRegime: only reads candles BEFORE the call (no hindsight leak)", () => {
+  // chop first, violent rally after: a call at the boundary must read CHOP
+  const closes = [...zigzag(48), ...rampUp(48, 100, 5)];
+  const cd = rSeries(t0, closes);
+  assert.equal(classifyRegime(cd, t0 + 47 * 3600).trend, "CHOP");
+  assert.equal(classifyRegime(cd, t0 + 95 * 3600).trend, "TREND_UP");
+});
+
+test("classifyRegime: a REAL-WORLD-shaped grind still reads as a trend", () => {
+  // Regression guard on the calibrated ER threshold. Live markets rarely produce
+  // clean ramps — a genuine trend advances two steps and gives one back, which lands
+  // around er≈0.33. The original 0.35 threshold called that CHOP and, measured over
+  // 60d across 5 symbols, labelled 94% of all windows CHOP. If this test starts
+  // failing, the classifier has gone blind again — re-run tools/calibrate-regime.mjs.
+  // two steps up (+0.5 each), one step back (-0.5625) → er ≈ 0.28, ~7% net move
+  let px = 100;
+  const closes = Array.from({ length: 48 }, (_, i) => (px += i % 3 === 2 ? -0.5625 : 0.5));
+  const reg = classifyRegime(rSeries(t0, closes), t0 + 47 * 3600);
+  assert.equal(reg.trend, "TREND_UP");
+  assert.ok(reg.er >= 0.2 && reg.er < 0.35, `er ${reg.er} should sit in the realistic band`);
+});
+
+test("callAlignment: with / against / chop", () => {
+  assert.equal(callAlignment("LONG", { trend: "TREND_UP" }), "WITH_TREND");
+  assert.equal(callAlignment("SHORT", { trend: "TREND_UP" }), "AGAINST_TREND");
+  assert.equal(callAlignment("LONG", { trend: "TREND_DOWN" }), "AGAINST_TREND");
+  assert.equal(callAlignment("SHORT", { trend: "TREND_DOWN" }), "WITH_TREND");
+  assert.equal(callAlignment("LONG", { trend: "CHOP" }), "CHOP");
+  assert.equal(callAlignment("LONG", null), "CHOP");
+});
+
+test("regimeBucketsOf: one bucket per dimension, none without a regime", () => {
+  const b = regimeBucketsOf("SHORT", { trend: "TREND_UP", vol: "CALM" });
+  assert.deepEqual(b, ["trend:TREND_UP", "vol:CALM", "align:AGAINST_TREND"]);
+  assert.deepEqual(regimeBucketsOf("LONG", null), []);
+});
+
+test("regimeBuckets: aggregates hit rate + avg R per bucket", () => {
+  const rows = [
+    { buckets: ["trend:TREND_UP"], r: 2, win: true },
+    { buckets: ["trend:TREND_UP"], r: -1, win: false },
+    { buckets: ["trend:CHOP"], r: -1, win: false },
+  ];
+  const b = regimeBuckets(rows);
+  assert.equal(b["trend:TREND_UP"].calls, 2);
+  assert.equal(b["trend:TREND_UP"].avgR, 0.5);
+  assert.equal(b["trend:TREND_UP"].hitRate, 50);
+  assert.equal(b["trend:CHOP"].avgR, -1);
+});
+
+test("regimeEdge: surfaces best/worst regime once both have a real sample", () => {
+  const rows = [
+    ...Array(6).fill({ buckets: ["trend:TREND_UP"], r: 2, win: true }),
+    ...Array(6).fill({ buckets: ["trend:CHOP"], r: -1, win: false }),
+  ];
+  const e = regimeEdge(regimeBuckets(rows), "trend");
+  assert.equal(e.best.bucket, "trend:TREND_UP");
+  assert.equal(e.worst.bucket, "trend:CHOP");
+  assert.equal(e.gapR, 3);
+});
+
+test("regimeEdge: stays SILENT on a thin sample or a narrow gap", () => {
+  // thin: 4 calls each, below minSample
+  const thin = [
+    ...Array(4).fill({ buckets: ["trend:TREND_UP"], r: 2, win: true }),
+    ...Array(4).fill({ buckets: ["trend:CHOP"], r: -1, win: false }),
+  ];
+  assert.equal(regimeEdge(regimeBuckets(thin), "trend"), null);
+  // sample is fine but both regimes perform the same, so there is no advice to give
+  const flat = [
+    ...Array(6).fill({ buckets: ["trend:TREND_UP"], r: 1, win: true }),
+    ...Array(6).fill({ buckets: ["trend:CHOP"], r: 1, win: true }),
+  ];
+  assert.equal(regimeEdge(regimeBuckets(flat), "trend"), null);
+  // and a single bucket is not a comparison
+  assert.equal(regimeEdge(regimeBuckets(thin.slice(0, 4)), "trend"), null);
+});
+
+// â”€â”€ plan quality â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+// A clean LONG: entry at market, stop 5 away, target 10 away, R:R 2 stated.
+const planCd = rSeries(t0, rampUp(60), 1); // bar range ~1% of price
+const cleanPlan = (over = {}) => ({
+  direction: "LONG", entryPrice: 130, stopLoss: 125, takeProfit1: 140,
+  riskReward: 2, createdAt: (t0 + 30 * 3600) * 1000, ...over,
+});
+
+test("planQuality: a well-formed call scores 100 with no flags", () => {
+  const p = planQuality(cleanPlan(), planCd);
+  assert.deepEqual(p.flags, []);
+  assert.equal(p.score, 100);
+  assert.equal(p.components.rrGeom, 2);
+});
+
+test("planQuality: LATE_ENTRY when the move already happened before the post", () => {
+  // market is at 130 by bar 30; claiming an entry back at 120 is 2R of free ground
+  const p = planQuality(cleanPlan({ entryPrice: 120, stopLoss: 115, takeProfit1: 130 }), planCd);
+  assert.ok(p.flags.includes("LATE_ENTRY"));
+  assert.equal(p.components.entryDriftR, 2);
+  assert.ok(p.score < 100);
+});
+
+test("planQuality: entering BEFORE the level is not penalized", () => {
+  // price 130, patient long stated at 135, so drift is negative and not a flag
+  const p = planQuality(cleanPlan({ entryPrice: 135, stopLoss: 130, takeProfit1: 145 }), planCd);
+  assert.ok(!p.flags.includes("LATE_ENTRY"));
+  assert.ok(p.components.entryDriftR < 0);
+});
+
+test("planQuality: LATE_ENTRY inverts correctly for shorts", () => {
+  // price has fallen to ~130 from 160; a short 'entry' at 150 is late
+  const down = rSeries(t0, rampUp(60, 160, -0.5), 1);
+  const p = planQuality({ direction: "SHORT", entryPrice: 150, stopLoss: 155, takeProfit1: 140, riskReward: 2, createdAt: (t0 + 59 * 3600) * 1000 }, down);
+  assert.ok(p.flags.includes("LATE_ENTRY"));
+});
+
+test("planQuality: STOP_IN_NOISE when the stop sits inside one bar's range", () => {
+  // bar range ~1% of ~130 is ~1.3, so a 0.2-wide stop is noise
+  const p = planQuality(cleanPlan({ stopLoss: 129.8, takeProfit1: 130.4, riskReward: 2 }), planCd);
+  assert.ok(p.flags.includes("STOP_IN_NOISE"));
+  assert.ok(p.components.stopAtr < 0.5);
+});
+
+test("planQuality: STOP_TOO_WIDE is flagged but costs less than noise", () => {
+  const wide = planQuality(cleanPlan({ stopLoss: 100, takeProfit1: 190, riskReward: 2 }), planCd);
+  assert.ok(wide.flags.includes("STOP_TOO_WIDE"));
+  assert.ok(wide.score > planQuality(cleanPlan({ stopLoss: 129.8, takeProfit1: 130.4 }), planCd).score);
+});
+
+test("planQuality: RR_MISMATCH when the claimed R disagrees with the levels", () => {
+  // levels give 2R; claiming 5R inflates every graded win
+  const p = planQuality(cleanPlan({ riskReward: 5 }), planCd);
+  assert.ok(p.flags.includes("RR_MISMATCH"));
+  assert.equal(p.components.rrStated, 5);
+  assert.equal(p.components.rrGeom, 2);
+});
+
+test("planQuality: small R:R rounding is tolerated", () => {
+  assert.ok(!planQuality(cleanPlan({ riskReward: 2.2 }), planCd).flags.includes("RR_MISMATCH"));
+});
+
+test("planQuality: BAD_LEVELS when target/stop are on the wrong side", () => {
+  const tpWrong = planQuality(cleanPlan({ takeProfit1: 120 }), planCd);
+  assert.ok(tpWrong.flags.includes("BAD_LEVELS"));
+  const slWrong = planQuality({ direction: "SHORT", entryPrice: 130, stopLoss: 125, takeProfit1: 120, createdAt: (t0 + 30 * 3600) * 1000 }, planCd);
+  assert.ok(slWrong.flags.includes("BAD_LEVELS"));
+});
+
+test("planQuality: score floors at 0 and never goes negative", () => {
+  const p = planQuality(cleanPlan({ entryPrice: 120, stopLoss: 119.9, takeProfit1: 119.5, riskReward: 9 }), planCd);
+  assert.ok(p.score >= 0);
+});
+
+test("planQuality: unscoreable inputs give null (missing levels, zero risk)", () => {
+  assert.equal(planQuality(null, planCd), null);
+  assert.equal(planQuality(cleanPlan({ stopLoss: 0 }), planCd), null);
+  assert.equal(planQuality(cleanPlan({ stopLoss: 130 }), planCd), null); // entry == stop, no risk
+});
+
+test("planQuality: still scores geometry with no candles at all", () => {
+  const p = planQuality(cleanPlan({ riskReward: 5 }), null);
+  assert.ok(p.flags.includes("RR_MISMATCH"));
+  assert.equal(p.components.entryDriftR, undefined); // nothing claimed without price
+});
+
+test("planSummary: mean score plus the most common leak", () => {
+  const s = planSummary([
+    { score: 100, flags: [] },
+    { score: 70, flags: ["LATE_ENTRY"] },
+    { score: 70, flags: ["LATE_ENTRY"] },
+    { score: 75, flags: ["STOP_IN_NOISE"] },
+  ]);
+  assert.equal(s.scored, 4);
+  assert.equal(s.score, 79);
+  assert.equal(s.topFlag.flag, "LATE_ENTRY");
+  assert.equal(s.topFlag.count, 2);
+  assert.equal(s.topFlag.rate, 50);
+  assert.equal(planSummary([]), null);
 });

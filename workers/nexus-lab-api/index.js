@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, REGIME, classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge, planQuality, planSummary } from "./logic.mjs";
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./backtest.mjs";
 // Directive level validation lives with the exec's money-path logic (single source);
@@ -454,13 +454,20 @@ function gradedStatusOf(outcome) {
 
 // Fetch 1h OHLC from the thesis's createdAt to now, for gradeCall. Shared by the cron
 // stamper and the on-read permalink grade so both use identical inputs.
+// ⚠️ The window starts REGIME_PAD_S *before* the call, not at the call. Grading only
+// needs candles from the call forward, but regime attribution + plan quality describe
+// the market the call was posted INTO, which lives entirely in the bars before it.
+// Without the pad, classifyRegime returns null for every call (nothing precedes it).
+// Closes (`c`) are kept for the same reason — gradeCall only reads highs/lows.
+const REGIME_PAD_S = (REGIME.LOOKBACK + 2) * 3600;
+
 async function fetchGradeHistory(symbol, createdAt) {
   const now = Math.floor(Date.now() / 1000);
-  const from = Math.max(Math.floor((createdAt || Date.now()) / 1000) - 3600, now - 60 * 86400);
+  const from = Math.max(Math.floor((createdAt || Date.now()) / 1000) - REGIME_PAD_S, now - 60 * 86400 - REGIME_PAD_S);
   try {
     const r = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${symbol}&resolution=60&from=${from}&to=${now}`);
     const d = await r.json();
-    if (d && d.s === "ok" && Array.isArray(d.t)) return { t: d.t, h: d.h, l: d.l };
+    if (d && d.s === "ok" && Array.isArray(d.t)) return { t: d.t, h: d.h, l: d.l, c: d.c };
   } catch (e) { console.error("[grade] history", symbol, e.message); }
   return null;
 }
@@ -482,15 +489,40 @@ async function gradePublicTheses(env) {
     let changed = false;
     for (const t of (data.theses || [])) {
       if (!t.isPublic || !t.symbol || !t.createdAt) continue;
-      if (t.gradedOutcome === "WIN" || t.gradedOutcome === "LOSS") continue; // resolved = final
+      const resolved = t.gradedOutcome === "WIN" || t.gradedOutcome === "LOSS"; // resolved = final
+      // Plan quality + regime are properties of the MOMENT THE CALL WAS POSTED, so
+      // they're stamped once and never revisited — including on already-resolved
+      // calls that predate this feature (backfill). Skipped beyond the history
+      // horizon, where the candles we'd need no longer come back.
+      const stampable = t.planScore === undefined && t.createdAt > Date.now() - 60 * 86400 * 1000;
+      if (resolved && !stampable) continue;
+
       const cacheKey = `${t.symbol}|${t.createdAt}`;
       if (!histCache.has(cacheKey)) histCache.set(cacheKey, await fetchGradeHistory(t.symbol, t.createdAt));
-      const g = gradeCall(t, histCache.get(cacheKey));
-      if (g.outcome === "WIN" || g.outcome === "LOSS") {
-        t.gradedOutcome = g.outcome;
-        t.gradedR = g.r;
-        t.gradedAt = Date.now();
-        changed = true; graded++;
+      const cd = histCache.get(cacheKey);
+
+      if (stampable) {
+        const pq = planQuality(t, cd);
+        if (pq) { t.planScore = pq.score; t.planFlags = pq.flags; }
+        const reg = classifyRegime(cd, Math.floor(t.createdAt / 1000));
+        if (reg) {
+          t.regimeTrend = reg.trend;
+          t.regimeVol = reg.vol;
+          t.regimeAlign = callAlignment(t.direction, reg);
+        }
+        // Stamp even when unscoreable, so a malformed call isn't re-fetched forever.
+        if (t.planScore === undefined) t.planScore = null;
+        changed = true;
+      }
+
+      if (!resolved) {
+        const g = gradeCall(t, cd);
+        if (g.outcome === "WIN" || g.outcome === "LOSS") {
+          t.gradedOutcome = g.outcome;
+          t.gradedR = g.r;
+          t.gradedAt = Date.now();
+          changed = true; graded++;
+        }
       }
     }
     if (changed) { await env.LAB_STORE.put(key.name, JSON.stringify(data)); walletsWritten++; }
@@ -499,14 +531,17 @@ async function gradePublicTheses(env) {
   return graded;
 }
 
-async function computeCallerStats(env, maxHorizonS = 30 * 86400) {
+async function computeCallerStats(env, maxHorizonS = 30 * 86400, opts = {}) {
+  const onlyWallet = opts.onlyWallet ? String(opts.onlyWallet).toLowerCase() : null;
   const listed = await env.LAB_STORE.list({ prefix: "lab:" });
   const calls = [];
   for (const key of listed.keys) {
+    const wallet = key.name.replace("lab:", "");
+    // Single-wallet readouts (the process x-ray) skip every other wallet's KV read.
+    if (onlyWallet && wallet.toLowerCase() !== onlyWallet) continue;
     const raw = await env.LAB_STORE.get(key.name);
     if (!raw) continue;
     let data; try { data = JSON.parse(raw); } catch { continue; }
-    const wallet = key.name.replace("lab:", "");
     for (const t of (data.theses || [])) {
       if (t.isPublic && t.symbol && t.createdAt) calls.push({ wallet, t });
     }
@@ -520,28 +555,46 @@ async function computeCallerStats(env, maxHorizonS = 30 * 86400) {
   const history = {};
   await Promise.all(Object.entries(symFrom).map(async ([sym, fromS]) => {
     try {
-      const from = Math.max(fromS - 3600, now - maxHorizonS);
+      // Pad the window backwards so each call has prior bars to classify (see REGIME_PAD_S).
+      const from = Math.max(fromS - REGIME_PAD_S, now - maxHorizonS - REGIME_PAD_S);
       const r = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${sym}&resolution=60&from=${from}&to=${now}`);
       const d = await r.json();
-      if (d && d.s === "ok" && Array.isArray(d.t)) history[sym] = { t: d.t, h: d.h, l: d.l };
+      if (d && d.s === "ok" && Array.isArray(d.t)) history[sym] = { t: d.t, h: d.h, l: d.l, c: d.c };
     } catch (e) { console.error("[caller-stats] history fetch", sym, e.message); }
   }));
   const byWallet = {};
   for (const { wallet, t } of calls) {
-    const g = gradeCall(t, history[t.symbol]);
+    const cd = history[t.symbol];
+    const g = gradeCall(t, cd);
     if (g.outcome === "PENDING" || g.outcome === "INVALID") continue;
-    const a = byWallet[wallet] || (byWallet[wallet] = { calls: 0, wins: 0, rSum: 0, resolved: [] });
+    const a = byWallet[wallet] || (byWallet[wallet] = { calls: 0, wins: 0, rSum: 0, resolved: [], regimeRows: [], planScored: [] });
     a.calls += 1; if (g.outcome === "WIN") a.wins += 1; a.rSum += g.r;
     // Track (time, R) so the leaderboard can emit a cumulative-R equity curve —
     // the same trustless grade, just as a series instead of an aggregate.
     a.resolved.push({ at: t.createdAt || 0, r: g.r });
+
+    // Attribute the SAME graded R to the regime the call was posted into. Same
+    // candles, same first-touch outcome — this only asks "in which market?".
+    const reg = classifyRegime(cd, Math.floor((t.createdAt || 0) / 1000));
+    if (reg) a.regimeRows.push({ buckets: regimeBucketsOf(t.direction, reg), r: g.r, win: g.outcome === "WIN" });
+    // Process grade: was the call well-formed at post time (public-verifiable half).
+    const pq = planQuality(t, cd);
+    if (pq) a.planScored.push(pq);
   }
-  // Build the chronological cumulative-R series per wallet (a.rSeries).
   for (const a of Object.values(byWallet)) {
+    // Build the chronological cumulative-R series per wallet (a.rSeries).
     a.resolved.sort((x, y) => x.at - y.at);
     let run = 0;
     a.rSeries = a.resolved.map((c) => (run += c.r, Math.round(run * 100) / 100));
-    delete a.resolved; // internal only — keep the returned shape lean
+    a.regime = regimeBuckets(a.regimeRows);
+    a.regimeEdges = {
+      trend: regimeEdge(a.regime, "trend"),
+      vol: regimeEdge(a.regime, "vol"),
+      align: regimeEdge(a.regime, "align"),
+    };
+    a.plan = planSummary(a.planScored);
+    a.regimeAttributed = a.regimeRows.length;
+    delete a.resolved; delete a.regimeRows; delete a.planScored; // internal only — keep the shape lean
   }
   return byWallet;
 }
@@ -5007,6 +5060,14 @@ document.getElementById("btn").addEventListener("click",go);
           score,
           meritRank: rankCaller(a), // earned identity rank (SIGNAL/SHARP/APEX) or null
           rSeries: a.rSeries || [],  // cumulative-R equity curve (chronological)
+          // PROCESS, alongside the outcome. Outcome grading can't separate a
+          // disciplined operator from a lucky gunslinger — both book +R. This is the
+          // publicly-verifiable half of that: were the calls well-formed when posted?
+          // Reported, NOT folded into `score` (changing the ranking formula is its own
+          // decision — see the expectancy rework).
+          discipline: a.plan ? { score: a.plan.score, scored: a.plan.scored, topFlag: a.plan.topFlag } : null,
+          // "Where does this trader's edge live" — the single strongest cut.
+          regimeEdge: a.regimeEdges?.trend || a.regimeEdges?.align || null,
         });
       }
       eligible.sort((x, y) => y.score - x.score || y.avgR - x.avgR);
@@ -5045,6 +5106,42 @@ document.getElementById("btn").addEventListener("click",go);
         criteria: {
           minCalls: MIN_CALLS,
           grading: "Objective first-touch vs public Orderly OHLC (/tv/history, 1h). TP1-first = WIN (+planned R), SL-first = LOSS (-1R), same-candle = LOSS (conservative). PENDING excluded. Anyone can recompute.",
+          discipline: "Plan quality at post time, from the same public candles: LATE_ENTRY (the move had already run >0.5R before the call went up, so the stated entry was never obtainable), STOP_IN_NOISE (<0.5 ATR), STOP_TOO_WIDE (>6 ATR), RR_MISMATCH (claimed R disagrees with the posted levels), BAD_LEVELS. Reported, not ranked on.",
+          regime: "Each graded call is attributed to the market it was posted INTO, classified from the 48 candles BEFORE it (efficiency ratio → TREND_UP/TREND_DOWN/CHOP; ATR vs the symbol's own baseline → CALM/NORMAL/VOLATILE). Never reads post-call bars, so no outcome leaks into the label.",
+        },
+      }, request);
+    }
+
+    // ── /theses/process/:wallet — the PROCESS x-ray for one caller ──
+    // The leaderboard says whether someone was right. This says HOW, and it's the
+    // one readout that can change behavior: which regime their edge actually lives
+    // in, and which recurring plan defect is costing them. Public + recomputable
+    // (same candles as the grade), so no auth — it exposes nothing private.
+    if (parts[0] === "theses" && parts[1] === "process" && parts[2]) {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+      const wallet = parts[2].toLowerCase();
+      const byWallet = await computeCallerStats(env, 30 * 86400, { onlyWallet: wallet });
+      const a = Object.values(byWallet)[0];
+      if (!a || !a.calls) {
+        return json({ wallet, calls: 0, regime: {}, regimeEdges: {}, discipline: null, note: "no resolved public calls yet" }, request);
+      }
+      return json({
+        wallet,
+        calls: a.calls,
+        hitRate: Math.round((a.wins / a.calls) * 1000) / 10,
+        avgR: Math.round((a.rSum / a.calls) * 100) / 100,
+        totalR: Math.round(a.rSum * 100) / 100,
+        meritRank: rankCaller(a),
+        // How many calls had enough prior history to classify (< calls near the
+        // horizon edge). Stated so a thin breakdown reads as thin, not as fact.
+        attributed: a.regimeAttributed,
+        regime: a.regime,
+        regimeEdges: a.regimeEdges,
+        discipline: a.plan,
+        criteria: {
+          lookbackCandles: REGIME.LOOKBACK,
+          minBucketSample: 5,
+          note: "Regime is read from the candles BEFORE each call (no hindsight). A best/worst verdict is withheld until both regimes have 5+ calls and the avg-R gap is ≥0.4R — a confident insight drawn from 3 calls is worse than silence.",
         },
       }, request);
     }
