@@ -26,6 +26,19 @@ import WatchOnlyBanner from "./WatchOnlyBanner";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 
+// Regime buckets → the trader's own words. Server keys are stable; labels aren't.
+const REGIME_LABEL: Record<string, string> = {
+  "trend:TREND_UP": "uptrends",
+  "trend:TREND_DOWN": "downtrends",
+  "trend:CHOP": "chop",
+  "align:WITH_TREND": "trend-following",
+  "align:AGAINST_TREND": "fading moves",
+  "align:CHOP": "rangebound tape",
+  "vol:CALM": "calm tape",
+  "vol:NORMAL": "normal vol",
+  "vol:VOLATILE": "volatile tape",
+};
+
 type FeedThesis = {
   id: string;
   symbol: string;
@@ -783,7 +796,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
   }, [board.length]);
 
   // Trustless call grades (public-price graded, on-chain anchored) keyed by wallet.
-  const [graded, setGraded] = useState<Map<string, { hitRate: number; avgR: number; calls: number; score: number; meritRank: { tier: string; title: string; glyph: string } | null; rSeries: number[] }>>(new Map());
+  const [graded, setGraded] = useState<Map<string, { hitRate: number; avgR: number; calls: number; score: number; meritRank: { tier: string; title: string; glyph: string } | null; rSeries: number[]; discipline: { score: number; scored: number } | null; regimeEdge: { best: { bucket: string; avgR: number } } | null }>>(new Map());
   const [emerging, setEmerging] = useState<Map<string, { calls: number; toQualify: number }>>(new Map());
   const [callLedger, setCallLedger] = useState<{ ledgerHash?: string; onChain?: { verified?: boolean; explorer?: string } | null } | null>(null);
   useEffect(() => {
@@ -793,9 +806,9 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
       fetch(`${API_BASE}/theses/ledger`).then((r) => r.json()).catch(() => null),
     ]).then(([lb, led]) => {
       if (cancel) return;
-      const m = new Map<string, { hitRate: number; avgR: number; calls: number; score: number; meritRank: { tier: string; title: string; glyph: string } | null; rSeries: number[] }>();
+      const m = new Map<string, { hitRate: number; avgR: number; calls: number; score: number; meritRank: { tier: string; title: string; glyph: string } | null; rSeries: number[]; discipline: { score: number; scored: number } | null; regimeEdge: { best: { bucket: string; avgR: number } } | null }>();
       for (const e of (lb?.leaderboard || [])) {
-        if (e.wallet) m.set(e.wallet.toLowerCase(), { hitRate: e.hitRate, avgR: e.avgR, calls: e.calls, score: e.score, meritRank: e.meritRank ?? null, rSeries: Array.isArray(e.rSeries) ? e.rSeries : [] });
+        if (e.wallet) m.set(e.wallet.toLowerCase(), { hitRate: e.hitRate, avgR: e.avgR, calls: e.calls, score: e.score, meritRank: e.meritRank ?? null, rSeries: Array.isArray(e.rSeries) ? e.rSeries : [], discipline: e.discipline ?? null, regimeEdge: e.regimeEdge ?? null });
       }
       setGraded(m);
       const em = new Map<string, { calls: number; toQualify: number }>();
@@ -912,11 +925,28 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                       ◆ EMERGING · {emerging.get(trader.wallet.toLowerCase())!.toQualify} to verify
                     </span>
                   )}
+                  {/* PLAN — process alongside outcome. Were the calls well-formed
+                      when posted (obtainable entry, real stop, honest R:R)? Scored
+                      from the same public candles as the grade, so it's verifiable
+                      by anyone. Amber below 70 = caution, never decoration. */}
+                  {trader.graded?.discipline && (
+                    <span
+                      title={`Plan quality ${trader.graded.discipline.score}/100 across ${trader.graded.discipline.scored} calls — scored at post time from public price: obtainable entry, a stop outside the noise, R:R matching the posted levels. Reported, not ranked on.`}
+                      style={{ fontSize: 8, color: trader.graded.discipline.score >= 70 ? "#a1a1aa" : "#fbbf24", border: `1px solid ${trader.graded.discipline.score >= 70 ? "#33333a" : "#4a3a00"}`, borderRadius: 2, padding: "1px 4px", background: trader.graded.discipline.score >= 70 ? "#1a1a1e" : "#2a1a00" }}
+                    >
+                      PLAN {trader.graded.discipline.score}
+                    </span>
+                  )}
                   <NexusTierBadge address={trader.wallet} />
                 </div>
                 {trader.graded ? (
                   <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", marginTop: 2 }}>
                     {trader.graded.hitRate.toFixed(0)}% hit · {trader.graded.avgR > 0 ? "+" : ""}{trader.graded.avgR.toFixed(2)}R · {trader.graded.calls} graded calls
+                    {trader.graded.regimeEdge && (
+                      <span title="The market this caller's graded record is actually strongest in — classified from the candles before each call.">
+                        {" "}· best in {REGIME_LABEL[trader.graded.regimeEdge.best.bucket] ?? trader.graded.regimeEdge.best.bucket}
+                      </span>
+                    )}
                   </div>
                 ) : (
                   <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 2 }}>{shortAddr}</div>

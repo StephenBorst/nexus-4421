@@ -1,8 +1,9 @@
 // Analytics tab + its charts/sections (RadarChart, TradingScore, breakdowns,
 // top assets, performance). Extracted from index.tsx (god-file split).
 import { useMemo } from "react";
-import type { ProcessedTrade } from "./types";
+import type { ProcessedTrade, ThesisTrade } from "./types";
 import { cardStyle, labelStyle } from "./styles";
+import { ProcessSection } from "./ProcessView";
 import { formatPnl } from "./helpers";
 import { PnlChart, PnlBars, EmptyState, CountUp, SectionHeader } from "./components";
 import { useIsMobile } from "./useIsMobile";
@@ -577,7 +578,7 @@ function YourEdgeCard({ orders }: { orders: ProcessedTrade[] }) {
   );
 }
 
-export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { orders: ProcessedTrade[]; totalPnl: number; winRate: number; collateral: number; }) {
+export function AnalyticsView({ orders, totalPnl, winRate, collateral, theses = [], wallet = null }: { orders: ProcessedTrade[]; totalPnl: number; winRate: number; collateral: number; theses?: ThesisTrade[]; wallet?: string | null; }) {
   const volume = useMemo(() => orders.reduce((s, o) => s + o.qty * o.price, 0), [orders]);
   const avgWin = useMemo(() => { const w = orders.filter((o) => o.pnl > 0); return w.length ? w.reduce((s, o) => s + o.pnl, 0) / w.length : 0; }, [orders]);
   const avgLoss = useMemo(() => { const l = orders.filter((o) => o.pnl < 0); return l.length ? Math.abs(l.reduce((s, o) => s + o.pnl, 0) / l.length) : 0; }, [orders]);
@@ -664,6 +665,9 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral }: { order
       <TimingAndRisk orders={orders} />
       <PerformanceAnalysis orders={orders} />
       <TopAssets orders={orders} />
+
+      {/* PROCESS — outcome analytics say how you did; these say how to get better. */}
+      <ProcessSection wallet={wallet} theses={theses} orders={orders} />
 
       {orders.length === 0 && <EmptyState message="no closed trades found — connect wallet to load your data" />}
     </div>

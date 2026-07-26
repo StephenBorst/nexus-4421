@@ -212,7 +212,7 @@ export default function TheLabPage() {
             entrance replays, giving a considered transition instead of a hard swap. */}
         <div key={activeTab} className="nx-fade-in">
         {activeTab === "analytics" && (
-          <AnalyticsView orders={processedTrades} totalPnl={totalPnl} winRate={winRate} collateral={availableBalance ?? 0} />
+          <AnalyticsView orders={processedTrades} totalPnl={totalPnl} winRate={winRate} collateral={availableBalance ?? 0} theses={theses} wallet={rootWalletAddress} />
         )}
         {activeTab === "tradelog" && (
           selectedDayKey && selectedDay !== null && dayGroups[selectedDayKey]
