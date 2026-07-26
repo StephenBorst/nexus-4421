@@ -7,7 +7,7 @@ import {
   orderlyAccountId, safeChartUrl, symbolToQuery,
   classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge,
   planQuality, planSummary,
-  expectancyStats, callerScore, convictionCalibration,
+  expectancyStats, callerScore, convictionCalibration, contestedBoard,
 } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
@@ -923,4 +923,90 @@ test("convictionCalibration: a small gap is not called calibrated", () => {
   const c = convictionCalibration(rows);
   assert.equal(c.calibrated, false); // gap 0.1 < 0.25 minimum
   assert.equal(c.inverted, false);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Disagreement board
+// ═══════════════════════════════════════════════════════════════════
+const E = (wallet, symbol, direction, weight, source) => ({ wallet, symbol, direction, weight, source });
+
+test("contestedBoard: a symbol with both camps is contested; consensus is not", () => {
+  const board = contestedBoard([
+    E("0xA", "BTC", "LONG"), E("0xB", "BTC", "SHORT"),
+    E("0xC", "ETH", "LONG"), E("0xD", "ETH", "LONG"), // consensus long → not contested
+  ]);
+  assert.equal(board.length, 1);
+  assert.equal(board[0].symbol, "BTC");
+  assert.equal(board[0].longCount, 1);
+  assert.equal(board[0].shortCount, 1);
+});
+
+test("contestedBoard: a wallet on both sides of one symbol is voided there", () => {
+  const board = contestedBoard([
+    E("0xA", "BTC", "LONG"), E("0xA", "BTC", "SHORT"), // self-contradiction → 0xA dropped for BTC
+    E("0xB", "BTC", "SHORT"),
+  ]);
+  // only 0xB survives on BTC → one-sided → not contested
+  assert.equal(board.length, 0);
+});
+
+test("contestedBoard: a wallet holding + calling the SAME way counts once", () => {
+  const board = contestedBoard([
+    E("0xA", "BTC", "LONG", 1, "position"), E("0xA", "BTC", "LONG", 1, "thesis"),
+    E("0xB", "BTC", "SHORT"),
+  ]);
+  assert.equal(board[0].longCount, 1); // not 2
+  assert.deepEqual(board[0].longs[0].sources.sort(), ["position", "thesis"]);
+});
+
+test("contestedBoard: same-side duplicate takes the strongest weight, never doubles", () => {
+  const board = contestedBoard([
+    E("0xA", "BTC", "LONG", 1), E("0xA", "BTC", "LONG", 3),
+    E("0xB", "BTC", "SHORT", 2),
+  ]);
+  assert.equal(board[0].longWeight, 3); // max(1,3), not 4
+});
+
+test("contestedBoard: tension rewards balanced heavyweight standoffs over lopsided ones", () => {
+  const board = contestedBoard([
+    // ETH: perfectly balanced heavy standoff (3 vs 3 weight)
+    E("a", "ETH", "LONG", 3), E("b", "ETH", "SHORT", 3),
+    // BTC: lopsided (5 vs 1)
+    E("c", "BTC", "LONG", 5), E("d", "BTC", "SHORT", 1),
+  ]);
+  assert.equal(board[0].symbol, "ETH"); // higher tension ranks first
+  assert.ok(board[0].tension > board[1].tension);
+  assert.equal(board[0].balance, 1);    // dead even
+});
+
+test("contestedBoard: weight lets credibility outrank raw headcount", () => {
+  const board = contestedBoard([
+    // two heavyweight sharps opposed
+    E("a", "SOL", "LONG", 5), E("b", "SOL", "SHORT", 5),
+    // many featherweight unknowns, near-balanced
+    E("c", "XRP", "LONG", 1), E("d", "XRP", "LONG", 1), E("e", "XRP", "SHORT", 1), E("f", "XRP", "SHORT", 1),
+  ]);
+  assert.equal(board[0].symbol, "SOL"); // total weight 10 > 4
+});
+
+test("contestedBoard: camps come back sorted by weight (loudest voice first)", () => {
+  const board = contestedBoard([
+    E("a", "BTC", "LONG", 1), E("b", "BTC", "LONG", 4),
+    E("c", "BTC", "SHORT", 2),
+  ]);
+  assert.equal(board[0].longs[0].wallet, "b"); // weight 4 before weight 1
+});
+
+test("contestedBoard: junk + empty input is handled cleanly", () => {
+  assert.deepEqual(contestedBoard([]), []);
+  assert.deepEqual(contestedBoard(null), []);
+  assert.deepEqual(contestedBoard([{ wallet: "a" }, E("b", "BTC", "SIDEWAYS"), E("c", "BTC", "LONG")]), []);
+});
+
+test("contestedBoard: wallet identity is case-insensitive", () => {
+  const board = contestedBoard([
+    E("0xAbC", "BTC", "LONG"), E("0xabc", "BTC", "SHORT"), // same wallet, both sides → voided
+    E("0xD", "BTC", "SHORT"),
+  ]);
+  assert.equal(board.length, 0);
 });

@@ -411,6 +411,76 @@ export function convictionCalibration(rows, cfg = CALIBRATION) {
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// DISAGREEMENT BOARD  (where the sharp callers are OPPOSED right now)
+// ═══════════════════════════════════════════════════════════════════════════
+// Consensus is cheap and mostly worthless — "everyone's long BTC" tells a trader
+// nothing they can act on. The signal is DISAGREEMENT: the symbols where credible
+// callers are taking opposite sides at this moment. That's where the interesting
+// read is, where copy-decisions actually matter, and it's the most clickable thing
+// on the page. Built from data we already publish — open positions (/agents/live)
+// and active public calls — so it's a pure recombination, no new source.
+//
+// entries: [{ wallet, symbol, direction:"LONG"|"SHORT", weight?, source? }]
+// weight defaults to 1; callers can pass credibility (e.g. merit-rank tier) so a
+// standoff between two Apex callers outranks two anonymous wallets.
+
+export const CONTESTED = { minPerSide: 1, minParticipants: 2 };
+
+export function contestedBoard(entries, cfg = CONTESTED) {
+  // 1) One stance per wallet per symbol. A wallet holding a position AND a call the
+  //    same way counts ONCE; a wallet on both sides of the same symbol is
+  //    self-contradicting → dropped for that symbol (its vote is meaningless).
+  const perWalletSym = new Map(); // `${wallet}|${symbol}` → { direction, weight, wallet, symbol, sources:Set }
+  for (const e of entries || []) {
+    if (!e || !e.wallet || !e.symbol) continue;
+    const dir = String(e.direction).toUpperCase();
+    if (dir !== "LONG" && dir !== "SHORT") continue;
+    const key = `${String(e.wallet).toLowerCase()}|${e.symbol}`;
+    const w = Number(e.weight) > 0 ? Number(e.weight) : 1;
+    const cur = perWalletSym.get(key);
+    if (!cur) { perWalletSym.set(key, { wallet: e.wallet, symbol: e.symbol, direction: dir, weight: w, conflict: false, sources: new Set(e.source ? [e.source] : []) }); continue; }
+    if (cur.conflict) continue;
+    if (cur.direction !== dir) { cur.conflict = true; continue; } // opposite stances → void this wallet here
+    cur.weight = Math.max(cur.weight, w); // same side twice → strongest weight, not double
+    if (e.source) cur.sources.add(e.source);
+  }
+
+  // 2) Group the surviving stances by symbol into long/short camps.
+  const bySym = {};
+  for (const s of perWalletSym.values()) {
+    if (s.conflict) continue;
+    const g = bySym[s.symbol] || (bySym[s.symbol] = { symbol: s.symbol, longs: [], shorts: [], longWeight: 0, shortWeight: 0 });
+    const camp = s.direction === "LONG" ? "longs" : "shorts";
+    g[camp].push({ wallet: s.wallet, weight: s.weight, sources: [...s.sources] });
+    g[s.direction === "LONG" ? "longWeight" : "shortWeight"] += s.weight;
+  }
+
+  // 3) Keep only genuinely contested symbols, and rank by TENSION = how evenly the
+  //    weight is split (a true standoff) × how much total weight is on the table.
+  //    A balanced 3-vs-3 of sharps beats a lopsided 5-vs-1 of unknowns.
+  const out = [];
+  for (const g of Object.values(bySym)) {
+    const nLong = g.longs.length, nShort = g.shorts.length;
+    if (nLong < cfg.minPerSide || nShort < cfg.minPerSide) continue;
+    if (nLong + nShort < cfg.minParticipants) continue;
+    const total = g.longWeight + g.shortWeight;
+    const balance = total > 0 ? 1 - Math.abs(g.longWeight - g.shortWeight) / total : 0; // 1 = dead even
+    const tension = round(balance * total, 3);
+    out.push({
+      symbol: g.symbol,
+      longs: g.longs.sort((a, b) => b.weight - a.weight),
+      shorts: g.shorts.sort((a, b) => b.weight - a.weight),
+      longCount: nLong, shortCount: nShort,
+      longWeight: round(g.longWeight, 2), shortWeight: round(g.shortWeight, 2),
+      balance: round(balance, 2),
+      tension,
+    });
+  }
+  out.sort((a, b) => b.tension - a.tension || (b.longCount + b.shortCount) - (a.longCount + a.shortCount));
+  return out;
+}
+
 // ── PRO subscription payment verification ───────────────────────────────────
 // Pure: given an eth_getTransactionReceipt result, decide whether it contains a
 // qualifying ERC-20 (USDC) Transfer to the subscription receiver, and who paid.

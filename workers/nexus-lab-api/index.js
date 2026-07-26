@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, REGIME, classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge, planQuality, planSummary, expectancyStats, callerScore, convictionCalibration } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, REGIME, classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge, planQuality, planSummary, expectancyStats, callerScore, convictionCalibration, contestedBoard } from "./logic.mjs";
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./backtest.mjs";
 // Directive level validation lives with the exec's money-path logic (single source);
@@ -5162,6 +5162,100 @@ document.getElementById("btn").addEventListener("click",go);
           lookbackCandles: REGIME.LOOKBACK,
           minBucketSample: 5,
           note: "Regime is read from the candles BEFORE each call (no hindsight). A best/worst verdict is withheld until both regimes have 5+ calls and the avg-R gap is ≥0.4R — a confident insight drawn from 3 calls is worse than silence.",
+        },
+      }, request);
+    }
+
+    // ── /theses/contested — the DISAGREEMENT board ──
+    // Consensus is worthless; the signal is where credible callers are OPPOSED right
+    // now. Combines two things we already publish — currently-open positions and
+    // active (unresolved) public calls — into per-symbol standoffs, weighted by each
+    // participant's EARNED merit tier so a sharp-vs-sharp fight outranks noise. Pure
+    // public read; the weighting is the same graded record the leaderboard uses.
+    if (parts[0] === "theses" && parts[1] === "contested") {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+      const bare = (s) => String(s || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+      const MERIT_WEIGHT = { APEX: 3, SHARP: 2, SIGNAL: 1 };
+      const FRESH_MS = 14 * 86400 * 1000; // an "active" call older than this is stale — ignore
+
+      // Merit weight per wallet, from the same graded record the board ranks on. A
+      // caller with no earned rank (or a non-caller agent/human) weighs 1.
+      const byWallet = await computeCallerStats(env, 30 * 86400);
+      const weightOf = (w) => {
+        const r = rankCaller(byWallet[w?.toLowerCase?.()] || byWallet[w] || null);
+        return r ? (MERIT_WEIGHT[r.tier] || 1) : 1;
+      };
+
+      const entries = [];
+      const now = Date.now();
+
+      // 1) Open positions (agents + opted-in humans) → directional stances.
+      try {
+        const usersRaw = await AGENT_KV.get("agent:users");
+        const users = usersRaw ? JSON.parse(usersRaw) : [];
+        const states = await Promise.all(users.map(async (w) => {
+          const s = await AGENT_KV.get(`agent:state:${w}`);
+          return { w, p: s ? (JSON.parse(s).current_position || null) : null };
+        }));
+        for (const { w, p } of states) {
+          if (p && !p.paper && p.symbol && p.direction) entries.push({ wallet: w, symbol: bare(p.symbol), direction: p.direction, weight: weightOf(w), source: "position" });
+        }
+        const humanList = await AGENT_KV.list({ prefix: "live:human:", limit: 1000 });
+        const snaps = await Promise.all(humanList.keys.map(async (k) => {
+          const raw = await AGENT_KV.get(k.name);
+          return raw ? { wallet: k.name.slice("live:human:".length), ...JSON.parse(raw) } : null;
+        }));
+        for (const sn of snaps) {
+          for (const p of (sn?.positions || [])) {
+            if (p.symbol && p.direction) entries.push({ wallet: sn.wallet, symbol: bare(p.symbol), direction: p.direction, weight: weightOf(sn.wallet), source: "position" });
+          }
+        }
+      } catch (e) { console.error("[contested] live positions", e.message); }
+
+      // 2) Active (unresolved, fresh) public calls → directional stances.
+      try {
+        const listed = await env.LAB_STORE.list({ prefix: "lab:" });
+        for (const key of listed.keys) {
+          const raw = await env.LAB_STORE.get(key.name);
+          if (!raw) continue;
+          let data; try { data = JSON.parse(raw); } catch { continue; }
+          const wallet = key.name.replace("lab:", "");
+          for (const t of (data.theses || [])) {
+            if (!t.isPublic || !t.symbol || !t.direction) continue;
+            if (t.gradedOutcome === "WIN" || t.gradedOutcome === "LOSS") continue; // resolved → no longer a live stance
+            if (t.status === "HIT_TP" || t.status === "STOPPED_OUT" || t.status === "INVALIDATED") continue;
+            if ((now - (t.createdAt || 0)) > FRESH_MS) continue; // stale
+            entries.push({ wallet, symbol: bare(t.symbol), direction: t.direction, weight: weightOf(wallet), source: "thesis" });
+          }
+        }
+      } catch (e) { console.error("[contested] active theses", e.message); }
+
+      const board = contestedBoard(entries).slice(0, 12);
+
+      // Enrich participants with profile identity (bounded — only the returned board).
+      const profileCache = new Map();
+      const profile = async (w) => {
+        const k = w.toLowerCase();
+        if (profileCache.has(k)) return profileCache.get(k);
+        const raw = await env.LAB_STORE.get(`profile:${w}`);
+        const p = raw ? (() => { try { return JSON.parse(raw); } catch { return {}; } })() : {};
+        const merit = rankCaller(byWallet[k] || byWallet[w] || null);
+        const out = { wallet: w, displayName: p.displayName || null, pfp: p.pfp || null, meritRank: merit };
+        profileCache.set(k, out);
+        return out;
+      };
+      const enriched = await Promise.all(board.map(async (row) => ({
+        ...row,
+        longs: await Promise.all(row.longs.map(async (l) => ({ ...await profile(l.wallet), weight: l.weight, sources: l.sources }))),
+        shorts: await Promise.all(row.shorts.map(async (s) => ({ ...await profile(s.wallet), weight: s.weight, sources: s.sources }))),
+      })));
+
+      return json({
+        count: enriched.length,
+        contested: enriched,
+        criteria: {
+          note: "Symbols where credible callers hold OPPOSING directions right now, from open positions + active (unresolved, <14d) public calls. Ranked by tension = weight balance × total weight; participants weighted by earned merit tier (Apex 3 / Sharp 2 / Signal 1). A wallet on both sides of a symbol is voided there.",
         },
       }, request);
     }

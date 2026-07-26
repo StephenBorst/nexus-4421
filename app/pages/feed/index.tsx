@@ -21,6 +21,7 @@ import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { Sparkline } from "@/pages/lab/components";
 import { chartImageList, effectiveStatus } from "@/pages/lab/helpers";
 import LiveNow from "./LiveNow";
+import Contested from "./Contested";
 import Desks from "./Desks";
 import WatchOnlyBanner from "./WatchOnlyBanner";
 
@@ -1562,6 +1563,7 @@ export default function FeedPage() {
                 failed to load feed — check connection
               </div>
             )}
+            {!loading && !error && <Contested />}
             {!loading && !error && (
               <LeaderboardView feed={feed} walletAddress={walletAddress} onCopy={setCopyTarget} />
             )}
