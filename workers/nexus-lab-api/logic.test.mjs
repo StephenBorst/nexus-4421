@@ -762,9 +762,16 @@ test("planQuality: STOP_IN_NOISE when the stop sits inside one bar's range", () 
   assert.ok(p.components.stopAtr < 0.5);
 });
 
-test("planQuality: STOP_TOO_WIDE is flagged but costs less than noise", () => {
-  const wide = planQuality(cleanPlan({ stopLoss: 100, takeProfit1: 190, riskReward: 2 }), planCd);
+test("planQuality: STOP_TOO_WIDE only fires on a stop that isn't risk control", () => {
+  // planCd bars span ~1% of price (~1.3 at 130), so 25 ATR is ~33 away. A stop 100
+  // away (~77 ATR) is not a stop; one 23 ATR away is an ordinary swing stop and must
+  // NOT flag — see the calibration note on PLAN.stopWideAtr.
+  // riskReward 2 matches the geometry (200 reward / 100 risk) so this isolates the
+  // stop-width flag instead of also tripping RR_MISMATCH.
+  const wide = planQuality(cleanPlan({ stopLoss: 30, takeProfit1: 330, riskReward: 2 }), planCd);
   assert.ok(wide.flags.includes("STOP_TOO_WIDE"));
+  const swing = planQuality(cleanPlan({ stopLoss: 100, takeProfit1: 190, riskReward: 2 }), planCd);
+  assert.ok(!swing.flags.includes("STOP_TOO_WIDE"), "a normal wide swing stop must not be flagged");
   assert.ok(wide.score > planQuality(cleanPlan({ stopLoss: 129.8, takeProfit1: 130.4 }), planCd).score);
 });
 

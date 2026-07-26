@@ -14,6 +14,7 @@ import { deployToAgent, thesisToAgentConfig, thesisAgentNotice, deployDirectiveF
 import { formatPnl, chartImageSrc, chartImageList, effectiveStatus, CHART_HOST_HINT, MAX_CHARTS } from "./helpers";
 import { LOSS_REASONS, lossReason } from "@/lib/postmortem.mjs";
 import { ThesisTimeline } from "./ThesisTimeline";
+import { ThesisAdvisor } from "./ThesisAdvisor";
 import { PnlChart, EmptyState, Coachmark } from "./components";
 import { SharePoster, type PosterData } from "./SharePoster";
 
@@ -1390,6 +1391,20 @@ export function ThesisView() {
                     the trade.</strong> Save private if you&apos;d rather not be graded, or DEPLOY (LIVE)
                     to also place a real order with real funds.
                   </div>
+                )}
+
+                {/* LIVE ADVISOR — the coach speaks while the plan is still editable.
+                    This is the difference between a dashboard and intelligence. */}
+                {!liveConfirm && liveStatus !== "submitting" && formValid && (
+                  <ThesisAdvisor
+                    symbol={form.symbol}
+                    direction={form.direction}
+                    entryPrice={form.entryPrice}
+                    stopLoss={form.stopLoss}
+                    takeProfit1={form.takeProfit1}
+                    riskReward={calc?.riskReward}
+                    wallet={walletAddress}
+                  />
                 )}
 
                 {/* Deploy buttons */}

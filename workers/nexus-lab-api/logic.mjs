@@ -233,7 +233,15 @@ export function regimeEdge(buckets, dimension = "trend", cfg = REGIME_EDGE) {
 // is why it can legitimately sit next to the trustless grade on the leaderboard.
 
 export const PLAN_PENALTY = { LATE_ENTRY: 30, STOP_IN_NOISE: 25, STOP_TOO_WIDE: 15, RR_MISMATCH: 20, BAD_LEVELS: 50 };
-export const PLAN = { lateEntryR: 0.5, stopNoiseAtr: 0.5, stopWideAtr: 6, rrTolerance: 0.5, rrRelTolerance: 0.25 };
+// ⚠️ stopWideAtr CALIBRATED on real hourly ATR, not guessed (tools/calibrate-regime.mjs
+// prints the ATR%; measured 2026-07 across BTC/ETH/SOL/DOGE/HYPE). The first value (6)
+// was badly wrong because ATR here is HOURLY, so the multiple scales with holding
+// period, not with recklessness — an ordinary 1.5% swing stop is 8.1 ATR on BTC (and
+// 2.2 on HYPE), so 6 flagged normal swing trading while passing a loose DOGE stop. It
+// measured TIMEFRAME, not discipline. A genuinely absurd stop (8% on BTC) is ~43 ATR,
+// so 25 passes every legitimate stop and still catches "this is not risk control".
+// False positives are worse than silence here: they train traders to ignore the advisor.
+export const PLAN = { lateEntryR: 0.5, stopNoiseAtr: 0.5, stopWideAtr: 25, rrTolerance: 0.5, rrRelTolerance: 0.25 };
 
 /**
  * Score how well-formed a call was, from public price at post time.

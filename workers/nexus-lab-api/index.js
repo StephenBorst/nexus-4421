@@ -461,6 +461,16 @@ function gradedStatusOf(outcome) {
 // Closes (`c`) are kept for the same reason — gradeCall only reads highs/lows.
 const REGIME_PAD_S = (REGIME.LOOKBACK + 2) * 3600;
 
+// Plan-quality flags, phrased for a trader looking at a DRAFT (POST /theses/advice)
+// rather than a graded record — present tense, and each one names the fix.
+const ADVICE_FLAG_TEXT = {
+  LATE_ENTRY: "Price has already run past your entry — the R you're claiming isn't obtainable from here.",
+  STOP_IN_NOISE: "Your stop sits inside a single bar's normal range — this is a coin flip on noise, not on the idea.",
+  STOP_TOO_WIDE: "That stop is too wide to be risk control. Cut the size instead.",
+  RR_MISMATCH: "Your stated R:R doesn't match these levels — the record will be graded on the levels.",
+  BAD_LEVELS: "Your target or stop is on the wrong side of entry.",
+};
+
 async function fetchGradeHistory(symbol, createdAt) {
   const now = Math.floor(Date.now() / 1000);
   const from = Math.max(Math.floor((createdAt || Date.now()) / 1000) - REGIME_PAD_S, now - 60 * 86400 - REGIME_PAD_S);
@@ -5257,6 +5267,80 @@ document.getElementById("btn").addEventListener("click",go);
         criteria: {
           note: "Symbols where credible callers hold OPPOSING directions right now, from open positions + active (unresolved, <14d) public calls. Ranked by tension = weight balance × total weight; participants weighted by earned merit tier (Apex 3 / Sharp 2 / Signal 1). A wallet on both sides of a symbol is voided there.",
         },
+      }, request);
+    }
+
+    // ── POST /theses/advice — JUST-IN-TIME intelligence, at the decision ──
+    // Every other readout in the Lab is retrospective: you visit a tab AFTER the fact.
+    // That's a dashboard. A coach speaks at the moment of the decision — so this
+    // answers, for a call you are ABOUT to post: what market is this symbol in right
+    // now, what is YOUR graded record in that market, and is this plan well-formed?
+    //
+    // Deliberately server-side: classifyRegime and planQuality already live here, and
+    // the preview must run the EXACT function that will grade the call later —
+    // duplicating either into the client would let the warning and the eventual grade
+    // drift apart, which is worse than no warning. Public data only, no auth needed.
+    if (parts[0] === "theses" && parts[1] === "advice") {
+      if (request.method !== "POST") return json({ error: "method not allowed" }, request, 405);
+      let body; try { body = await request.json(); } catch { return json({ error: "bad json" }, request, 400); }
+      const { wallet, symbol, direction, entryPrice, stopLoss, takeProfit1, riskReward } = body || {};
+      const sym = normalizeSymbol(symbol);
+      if (!sym) return json({ error: "invalid symbol" }, request, 400);
+
+      const now = Math.floor(Date.now() / 1000);
+      const from = now - (REGIME.LOOKBACK + 8) * 3600;
+      let cd = null;
+      try {
+        const r = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${sym}&resolution=60&from=${from}&to=${now}`);
+        const d = await r.json();
+        if (d?.s === "ok" && Array.isArray(d.t)) cd = { t: d.t, h: d.h, l: d.l, c: d.c };
+      } catch (e) { console.error("[advice] history", e.message); }
+
+      const regime = cd ? classifyRegime(cd, now) : null;
+      const alignment = regime ? callAlignment(direction, regime) : null;
+
+      // Plan quality on the DRAFT — the same scorer that will judge it once posted,
+      // so a trader can fix a stop-in-noise before it costs them, not after.
+      const draft = { direction, entryPrice: Number(entryPrice), stopLoss: Number(stopLoss), takeProfit1: Number(takeProfit1), riskReward: Number(riskReward), createdAt: Date.now() };
+      const plan = (draft.entryPrice && draft.stopLoss && draft.takeProfit1) ? planQuality(draft, cd) : null;
+
+      // The trader's own graded record in THIS market — the line that changes minds.
+      let yourRecord = null;
+      if (wallet && regime) {
+        try {
+          const stats = await computeCallerStats(env, 30 * 86400, { onlyWallet: String(wallet).toLowerCase() });
+          const a = Object.values(stats)[0];
+          if (a?.regime) {
+            const pick = (b) => (a.regime[b]?.calls >= 3 ? a.regime[b] : null); // no claim under 3
+            yourRecord = {
+              trend: pick(`trend:${regime.trend}`),
+              vol: pick(`vol:${regime.vol}`),
+              align: alignment ? pick(`align:${alignment}`) : null,
+              calls: a.calls,
+            };
+          }
+        } catch (e) { console.error("[advice] caller stats", e.message); }
+      }
+
+      // Warnings, most severe first. Only emitted when the evidence clears its gate —
+      // a confident nudge built on 2 calls would train the wrong behavior.
+      const warnings = [];
+      const worst = [yourRecord?.trend, yourRecord?.align, yourRecord?.vol]
+        .filter((b) => b && b.avgR < 0)
+        .sort((x, y) => x.avgR - y.avgR)[0];
+      if (worst) {
+        warnings.push({
+          severity: "high", kind: "REGIME_MISMATCH",
+          text: `Your record in this market is ${worst.avgR}R over ${worst.calls} calls.`,
+        });
+      }
+      for (const f of (plan?.flags || [])) {
+        warnings.push({ severity: f === "BAD_LEVELS" ? "high" : "medium", kind: f, text: ADVICE_FLAG_TEXT[f] || f });
+      }
+
+      return json({
+        symbol: sym, regime, alignment, yourRecord, plan, warnings,
+        note: "Scored by the same functions that will grade this call once posted.",
       }, request);
     }
 
