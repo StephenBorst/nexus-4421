@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { ProcessedTrade, ThesisTrade } from "./types";
 import { cardStyle, labelStyle } from "./styles";
 import { ProcessSection } from "./ProcessView";
+import { OperatorProfileCard } from "./OperatorProfile";
 import { formatPnl } from "./helpers";
 import { PnlChart, PnlBars, EmptyState, CountUp, SectionHeader } from "./components";
 import { useIsMobile } from "./useIsMobile";
@@ -594,6 +595,10 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral, theses = 
         title="Performance Analytics"
         note={<a href="/analyze" style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, letterSpacing: "0.08em", textDecoration: "none", border: "1px solid #232327", borderRadius: 4, padding: "5px 10px" }}>▶ X-RAY ANY WALLET</a>}
       />
+      {/* SYNTHESIS FIRST — one point of view, before the instrument panel. Everything
+          below is the evidence for it. */}
+      <OperatorProfileCard wallet={wallet} theses={theses} orders={orders} />
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 8 }}>
         <div style={cardStyle}>
           <div style={labelStyle}>TOTAL PNL</div>
