@@ -111,19 +111,31 @@ export default function TheLabPage() {
   const openCount = openPositions.length;
   const unrealizedPnl = openPositions.reduce((s: number, p: any) => s + (p.unsettled_pnl ?? 0), 0);
 
-  // Left-to-right = the trader's lifecycle: scout → plan → automate → follow →
-  // record → grade. Analytics sits last to close the loop back to the top.
-  const tabs: { id: TabId; label: string; short: string }[] = [
-    { id: "intel",          label: "[ MARKET INTEL ]",    short: "INTEL" },
-    { id: "smart",          label: "[ SMART MONEY ]",     short: "SMART" },
-    { id: "thesis",         label: "[ NEXUS THESIS ENGINE ]", short: "LAB"   },
-    { id: "agent",          label: "[ TRADING AGENT ]",   short: "AGENT" },
-    { id: "quicktrade",     label: "[ QUICK TRADE ]",     short: "TRADE" },
-    { id: "copies",         label: "[ COPY TRADES ]",     short: "COPY"  },
-    { id: "tradelog",       label: "[ TRADING LOG ]",     short: "LOG"   },
-    { id: "holders",        label: "[ HOLDERS ROOM ]",    short: "ROOM"  },
-    { id: "analytics",      label: "[ ANALYTICS ]",       short: "STATS" },
+  // ── The loop, made visible ────────────────────────────────────────────────
+  // The product's whole claim is a LOOP — observe → plan → execute → prove — but the
+  // nav used to be nine equal-weight peers, which reads as nine unrelated tools and
+  // hides the one thing that makes the Lab coherent. Tabs are unchanged; they're now
+  // grouped under the phase they belong to, so the structure teaches the workflow.
+  // (Holders Room sits outside the loop — it's community access, not a trading step,
+  // and pretending otherwise would be the same dishonesty in the other direction.)
+  const tabs: { id: TabId; label: string; short: string; phase: string }[] = [
+    { id: "intel",          label: "[ MARKET INTEL ]",       short: "INTEL", phase: "OBSERVE" },
+    { id: "smart",          label: "[ SMART MONEY ]",        short: "SMART", phase: "OBSERVE" },
+    { id: "thesis",         label: "[ NEXUS THESIS ENGINE ]", short: "LAB",  phase: "PLAN"    },
+    { id: "agent",          label: "[ TRADING AGENT ]",      short: "AGENT", phase: "EXECUTE" },
+    { id: "quicktrade",     label: "[ QUICK TRADE ]",        short: "TRADE", phase: "EXECUTE" },
+    { id: "copies",         label: "[ COPY TRADES ]",        short: "COPY",  phase: "EXECUTE" },
+    { id: "tradelog",       label: "[ TRADING LOG ]",        short: "LOG",   phase: "PROVE"   },
+    { id: "analytics",      label: "[ ANALYTICS ]",          short: "STATS", phase: "PROVE"   },
+    { id: "holders",        label: "[ HOLDERS ROOM ]",       short: "ROOM",  phase: ""        },
   ];
+  // Group in declaration order — the array above IS the loop's order.
+  const tabGroups = tabs.reduce<{ phase: string; items: typeof tabs }[]>((acc, t) => {
+    const last = acc[acc.length - 1];
+    if (last && last.phase === t.phase) last.items.push(t);
+    else acc.push({ phase: t.phase, items: [t] });
+    return acc;
+  }, []);
 
   const calendarProps = { dayGroups, onDayClick: handleDayClick, viewMonth, viewYear, onPrevMonth: prevMonth, onNextMonth: nextMonth, totalPnl };
 
@@ -161,8 +173,19 @@ export default function TheLabPage() {
       </div>
       {/* ── TAB BAR ── */}
       <div style={{ display: "flex", gap: 2, padding: isMobile ? "6px 8px" : "8px 16px", borderBottom: "1px solid #232327", background: "#0f0f11", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", gap: isMobile ? 4 : 2, flex: 1, minWidth: 0, flexWrap: isMobile ? "wrap" : "nowrap", overflowX: isMobile ? "visible" : "auto" }}>
-          {tabs.map((tab) => (
+        <div style={{ display: "flex", gap: isMobile ? 4 : 2, flex: 1, minWidth: 0, flexWrap: isMobile ? "wrap" : "nowrap", overflowX: isMobile ? "visible" : "auto", alignItems: "center" }}>
+          {/* Desktop shows the phase spine; mobile keeps the equal-width wrap grid
+              (phase labels would eat the row, and the order alone carries the loop). */}
+          {tabGroups.map((group, gi) => (
+            <div key={group.phase || `x${gi}`} style={{ display: "contents" }}>
+              {!isMobile && group.phase && (
+                <span style={{
+                  fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.16em",
+                  color: "#52525b", flexShrink: 0, padding: "0 8px 0 " + (gi === 0 ? "0" : "10px"),
+                  borderLeft: gi === 0 ? "none" : "1px solid #232327",
+                }}>{group.phase}</span>
+              )}
+              {group.items.map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
               background: activeTab === tab.id ? "#1a1a1e" : "none",
               border: `1px solid ${activeTab === tab.id ? "#ededf0" : "transparent"}`,
@@ -178,6 +201,8 @@ export default function TheLabPage() {
               flexShrink: isMobile ? 1 : 0,
               whiteSpace: "nowrap",
             }}>{isMobile ? tab.short : tab.label}</button>
+              ))}
+            </div>
           ))}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, marginLeft: 8 }}>

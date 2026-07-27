@@ -181,7 +181,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "get_market_regime",
     description:
-      "Get the broad market regime signals: crypto Fear & Greed index (0-100 + classification), total market-cap 24h change, and BTC dominance. Use for 'how's the market', risk-on/risk-off, or sentiment questions.",
+      "Get the broad market TAPE: crypto Fear & Greed index (0-100 + classification), total market-cap 24h change, and BTC dominance. Use for 'how's the market', risk-on/risk-off, or sentiment questions. Call this the 'tape' in your answer, NOT the 'regime' — in Nexus, 'regime' means the PER-SYMBOL trend/volatility classification used to grade calls (see get_my_edge / Regime Edge), and conflating the two confuses the user.",
     input_schema: { type: "object", properties: {} },
     run: async () => {
       const out: Record<string, unknown> = {};

@@ -99,7 +99,7 @@ function TradingScoreSection({ orders, winRate }: { orders: ProcessedTrade[]; wi
     };
   }, [orders, winRate]);
 
-  if (!metrics) return <EmptyState message="connect wallet + make trades to see trading score" />;
+  if (!metrics) return <EmptyState message="no trading score yet" unlock="Your score is computed from closed trades — connect your wallet and it fills in from your real history." />;
 
   return (
     <div style={{ ...cardStyle, marginTop: 12 }}>
@@ -627,7 +627,7 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral, theses = 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 240px", gap: 8, marginBottom: 8 }}>
         <div style={cardStyle}>
           <div style={labelStyle}>&#9632; P&amp;L OVER TIME</div>
-          {orders.length ? <PnlChart points={cumulativePnl} /> : <EmptyState message="connect wallet + make trades to see curve" />}
+          {orders.length ? <PnlChart points={cumulativePnl} /> : <EmptyState message="no equity curve yet" unlock="This draws itself from your closed trades. Nothing to plot until the first one settles." />}
         </div>
         <div style={cardStyle}>
           <div style={{ fontSize: 10, color: "#71717a", letterSpacing: "0.1em", marginBottom: 14, fontFamily: "var(--nx-font-mono)" }}>PERFORMANCE</div>
@@ -674,7 +674,7 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral, theses = 
       {/* PROCESS — outcome analytics say how you did; these say how to get better. */}
       <ProcessSection wallet={wallet} theses={theses} orders={orders} />
 
-      {orders.length === 0 && <EmptyState message="no closed trades found — connect wallet to load your data" />}
+      {orders.length === 0 && <EmptyState message="no closed trades found" unlock="Connect the wallet you trade with — the Lab reads your Orderly history directly, nothing to import." />}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { navBtnStyle } from "./styles";
 import { useIsMobile } from "./useIsMobile";
 import IntelPage from "@/pages/intel";
-import { MarketRegime } from "./MarketRegime";
+import { MarketTape } from "./MarketTape";
 
 // ─── News helpers ─────────────────────────────────────────
 interface NewsItem { title: string; description: string; link: string; pubDate: string; source: string; category: string; }
@@ -164,7 +164,7 @@ export function MarketIntelView() {
         <div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>Scout</div>
         <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 24, fontWeight: 700, color: "#f4f4f5", lineHeight: 1.1, letterSpacing: "-0.01em" }}>The Market Terminal</div>
       </div>
-      <MarketRegime />
+      <MarketTape />
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
         {([
           { id: "intel" as const, label: "INTEL" },

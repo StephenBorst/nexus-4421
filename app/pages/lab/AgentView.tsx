@@ -1207,15 +1207,18 @@ export function AgentView() {
             </div>
           </div>
 
-          {/* Opt-in market-regime filter — gates entries that fight a strong tape.
-              Server-enforced in the brain; never flips direction or touches positions. */}
+          {/* Opt-in market-TAPE filter — gates entries that fight a strong tape.
+              Server-enforced in the brain; never flips direction or touches positions.
+              ⚠️ The stored config key stays `respectRegime` — it's persisted in KV, read
+              by the brain and set by the Bankr skill, so renaming it would break live
+              agents. Only the LABEL moved to "tape" (see MarketTape.tsx on the naming). */}
           <div style={agentCardStyle}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
               <div>
-                <div style={agentLabelStyle}>// MARKET REGIME FILTER</div>
+                <div style={agentLabelStyle}>// MARKET TAPE FILTER</div>
                 <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 6, color: "#71717a", letterSpacing: 0 }}>
                   Skip NEW entries that fight a strong tape — RISK-ON gates shorts, RISK-OFF gates longs.
-                  Never flips direction or touches open positions. Test in PAPER first. (See live regime in Market Intel.)
+                  Never flips direction or touches open positions. Test in PAPER first. (See the live tape in Market Intel.)
                 </div>
               </div>
               <button onClick={() => setConfig({ ...config, respectRegime: !config.respectRegime })}

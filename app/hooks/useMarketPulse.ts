@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 // crowding), computed from the same public futures feed the Lab's Market Regime
 // uses. Drives ambient data-reactivity: the terminal quietly gets livelier when
 // the market is risk-on, calmer when risk-off. Cosmetic only — never a trading
-// signal — so a lean recompute here (mirroring MarketRegime) is fine. Fail-soft:
+// signal — so a lean recompute here (mirroring MarketTape) is fine. Fail-soft:
 // returns null until it resolves, and the ambient holds its neutral default.
 const PROXY = "https://orderly-proxy.stephenpatrick24.workers.dev";
 

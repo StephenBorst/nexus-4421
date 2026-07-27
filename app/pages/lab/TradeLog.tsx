@@ -148,7 +148,7 @@ export function TradeLogAllView({
     return (
       <div>
         {viewToggle}
-        <EmptyState message="no closed trades found — connect wallet to load your trade history" />
+        <EmptyState message="no closed trades found" unlock="Connect the wallet you trade with — your Orderly history loads automatically, no import step." />
       </div>
     );
   }

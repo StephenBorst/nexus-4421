@@ -320,11 +320,37 @@ export function PnlBars({ values, labels }: { values: number[]; labels?: string[
 }
 
 // ─── Empty State ─────────────────────────────────────────
-export function EmptyState({ message }: { message: string }) {
+// Empty is a real product STATE here, not an error — most of the Lab is earned by
+// doing the work, so a new trader legitimately sees a lot of nothing. The failure
+// mode is nine tabs that each go quiet in their own way, which reads as half-built.
+// One voice everywhere: say what's missing, then name the ONE next action that
+// changes it (`unlock`) — the pattern the Operator Profile uses. Never scold, never
+// hedge, never dead-end.
+export function EmptyState({ message, unlock, onAction, actionLabel }: {
+  message: string;
+  /** The single next action that fills this surface. Keep it concrete and small. */
+  unlock?: string;
+  onAction?: () => void;
+  actionLabel?: string;
+}) {
   return (
     <div style={{ padding: "40px 0", textAlign: "center", color: "#33333a", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
       <div style={{ fontSize: 20, marginBottom: 8 }}>&#9632;</div>
       {message}
+      {unlock && (
+        <div style={{ marginTop: 10, color: "#52525b", fontFamily: "var(--nx-font-ui)", fontSize: 12, lineHeight: 1.55, maxWidth: 380, marginLeft: "auto", marginRight: "auto" }}>
+          <span style={{ color: "#33333a", fontFamily: "var(--nx-font-mono)", marginRight: 6 }}>→</span>{unlock}
+        </div>
+      )}
+      {onAction && actionLabel && (
+        <button
+          type="button"
+          onClick={onAction}
+          style={{ marginTop: 12, background: "none", border: "1px solid #33333a", borderRadius: 3, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 11, letterSpacing: "0.05em", padding: "7px 14px", cursor: "pointer" }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "#ededf0"; e.currentTarget.style.borderColor = "#52525b"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "#a1a1aa"; e.currentTarget.style.borderColor = "#33333a"; }}
+        >{actionLabel}</button>
+      )}
     </div>
   );
 }

@@ -475,7 +475,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
 
       {/* ── Market Regime ───────────────────────────────────── */}
       <Card style={{ marginBottom: "10px" }}>
-        <SectionTitle>// MARKET REGIME — TERMINAL</SectionTitle>
+        <SectionTitle>// MARKET TAPE — TERMINAL</SectionTitle>
 
         <div style={{ marginBottom: "6px" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: "10px", marginBottom: "4px", flexWrap: "wrap" }}>
@@ -568,11 +568,11 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
 
         if (regimeBearish && youLong) {
           tensionColor = RED;
-          tensionLabel = "RISK — REGIME BEARISH, YOU ARE LONG";
+          tensionLabel = "RISK — TAPE BEARISH, YOU ARE LONG";
           tensionMsg   = `Regime score ${regScore} signals bearish conditions. Your portfolio is ${netLong}% long. Tighten stops or reduce exposure.`;
         } else if (regimeBullish && youShort) {
           tensionColor = RED;
-          tensionLabel = "RISK — REGIME BULLISH, YOU ARE SHORT";
+          tensionLabel = "RISK — TAPE BULLISH, YOU ARE SHORT";
           tensionMsg   = `Regime score ${regScore} signals bullish conditions. Your portfolio is ${netShort}% short. Watch for forced unwind.`;
         } else if (crowdedLong && youLong && netLong >= 65) {
           tensionColor = YELLOW;
@@ -584,11 +584,11 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
           tensionMsg   = `You are ${netShort}% short and the market signal shows crowded shorts. Upside unwind risk if price rips.`;
         } else if (regimeBullish && youLong) {
           tensionColor = GREEN;
-          tensionLabel = "ALIGNED — REGIME CONFIRMS LONG BIAS";
+          tensionLabel = "ALIGNED — TAPE CONFIRMS LONG BIAS";
           tensionMsg   = `Regime score ${regScore} supports bullish positioning. Your ${netLong}% long exposure is with the trend.`;
         } else if (regimeBearish && youShort) {
           tensionColor = GREEN;
-          tensionLabel = "ALIGNED — REGIME CONFIRMS SHORT BIAS";
+          tensionLabel = "ALIGNED — TAPE CONFIRMS SHORT BIAS";
           tensionMsg   = `Regime score ${regScore} supports bearish positioning. Your ${netShort}% short exposure is with the trend.`;
         }
 

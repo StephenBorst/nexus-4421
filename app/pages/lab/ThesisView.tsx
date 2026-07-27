@@ -580,7 +580,7 @@ export function ThesisAnalyticsView() {
   const worstAssets = [...assetStats].reverse().slice(0, 3);
 
   if (!walletAddress) {
-    return <EmptyState message="connect wallet to view thesis analytics" />;
+    return <EmptyState message="no thesis analytics yet" unlock="Connect your wallet to load the calls you've written — these charts are built from your own theses." />;
   }
 
   const endVal = equityPoints.length > 0 ? equityPoints[equityPoints.length - 1] : 0;
@@ -1506,7 +1506,7 @@ export function ThesisView() {
 
       {trades.length === 0 && (
         <div style={{ marginTop: 24 }}>
-          <EmptyState message="no theses deployed yet — fill the form above and hit deploy" />
+          <EmptyState message="no theses deployed yet" unlock="Write your first one above. Post it public and it grades itself against real price — that graded record is the only thing that ranks here." />
         </div>
       )}
     </div>

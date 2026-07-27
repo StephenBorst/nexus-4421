@@ -33,7 +33,7 @@ export function CopiesView() {
       </div>
 
       {copiedTheses.length === 0 ? (
-        <EmptyState message="no copied theses yet — use COPY on any public thesis in the FEED" />
+        <EmptyState message="no copied theses yet" unlock="Hit COPY on any public call in the Feed and it lands here, tracked against the original author's graded record." />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {copiedTheses.map((t) => {
