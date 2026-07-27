@@ -4,6 +4,8 @@ import { navBtnStyle } from "./styles";
 import { useIsMobile } from "./useIsMobile";
 import IntelPage from "@/pages/intel";
 import { MarketTape } from "./MarketTape";
+// Pure + pinned by tests (app/lib/rssDate.test.mjs) — see that file for the "-333m" bug.
+import { parseRssDate, timeAgo } from "@/lib/rssDate.mjs";
 
 // ─── News helpers ─────────────────────────────────────────
 interface NewsItem { title: string; description: string; link: string; pubDate: string; source: string; category: string; }
@@ -65,7 +67,10 @@ function NewsTab() {
     const seen = new Set<string>();
     const deduped = all
       .filter(i => { const k = i.title.slice(0, 50); if (seen.has(k)) return false; seen.add(k); return !!i.title; })
-      .sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime())
+      // Same parser as ago() — mixing the two would sort by one clock and label by
+      // another. (Ordering happened to survive the old bug only because every feed was
+      // shifted by the same offset; that was luck, not correctness.)
+      .sort((a, b) => (parseRssDate(b.pubDate) || 0) - (parseRssDate(a.pubDate) || 0))
       .slice(0, 50);
     setItems(deduped);
     setLoading(false);
@@ -76,7 +81,7 @@ function NewsTab() {
   useEffect(() => { const iv = setInterval(load, 300_000); return () => clearInterval(iv); }, []);
   useEffect(() => { const t = setInterval(() => setCountdown(c => c > 0 ? c - 1 : 300), 1000); return () => clearInterval(t); }, []);
 
-  const ago = (d: string) => { const m = (Date.now() - new Date(d).getTime()) / 60000; return m < 60 ? `${Math.round(m)}m` : m < 1440 ? `${Math.round(m/60)}h` : `${Math.round(m/1440)}d`; };
+  const ago = (d: string) => timeAgo(d);
   const shown = filter === "ALL" ? items : items.filter(i => i.category === filter);
 
   return (
