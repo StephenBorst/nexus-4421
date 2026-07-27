@@ -46,18 +46,18 @@ export function NumberField({ value, onCommit, min, max, step }: {
  * stops) — identical markup differing only in copy and accent, which is how the
  * fourth one would have been written too.
  *
- * ⚠️ `accent` is a parameter only because the smart-money toggle shipped green while
- * the others are bone. That's inherited, and this refactor preserves it rather than
- * silently restyling live UI — but green is supposed to be reserved for P&L, so the
- * right end state is one accent here and no prop at all.
+ * One accent, no prop: every guardrail toggle is bone. The smart-money one shipped
+ * GREEN, which broke the design law that green means P&L and nothing else — an ON
+ * switch is not a profit. Unified here deliberately (the preceding refactor commit
+ * preserved the drift so the restyle wouldn't hide inside a mechanical change).
  */
-export function AgentToggleCard({ label, description, on, onToggle, accent = "#ededf0" }: {
+export function AgentToggleCard({ label, description, on, onToggle }: {
   label: string;
   description: React.ReactNode;
   on: boolean;
   onToggle: () => void;
-  accent?: string;
 }) {
+  const accent = "#ededf0";
   return (
     <div style={agentCardStyle}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
