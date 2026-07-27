@@ -10,6 +10,7 @@
 // module it dispatches to.
 //
 // ⚠️ Pure move — logic byte-identical to what shipped.
+import { notifyResolution } from "./resolutions.mjs";
 import {
   gradeCall, REGIME, classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets,
   regimeEdge, planQuality, planSummary, expectancyStats, convictionCalibration,
@@ -71,6 +72,9 @@ export async function gradePublicTheses(env) {
     if (!raw) continue;
     let data; try { data = JSON.parse(raw); } catch { continue; }
     let changed = false;
+    // Collected, not dispatched inline: a resolution must only be announced once the
+    // stamp is actually persisted (see resolutions.mjs).
+    const justResolved = [];
     for (const t of (data.theses || [])) {
       if (!t.isPublic || !t.symbol || !t.createdAt) continue;
       const resolved = t.gradedOutcome === "WIN" || t.gradedOutcome === "LOSS"; // resolved = final
@@ -106,10 +110,20 @@ export async function gradePublicTheses(env) {
           t.gradedR = g.r;
           t.gradedAt = Date.now();
           changed = true; graded++;
+          justResolved.push({ t, outcome: g.outcome, r: g.r });
         }
       }
     }
-    if (changed) { await env.LAB_STORE.put(key.name, JSON.stringify(data)); walletsWritten++; }
+    if (changed) {
+      await env.LAB_STORE.put(key.name, JSON.stringify(data)); walletsWritten++;
+      // Only now that the grade is durable. If the put throws we skip the fan-out and
+      // the next pass re-resolves cleanly — better a late notification than a phantom
+      // one for a grade that was never saved.
+      const wallet = key.name.replace("lab:", "");
+      for (const rz of justResolved) {
+        await notifyResolution(env, wallet, rz.t, rz.outcome, rz.r);
+      }
+    }
   }
   console.log(`[grade] resolved ${graded} calls across ${walletsWritten} wallets`);
   return graded;

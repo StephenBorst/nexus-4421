@@ -1058,3 +1058,53 @@ test("postmortemSummary: nothing valid → null (no empty artifact)", () => {
   assert.equal(postmortemSummary(["GARBAGE"]), null);
   assert.equal(postmortemSummary(null), null);
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// Call resolution events
+// ═══════════════════════════════════════════════════════════════════
+import { resolutionMessage, resolutionFeedEntry, RESOLVED_FEED_KEY } from "./resolutions.mjs";
+
+const rzThesis = { id: "t1", symbol: "PERP_BTC_USDC", direction: "LONG", entryPrice: 100, stopLoss: 95, takeProfit1: 110 };
+
+test("resolutionMessage: a win states the fact, without celebration", () => {
+  const m = resolutionMessage(rzThesis, "WIN", 2);
+  assert.equal(m.won, true);
+  assert.equal(m.message, "BTC LONG hit target — +2R");
+  assert.match(m.telegram, /BTC LONG hit target/);
+  assert.match(m.telegram, /graded from public price/);
+  // The grade is a fact about price; hype would read as spin.
+  assert.ok(!/congrat|nice|great|🎉/i.test(m.message + m.telegram));
+});
+
+test("resolutionMessage: a loss states it plainly, without sympathy or blame", () => {
+  const m = resolutionMessage(rzThesis, "LOSS", -1);
+  assert.equal(m.won, false);
+  assert.equal(m.message, "BTC LONG stopped out — -1R");
+  assert.ok(!/unlucky|sorry|bad luck|shame/i.test(m.message + m.telegram));
+});
+
+test("resolutionMessage: symbol is bare and R is rounded for display", () => {
+  assert.match(resolutionMessage({ ...rzThesis, symbol: "PERP_1000PEPE_USDC" }, "WIN", 1.666).message, /^1000PEPE/);
+  assert.match(resolutionMessage(rzThesis, "WIN", 1.666).message, /\+1\.67R/);
+});
+
+test("resolutionMessage: survives a malformed thesis rather than throwing in cron", () => {
+  const m = resolutionMessage({}, "LOSS", -1);
+  assert.ok(typeof m.message === "string" && m.message.length > 0);
+  assert.doesNotThrow(() => resolutionMessage(null, "WIN", 1));
+});
+
+test("resolutionFeedEntry: carries what the feed needs and nothing private", () => {
+  const e = resolutionFeedEntry("0xAbC", rzThesis, "WIN", 2);
+  assert.equal(e.kind, "RESOLUTION");
+  assert.equal(e.symbol, "BTC");
+  assert.equal(e.outcome, "WIN");
+  assert.equal(e.r, 2);
+  assert.equal(e.wallet, "0xAbC");
+  assert.ok(e.createdAt > 0);
+  // Only fields already public on the call itself — no size, no account, no P&L.
+  for (const k of ["positionSize", "accountSize", "riskPercent", "actualPnl", "notes"]) {
+    assert.equal(e[k], undefined, `${k} must not ride along into the public feed`);
+  }
+  assert.equal(RESOLVED_FEED_KEY, "resolved:feed");
+});

@@ -22,6 +22,7 @@ import { Sparkline } from "@/pages/lab/components";
 import { chartImageList, effectiveStatus } from "@/pages/lab/helpers";
 import LiveNow from "./LiveNow";
 import Contested from "./Contested";
+import Resolved, { type ResolutionEvent } from "./Resolved";
 import LeakReport from "./LeakReport";
 import { lifecycleState, describeUpdate, updateKind } from "@/lib/lifecycle.mjs";
 import Desks from "./Desks";
@@ -1315,6 +1316,10 @@ type DirFilter = "ALL" | "LONG" | "SHORT";
 export default function FeedPage() {
   const isMobile = useIsMobile();
   const [feed, setFeed] = useState<FeedThesis[]>([]);
+  // Resolution events ride in the same /feed payload but are NOT thesis-shaped — they
+  // carry no levels or status. Split out so FeedCard never sees one and so they can't
+  // skew the trader/thesis counts derived from `feed`.
+  const [resolutions, setResolutions] = useState<ResolutionEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState<FilterStatus>("ALL");
@@ -1381,8 +1386,10 @@ export default function FeedPage() {
     setError(false);
     fetch(`${API_BASE}/feed`)
       .then((r) => r.json())
-      .then((data: { feed: FeedThesis[] }) => {
-        setFeed(data.feed ?? []);
+      .then((data: { feed: (FeedThesis & { resolution?: boolean })[] }) => {
+        const all = data.feed ?? [];
+        setFeed(all.filter((t) => !t.resolution) as FeedThesis[]);
+        setResolutions(all.filter((t) => t.resolution) as unknown as ResolutionEvent[]);
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
@@ -1709,6 +1716,8 @@ export default function FeedPage() {
                   </div>
                 )
             )}
+
+            {!loading && !error && <Resolved events={resolutions} />}
 
             {!loading && !error && filtered.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

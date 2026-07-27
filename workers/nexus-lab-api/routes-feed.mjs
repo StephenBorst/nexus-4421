@@ -11,6 +11,7 @@
 // ⚠️ Pure move — logic byte-identical to what shipped.
 import { json, normalizeAddress, recoverEthAddress, holdersRoomMessage } from "./shared.mjs";
 import { safeChartUrl } from "./logic.mjs";
+import { RESOLVED_FEED_KEY } from "./resolutions.mjs";
 
 export async function handleFeed(parts, request, env) {
   if (!["feed", "comments", "reactions"].includes(parts[0])) return null;
@@ -66,6 +67,17 @@ export async function handleFeed(parts, request, env) {
       }
     } catch (e) {
       console.error("[feed] agent merge failed:", e);
+    }
+
+    // Merge RESOLUTION events — a call hitting its target or stop is the most
+    // interesting thing that happens here, and it used to be invisible: the cron
+    // stamped the grade silently and the feed showed nothing. These are outcomes of
+    // calls already public, so they expose nothing new. Best-effort.
+    try {
+      const rraw = await env.LAB_STORE.get(RESOLVED_FEED_KEY);
+      for (const ev of (rraw ? JSON.parse(rraw) : [])) feedItems.push({ ...ev, resolution: true });
+    } catch (e) {
+      console.error("[feed] resolution merge failed:", e);
     }
 
     // Sort newest first

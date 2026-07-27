@@ -33,7 +33,7 @@ import { handleTheses } from "./routes-theses.mjs";
 import { handleAgents } from "./routes-agents.mjs";
 import { handleFeed } from "./routes-feed.mjs";
 import { loadOiHistForBacktest, revalidateStrategy, OI_BACKTEST_MIN_DAYS, OI_BACKTEST_MIN_SAMPLES } from "./strategies.mjs";
-import { json, cors, normalizeAddress, recoverEthAddress, ALLOWED_ORIGINS, holdersRoomMessage } from "./shared.mjs";
+import { json, cors, normalizeAddress, recoverEthAddress, ALLOWED_ORIGINS, holdersRoomMessage, appendNotification } from "./shared.mjs";
 import { gradedStatusOf, fetchGradeHistory, gradePublicTheses, computeCallerStats, REGIME_PAD_S, ADVICE_FLAG_TEXT } from "./grading.mjs";
 // Directive level validation lives with the exec's money-path logic (single source);
 // wrangler bundles the cross-dir import (same as backtest.mjs).
@@ -207,14 +207,6 @@ async function walletIsPro(address, env) {
 
 
 // ── Ph27: notification helpers ────────────────────────────────────────────────
-async function appendNotification(env, wallet, notif) {
-  const key = `notif:${wallet}`;
-  const raw = await env.LAB_STORE.get(key);
-  const list = raw ? JSON.parse(raw) : [];
-  list.unshift(notif);
-  await env.LAB_STORE.put(key, JSON.stringify(list.slice(0, 50)));
-}
-
 // ── Ph16: SVG OG image helpers ────────────────────────────────────────────────
 function esc(str) {
   return String(str)

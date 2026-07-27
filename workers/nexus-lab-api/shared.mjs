@@ -83,3 +83,16 @@ export function holdersRoomMessage(address, ts) {
 Address: ${address.toLowerCase()}
 Timestamp: ${ts}`;
 }
+
+/**
+ * Append to a wallet's in-app notification list (newest first, capped at 50).
+ * Lives here because both the /notifications route and the resolution fan-out write
+ * it — importing it from index.js would make route modules circular.
+ */
+export async function appendNotification(env, wallet, notif) {
+  const key = `notif:${wallet}`;
+  const raw = await env.LAB_STORE.get(key);
+  const list = raw ? JSON.parse(raw) : [];
+  list.unshift(notif);
+  await env.LAB_STORE.put(key, JSON.stringify(list.slice(0, 50)));
+}
