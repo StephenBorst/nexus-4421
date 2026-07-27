@@ -210,3 +210,31 @@ test("narrative: publicOnly drops every private read (the shareable version)", (
   assert.ok(!/DOGE/.test(pub), "private per-symbol record must not appear either");
   assert.match(pub, /edge is real in uptrends/); // graded reads survive
 });
+
+// ── public rendering (the trader page) ──────────────────────────────
+
+test("PUBLIC: third-person voice re-points every pronoun, including objects", () => {
+  const p = buildOperatorProfile({ process: fullProcess, edge: fullEdge, adherence: fullAdherence, leaks: fullLeaks, trades: fullTrades });
+  const pub = profileNarrative(p, { publicOnly: true, voice: "third" });
+  assert.ok(!/\byou\b/i.test(pub), `leaked 2nd person: ${pub}`);
+  assert.ok(!/\byour\b/i.test(pub), `leaked "your": ${pub}`);
+  assert.match(pub, /their edge/i);
+  // "the wins carry you" must become "carry them", not "carry they"
+  assert.ok(!/carry they/i.test(pub), `object pronoun mangled: ${pub}`);
+  // ...and the owner's own view is unchanged
+  assert.match(profileNarrative(p), /\byour\b/i);
+});
+
+test("REGRESSION: a big GRADED record is ESTABLISHED without private fills", () => {
+  // A public profile can never see another wallet's closed trades. Requiring them for
+  // ESTABLISHED made every public profile append "still a small sample" to a 24-call
+  // record — a statement that was simply false.
+  const p = buildOperatorProfile({ process: { ...fullProcess, calls: 24 } });
+  assert.equal(p.closedTrades, 0);
+  assert.equal(p.tier, "ESTABLISHED");
+  assert.ok(!/small sample/i.test(profileNarrative(p, { publicOnly: true, voice: "third" })));
+  // but a genuinely thin record still hedges
+  const thin = buildOperatorProfile({ process: { ...fullProcess, calls: 6 } });
+  assert.equal(thin.tier, "FORMING");
+  assert.match(profileNarrative(thin, { publicOnly: true, voice: "third" }), /small sample/i);
+});

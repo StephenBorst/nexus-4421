@@ -206,7 +206,15 @@ export function buildOperatorProfile({ process, edge, adherence, leaks, trades }
     Math.min(closed / 30, 1) * 25 +           // realized fills add the private half
     Math.min((adherence?.matched || 0) / 8, 1) * 15,
   ));
-  const tier = gradedCalls >= 20 && closed >= 20 ? "ESTABLISHED" : (gradedCalls >= 5 || closed >= 10) ? "FORMING" : "UNKNOWN";
+  // ⚠️ A large GRADED sample alone is enough to stop hedging. The first cut required
+  // `closed >= 20` too, which a PUBLIC profile can never satisfy — another wallet's
+  // fills are private by construction — so every public profile stayed FORMING and
+  // appended "still a small sample" to a 24-call record. That hedge was simply false.
+  // Graded calls are the load-bearing evidence (60% of dataScore); private fills
+  // deepen a profile but are not required to trust it.
+  const tier = (gradedCalls >= 20 || (gradedCalls >= 10 && closed >= 20)) ? "ESTABLISHED"
+    : (gradedCalls >= 5 || closed >= 10) ? "FORMING"
+    : "UNKNOWN";
 
   return {
     tier, dataScore, gradedCalls, closedTrades: closed, holdHours,
@@ -257,18 +265,42 @@ export function buildUnlocks({ gradedCalls, closed, adherence, leaks, discipline
  * every surface (Lab card, share image, the AI copilot's context) says the same
  * thing about a trader.
  * @param {object} profile
- * @param {{publicOnly?:boolean, max?:number}} opts publicOnly drops private reads.
+ * @param {{publicOnly?:boolean, max?:number, voice?:"second"|"third"}} [opts]
+ *   publicOnly drops private reads (the shareable version); voice:"third" re-points
+ *   the pronouns for a stranger reading someone else's profile.
  */
-export function profileNarrative(profile, { publicOnly = false, max = 4 } = {}) {
+export function profileNarrative(profile, { publicOnly = false, max = 4, voice = "second" } = {}) {
   if (!profile) return "";
+  const third = voice === "third";
   const reads = (profile.reads || []).filter((r) => !publicOnly || PUBLIC_READS.has(r.kind)).slice(0, max);
   if (!reads.length) {
-    return profile.tier === "UNKNOWN"
-      ? "Not enough of a record yet to say who you are as a trader — that's what the unlocks below are for."
+    if (profile.tier === "UNKNOWN") {
+      return third
+        ? "Not enough of a graded record yet to say who this trader is."
+        : "Not enough of a record yet to say who you are as a trader — that's what the unlocks below are for.";
+    }
+    return third
+      ? "This record is still forming; the reads below will sharpen as more calls resolve."
       : "Your record is still forming; the reads below will sharpen as more calls resolve.";
   }
   const head = profile.archetype ? `${profile.archetype.label}. ` : "";
-  const body = reads.map((r) => r.text).join(". ");
-  const tail = profile.tier === "FORMING" ? " (Still a small sample — treat these as leaning, not settled.)" : "";
+  const body = reads.map((r) => (third ? toThirdPerson(r.text) : r.text)).join(". ");
+  const tail = profile.tier === "FORMING"
+    ? (third ? " (Small sample so far — leaning, not settled.)" : " (Still a small sample — treat these as leaning, not settled.)")
+    : "";
   return `${head}${body.charAt(0).toUpperCase()}${body.slice(1)}.${tail}`;
+}
+
+// Read texts are authored in second person for the owner's own Lab. A public profile
+// is a stranger reading ABOUT someone, where "your edge" is plainly wrong — so the
+// same sentences are re-pointed rather than duplicated in two voices (which would
+// inevitably drift apart).
+function toThirdPerson(text) {
+  return text
+    // Object pronouns FIRST: these read "...carry you", where a blanket you->they
+    // would produce "carry they". Word-boundaried so "yourself" cannot be mangled.
+    .replace(/\b(carry|costing|paying|pays|cost)\s+you\b/gi, "$1 them")
+    .replace(/\byou're\b/gi, "they're")
+    .replace(/\byour\b/gi, "their")
+    .replace(/\byou\b/gi, "they");
 }
