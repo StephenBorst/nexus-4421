@@ -71,3 +71,15 @@ export function recoverEthAddress(message, sigHex) {
     return null;
   }
 }
+
+/**
+ * Canonical Holders-Room challenge — client and server MUST build this identically or
+ * ecrecover yields a different address and the gate silently denies everyone. Lives
+ * here (not in a route module) because both the /feed/holders route and index.js's
+ * auth paths construct it.
+ */
+export function holdersRoomMessage(address, ts) {
+  return `Nexus Holders Room
+Address: ${address.toLowerCase()}
+Timestamp: ${ts}`;
+}
