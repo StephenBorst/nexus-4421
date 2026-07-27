@@ -5297,7 +5297,12 @@ document.getElementById("btn").addEventListener("click",go);
       } catch (e) { console.error("[advice] history", e.message); }
 
       const regime = cd ? classifyRegime(cd, now) : null;
-      const alignment = regime ? callAlignment(direction, regime) : null;
+      // ⚠️ Only claim an alignment when a direction was actually supplied. Quick Trade
+      // asks BEFORE the trader picks a side, and callAlignment() on an undefined
+      // direction would silently resolve to "AGAINST_TREND" — a confident, invented
+      // warning. No direction → no alignment; the trend bucket still applies.
+      const dirUp = String(direction || "").toUpperCase();
+      const alignment = (regime && (dirUp === "LONG" || dirUp === "SHORT")) ? callAlignment(dirUp, regime) : null;
 
       // Plan quality on the DRAFT — the same scorer that will judge it once posted,
       // so a trader can fix a stop-in-noise before it costs them, not after.

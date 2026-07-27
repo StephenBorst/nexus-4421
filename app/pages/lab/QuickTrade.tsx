@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { ThesisAdvisor } from "./ThesisAdvisor";
 import { useOrderEntry, useLeverage, useCollateral, useAccount, usePositionStream, usePositionClose } from "@orderly.network/hooks";
 import { OrderSide, OrderType } from "@orderly.network/types";
 import { MiniPriceChart } from "@/components/MiniPriceChart";
@@ -72,7 +73,8 @@ const input: React.CSSProperties = { background: "#0a0a0b", border: "1px solid #
 
 export function QuickTrade() {
   const { state: accountState } = useAccount();
-  const connected = !!(accountState as { address?: string })?.address;
+  const walletAddress = (accountState as { address?: string })?.address ?? null;
+  const connected = !!walletAddress;
 
   const [symbol, setSymbol] = useState(SYMBOLS[0]);
   const [notional, setNotional] = useState(100);
@@ -239,6 +241,11 @@ export function QuickTrade() {
           </div>
         )}
       </div>
+
+      {/* Context before a one-tap market order. Quick Trade is where the impulsive
+          decisions happen, so it's where the record is most worth seeing — direction
+          is deliberately not passed (no side chosen yet, so no alignment claim). */}
+      <ThesisAdvisor symbol={symbol} wallet={walletAddress} compact />
 
       {/* One-tap LONG / SHORT */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

@@ -28,14 +28,18 @@ type Advice = {
 const TREND_WORD: Record<string, string> = { TREND_UP: "trending up", TREND_DOWN: "trending down", CHOP: "chopping" };
 const VOL_WORD: Record<string, string> = { CALM: "calm", NORMAL: "normal vol", VOLATILE: "volatile" };
 
-export function ThesisAdvisor({ symbol, direction, entryPrice, stopLoss, takeProfit1, riskReward, wallet }: {
+export function ThesisAdvisor({ symbol, direction, entryPrice, stopLoss, takeProfit1, riskReward, wallet, compact = false }: {
   symbol: string;
-  direction: "LONG" | "SHORT";
-  entryPrice: string;
-  stopLoss: string;
-  takeProfit1: string;
+  /** Omitted on surfaces where the side isn't chosen yet (Quick Trade) — the server
+   *  then withholds the alignment claim rather than inventing one. */
+  direction?: "LONG" | "SHORT";
+  entryPrice?: string;
+  stopLoss?: string;
+  takeProfit1?: string;
   riskReward?: number;
   wallet?: string | null;
+  /** One-line variant for surfaces with no written plan to score (Quick Trade). */
+  compact?: boolean;
 }) {
   const [advice, setAdvice] = useState<Advice | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -68,6 +72,20 @@ export function ThesisAdvisor({ symbol, direction, entryPrice, stopLoss, takePro
   const recTone = rec ? (rec.avgR > 0 ? C.pos : C.neg) : C.text.fog;
   const high = warnings.filter((w) => w.severity === "high");
   const medium = warnings.filter((w) => w.severity !== "high");
+
+  // Compact: market character + your record in it, one line. Used where there's no
+  // written plan to score — the point is context BEFORE a one-tap market order.
+  if (compact) {
+    return (
+      <div style={{ background: C.inset, border: `1px solid ${C.border}`, borderRadius: RADIUS.sm, padding: "8px 11px", fontFamily: "var(--nx-font-ui)", fontSize: 11.5, color: C.text.muted, lineHeight: 1.55 }}>
+        <strong style={{ color: C.text.fog }}>{symbol.replace("PERP_", "").replace("_USDC", "")}</strong> is{" "}
+        {TREND_WORD[regime.trend] ?? regime.trend.toLowerCase()} ({VOL_WORD[regime.vol] ?? regime.vol.toLowerCase()}).
+        {rec
+          ? <> Your record in this market: <strong style={{ color: recTone }}>{rec.avgR > 0 ? "+" : ""}{rec.avgR}R</strong> over {rec.calls}.</>
+          : <> No graded record here yet.</>}
+      </div>
+    );
+  }
 
   return (
     <div style={{ background: C.inset, border: `1px solid ${high.length ? "#4a3a00" : C.border}`, borderRadius: RADIUS.sm, padding: "9px 11px", marginBottom: 8 }}>
