@@ -252,6 +252,10 @@ async function smartSeed(env) {
 // at runtime while still bundling cleanly.
 export async function handleSmart(parts, request, env, ctx) {
   if (parts[0] !== "smart") return null;
+  // Derived here rather than passed in: it's a property of the request, and relying on
+  // the caller's scope is exactly what broke /smart/trader and /smart/xray on the first
+  // extraction (free variable → clean bundle → ReferenceError in production).
+  const url = new URL(request.url);
 
   if (parts[0] === "smart" && parts[1] === "board" && request.method === "GET") {
     const CACHE_KEY = "sm:board:v5";

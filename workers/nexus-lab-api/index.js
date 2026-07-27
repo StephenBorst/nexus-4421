@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, REGIME, classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge, planQuality, planSummary, expectancyStats, callerScore, convictionCalibration, contestedBoard, LOSS_REASONS, isLossReason, postmortemSummary } from "./logic.mjs";
+import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, rankCaller, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, REGIME, classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge, planQuality, planSummary, expectancyStats, callerScore, convictionCalibration, contestedBoard, LOSS_REASONS, isLossReason, postmortemSummary } from "./logic.mjs";
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./backtest.mjs";
 // Route families lifted out of the 74-route fetch handler (see shared.mjs for the
@@ -2711,7 +2711,13 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
             try {
               const msgHex = hex.slice(10 + 64); // skip selector + offset
               const msgLen = parseInt(hex.slice(10 + 64, 10 + 128), 16);
-              reason = Buffer.from(msgHex.slice(64, 64 + msgLen * 2), "hex").toString("utf8");
+              // ⚠️ Was Buffer.from(...) — Buffer does NOT exist in the Workers runtime
+              // (no nodejs_compat flag), so this threw every time and the empty catch
+              // swallowed it: the decoded revert reason was silently never produced.
+              // Found by an eslint no-undef sweep, not by any test. hexToBytes is
+              // already imported; TextDecoder is a Workers global.
+              const bytes = hexToBytes(msgHex.slice(64, 64 + msgLen * 2));
+              reason = new TextDecoder().decode(bytes);
             } catch (_) {}
           }
           return json({

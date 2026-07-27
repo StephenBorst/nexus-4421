@@ -1,0 +1,7 @@
+{
+  "root": true,
+  "env": { "worker": true, "es2022": true, "browser": true },
+  "parserOptions": { "ecmaVersion": 2022, "sourceType": "module" },
+  "ignorePatterns": ["node_modules/", "setup-trading-keys.js"],
+  "rules": { "no-undef": "error" }
+}
