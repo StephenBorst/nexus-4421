@@ -2,7 +2,6 @@
 // track-record panels, and the Orderly delegated-key readers.
 // Extracted from index.tsx (god-file split).
 import { useState, useEffect, useRef } from "react";
-import { signWithInjected } from "@/utils/injectedWallet";
 import type { AgentConfig, AgentState, AgentTrade, AgentLeaderboardEntry, AgentPendingThesis } from "./types";
 import { DEFAULT_CONFIG } from "./types";
 import { agentCardStyle, agentLabelStyle, agentInputStyle, agentBtnStyle, btnPrimary, navBtnStyle } from "./styles";
@@ -14,206 +13,14 @@ import { AGENT_PREFILL_KEY, DIRECTIVE_PREFILL_KEY, type AgentPrefill, type Direc
 import { PnlChart, CountUp, TableSkeleton, Coachmark } from "./components";
 import { SharePoster, type PosterData } from "./SharePoster";
 
-// The directional directive as returned by GET /agent/:address (read-only mirror).
-type ActiveDirective = {
-  id: string; symbol: string; direction: "LONG" | "SHORT"; status: string;
-  entryType?: "MARKET" | "LIMIT"; entryPrice: number; stopLoss: number; takeProfit1: number; takeProfit2?: number;
-  tp1SizePct?: number; leverage?: number; validUntil?: number; filledPrice?: number; result?: string;
-};
 
-const AGENT_API = "https://og.nexustradinglabs.com";
-// The Telegram bot username for the alerts deep-link. ⚠️ Must match the bot whose
-// token is set as TELEGRAM_TOKEN on the workers. Change here if it differs.
-const TG_BOT = "nexustradinglabs_bot";
-
-/**
- * Number input that holds its own text state so you can clear/edit freely
- * (empty, "0.", "1.2" mid-type) without the controlled value snapping back to 0
- * or fighting the cursor. Commits a valid number as you type; normalizes on blur.
- */
-function NumberField({ value, onCommit, min, max, step }: {
-  value: number; onCommit: (n: number) => void; min?: number; max?: number; step?: number;
-}) {
-  const [text, setText] = useState(String(value));
-  useEffect(() => { setText(String(value)); }, [value]);
-  return (
-    <input
-      type="number"
-      inputMode="decimal"
-      value={text}
-      min={min} max={max} step={step}
-      onChange={(e) => {
-        setText(e.target.value);
-        const n = parseFloat(e.target.value);
-        if (!isNaN(n)) onCommit(n);
-      }}
-      onBlur={() => {
-        const n = parseFloat(text);
-        const final = isNaN(n) ? (min ?? 0) : n;
-        onCommit(final);
-        setText(String(final));
-      }}
-      style={{ ...agentInputStyle, width: "70%" }}
-    />
-  );
-}
-
-const AVAILABLE_SYMBOLS = [
-  "PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC", "PERP_ARB_USDC",
-  "PERP_HYPE_USDC", "PERP_ORDER_USDC", "PERP_AVAX_USDC", "PERP_XMR_USDC",
-  "PERP_ZEC_USDC", "PERP_PUMP_USDC", "PERP_PENGU_USDC",
-  "PERP_SPX500_USDC", "PERP_NAS100_USDC",
-];
-
-// ─── Agent Track Record (shared by live + paper) ─────────
-function AgentTrackRecord({ title, accent, trades, paper, onReset, summary }: {
-  title: string;
-  accent: string;
-  trades: AgentTrade[];
-  paper?: boolean;
-  onReset?: () => void;
-  // Server-side FULL aggregate (all trades, not the last-50 the GET ships). When
-  // present it drives the headline numbers so a long-running agent's record isn't
-  // undercounted; falls back to computing from `trades` (paper has no server side).
-  summary?: { trades: number; winRate: number; netPnl: number; avgWin: number; avgLoss: number; firstTradeAt?: number } | null;
-}) {
-  const useSummary = !!summary && (summary.trades ?? 0) > 0;
-  const tr = useSummary ? summary!.trades : trades.length;
-  const wr = useSummary ? summary!.winRate : (trades.length ? (trades.filter((t) => t.pnl > 0).length / trades.length) * 100 : 0);
-  const net = useSummary ? summary!.netPnl : trades.reduce((s, t) => s + t.pnl, 0);
-  const winsArr = trades.filter((t) => t.pnl > 0);
-  const lossArr = trades.filter((t) => t.pnl <= 0);
-  const avgWin = useSummary ? summary!.avgWin : (winsArr.length ? winsArr.reduce((s, t) => s + t.pnl, 0) / winsArr.length : 0);
-  const avgLoss = useSummary ? summary!.avgLoss : (lossArr.length ? lossArr.reduce((s, t) => s + Math.abs(t.pnl), 0) / lossArr.length : 0);
-  const sinceMs = useSummary && summary!.firstTradeAt
-    ? summary!.firstTradeAt
-    : (trades.length ? Math.min(...trades.map((t) => new Date(t.opened_at).getTime() || Date.now())) : 0);
-  const since = sinceMs ? new Date(sinceMs).toLocaleDateString() : null;
-
-  return (
-    <div style={{ ...agentCardStyle, borderColor: tr > 0 ? (net >= 0 ? "#33333a" : "#4a1e22") : "#232327" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ ...agentLabelStyle, color: accent }}>{title}</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {since && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b" }}>since {since}</span>}
-          {onReset && tr > 0 && (
-            <button onClick={onReset} style={{ ...navBtnStyle, fontSize: 9, padding: "3px 10px", color: "#d4d4d8", borderColor: "#33333a" }}>RESET</button>
-          )}
-        </div>
-      </div>
-      {tr === 0 ? (
-        <div style={{ color: "#71717a", fontFamily: "var(--nx-font-ui)", fontSize: 11, marginTop: 8, lineHeight: 1.6 }}>
-          {paper
-            ? <>No paper trades yet — switch to 🧪 PAPER and activate to build a simulated track record against live prices. Risk-free.</>
-            : <>No live track record yet — this agent hasn't traded for you. Stats build here transparently from its first trade. <strong style={{ color: "#a1a1aa" }}>Start small.</strong></>}
-        </div>
-      ) : (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(108px, 1fr))", gap: 12, marginTop: 8 }}>
-            {[
-              { label: "NET P&L", value: `${net >= 0 ? "+" : "-"}$${Math.abs(net).toFixed(2)}`, color: net >= 0 ? "#3ecf8e" : "#f7525f" },
-              { label: "WIN RATE", value: `${wr.toFixed(1)}%`, color: wr >= 50 ? "#3ecf8e" : "#f7525f" },
-              { label: "TRADES", value: String(tr), color: "#d4d4d8" },
-              { label: "AVG WIN", value: `$${avgWin.toFixed(2)}`, color: "#ededf0" },
-              { label: "AVG LOSS", value: `$${avgLoss.toFixed(2)}`, color: "#f7525f" },
-            ].map(({ label, value, color }) => (
-              <div key={label}>
-                <div style={{ ...agentLabelStyle, fontSize: 9 }}>{label}</div>
-                <div style={{ color, fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: 600 }}>{value}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ marginTop: 10, fontFamily: "var(--nx-font-ui)", fontSize: 9, color: "#52525b", lineHeight: 1.5 }}>
-            {paper
-              ? "🧪 Simulated results — paper trades never touch the exchange. A great paper record is encouraging, not a guarantee."
-              : "⚠ Past performance does not guarantee future results. Markets are risky — only deploy capital you can afford to lose, and start small."}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// Orderly SDK (@orderly.network/core LocalStorageStore) stores the delegated
-// trading key as JSON at `orderly_{networkId}_{address}`:
-//   { orderlyKey: "<secret>", accountId: "<id>" }
-// The address it keys on is whatever is stored at `orderly_{networkId}_address`.
-function getOrderlyNetworkId(): string {
-  return (localStorage.getItem("orderly_networkId") as string) || "mainnet";
-}
-
-function getOrderlyKeyStore(): { tradingKey: string; accountId: string } | null {
-  const networkId = getOrderlyNetworkId();
-  const address = localStorage.getItem(`orderly_${networkId}_address`);
-  const tryParse = (raw: string | null) => {
-    if (!raw) return null;
-    try {
-      const obj = JSON.parse(raw);
-      if (obj && typeof obj.orderlyKey === "string" && obj.orderlyKey.length > 20) {
-        return { tradingKey: obj.orderlyKey as string, accountId: (obj.accountId as string) || "" };
-      }
-    } catch {
-      // not the JSON blob we want
-    }
-    return null;
-  };
-
-  // Preferred: the exact per-address blob
-  if (address) {
-    const direct = tryParse(localStorage.getItem(`orderly_${networkId}_${address}`));
-    if (direct) return direct;
-  }
-
-  // Fallback: scan for any orderly_{network}_0x... blob containing an orderlyKey
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key || !/^orderly_[a-z]+_0x[0-9a-fA-F]+$/.test(key)) continue;
-    const parsed = tryParse(localStorage.getItem(key));
-    if (parsed) return parsed;
-  }
-  return null;
-}
-
-function findOrderlyTradingKey(): string | null {
-  return getOrderlyKeyStore()?.tradingKey ?? null;
-}
-
-function getWalletAddress(): string | null {
-  const networkId = getOrderlyNetworkId();
-  return localStorage.getItem(`orderly_${networkId}_address`);
-}
-
-// Ownership proof for agent control ops. Backend ecrecovers a personal_sign of
-// "nexus-trading-key-v1" and requires the recovered address to equal the agent's
-// wallet — so kill/deactivate/config can't be triggered by anyone but the owner.
-// Deterministic message → cache the sig per session (same sig the Orderly key
-// derives from). Signs via the injected wallet (same pattern as Holders Room).
-async function getAgentSig(address: string): Promise<string> {
-  const key = `nexus_agent_sig_${address.toLowerCase()}`;
-  try {
-    const cached = JSON.parse(sessionStorage.getItem(key) || "null");
-    if (cached && typeof cached.sig === "string") return cached.sig;
-  } catch { /* ignore */ }
-  const sig = await signWithInjected(address, "nexus-trading-key-v1");
-  try { sessionStorage.setItem(key, JSON.stringify({ sig })); } catch { /* ignore */ }
-  return sig;
-}
-
-// This agent's own leaderboard standing (mirrors lab-api /agents/standing).
-type AgentStandingCriterion = { key: string; label: string; met: boolean; value: number; target: number };
-type AgentStanding = {
-  eligible: boolean;
-  metCount: number;
-  total: number;
-  criteria: AgentStandingCriterion[];
-  stats: { trades: number; daysActive: number; winRate: number; netPnl: number; profitFactor: number; score: number; avgWin: number; avgLoss: number; firstTradeAt: number } | null;
-};
-
-function formatAgentTime(ms: number): string {
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  return `${h}h ${m}m`;
-}
+// ── Extracted modules (god-file split) ──────────────────────────────────────
+// Constants/local types, leaf components, and the Orderly key + ownership-proof
+// readers now live beside this file. Behavior is unchanged — the move was purely
+// mechanical, which matters because this is the agent MONEY PATH.
+import { AGENT_API, TG_BOT, AVAILABLE_SYMBOLS, type ActiveDirective, type AgentStanding } from "./agentTypes";
+import { NumberField, AgentTrackRecord, AgentToggleCard } from "./AgentPanels";
+import { getOrderlyKeyStore, findOrderlyTradingKey, getWalletAddress, getAgentSig, formatAgentTime } from "./agentKeys";
 
 export function AgentView() {
   const [config, setConfig] = useState<AgentConfig>(DEFAULT_CONFIG);
@@ -1212,70 +1019,27 @@ export function AgentView() {
               ⚠️ The stored config key stays `respectRegime` — it's persisted in KV, read
               by the brain and set by the Bankr skill, so renaming it would break live
               agents. Only the LABEL moved to "tape" (see MarketTape.tsx on the naming). */}
-          <div style={agentCardStyle}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-              <div>
-                <div style={agentLabelStyle}>// MARKET TAPE FILTER</div>
-                <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 6, color: "#71717a", letterSpacing: 0 }}>
-                  Skip NEW entries that fight a strong tape — RISK-ON gates shorts, RISK-OFF gates longs.
-                  Never flips direction or touches open positions. Test in PAPER first. (See the live tape in Market Intel.)
-                </div>
-              </div>
-              <button onClick={() => setConfig({ ...config, respectRegime: !config.respectRegime })}
-                style={{
-                  flexShrink: 0, cursor: "pointer", fontFamily: "var(--nx-font-mono)", fontSize: 11, borderRadius: 4, padding: "6px 16px",
-                  background: config.respectRegime ? "#ededf015" : "#0a0a0b",
-                  border: `1px solid ${config.respectRegime ? "#ededf0" : "#232327"}`,
-                  color: config.respectRegime ? "#ededf0" : "#71717a",
-                }}>
-                {config.respectRegime ? "ON" : "OFF"}
-              </button>
-            </div>
-          </div>
+          <AgentToggleCard
+            label="// MARKET TAPE FILTER"
+            description={<>Skip NEW entries that fight a strong tape — RISK-ON gates shorts, RISK-OFF gates longs. Never flips direction or touches open positions. Test in PAPER first. (See the live tape in Market Intel.)</>}
+            on={!!config.respectRegime}
+            onToggle={() => setConfig({ ...config, respectRegime: !config.respectRegime })}
+          />
 
-          {/* Smart-money consensus gate — opt-in; brain skips NEW entries that fight
-              a strong consensus of top on-chain traders (respectSmartMoney). */}
-          <div style={agentCardStyle}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-              <div>
-                <div style={agentLabelStyle}>// SMART-MONEY FILTER</div>
-                <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 6, color: "#71717a", letterSpacing: 0 }}>
-                  Skip a NEW entry that fights a strong consensus (3+) of top on-chain traders on that symbol — see it live in
-                  the Smart Money tab. A guardrail, not a signal (smart money is often early AND often wrong). Test in PAPER first.
-                </div>
-              </div>
-              <button onClick={() => setConfig({ ...config, respectSmartMoney: !config.respectSmartMoney })}
-                style={{
-                  flexShrink: 0, cursor: "pointer", fontFamily: "var(--nx-font-mono)", fontSize: 11, borderRadius: 4, padding: "6px 16px",
-                  background: config.respectSmartMoney ? "#3ecf8e15" : "#0a0a0b",
-                  border: `1px solid ${config.respectSmartMoney ? "#3ecf8e" : "#232327"}`,
-                  color: config.respectSmartMoney ? "#3ecf8e" : "#71717a",
-                }}>
-                {config.respectSmartMoney ? "ON" : "OFF"}
-              </button>
-            </div>
-          </div>
+          <AgentToggleCard
+            label="// SMART-MONEY FILTER"
+            description={<>Skip a NEW entry that fights a strong consensus (3+) of top on-chain traders on that symbol — see it live in the Smart Money tab. A guardrail, not a signal (smart money is often early AND often wrong). Test in PAPER first.</>}
+            on={!!config.respectSmartMoney}
+            onToggle={() => setConfig({ ...config, respectSmartMoney: !config.respectSmartMoney })}
+            accent="#3ecf8e"
+          />
 
-          <div style={agentCardStyle}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-              <div>
-                <div style={agentLabelStyle}>// VOLATILITY-SCALED STOPS</div>
-                <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 6, color: "#71717a", letterSpacing: 0 }}>
-                  Sizes TP/SL to each symbol&apos;s recent ATR instead of a flat % — so a high-vol coin (SOL) isn&apos;t
-                  noise-stopped and a calm one isn&apos;t over-given. Keeps your R:R ratio. Test in PAPER first.
-                </div>
-              </div>
-              <button onClick={() => setConfig({ ...config, volScaledStops: !config.volScaledStops })}
-                style={{
-                  flexShrink: 0, cursor: "pointer", fontFamily: "var(--nx-font-mono)", fontSize: 11, borderRadius: 4, padding: "6px 16px",
-                  background: config.volScaledStops ? "#ededf015" : "#0a0a0b",
-                  border: `1px solid ${config.volScaledStops ? "#ededf0" : "#232327"}`,
-                  color: config.volScaledStops ? "#ededf0" : "#71717a",
-                }}>
-                {config.volScaledStops ? "ON" : "OFF"}
-              </button>
-            </div>
-          </div>
+          <AgentToggleCard
+            label="// VOLATILITY-SCALED STOPS"
+            description={<>Sizes TP/SL to each symbol&apos;s recent ATR instead of a flat % — so a high-vol coin (SOL) isn&apos;t noise-stopped and a calm one isn&apos;t over-given. Keeps your R:R ratio. Test in PAPER first.</>}
+            on={!!config.volScaledStops}
+            onToggle={() => setConfig({ ...config, volScaledStops: !config.volScaledStops })}
+          />
 
           <div style={agentCardStyle}>
             <div style={agentLabelStyle}>// WATCHLIST — SELECT SYMBOLS</div>
