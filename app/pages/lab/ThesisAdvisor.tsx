@@ -23,6 +23,7 @@ type Advice = {
   yourRecord: { trend: Bucket | null; vol: Bucket | null; align: Bucket | null; calls: number } | null;
   plan: { score: number; flags: string[] } | null;
   warnings: { severity: string; kind: string; text: string }[];
+  eta: { hours: number; label: string; basis: string } | null;
 };
 
 const TREND_WORD: Record<string, string> = { TREND_UP: "trending up", TREND_DOWN: "trending down", CHOP: "chopping" };
@@ -104,6 +105,16 @@ export function ThesisAdvisor({ symbol, direction, entryPrice, stopLoss, takePro
           <span style={{ color: C.text.faint }}> No graded record in this market yet.</span>
         )}
       </div>
+
+      {/* When this gets graded. A call resolves on first touch, so levels a few hours
+          apart are a coin flip on noise and levels weeks apart are a different trade
+          than the one being written. */}
+      {advice.eta && (
+        <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 11.5, color: C.text.muted, marginTop: 5, lineHeight: 1.5 }}>
+          Typically resolves in <strong style={{ color: C.text.fog }}>{advice.eta.label}</strong>
+          <span style={{ color: C.text.faint }}> — {advice.eta.basis}</span>
+        </div>
+      )}
 
       {/* Plan defects, present tense, each naming the fix. Amber = caution. */}
       {(high.length > 0 || medium.length > 0) && (

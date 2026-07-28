@@ -304,6 +304,56 @@ export function planQuality(t, cd, cfg = PLAN) {
   return { score: Math.max(0, Math.min(100, score)), flags, components };
 }
 
+// ── Expected time to resolution ──────────────────────────────────────────────
+// A call is graded on FIRST TOUCH of its target or stop, so "when will I know?" is a
+// real question with a real answer — and one nobody asks until they've been waiting
+// three days. It also tells a trader something about the call itself: levels a few
+// hours apart are a coin flip on noise; levels three weeks apart are a different trade
+// than the one they think they're making.
+//
+// Model: driftless random walk with two absorbing barriers. For per-bar volatility σ
+// and barriers a (to the stop) and b (to the target), expected first-passage time is
+// a·b/σ² bars. Driftless is the honest assumption — if we could predict direction we
+// wouldn't be estimating timing.
+//
+// ⚠️ First-passage times are heavily right-skewed: the MEAN sits well above the median,
+// so this is a rough order of magnitude, not a forecast. Present the bucket, not the
+// number, and never imply a deadline.
+// Boundaries are deliberately generous because the number they bucket is a MEAN, and
+// first-passage times are right-skewed — the typical (median) wait lands well below
+// it. Labelling a 168h mean "a few days" is honest for that reason; labelling it
+// "a week" would systematically overstate the wait.
+export const RESOLUTION_BUCKETS = [
+  { maxHours: 6, label: "hours" },
+  { maxHours: 36, label: "about a day" },
+  { maxHours: 168, label: "a few days" },
+  { maxHours: 504, label: "a week or two" },
+  { maxHours: Infinity, label: "weeks" },
+];
+
+/**
+ * @param {object} t  { entryPrice, stopLoss, takeProfit1 }
+ * @param {number} atrPct  per-bar (hourly) range as % of price — classifyRegime.atrPct
+ * @returns {{hours:number, label:string, basis:string}|null}
+ */
+export function estimateResolution(t, atrPct) {
+  if (!t || !Number.isFinite(atrPct) || atrPct <= 0) return null;
+  const entry = Number(t.entryPrice), stop = Number(t.stopLoss), tp = Number(t.takeProfit1);
+  if (!entry || !stop || !tp) return null;
+  // Work in % of price so ATR% is directly comparable.
+  const a = Math.abs((entry - stop) / entry) * 100;
+  const b = Math.abs((tp - entry) / entry) * 100;
+  if (!a || !b) return null;
+  const hours = (a * b) / (atrPct * atrPct);
+  if (!Number.isFinite(hours) || hours <= 0) return null;
+  const bucket = RESOLUTION_BUCKETS.find((x) => hours <= x.maxHours) || RESOLUTION_BUCKETS[RESOLUTION_BUCKETS.length - 1];
+  return {
+    hours: Math.round(hours),
+    label: bucket.label,
+    basis: `${round(atrPct, 3)}%/h typical range · stop ${round(a, 2)}% away, target ${round(b, 2)}%`,
+  };
+}
+
 /** Mean plan score + how often each flag fired, across a set of scored calls. */
 export function planSummary(scored) {
   const rows = (scored || []).filter((s) => s && typeof s.score === "number");

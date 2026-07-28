@@ -19,6 +19,7 @@ import { json } from "./shared.mjs";
 import {
   rankCaller, callerScore, contestedBoard, classifyRegime, callAlignment,
   planQuality, normalizeSymbol, REGIME, postmortemSummary, isLossReason, LOSS_REASONS,
+  estimateResolution,
 } from "./logic.mjs";
 import { computeCallerStats, REGIME_PAD_S, ADVICE_FLAG_TEXT } from "./grading.mjs";
 
@@ -285,6 +286,11 @@ export async function handleTheses(parts, request, env) {
     const draft = { direction, entryPrice: Number(entryPrice), stopLoss: Number(stopLoss), takeProfit1: Number(takeProfit1), riskReward: Number(riskReward), createdAt: Date.now() };
     const plan = (draft.entryPrice && draft.stopLoss && draft.takeProfit1) ? planQuality(draft, cd) : null;
 
+    // "When will I know?" — a call grades on FIRST TOUCH, so this has a real answer,
+    // and nobody asks it until they have already been waiting three days. Uses the ATR
+    // the regime classifier just computed; no extra fetch.
+    const eta = regime?.atrPct ? estimateResolution(draft, regime.atrPct) : null;
+
     // The trader's own graded record in THIS market — the line that changes minds.
     let yourRecord = null;
     if (wallet && regime) {
@@ -320,7 +326,7 @@ export async function handleTheses(parts, request, env) {
     }
 
     return json({
-      symbol: sym, regime, alignment, yourRecord, plan, warnings,
+      symbol: sym, regime, alignment, yourRecord, plan, warnings, eta,
       note: "Scored by the same functions that will grade this call once posted.",
     }, request);
   }

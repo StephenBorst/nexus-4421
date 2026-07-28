@@ -1108,3 +1108,49 @@ test("resolutionFeedEntry: carries what the feed needs and nothing private", () 
   }
   assert.equal(RESOLVED_FEED_KEY, "resolved:feed");
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// Expected time to resolution
+// ═══════════════════════════════════════════════════════════════════
+import { estimateResolution, RESOLUTION_BUCKETS } from "./logic.mjs";
+
+test("estimateResolution: tight levels resolve in hours, wide levels in weeks", () => {
+  const atr = 0.19; // BTC hourly ATR%, measured live
+  const scalp = estimateResolution({ entryPrice: 100, stopLoss: 99.7, takeProfit1: 100.6 }, atr);
+  const swing = estimateResolution({ entryPrice: 100, stopLoss: 98.5, takeProfit1: 103 }, atr);
+  const position = estimateResolution({ entryPrice: 100, stopLoss: 92, takeProfit1: 120 }, atr);
+  assert.ok(scalp.hours < swing.hours && swing.hours < position.hours);
+  assert.equal(scalp.label, "hours");
+  assert.equal(swing.label, "a few days"); // 125h mean
+  assert.ok(swing.hours > 100 && swing.hours < 150);
+  assert.equal(position.label, "weeks");
+});
+
+test("estimateResolution: a more volatile symbol resolves the same levels sooner", () => {
+  const levels = { entryPrice: 100, stopLoss: 98.5, takeProfit1: 103 };
+  const calm = estimateResolution(levels, 0.19);
+  const hot = estimateResolution(levels, 0.7);
+  assert.ok(hot.hours < calm.hours, "higher ATR must shorten the estimate");
+  // quadratic in vol: ~3.7x the ATR should be ~13x faster
+  assert.ok(calm.hours / hot.hours > 10);
+});
+
+test("estimateResolution: symmetric in direction — a short is not slower than a long", () => {
+  const long = estimateResolution({ entryPrice: 100, stopLoss: 98, takeProfit1: 104 }, 0.3);
+  const short = estimateResolution({ entryPrice: 100, stopLoss: 102, takeProfit1: 96 }, 0.3);
+  assert.equal(long.hours, short.hours);
+});
+
+test("estimateResolution: unusable input yields null, never a fake ETA", () => {
+  assert.equal(estimateResolution(null, 0.3), null);
+  assert.equal(estimateResolution({ entryPrice: 100, stopLoss: 98, takeProfit1: 104 }, 0), null);
+  assert.equal(estimateResolution({ entryPrice: 100, stopLoss: 98, takeProfit1: 104 }, NaN), null);
+  assert.equal(estimateResolution({ entryPrice: 100, stopLoss: 100, takeProfit1: 104 }, 0.3), null); // no risk
+  assert.equal(estimateResolution({ entryPrice: 0, stopLoss: 98, takeProfit1: 104 }, 0.3), null);
+});
+
+test("estimateResolution: buckets are ordered and total coverage is unbounded", () => {
+  let prev = 0;
+  for (const b of RESOLUTION_BUCKETS) { assert.ok(b.maxHours > prev); prev = b.maxHours; }
+  assert.equal(RESOLUTION_BUCKETS[RESOLUTION_BUCKETS.length - 1].maxHours, Infinity);
+});
