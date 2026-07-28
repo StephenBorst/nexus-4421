@@ -1446,6 +1446,18 @@ export default function FeedPage() {
     letterSpacing: "0.05em",
   });
 
+  // ⚠️ On DESKTOP the $NEXUS/treasury strip leads; on MOBILE it ate the entire first
+  // screen and buried the calls (same problem the Lab had — promo chrome above the
+  // fold). Rendered once, placed differently per breakpoint: top on desktop, foot on
+  // mobile so the feed content leads.
+  const flywheel = (
+    <div style={{ padding: isMobile ? "10px 12px" : "10px 16px", maxWidth: 860, margin: "0 auto", width: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 8 }}>
+      <NexusMarket />
+      <NexusTreasury />
+      <NexusTreasuryStack />
+    </div>
+  );
+
   return (
     <div style={{ background: "#0a0a0b", minHeight: "100svh", padding: 0 }}>
       {/* Copy modal */}
@@ -1542,12 +1554,8 @@ export default function FeedPage() {
         </div>
       </div>
 
-      {/* Public $NEXUS flywheel banners — treasury + burn, visible to everyone */}
-      <div style={{ padding: "10px 16px", maxWidth: 860, margin: "0 auto", width: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 8 }}>
-        <NexusMarket />
-        <NexusTreasury />
-        <NexusTreasuryStack />
-      </div>
+      {/* $NEXUS flywheel — top on desktop, moved below the feed on mobile. */}
+      {!isMobile && flywheel}
 
       <div className="nx-stagger" style={{ padding: 16, maxWidth: 860, margin: "0 auto" }}>
 
@@ -1748,6 +1756,9 @@ export default function FeedPage() {
           </>
         )}
       </div>
+
+      {/* Flywheel at the foot on mobile — the calls lead, the token chrome follows. */}
+      {isMobile && flywheel}
     </div>
   );
 }

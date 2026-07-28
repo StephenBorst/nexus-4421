@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { createPublicClient, http, fallback, formatUnits } from "viem";
 import { arbitrum, base } from "viem/chains";
 import { C } from "@/config/theme";
@@ -81,9 +82,10 @@ export function NexusTreasury({ compact = false }: { compact?: boolean }) {
     ? `$${usdc.toLocaleString(undefined, { maximumFractionDigits: usdc < 1000 ? 2 : 0 })}`
     : "—";
 
+  const isMobile = useIsMobile();
   return (
     <div style={{
-      display: "flex", alignItems: "center", gap: compact ? 12 : 20,
+      display: "flex", alignItems: "center", gap: compact ? 12 : 20, flexWrap: "wrap",
       padding: compact ? "8px 12px" : "12px 16px",
       background: "#141416", border: "1px solid #232327", borderRadius: 4,
       fontFamily: "var(--nx-font-mono)",
@@ -101,7 +103,7 @@ export function NexusTreasury({ compact = false }: { compact?: boolean }) {
         <span style={{ fontSize: 8, letterSpacing: "0.12em", color: C.text.faint }}>SAFE ADDRESS ↗</span>
         <span style={{ fontSize: compact ? 11 : 12, color: C.info }}>{short}</span>
       </a>
-      {!compact && (
+      {!compact && !isMobile && (
         <div style={{ flex: 1, minWidth: 0, fontSize: 8, color: "#33333a", lineHeight: 1.4, textAlign: "right" }}>
           fees → treasury → $NEXUS war chest
           <br />
