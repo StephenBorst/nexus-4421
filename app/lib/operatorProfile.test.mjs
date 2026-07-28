@@ -44,7 +44,7 @@ test("medianHoldHours: median of realized hold times, ignoring unusable rows", (
 });
 
 test("archetype: fat-tail + trend-follower + horizon, each axis evidence-gated", () => {
-  const a = deriveArchetype({ regimeEdges: fullProcess.regimeEdges, expectancy: fullProcess.expectancy, holdHours: 4 });
+  const a = deriveArchetype({ regimeEdges: fullProcess.regimeEdges, expectancy: fullProcess.expectancy, holdHours: 4, gradedCalls: 30 });
   assert.match(a.label, /Fat-tail/);
   assert.match(a.label, /trend-follower/);
   assert.equal(a.horizon, "intraday");
@@ -60,7 +60,7 @@ test("archetype: a counter-trend record is labelled as such, not flattered into 
 });
 
 test("archetype: grinders (symmetric payoff) are distinguished from fat tails", () => {
-  const a = deriveArchetype({ expectancy: { tailRatio: 0.2, avgWinR: 1, avgLossR: 1 }, holdHours: 20 });
+  const a = deriveArchetype({ expectancy: { tailRatio: 0.2, avgWinR: 1, avgLossR: 1 }, holdHours: 20, gradedCalls: 20 });
   assert.match(a.label, /Grinder/i);
   assert.equal(a.horizon, "swing");
 });
@@ -237,4 +237,17 @@ test("REGRESSION: a big GRADED record is ESTABLISHED without private fills", () 
   const thin = buildOperatorProfile({ process: { ...fullProcess, calls: 6 } });
   assert.equal(thin.tier, "FORMING");
   assert.match(profileNarrative(thin, { publicOnly: true, voice: "third" }), /small sample/i);
+});
+
+test("REGRESSION: no archetype claim from a tiny sample", () => {
+  // A single losing call gives avgWinR 0 / avgLossR 1 → payoff 0 → "Grinder".
+  // Seen live on a real 1-call wallet, headlining a profile with zero reads.
+  const thin = { calls: 1, hitRate: 0, expectancy: { expectancy: -1, profitFactor: 0, tailRatio: 0, avgWinR: 0, avgLossR: 1 } };
+  const p = buildOperatorProfile({ process: thin });
+  assert.equal(p.reads.length, 0);
+  assert.equal(p.archetype, null, "one call must not produce an archetype");
+  // ...but hold-time alone (from real fills) is still a fair observation
+  assert.equal(deriveArchetype({ holdHours: 4, gradedCalls: 0 })?.horizon, "intraday");
+  // and a real sample still labels
+  assert.match(deriveArchetype({ expectancy: fullProcess.expectancy, gradedCalls: 30 }).label, /Fat-tail/);
 });

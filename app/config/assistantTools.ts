@@ -9,6 +9,9 @@
  */
 
 import { deployDirectiveFromThesis } from "@/utils/agentPrefill";
+// Same synthesis the Lab renders — the copilot must speak with ONE point of view,
+// not answer from an older, narrower readout while the terminal shows another.
+import { buildOperatorProfile, profileNarrative } from "@/lib/operatorProfile.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const AGENT_API = "https://og.nexustradinglabs.com";
@@ -163,6 +166,59 @@ export const TOOLS: ToolDef[] = [
       const edge = (ctx.performance as { edge?: unknown } | null)?.edge;
       if (!edge) return JSON.stringify({ error: "no closed trades yet — an edge readout needs a realized record (or wallet not authenticated to Orderly)" });
       return JSON.stringify(edge);
+    },
+  },
+  {
+    name: "get_operator_profile",
+    description:
+      "Get the OPERATOR PROFILE — the Lab's single synthesized read of a trader, and the RIGHT starting point for any 'how am I doing', 'what kind of trader am I', 'what should I work on' question. Composes the graded-call record into: an archetype (e.g. 'Fat-tail trend-follower'), expectancy + profit factor, WHICH MARKET REGIME their edge lives and dies in, plan quality (were the calls well-formed when posted), and conviction calibration (do they size up on their best ideas). Omit `wallet` for the connected user; pass a wallet to read any public profile. PREFER THIS OVER get_my_edge for overall assessment — get_my_edge is only the per-symbol/per-side realized P&L slice. Everything here is graded from public price, so it is verifiable, not self-reported. Respect the `tier` field: FORMING means small sample — say so rather than stating conclusions.",
+    input_schema: { type: "object", properties: { wallet: { type: "string", description: "Optional wallet address; defaults to the connected user." } } },
+    run: async (args, ctx) => {
+      const addr = String(args.wallet || ctx.wallet || "").trim();
+      if (!addr) return JSON.stringify({ error: "no wallet — connect one or pass a wallet address" });
+      const res = await fetch(`${AGENT_API}/theses/process/${addr}`);
+      if (!res.ok) return JSON.stringify({ error: `process read failed (${res.status})` });
+      const process = await res.json();
+      if (!process?.calls) {
+        return JSON.stringify({
+          calls: 0,
+          note: "No resolved public calls yet, so there is no graded record to read. A profile needs calls posted PUBLIC that have since resolved against real price. Say this plainly instead of inferring a profile from nothing.",
+        });
+      }
+      const profile = buildOperatorProfile({ process });
+      return JSON.stringify({
+        tier: profile.tier,
+        gradedCalls: profile.gradedCalls,
+        archetype: profile.archetype?.label ?? null,
+        headline: profile.headline,
+        reads: profile.reads.map((r: { kind: string; text: string }) => ({ kind: r.kind, text: r.text })),
+        narrative: profileNarrative(profile, { publicOnly: true, voice: args.wallet ? "third" : "second" }),
+        unlocks: profile.unlocks,
+      });
+    },
+  },
+  {
+    name: "get_call_advice",
+    description:
+      "Sanity-check a SPECIFIC trade idea BEFORE it is posted or taken. Given a symbol (and optionally direction + entry/stop/target), returns: the market regime that symbol is in RIGHT NOW (trending up/down or chopping, and its volatility), the user's own graded record IN THAT REGIME, and any defects in the proposed plan — entry the market has already run past, a stop inside the noise, a stop too wide to be risk control, or an R:R that doesn't match the levels. Use whenever the user is considering a trade, asks 'should I take this', or drafts a thesis. This runs the SAME functions that will grade the call later, so the warnings match how it will actually be judged. Report what it returns; do not turn it into an instruction to trade.",
+    input_schema: {
+      type: "object",
+      properties: {
+        symbol: { type: "string", description: "Ticker or perp symbol, e.g. BTC or PERP_BTC_USDC" },
+        direction: { type: "string", description: "LONG or SHORT (optional — omit if the user hasn't picked a side)" },
+        entryPrice: { type: "number" }, stopLoss: { type: "number" }, takeProfit1: { type: "number" },
+        riskReward: { type: "number" },
+      },
+      required: ["symbol"],
+    },
+    run: async (args, ctx) => {
+      const res = await fetch(`${AGENT_API}/theses/advice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet: ctx.wallet, ...args }),
+      });
+      if (!res.ok) return JSON.stringify({ error: `advice failed (${res.status})` });
+      return JSON.stringify(await res.json());
     },
   },
   {

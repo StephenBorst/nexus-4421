@@ -50,12 +50,18 @@ export function medianHoldHours(trades) {
  *   horizon     — median hold time (realized fills)
  * Any axis with too little evidence is simply omitted rather than guessed.
  */
-export function deriveArchetype({ regimeEdges, expectancy, holdHours } = {}) {
+export const ARCHETYPE_MIN_CALLS = 5; // payoff shape needs a real sample, like every other claim
+
+export function deriveArchetype({ regimeEdges, expectancy, holdHours, gradedCalls = 0 } = {}) {
   const parts = [];
   const why = [];
 
   // Payoff shape — the most characterful axis, so it leads.
-  if (expectancy && Number.isFinite(expectancy.tailRatio)) {
+  // ⚠️ Sample-gated. Without this a SINGLE losing call yields avgWinR 0 / avgLossR 1,
+  // a payoff ratio of 0, and the confident label "Grinder" — which is exactly the
+  // overclaim the rest of this module exists to prevent. Caught on a live 1-call
+  // wallet, where the archetype headlined a profile that had no reads at all.
+  if (gradedCalls >= ARCHETYPE_MIN_CALLS && expectancy && Number.isFinite(expectancy.tailRatio)) {
     const { tailRatio, avgWinR, avgLossR } = expectancy;
     const payoff = avgLossR > 0 ? avgWinR / avgLossR : null;
     if (tailRatio >= 0.5 && payoff != null && payoff >= 1.8) {
@@ -120,7 +126,7 @@ export function buildOperatorProfile({ process, edge, adherence, leaks, trades }
   const closed = Number(edge?.closed_trades) || (trades?.length ?? 0);
 
   const holdHours = medianHoldHours(trades);
-  const archetype = deriveArchetype({ regimeEdges, expectancy, holdHours });
+  const archetype = deriveArchetype({ regimeEdges, expectancy, holdHours, gradedCalls });
   const reads = [];
 
   // 1. MONEY LEAK — the costliest fixable habit, whichever source priced it highest.
