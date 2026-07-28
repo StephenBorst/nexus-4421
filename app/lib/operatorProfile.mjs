@@ -225,7 +225,7 @@ export function buildOperatorProfile({ process, edge, adherence, leaks, trades }
   return {
     tier, dataScore, gradedCalls, closedTrades: closed, holdHours,
     archetype, reads,
-    headline: buildHeadline({ process, expectancy, adherence, leaks }),
+    headline: buildHeadline({ process, expectancy, adherence, leaks, gradedCalls }),
     unlocks: buildUnlocks({ gradedCalls, closed, adherence, leaks, discipline, regimeEdges }),
     meritRank: process?.meritRank || null,
   };
@@ -240,11 +240,19 @@ const DISCIPLINE_WORD = {
 };
 
 /** The three numbers worth putting at the top. Nulls are rendered as em-dashes. */
-export function buildHeadline({ process, expectancy, adherence, leaks } = {}) {
+export function buildHeadline({ process, expectancy, adherence, leaks, gradedCalls = 0 } = {}) {
   const leakCost = Math.max(adherence?.topLeak?.costUsd || 0, leaks?.top?.costUsd || 0);
+  // ⚠️ Sample-gated on the SAME threshold as the PAYOFF read. Without this the module
+  // refuses to *say* the payoff sentence under 5 calls but happily *displays* the same
+  // number as a headline stat — seen live on a 1-call profile reading "Not enough of a
+  // graded record yet to say who this trader is" directly above "Expectancy -1R,
+  // Profit factor 0". One losing call is not an expectancy. Plan quality is exempt: it
+  // scores how a call was FORMED, which is meaningful from the very first one.
+  const enough = gradedCalls >= ARCHETYPE_MIN_CALLS;
+  const exp = enough ? expectancy : null;
   return [
-    { key: "expectancy", label: "Expectancy", value: expectancy ? `${expectancy.expectancy > 0 ? "+" : ""}${expectancy.expectancy}R` : null, tone: expectancy ? (expectancy.expectancy > 0 ? "pos" : "neg") : null, sub: "per graded call" },
-    { key: "profitFactor", label: "Profit factor", value: expectancy ? (expectancy.profitFactor >= 99 ? "∞" : String(expectancy.profitFactor)) : null, tone: expectancy ? (expectancy.profitFactor >= 1 ? "pos" : "neg") : null, sub: "R won ÷ R lost" },
+    { key: "expectancy", label: "Expectancy", value: exp ? `${exp.expectancy > 0 ? "+" : ""}${exp.expectancy}R` : null, tone: exp ? (exp.expectancy > 0 ? "pos" : "neg") : null, sub: enough ? "per graded call" : `needs ${ARCHETYPE_MIN_CALLS} graded calls` },
+    { key: "profitFactor", label: "Profit factor", value: exp ? (exp.profitFactor >= 99 ? "∞" : String(exp.profitFactor)) : null, tone: exp ? (exp.profitFactor >= 1 ? "pos" : "neg") : null, sub: enough ? "R won ÷ R lost" : `needs ${ARCHETYPE_MIN_CALLS} graded calls` },
     leakCost > 0
       ? { key: "leak", label: "Top leak", value: `−${money(leakCost)}`, tone: "neg", sub: "fixable, this ledger" }
       : { key: "plan", label: "Plan quality", value: process?.discipline ? `${process.discipline.score}` : null, tone: null, sub: "how well-formed your calls are" },
@@ -259,7 +267,11 @@ export function buildUnlocks({ gradedCalls, closed, adherence, leaks, discipline
   const out = [];
   if (gradedCalls < 5) out.push({ need: 5 - gradedCalls, text: `Post ${5 - gradedCalls} more public call${5 - gradedCalls === 1 ? "" : "s"} to unlock your graded expectancy and merit rank` });
   else if (!regimeEdges?.trend && !regimeEdges?.align) out.push({ need: null, text: "A few more graded calls across different markets will reveal which regime your edge lives in" });
-  if (!closed) out.push({ need: null, text: "Connect your wallet so realized fills can be read — that unlocks execution adherence and your per-symbol edge" });
+  // ⚠️ Reads correctly whether or not a wallet is attached. The first version said
+  // "Connect your wallet…", which was shown to a user whose wallet WAS connected and
+  // simply had no closed trades yet — the unlock told them to do something they had
+  // already done.
+  if (!closed) out.push({ need: null, text: "No closed trades read yet — once you trade the wallet you're connected with, execution adherence and your per-symbol edge unlock" });
   else if (!adherence?.matched) out.push({ need: null, text: "Write a thesis BEFORE you take the trade and adherence scoring will tell you whether you followed your own plan" });
   if (!leaks?.tagged) out.push({ need: null, text: "Tag why your losers lost (one tap) to build your leak profile" });
   if (discipline && discipline.scored < 5) out.push({ need: null, text: "Plan quality sharpens after 5 scored calls" });

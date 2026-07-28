@@ -172,13 +172,13 @@ test("dataScore: rises with graded calls, fills and matched plans", () => {
 // ── headline + unlocks + narrative ──────────────────────────────────
 
 test("headline: three numbers, leak replaces plan-quality when one is priced", () => {
-  const h = buildHeadline({ process: fullProcess, expectancy: fullProcess.expectancy, adherence: fullAdherence, leaks: fullLeaks });
+  const h = buildHeadline({ process: fullProcess, expectancy: fullProcess.expectancy, adherence: fullAdherence, leaks: fullLeaks, gradedCalls: 30 });
   assert.equal(h.length, 3);
   assert.equal(h[0].value, "+0.6R");
   assert.equal(h[2].key, "leak");
   assert.match(h[2].value, /1,240/);
   // With no priced leak it falls back to plan quality.
-  assert.equal(buildHeadline({ process: fullProcess, expectancy: fullProcess.expectancy })[2].key, "plan");
+  assert.equal(buildHeadline({ process: fullProcess, expectancy: fullProcess.expectancy, gradedCalls: 30 })[2].key, "plan");
 });
 
 test("headline: missing data yields null values, never invented zeroes", () => {
@@ -250,4 +250,29 @@ test("REGRESSION: no archetype claim from a tiny sample", () => {
   assert.equal(deriveArchetype({ holdHours: 4, gradedCalls: 0 })?.horizon, "intraday");
   // and a real sample still labels
   assert.match(deriveArchetype({ expectancy: fullProcess.expectancy, gradedCalls: 30 }).label, /Fat-tail/);
+});
+
+test("REGRESSION: headline stats are sample-gated like the reads", () => {
+  // Live 1-call profile showed "Not enough of a graded record yet to say who this
+  // trader is" directly above "Expectancy -1R / Profit factor 0". The module must not
+  // display a number it refuses to state in words.
+  const thin = { calls: 1, expectancy: { expectancy: -1, profitFactor: 0, tailRatio: 0, avgWinR: 0, avgLossR: 1 }, discipline: { score: 100, scored: 1 } };
+  const h = buildOperatorProfile({ process: thin }).headline;
+  assert.equal(h.find((x) => x.key === "expectancy").value, null);
+  assert.equal(h.find((x) => x.key === "profitFactor").value, null);
+  assert.match(h.find((x) => x.key === "expectancy").sub, /needs 5 graded calls/);
+  // Plan quality IS meaningful from one call — it scores how the call was FORMED.
+  assert.equal(h.find((x) => x.key === "plan").value, "100");
+  // ...and a real sample shows the numbers
+  assert.equal(buildOperatorProfile({ process: fullProcess }).headline[0].value, "+0.6R");
+});
+
+test("unlocks: never tells a connected user to connect their wallet", () => {
+  // Seen live: wallet connected, zero closed trades → "Connect your wallet…", i.e. the
+  // unlock asked for something already done. The copy must hold in both states.
+  const u = buildUnlocks({ gradedCalls: 1, closed: 0 });
+  const walletLine = u.find((x) => /adherence/.test(x.text));
+  assert.ok(walletLine, "expected the fills unlock");
+  assert.ok(!/^Connect your wallet/i.test(walletLine.text), `misleading for a connected user: ${walletLine.text}`);
+  assert.match(walletLine.text, /no closed trades/i);
 });

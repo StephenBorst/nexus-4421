@@ -6,6 +6,7 @@
 // Rendered as a strip rather than interleaved into the thesis list: a resolution isn't
 // thesis-shaped (no levels, no status), so mixing it into FeedCard's input would break
 // the card and skew the "N traders" counts. It also reads better as a ticker.
+import { useNavigate } from "react-router-dom";
 import { C, MONO, RADIUS } from "@/config/theme";
 
 export type ResolutionEvent = {
@@ -27,6 +28,7 @@ const ago = (ms: number) => {
 };
 
 export default function Resolved({ events }: { events: ResolutionEvent[] }) {
+  const navigate = useNavigate();
   if (!events?.length) return null;
   const shown = events.slice(0, 8);
 
@@ -42,10 +44,12 @@ export default function Resolved({ events }: { events: ResolutionEvent[] }) {
           // Green/red here is P&L, which is the one place chroma is allowed.
           const tone = e.outcome === "WIN" ? C.pos : C.neg;
           return (
-            <a
+            // ⚠️ /feed/trader/:wallet — the trader page is a CHILD of the feed route.
+            // A bare /trader/... hard-404s the app (verified on prod).
+            <div
               key={`${e.wallet}-${e.thesisId ?? i}`}
-              href={`/trader/${e.wallet}`}
-              style={{ textDecoration: "none" }}
+              onClick={() => navigate(`/feed/trader/${e.wallet}`)}
+              style={{ cursor: "pointer" }}
             >
               <div style={{
                 display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
@@ -66,7 +70,7 @@ export default function Resolved({ events }: { events: ResolutionEvent[] }) {
                   {shortAddr(e.wallet)} · {ago(e.createdAt)}
                 </span>
               </div>
-            </a>
+            </div>
           );
         })}
       </div>
