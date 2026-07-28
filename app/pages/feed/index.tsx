@@ -55,6 +55,7 @@ type FeedThesis = {
   positionSize: number;
   leverage: number;
   status: "ACTIVE" | "HIT_TP" | "STOPPED_OUT" | "INVALIDATED" | "CLOSED";
+  gradedOutcome?: "WIN" | "LOSS"; // trustless price-grade (cron-stamped); absent = not yet graded
   actualPnl: number | null;
   createdAt: number;
   notes: string;
@@ -1273,8 +1274,15 @@ function AgentTrackRecord() {
 function FeedPulse({ feed }: { feed: FeedThesis[] }) {
   if (feed.length === 0) return null;
   const callers = new Set(feed.filter((t) => !t.agent).map((t) => t.wallet.toLowerCase())).size;
-  const live = feed.filter((t) => t.status === "ACTIVE").length;
-  const resolved = feed.filter((t) => t.status === "HIT_TP" || t.status === "STOPPED_OUT" || t.status === "CLOSED").length;
+  // "Live" = open AND not yet price-graded. A call whose price already touched TP/SL is
+  // decided even if the author never manually flipped its status, so it belongs in
+  // GRADED, not LIVE — otherwise the same call is counted in both.
+  const live = feed.filter((t) => t.status === "ACTIVE" && t.gradedOutcome !== "WIN" && t.gradedOutcome !== "LOSS").length;
+  // ⚠️ GRADED, not self-reported. The old counter tallied HIT_TP/STOPPED_OUT — statuses
+  // the author sets by hand — and displayed a big number of exactly the thing the moat
+  // says not to trust (11 self-reported while only 3 were price-graded). Count the
+  // trustless gradedOutcome so this agrees with the leaderboard's "graded call" language.
+  const graded = feed.filter((t) => t.gradedOutcome === "WIN" || t.gradedOutcome === "LOSS").length;
   const agents = feed.filter((t) => t.agent).length;
   const newest = Math.max(...feed.map((t) => t.createdAt || 0));
   const ageStr = (() => {
@@ -1288,7 +1296,7 @@ function FeedPulse({ feed }: { feed: FeedThesis[] }) {
     { label: "CALLERS", val: String(callers) },
     { label: "PUBLIC CALLS", val: String(feed.length) },
     { label: "LIVE", val: String(live), color: "#d4d4d8" },
-    { label: "RESOLVED", val: String(resolved) },
+    { label: "GRADED", val: String(graded) },
     ...(agents > 0 ? [{ label: "🤖 AGENT", val: String(agents), color: "#ededf0" }] : []),
     { label: "LAST CALL", val: ageStr },
   ];
