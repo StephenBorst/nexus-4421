@@ -1915,81 +1915,9 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       }), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300", ...cors(request) } });
     }
 
-    // ── /intel/news — aggregated market news feed (server-side) ──────────────
-    // WHY server-side: the browser used to fire 5 concurrent rss2json calls; the
-    // free tier throttles the burst so usually only ONE feed survived — and if
-    // that survivor was The Defiant (which stamps EVERY item with the same
-    // feed-BUILD timestamp, not the article date), its old stories all read as
-    // "now" and pinned the top forever → the "stale but says 32m" bug. Fetching
-    // sequentially here (one Cloudflare IP, edge-cached 300s) lets every feed land,
-    // and we de-rank any feed whose items share one uniform timestamp so a broken
-    // clock can't dominate ordering. Public, no auth, fail-soft.
-    if (parts[0] === "intel" && parts[1] === "news" && request.method === "GET") {
-      const FEEDS = [
-        { url: "https://www.coindesk.com/arc/outboundfeeds/rss/", name: "COINDESK" },
-        { url: "https://cointelegraph.com/rss",                   name: "COINTELEGRAPH" },
-        { url: "https://decrypt.co/feed",                         name: "DECRYPT" },
-        { url: "https://thedefiant.io/feed",                      name: "THE DEFIANT" },
-        { url: "https://finance.yahoo.com/news/rssindex",         name: "YAHOO FINANCE" },
-      ];
-      const stripTags = (s) => String(s || "").replace(/<[^>]*>/g, "").replace(/&[a-z]+;/gi, " ").trim();
-      const classify = (title, desc) => {
-        const t = (title + " " + desc).toLowerCase();
-        if (/\b(fed|fomc|powell|interest rate|inflation|gdp|recession|economy|treasury|cpi|monetary)\b/.test(t)) return "MACRO";
-        if (/\b(defi|dex|perpetual|protocol|yield|aave|uniswap|orderly|gmx|liquidity|onchain)\b/.test(t)) return "DEFI";
-        if (/\b(geopolit|war|sanction|iran|russia|china|tariff|trade war|conflict|military)\b/.test(t)) return "GEOPOLITICS";
-        if (/\b(bitcoin|btc|ethereum|eth|solana|sol|crypto|blockchain|altcoin|token|nft|web3)\b/.test(t)) return "CRYPTO";
-        if (/\b(stocks|equity|nasdaq|s&p|dow|earnings|ipo|nyse|market cap|share)\b/.test(t)) return "MARKETS";
-        return "NEWS";
-      };
-      // zone-less "YYYY-MM-DD HH:MM:SS" (rss2json) → treat as UTC (the "-333m" bug fix)
-      const parseTs = (d) => {
-        if (!d) return 0;
-        const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/.exec(String(d).trim());
-        const ms = m ? Date.UTC(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]) : Date.parse(d);
-        return Number.isFinite(ms) ? ms : 0;
-      };
-      let all = [];
-      // Sequential (not Promise.all) so we don't recreate the concurrent-burst
-      // throttle that broke the browser path in the first place.
-      for (const f of FEEDS) {
-        try {
-          const nd = await (await fetch(
-            `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(f.url)}`,
-            { signal: AbortSignal.timeout(6000) },
-          )).json();
-          if (nd?.status !== "ok" || !Array.isArray(nd.items)) continue;
-          const items = nd.items.slice(0, 12).map((it) => {
-            const title = String(it.title || "").trim();
-            const desc = stripTags(it.description).slice(0, 240);
-            return { title, description: desc, link: it.link || "", pubDate: it.pubDate || "",
-                     ts: parseTs(it.pubDate), source: f.name, category: classify(title, desc) };
-          }).filter((i) => i.title);
-          // Detect a broken clock: if a feed with several items reports ONE distinct
-          // timestamp, its dates are the feed-build time, not article times — mark
-          // them unreliable so they sort BELOW properly-dated stories.
-          const distinct = new Set(items.map((i) => i.ts));
-          const uniform = items.length >= 3 && distinct.size === 1;
-          for (const i of items) i.reliableDate = !uniform;
-          all = all.concat(items);
-        } catch { /* fail-soft — skip this feed */ }
-      }
-      // Dedup by title prefix
-      const seen = new Set();
-      all = all.filter((i) => { const k = i.title.slice(0, 50); if (seen.has(k)) return false; seen.add(k); return true; });
-      // Sort: reliably-dated newest-first; unreliable-clock feeds sink to the bottom.
-      all.sort((a, b) => (Number(b.reliableDate) - Number(a.reliableDate)) || (b.ts - a.ts));
-      // Cap per source so no single feed can dominate the top of the list.
-      const perSource = {};
-      const capped = [];
-      for (const i of all) {
-        perSource[i.source] = (perSource[i.source] || 0) + 1;
-        if (perSource[i.source] <= 12) capped.push(i);
-      }
-      const out = capped.slice(0, 50).map(({ ts, reliableDate, ...rest }) => rest);
-      return new Response(JSON.stringify({ items: out, asOf: new Date().toISOString(), count: out.length }),
-        { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300", ...cors(request) } });
-    }
+    // NB: news aggregation is CLIENT-side (app/pages/lab/MarketIntel.tsx) on purpose —
+    // rss2json blocks Cloudflare Worker IPs, so a server-side /intel/news returns 0.
+    // (Same reason /intel/catalysts comes back empty in prod — a known limitation.)
 
     // ── POST /upload/chart — host a chart image pasted from the clipboard ─────
     // Extends paste-to-fill: instead of hunting for a hosted URL, the trader pastes a
@@ -2000,11 +1928,19 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       const ct = (request.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
       const ALLOWED = ["image/png", "image/jpeg", "image/webp", "image/gif"];
       if (!ALLOWED.includes(ct)) return json({ error: "unsupported type — png/jpeg/webp/gif only" }, request, 415);
+      // Guard: per-IP hourly rate limit (KV counter, ~atomic enough for abuse control)
+      // so an open upload endpoint can't be used to fill storage. Frictionless — no
+      // signing prompt on every paste.
+      const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+      const rlKey = `chartrl:${ip}:${Math.floor(Date.now() / 3_600_000)}`;
+      const cnt = parseInt((await env.LAB_STORE.get(rlKey)) || "0", 10) || 0;
+      if (cnt >= 30) return json({ error: "rate limit — too many uploads this hour" }, request, 429);
       const buf = await request.arrayBuffer();
       if (!buf.byteLength) return json({ error: "empty body" }, request, 400);
       if (buf.byteLength > 2 * 1024 * 1024) return json({ error: "image too large — 2MB max" }, request, 413);
       const id = crypto.randomUUID().replace(/-/g, "");
       await env.LAB_STORE.put(`chartimg:${id}`, buf, { metadata: { ct } });
+      await env.LAB_STORE.put(rlKey, String(cnt + 1), { expirationTtl: 3600 });
       return json({ url: `https://og.nexustradinglabs.com/chart-img/${id}` }, request);
     }
 

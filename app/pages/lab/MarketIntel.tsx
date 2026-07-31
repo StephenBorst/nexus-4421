@@ -4,12 +4,57 @@ import { navBtnStyle } from "./styles";
 import { useIsMobile } from "./useIsMobile";
 import IntelPage from "@/pages/intel";
 import { MarketTape } from "./MarketTape";
-import { AGENT_API } from "./agentTypes";
 // Pure + pinned by tests (app/lib/rssDate.test.mjs) — see that file for the "-333m" bug.
-import { timeAgo } from "@/lib/rssDate.mjs";
+import { parseRssDate, timeAgo } from "@/lib/rssDate.mjs";
 
 // ─── News helpers ─────────────────────────────────────────
+// ⚠ rss2json MUST be called from the BROWSER, not a Worker: it blocks Cloudflare
+// datacenter IPs (same class as the CoinGecko-from-Workers 403), so a server-side
+// /intel/news route returns nothing. The bug that made news look "stale" was never
+// the fetch — it was The Defiant stamping every item with one feed-BUILD timestamp,
+// which floated its old stories to the top. We fix that here (de-rank a uniform-clock
+// feed + cap per source) while keeping the fetch client-side where rss2json answers.
 interface NewsItem { title: string; description: string; link: string; pubDate: string; source: string; category: string; }
+
+const FEEDS = [
+  { url: "https://www.coindesk.com/arc/outboundfeeds/rss/", name: "COINDESK" },
+  { url: "https://cointelegraph.com/rss",                   name: "COINTELEGRAPH" },
+  { url: "https://decrypt.co/feed",                         name: "DECRYPT" },
+  { url: "https://thedefiant.io/feed",                      name: "THE DEFIANT" },
+  { url: "https://finance.yahoo.com/news/rssindex",         name: "YAHOO FINANCE" },
+];
+
+function categorizeNews(title: string, desc: string): string {
+  const t = (title + " " + desc).toLowerCase();
+  if (/\b(fed|fomc|powell|interest rate|inflation|gdp|recession|economy|treasury|cpi|monetary)\b/.test(t)) return "MACRO";
+  if (/\b(defi|dex|perpetual|protocol|yield|aave|uniswap|orderly|gmx|liquidity|onchain)\b/.test(t)) return "DEFI";
+  if (/\b(geopolit|war|sanction|iran|russia|china|tariff|trade war|conflict|military)\b/.test(t)) return "GEOPOLITICS";
+  if (/\b(bitcoin|btc|ethereum|eth|solana|sol|crypto|blockchain|altcoin|token|nft|web3)\b/.test(t)) return "CRYPTO";
+  if (/\b(stocks|equity|nasdaq|s&p|dow|earnings|ipo|nyse|market cap|share)\b/.test(t)) return "MARKETS";
+  return "NEWS";
+}
+
+interface RawItem extends NewsItem { ts: number; reliableDate: boolean; }
+
+async function fetchFeed(url: string, source: string): Promise<RawItem[]> {
+  try {
+    // rss2json's `count` needs a paid key (free tier 422s) — omit + slice instead.
+    const d = await (await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`)).json();
+    if (d?.status !== "ok" || !Array.isArray(d.items)) return [];
+    const items: RawItem[] = d.items.slice(0, 12).map((it: { title?: string; description?: string; link?: string; pubDate?: string }) => {
+      const title = (it.title ?? "").trim();
+      const description = (it.description ?? "").replace(/<[^>]*>/g, "").slice(0, 240).trim();
+      return { title, description, link: it.link ?? "", pubDate: it.pubDate ?? "",
+               ts: parseRssDate(it.pubDate ?? "") || 0, source, category: categorizeNews(title, description), reliableDate: true };
+    }).filter((i: RawItem) => i.title);
+    // Broken-clock detection: a feed reporting ONE distinct timestamp across several
+    // items is publishing its build time, not article times (The Defiant does this) —
+    // mark those dates unreliable so they sort BELOW properly-dated stories.
+    const distinct = new Set(items.map((i) => i.ts));
+    if (items.length >= 3 && distinct.size === 1) items.forEach((i) => { i.reliableDate = false; });
+    return items;
+  } catch { return []; }
+}
 
 function NewsTab() {
   const [items,     setItems]     = useState<NewsItem[]>([]);
@@ -25,18 +70,19 @@ function NewsTab() {
   // chip. Colour here would imply state (amber=caution, red=loss, green=profit) it doesn't have.
   const catClr = (_c: string) => TEAL;
 
-  // Aggregation now happens SERVER-SIDE (/intel/news): one request instead of 5
-  // concurrent rss2json calls (which the free tier throttled → only 1 feed survived,
-  // usually The Defiant, whose uniform feed-build timestamps pinned stale stories to
-  // the top). The worker fetches sequentially, de-ranks broken-clock feeds, caps per
-  // source and edge-caches 300s. Fail-soft: an error just leaves the list untouched.
   const load = async () => {
     setLoading(true);
-    try {
-      const r = await fetch(`${AGENT_API}/intel/news`);
-      const d = await r.json();
-      if (Array.isArray(d?.items)) setItems(d.items as NewsItem[]);
-    } catch { /* keep whatever we had */ }
+    const results = await Promise.allSettled(FEEDS.map((f) => fetchFeed(f.url, f.name)));
+    let all: RawItem[] = results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
+    // Dedup by title prefix.
+    const seen = new Set<string>();
+    all = all.filter((i) => { const k = i.title.slice(0, 50); if (seen.has(k)) return false; seen.add(k); return true; });
+    // Reliably-dated newest-first; broken-clock feeds sink to the bottom.
+    all.sort((a, b) => (Number(b.reliableDate) - Number(a.reliableDate)) || (b.ts - a.ts));
+    // Cap per source so no single feed can dominate the top.
+    const per: Record<string, number> = {};
+    const capped = all.filter((i) => { per[i.source] = (per[i.source] || 0) + 1; return per[i.source] <= 12; });
+    if (capped.length) setItems(capped.slice(0, 50).map(({ ts, reliableDate, ...rest }) => rest));
     setLoading(false);
     setCountdown(300);
   };
