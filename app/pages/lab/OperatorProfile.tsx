@@ -128,6 +128,25 @@ export function OperatorProfileCard({ wallet, theses, orders }: {
         ))}
       </div>
 
+      {/* SHARE — the viral loop. Posting this card is an ad that says "my record is
+          provable, is yours?" — a claim only a graded record can make. Works at cold
+          start too: the card pivots to a "building in public" hook. */}
+      {wallet && (
+        <button
+          type="button"
+          onClick={() => {
+            const shareUrl = `https://og.nexustradinglabs.com/share/identity/${wallet.toLowerCase()}`;
+            const text = profile.tier === "UNKNOWN"
+              ? "building a provable trading record on Nexus — every call graded from public price, not self-reported."
+              : `my trading identity${profile.archetype ? ` — ${profile.archetype.label.toLowerCase()}` : ""}. every call graded from public price, not self-reported.`;
+            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`, "_blank", "noopener,noreferrer");
+          }}
+          style={{ marginTop: 12, width: "100%", background: "none", border: `1px solid ${C.borderStrong}`, borderRadius: RADIUS.sm, color: C.text.fog, fontFamily: MONO, fontSize: 11, letterSpacing: "0.06em", padding: "9px 14px", cursor: "pointer", textTransform: "uppercase" }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = C.text.bright; e.currentTarget.style.borderColor = C.text.muted; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = C.text.fog; e.currentTarget.style.borderColor = C.borderStrong; }}
+        >↗ Share your trading identity</button>
+      )}
+
       {/* What would earn the next claim. The cold-start product, not an error state. */}
       {profile.unlocks.length > 0 && (
         <div style={{ marginTop: 12, padding: "10px 12px", background: C.inset, border: `1px solid ${C.border}`, borderRadius: RADIUS.sm }}>
