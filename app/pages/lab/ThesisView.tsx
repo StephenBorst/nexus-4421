@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
-import { useAccount, useMutation } from "@orderly.network/hooks";
+import { useAccount, useMutation, useCollateral } from "@orderly.network/hooks";
 import { useLabStorage } from "@/hooks/useLabStorage";
 import { useThesisRegistry } from "@/hooks/useThesisRegistry";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
@@ -290,6 +290,29 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
                 </div>
               </>
             )}
+          </div>
+        );
+      })()}
+
+      {/* Auto-resolve nudge — the card NOTICES when live price has tagged a level and
+          offers a one-click mark (which auto-fills the P&L). A suggestion, not an
+          auto-commit: wicks reverse, and the objective on-chain grade is independent. */}
+      {t.status === "ACTIVE" && markPrice != null && (() => {
+        const tag = t.direction === "LONG"
+          ? (markPrice >= t.takeProfit1 ? "HIT_TP" : markPrice <= t.stopLoss ? "STOPPED_OUT" : null)
+          : (markPrice <= t.takeProfit1 ? "HIT_TP" : markPrice >= t.stopLoss ? "STOPPED_OUT" : null);
+        if (!tag) return null;
+        const isTp = tag === "HIT_TP";
+        const color = isTp ? "#3ecf8e" : "#f7525f";
+        return (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", border: `1px solid ${color}55`, background: `${color}10`, borderRadius: 4, padding: "8px 10px", marginBottom: 10 }}>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color }}>
+              ◆ price {isTp ? "tagged your TP1" : "tagged your stop"} at ${markPrice.toFixed(markPrice < 10 ? 4 : 2)} — resolve this call?
+            </span>
+            <button onClick={() => handleStatusClick(tag as ThesisStatus)}
+              style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "5px 12px", borderRadius: 3, border: `1px solid ${color}`, background: "transparent", color, cursor: "pointer", whiteSpace: "nowrap" }}>
+              MARK {isTp ? "HIT TP" : "STOPPED OUT"} →
+            </button>
           </div>
         );
       })()}
@@ -766,6 +789,7 @@ export function ThesisView() {
   const walletAddress = (accountState as { address?: string })?.address ?? null;
   const { theses: trades, saveTheses } = useLabStorage(walletAddress);
   const { registerOnChain, closeOnChain } = useThesisRegistry();
+  const { availableBalance } = useCollateral();
 
   // Live prices for all active theses
   const activeSymbols = useMemo(
@@ -816,6 +840,31 @@ export function ThesisView() {
   const [published, setPublished] = useState(false);
   const [filter, setFilter] = useState<ThesisStatus | "ALL">("ALL");
   const [markBusy, setMarkBusy] = useState(false);
+  const [fundingBusy, setFundingBusy] = useState(false);
+
+  // Full listed-markets set → validate the symbol (a typo makes an ungradeable call)
+  // and power the autocomplete datalist. Fetched once, fail-soft (no list ⇒ no warning).
+  const [marketTickers, setMarketTickers] = useState<string[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const d = await (await fetch("https://api-evm.orderly.org/v1/public/info")).json();
+        const rows = d?.data?.rows ?? [];
+        const tickers = rows.map((x: { symbol?: string }) => String(x.symbol || "").replace("PERP_", "").replace("_USDC", "")).filter(Boolean);
+        if (alive && tickers.length) setMarketTickers([...new Set<string>(tickers)].sort());
+      } catch { /* fail-soft — no validation rather than a false warning */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Remember the account size across theses — it's the one field that never changes
+  // between trades, yet the form used to make you retype it every time.
+  const ACCT_KEY = "nexus_thesis_account";
+  useEffect(() => {
+    try { const v = window.localStorage.getItem(ACCT_KEY); if (v) setForm((f) => (f.accountSize ? f : { ...f, accountSize: v })); } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Consume a thesis draft handed off by the AI assistant (draft_thesis tool):
   // pre-fill the form once, then clear the draft so it doesn't re-apply. Runs on
@@ -863,6 +912,11 @@ export function ThesisView() {
   // string | string[] — chartUrls is a list; every other field is a plain string.
   const set = (field: string, value: string | string[]) => setForm((f) => ({ ...f, [field]: value }));
 
+  // Symbol validation: warn only once the market list has loaded, so we never flash a
+  // false "not listed" while it's still fetching.
+  const symbolUpper = form.symbol.trim().toUpperCase();
+  const symbolListed = !marketTickers || !symbolUpper || marketTickers.includes(symbolUpper);
+
   // ── Guided-entry helpers (kill the blank-form friction) ──────────────────
   const roundPrice = (n: number) => Number(n.toFixed(n < 1 ? 6 : n < 100 ? 4 : 2));
   // Fill entry from the live mark price so the plan is anchored to reality.
@@ -878,6 +932,23 @@ export function ThesisView() {
     } catch { /* fail-soft */ }
     finally { setMarkBusy(false); }
   };
+  // Fill the funding rate from the live 8h rate (signed → the "who pays" line is
+  // right too), so the funding-cost estimate is real instead of the 0.01 placeholder.
+  const fillFundingFromLive = async () => {
+    if (!form.symbol) return;
+    setFundingBusy(true);
+    try {
+      const sym = `PERP_${form.symbol.toUpperCase()}_USDC`;
+      const d = await (await fetch(`https://api-evm.orderly.org/v1/public/futures/${sym}`)).json();
+      const fr = parseFloat(d?.data?.last_funding_rate); // decimal fraction per 8h
+      if (Number.isFinite(fr)) set("fundingRate", String(Math.round(fr * 100 * 1e4) / 1e4));
+    } catch { /* fail-soft */ }
+    finally { setFundingBusy(false); }
+  };
+  // Persist account size whenever it changes (see ACCT_KEY seed effect above).
+  useEffect(() => {
+    try { if (parseFloat(form.accountSize) > 0) window.localStorage.setItem(ACCT_KEY, form.accountSize); } catch { /* ignore */ }
+  }, [form.accountSize]);
   // Stop = pct adverse from entry (direction-aware).
   const applyStopPct = (pct: number) => {
     const e = parseFloat(form.entryPrice);
@@ -1168,7 +1239,18 @@ export function ThesisView() {
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 160px", gap: 8 }}>
               <div>
                 <span style={fieldLabelStyle}>SYMBOL</span>
-                <input style={inputStyle} placeholder="BTC, ETH, SOL..." value={form.symbol} onChange={(e) => set("symbol", e.target.value)} />
+                <input
+                  style={{ ...inputStyle, borderColor: symbolListed ? "#232327" : "#4a1e22" }}
+                  placeholder="BTC, ETH, SOL..." value={form.symbol}
+                  list="nexus-thesis-symbols" autoCapitalize="characters" autoComplete="off"
+                  onChange={(e) => set("symbol", e.target.value)}
+                />
+                {marketTickers && <datalist id="nexus-thesis-symbols">{marketTickers.map((s) => <option key={s} value={s} />)}</datalist>}
+                {!symbolListed && (
+                  <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9.5, color: "#fbbf24", marginTop: 4, lineHeight: 1.45 }}>
+                    ⚠ Not a listed market — this call can&apos;t be graded. Pick from the list.
+                  </div>
+                )}
               </div>
               <div>
                 <span style={fieldLabelStyle}>DIRECTION</span>
@@ -1251,6 +1333,15 @@ export function ThesisView() {
               <div>
                 <span style={fieldLabelStyle}>ACCOUNT SIZE (USDC)</span>
                 <input style={inputStyle} type="number" placeholder="10000" value={form.accountSize} onChange={(e) => set("accountSize", e.target.value)} />
+                {Number(availableBalance) > 0 && (
+                  <button
+                    onClick={() => set("accountSize", String(Math.floor(Number(availableBalance))))}
+                    title="Use your connected Orderly free collateral"
+                    style={{ marginTop: 5, fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 8px", borderRadius: 3, border: "1px solid #33333a", background: "#0a0a0b", color: "#d4d4d8", cursor: "pointer" }}
+                  >
+                    = MY COLLATERAL (${Math.floor(Number(availableBalance)).toLocaleString()})
+                  </button>
+                )}
               </div>
               <div>
                 <span style={fieldLabelStyle}>RISK %</span>
@@ -1263,8 +1354,15 @@ export function ThesisView() {
                   type="number" placeholder="0.01" step="0.001"
                   value={form.fundingRate} onChange={(e) => set("fundingRate", e.target.value)}
                 />
-                <div style={{ fontSize: 9, color: "#33333a", fontFamily: "var(--nx-font-mono)", marginTop: 4 }}>
-                  {fundingIsPositive ? "longs pay shorts" : "shorts pay longs"}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginTop: 4 }}>
+                  <span style={{ fontSize: 9, color: "#33333a", fontFamily: "var(--nx-font-mono)" }}>
+                    {fundingIsPositive ? "longs pay shorts" : "shorts pay longs"}
+                  </span>
+                  <button onClick={fillFundingFromLive} disabled={!form.symbol || fundingBusy}
+                    title="Fill with the current live 8h funding rate"
+                    style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "3px 7px", borderRadius: 3, border: "1px solid #33333a", background: "#0a0a0b", color: form.symbol ? "#d4d4d8" : "#33333a", cursor: form.symbol ? "pointer" : "not-allowed" }}>
+                    {fundingBusy ? "…" : "⟳ LIVE"}
+                  </button>
                 </div>
               </div>
             </div>
