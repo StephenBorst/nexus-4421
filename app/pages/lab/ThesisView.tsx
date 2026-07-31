@@ -14,6 +14,7 @@ import { deployToAgent, thesisToAgentConfig, thesisAgentNotice, deployDirectiveF
 import { formatPnl, chartImageSrc, chartImageList, effectiveStatus, CHART_HOST_HINT, MAX_CHARTS } from "./helpers";
 import { LOSS_REASONS, lossReason } from "@/lib/postmortem.mjs";
 import { parseThesis } from "@/lib/thesisParse.mjs";
+import { AGENT_API } from "./agentTypes";
 import { ThesisTimeline } from "./ThesisTimeline";
 import { ThesisAdvisor } from "./ThesisAdvisor";
 import { PnlChart, EmptyState, Coachmark } from "./components";
@@ -294,24 +295,33 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
         );
       })()}
 
-      {/* Auto-resolve nudge — the card NOTICES when live price has tagged a level and
-          offers a one-click mark (which auto-fills the P&L). A suggestion, not an
-          auto-commit: wicks reverse, and the objective on-chain grade is independent. */}
-      {t.status === "ACTIVE" && markPrice != null && (() => {
-        const tag = t.direction === "LONG"
-          ? (markPrice >= t.takeProfit1 ? "HIT_TP" : markPrice <= t.stopLoss ? "STOPPED_OUT" : null)
-          : (markPrice <= t.takeProfit1 ? "HIT_TP" : markPrice >= t.stopLoss ? "STOPPED_OUT" : null);
-        if (!tag) return null;
-        const isTp = tag === "HIT_TP";
+      {/* Auto-resolve nudge. Two tiers, authoritative first:
+          (1) If Nexus has already GRADED this public call from public price
+              (gradedOutcome, first-touch OHLC) but the self-reported status is still
+              ACTIVE, surface the real result and offer to sync the log (auto-fills P&L).
+          (2) Otherwise, if live mark has tagged a level, offer a provisional resolve.
+          Never an auto-commit — the graded record stands on its own regardless. */}
+      {t.status === "ACTIVE" && (() => {
+        const graded = t.gradedOutcome === "WIN" || t.gradedOutcome === "LOSS";
+        const isTp = graded
+          ? t.gradedOutcome === "WIN"
+          : (markPrice != null && (t.direction === "LONG" ? markPrice >= t.takeProfit1 : markPrice <= t.takeProfit1));
+        const isSl = graded
+          ? t.gradedOutcome === "LOSS"
+          : (markPrice != null && (t.direction === "LONG" ? markPrice <= t.stopLoss : markPrice >= t.stopLoss));
+        if (!isTp && !isSl) return null;
+        const outcome: ThesisStatus = isTp ? "HIT_TP" : "STOPPED_OUT";
         const color = isTp ? "#3ecf8e" : "#f7525f";
+        const label = graded
+          ? `✓ Nexus graded this a ${isTp ? "WIN" : "LOSS"}${t.gradedR != null ? ` (${t.gradedR >= 0 ? "+" : ""}${t.gradedR.toFixed(2)}R)` : ""} — sync your log?`
+          : `◆ price ${isTp ? "tagged your TP1" : "tagged your stop"}${markPrice != null ? ` at $${markPrice.toFixed(markPrice < 10 ? 4 : 2)}` : ""} — resolve this call?`;
         return (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", border: `1px solid ${color}55`, background: `${color}10`, borderRadius: 4, padding: "8px 10px", marginBottom: 10 }}>
-            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color }}>
-              ◆ price {isTp ? "tagged your TP1" : "tagged your stop"} at ${markPrice.toFixed(markPrice < 10 ? 4 : 2)} — resolve this call?
-            </span>
-            <button onClick={() => handleStatusClick(tag as ThesisStatus)}
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color }}>{label}</span>
+            <button onClick={() => handleStatusClick(outcome)}
+              title={graded ? "Nexus already scored this from public price — this only aligns your own P&L log" : "Provisional: based on the current mark; the graded record is independent"}
               style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "5px 12px", borderRadius: 3, border: `1px solid ${color}`, background: "transparent", color, cursor: "pointer", whiteSpace: "nowrap" }}>
-              MARK {isTp ? "HIT TP" : "STOPPED OUT"} →
+              {graded ? "SYNC LOG" : `MARK ${isTp ? "HIT TP" : "STOPPED OUT"}`} →
             </button>
           </div>
         );
@@ -841,6 +851,8 @@ export function ThesisView() {
   const [filter, setFilter] = useState<ThesisStatus | "ALL">("ALL");
   const [markBusy, setMarkBusy] = useState(false);
   const [fundingBusy, setFundingBusy] = useState(false);
+  const [chartBusy, setChartBusy] = useState<number | null>(null); // index being uploaded
+  const [chartErr, setChartErr] = useState<string | null>(null);
 
   // Full listed-markets set → validate the symbol (a typo makes an ungradeable call)
   // and power the autocomplete datalist. Fetched once, fail-soft (no list ⇒ no warning).
@@ -916,6 +928,25 @@ export function ThesisView() {
   // false "not listed" while it's still fetching.
   const symbolUpper = form.symbol.trim().toUpperCase();
   const symbolListed = !marketTickers || !symbolUpper || marketTickers.includes(symbolUpper);
+
+  // Plan geometry sanity — calcThesis uses Math.abs, so a stop on the WRONG side of
+  // entry (or a target on the wrong side) still produces a "valid" size. Catch the
+  // fat-finger before it becomes a nonsensical call. Warn, don't block (rare valid cases).
+  const planWarnings = (() => {
+    const e = parseFloat(form.entryPrice), s = parseFloat(form.stopLoss), tp = parseFloat(form.takeProfit1);
+    const w: string[] = [];
+    if (e > 0 && s > 0) {
+      if (form.direction === "LONG" && s >= e) w.push("Stop is at/above entry on a LONG — a long's stop sits below entry. Did you mean SHORT?");
+      if (form.direction === "SHORT" && s <= e) w.push("Stop is at/below entry on a SHORT — a short's stop sits above entry. Did you mean LONG?");
+    }
+    if (e > 0 && tp > 0) {
+      if (form.direction === "LONG" && tp <= e) w.push("TP1 is at/below entry on a LONG — your target should be above entry.");
+      if (form.direction === "SHORT" && tp >= e) w.push("TP1 is at/above entry on a SHORT — your target should be below entry.");
+    }
+    if (calc && Number.isFinite(calc.riskReward) && calc.riskReward > 0 && calc.riskReward < 1)
+      w.push(`R:R is 1:${calc.riskReward.toFixed(2)} — you're risking more than the target pays.`);
+    return w;
+  })();
 
   // ── Guided-entry helpers (kill the blank-form friction) ──────────────────
   const roundPrice = (n: number) => Number(n.toFixed(n < 1 ? 6 : n < 100 ? 4 : 2));
@@ -1325,6 +1356,13 @@ export function ThesisView() {
                 );
               })()}
             </div>
+            {planWarnings.length > 0 && (
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+                {planWarnings.map((msg, i) => (
+                  <div key={i} style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9.5, color: "#fbbf24", lineHeight: 1.45 }}>⚠ {msg}</div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div style={cardStyle}>
@@ -1392,6 +1430,25 @@ export function ThesisView() {
                 while (next.length < shown) next.push("");
                 set("chartUrls", next);
               };
+              // Paste a screenshot straight from the clipboard → upload → fill the URL,
+              // so the trader never has to find a hosted link. Text paste falls through.
+              const onPasteImage = (e: React.ClipboardEvent<HTMLInputElement>, i: number) => {
+                const item = Array.from(e.clipboardData.items).find((it) => it.type.startsWith("image/"));
+                if (!item) return;
+                e.preventDefault();
+                const file = item.getAsFile();
+                if (!file) return;
+                if (file.size > 2 * 1024 * 1024) { setChartErr("Image too large — 2MB max."); return; }
+                setChartErr(null); setChartBusy(i);
+                (async () => {
+                  try {
+                    const r = await fetch(`${AGENT_API}/upload/chart`, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+                    const d = await r.json();
+                    if (d?.url) setAt(i, d.url); else setChartErr("Upload failed — paste a hosted link instead.");
+                  } catch { setChartErr("Upload failed — paste a hosted link instead."); }
+                  finally { setChartBusy(null); }
+                })();
+              };
               return (
                 <>
                   {Array.from({ length: shown }).map((_, i) => {
@@ -1402,11 +1459,19 @@ export function ThesisView() {
                       <div key={i} style={{ marginBottom: 8 }}>
                         <input
                           style={inputStyle}
-                          placeholder={i === 0 ? "https://s3.tradingview.com/snapshot/…" : `chart ${i + 1} (optional)`}
-                          value={val}
+                          placeholder={i === 0 ? "paste a screenshot, or https://…snapshot" : `chart ${i + 1} (optional)`}
+                          value={chartBusy === i ? "uploading…" : val}
+                          onPaste={(e) => onPasteImage(e, i)}
                           onChange={(e) => setAt(i, e.target.value)}
+                          readOnly={chartBusy === i}
                         />
-                        {typed && !src && (
+                        {chartBusy === i && (
+                          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9.5, color: "#a1a1aa", marginTop: 4 }}>⟳ uploading screenshot…</div>
+                        )}
+                        {chartErr && i === 0 && chartBusy === null && (
+                          <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9.5, color: "#fbbf24", marginTop: 4, lineHeight: 1.45 }}>⚠ {chartErr}</div>
+                        )}
+                        {typed && !src && chartBusy !== i && (
                           <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9.5, color: "#fbbf24", marginTop: 4, lineHeight: 1.45 }}>
                             ⚠ Not a supported image link — use a {CHART_HOST_HINT} (https only). It won&apos;t be shown.
                           </div>
@@ -1422,9 +1487,9 @@ export function ThesisView() {
                   })}
                   {filled === 0 && (
                     <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9.5, color: "#52525b", lineHeight: 1.45 }}>
-                      Paste a {CHART_HOST_HINT}. In TradingView, the camera icon → &ldquo;Copy link to
-                      the chart image&rdquo;. Charts show on your call in the public feed; the first one
-                      also goes on the share card.
+                      Paste a screenshot straight into the box (Ctrl/⌘+V) and we&apos;ll host it — or drop a {CHART_HOST_HINT}.
+                      In TradingView, the camera icon → &ldquo;Copy link to the chart image&rdquo;. Charts show on your call
+                      in the public feed; the first one also goes on the share card.
                     </div>
                   )}
                 </>

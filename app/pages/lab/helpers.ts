@@ -44,6 +44,7 @@ const CHART_HOSTS = [
   "i.imgur.com",
   "imgur.com",
   "pbs.twimg.com",        // images lifted from an X post
+  "og.nexustradinglabs.com", // charts pasted from the clipboard, hosted by our worker
 ];
 
 /** Returns the URL only if it's a safe, allowlisted chart image — otherwise null. */

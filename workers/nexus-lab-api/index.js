@@ -1991,6 +1991,31 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300", ...cors(request) } });
     }
 
+    // ── POST /upload/chart — host a chart image pasted from the clipboard ─────
+    // Extends paste-to-fill: instead of hunting for a hosted URL, the trader pastes a
+    // TradingView screenshot and we store it in KV + return a URL that chartImageSrc's
+    // allowlist accepts (og.nexustradinglabs.com). Image-only + size-capped to bound
+    // abuse; served immutably by GET /chart-img/:id below.
+    if (parts[0] === "upload" && parts[1] === "chart" && request.method === "POST") {
+      const ct = (request.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+      const ALLOWED = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+      if (!ALLOWED.includes(ct)) return json({ error: "unsupported type — png/jpeg/webp/gif only" }, request, 415);
+      const buf = await request.arrayBuffer();
+      if (!buf.byteLength) return json({ error: "empty body" }, request, 400);
+      if (buf.byteLength > 2 * 1024 * 1024) return json({ error: "image too large — 2MB max" }, request, 413);
+      const id = crypto.randomUUID().replace(/-/g, "");
+      await env.LAB_STORE.put(`chartimg:${id}`, buf, { metadata: { ct } });
+      return json({ url: `https://og.nexustradinglabs.com/chart-img/${id}` }, request);
+    }
+
+    // ── GET /chart-img/:id — serve a pasted chart image ──────────────────────
+    if (parts[0] === "chart-img" && parts[1] && request.method === "GET") {
+      const rec = await env.LAB_STORE.getWithMetadata(`chartimg:${parts[1]}`, { type: "arrayBuffer" });
+      if (!rec || !rec.value) return json({ error: "not found" }, request, 404);
+      const ct = (rec.metadata && rec.metadata.ct) || "image/png";
+      return new Response(rec.value, { headers: { "Content-Type": ct, "Cache-Control": "public, max-age=31536000, immutable", ...cors(request) } });
+    }
+
     // ── /funding-rate — current funding rate for a symbol ────────────────────
     // Public endpoint, no auth. Returns current funding rate + next funding time.
     if (parts[0] === "funding-rate" && request.method === "GET") {
