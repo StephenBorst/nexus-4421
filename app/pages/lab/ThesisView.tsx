@@ -13,6 +13,7 @@ import { cardStyle, labelStyle, navBtnStyle, inputStyle, fieldLabelStyle, STATUS
 import { deployToAgent, thesisToAgentConfig, thesisAgentNotice, deployDirectiveFromThesis } from "@/utils/agentPrefill";
 import { formatPnl, chartImageSrc, chartImageList, effectiveStatus, CHART_HOST_HINT, MAX_CHARTS } from "./helpers";
 import { LOSS_REASONS, lossReason } from "@/lib/postmortem.mjs";
+import { parseThesis } from "@/lib/thesisParse.mjs";
 import { ThesisTimeline } from "./ThesisTimeline";
 import { ThesisAdvisor } from "./ThesisAdvisor";
 import { PnlChart, EmptyState, Coachmark } from "./components";
@@ -788,6 +789,28 @@ export function ThesisView() {
   });
 
 
+  // Paste-to-fill: drop a TradingView analysis (or any freeform thesis) and the
+  // heuristic parser prefills the fields the trader already wrote out. Conservative
+  // by design — it only fills clearly-anchored values and always keeps the full text.
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  const [pasteResult, setPasteResult] = useState<string[] | null>(null);
+  const applyPaste = () => {
+    const r = parseThesis(pasteText);
+    setForm((f) => ({
+      ...f,
+      symbol: r.symbol ?? f.symbol,
+      direction: r.direction ?? f.direction,
+      entryPrice: r.entryPrice ?? f.entryPrice,
+      stopLoss: r.stopLoss ?? f.stopLoss,
+      takeProfit1: r.takeProfit1 ?? f.takeProfit1,
+      takeProfit2: r.takeProfit2 ?? f.takeProfit2,
+      // Only seed notes if empty, so we don't clobber something the trader typed.
+      notes: f.notes.trim() ? f.notes : r.notes,
+    }));
+    setPasteResult(r.filled);
+  };
+
   const [deployed, setDeployed] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
@@ -1102,6 +1125,44 @@ export function ThesisView() {
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 320px", gap: 12, alignItems: "start" }}>
         {/* Form */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {/* Paste-to-fill: import a TradingView analysis (or any thesis text) */}
+          <div style={cardStyle}>
+            <button
+              onClick={() => setPasteOpen((o) => !o)}
+              style={{ ...navBtnStyle, width: "100%", textAlign: "left", fontSize: 10, letterSpacing: "0.08em", color: pasteOpen ? "#ededf0" : "#a1a1aa", borderColor: pasteOpen ? "#33333a" : "#232327", padding: "8px 10px" }}
+              title="Paste a thesis from TradingView (or anywhere) — Nexus prefills the fields it can read"
+            >
+              {pasteOpen ? "▾" : "▸"} PASTE THESIS TO AUTOFILL
+            </button>
+            {pasteOpen && (
+              <div style={{ marginTop: 8 }}>
+                <textarea
+                  value={pasteText}
+                  onChange={(e) => { setPasteText(e.target.value); setPasteResult(null); }}
+                  placeholder="Paste your TradingView analysis here — e.g. &quot;ZECUSD… net bullish… stop below $415… supply zone $624–$685…&quot;"
+                  rows={5}
+                  style={{ ...inputStyle, width: "100%", resize: "vertical", fontSize: 11, lineHeight: 1.5, minHeight: 90 }}
+                />
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                  <button onClick={applyPaste} disabled={!pasteText.trim()}
+                    style={{ ...navBtnStyle, fontSize: 10, color: pasteText.trim() ? "#ededf0" : "#3f3f46", borderColor: pasteText.trim() ? "#33333a" : "#232327", cursor: pasteText.trim() ? "pointer" : "not-allowed", padding: "6px 12px" }}>
+                    ✧ AUTOFILL FIELDS
+                  </button>
+                  {pasteResult && (
+                    <span style={{ fontSize: 9, color: pasteResult.length ? "#a1a1aa" : "#71717a", fontFamily: "var(--nx-font-mono)" }}>
+                      {pasteResult.length
+                        ? `filled ${pasteResult.join(" · ")} — review below, then adjust`
+                        : "couldn't read fields — fill them in manually"}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginTop: 6, letterSpacing: "0.04em" }}>
+                  Best-effort read of symbol / direction / entry / stop / targets. Always confirm the numbers before saving. Full text is kept in NOTES.
+                </div>
+              </div>
+            )}
+          </div>
+
           <div style={cardStyle}>
             <div style={{ fontSize: 10, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; INSTRUMENT</div>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 160px", gap: 8 }}>

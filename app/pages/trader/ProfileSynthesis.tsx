@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { C, MONO, RADIUS } from "@/config/theme";
 import { buildOperatorProfile, profileNarrative } from "@/lib/operatorProfile.mjs";
 import { callProgress, openCallsSummary, PROGRESS_LABEL } from "@/lib/callProgress.mjs";
+import { openIdentityShare } from "@/utils/shareIdentity";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 
@@ -30,7 +31,7 @@ const eyebrow: React.CSSProperties = {
 type OpenCall = { symbol: string; direction: "LONG" | "SHORT"; entryPrice: number; stopLoss: number; takeProfit1: number };
 
 // ── 1. WHO THEY ARE ──────────────────────────────────────────────────
-export function PublicOperatorProfile({ wallet }: { wallet: string | null }) {
+export function PublicOperatorProfile({ wallet, isOwn = false }: { wallet: string | null; isOwn?: boolean }) {
   const [process, setProcess] = useState<Record<string, unknown> | null>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -83,6 +84,18 @@ export function PublicOperatorProfile({ wallet }: { wallet: string | null }) {
             </div>
           ))}
       </div>
+
+      {/* Share — only the owner posts their OWN card. A visitor sees the record; the
+          identity poster is the trader's to broadcast (and the tweet copy says "my"). */}
+      {isOwn && wallet && (
+        <button
+          type="button"
+          onClick={() => openIdentityShare(wallet, { established: profile.tier !== "UNKNOWN", archetypeLabel: profile.archetype?.label })}
+          style={{ marginTop: 12, width: "100%", background: "none", border: `1px solid ${C.borderStrong}`, borderRadius: RADIUS.sm, color: C.text.fog, fontFamily: MONO, fontSize: 11, letterSpacing: "0.06em", padding: "9px 14px", cursor: "pointer", textTransform: "uppercase" }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = C.text.bright; e.currentTarget.style.borderColor = C.text.muted; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = C.text.fog; e.currentTarget.style.borderColor = C.borderStrong; }}
+        >↗ Share your trading identity</button>
+      )}
     </div>
   );
 }

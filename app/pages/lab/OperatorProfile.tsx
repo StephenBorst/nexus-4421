@@ -16,6 +16,7 @@ import { computeEdge } from "@/config/edge";
 import { adherenceReport } from "@/lib/adherence.mjs";
 import { leakProfile } from "@/lib/postmortem.mjs";
 import { buildOperatorProfile, profileNarrative } from "@/lib/operatorProfile.mjs";
+import { openIdentityShare } from "@/utils/shareIdentity";
 
 const AGENT_API = "https://og.nexustradinglabs.com";
 
@@ -134,13 +135,7 @@ export function OperatorProfileCard({ wallet, theses, orders }: {
       {wallet && (
         <button
           type="button"
-          onClick={() => {
-            const shareUrl = `https://og.nexustradinglabs.com/share/identity/${wallet.toLowerCase()}`;
-            const text = profile.tier === "UNKNOWN"
-              ? "building a provable trading record on Nexus — every call graded from public price, not self-reported."
-              : `my trading identity${profile.archetype ? ` — ${profile.archetype.label.toLowerCase()}` : ""}. every call graded from public price, not self-reported.`;
-            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`, "_blank", "noopener,noreferrer");
-          }}
+          onClick={() => openIdentityShare(wallet, { established: profile.tier !== "UNKNOWN", archetypeLabel: profile.archetype?.label })}
           style={{ marginTop: 12, width: "100%", background: "none", border: `1px solid ${C.borderStrong}`, borderRadius: RADIUS.sm, color: C.text.fog, fontFamily: MONO, fontSize: 11, letterSpacing: "0.06em", padding: "9px 14px", cursor: "pointer", textTransform: "uppercase" }}
           onMouseEnter={(e) => { e.currentTarget.style.color = C.text.bright; e.currentTarget.style.borderColor = C.text.muted; }}
           onMouseLeave={(e) => { e.currentTarget.style.color = C.text.fog; e.currentTarget.style.borderColor = C.borderStrong; }}

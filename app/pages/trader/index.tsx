@@ -749,7 +749,7 @@ export default function TraderPage() {
               <>
                 {/* SYNTHESIS FIRST — who this trader is, what's in flight, and what the
                     venue independently says. The raw stat grid below is the evidence. */}
-                <PublicOperatorProfile wallet={wallet ?? null} />
+                <PublicOperatorProfile wallet={wallet ?? null} isOwn={isOwn} />
                 <InFlightCalls calls={openCalls} prices={livePrices} />
                 <VenueEvidence wallet={wallet ?? null} openCalls={openCalls} />
 
