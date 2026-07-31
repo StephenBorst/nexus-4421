@@ -63,12 +63,33 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
   const cfg = STATUS_CONFIG[effectiveStatus(t)] ?? STATUS_CONFIG.ACTIVE;
   const isClosed = CLOSED_STATUSES.includes(t.status);
 
+  // Auto-grade the dollar P&L from the plan the trader already logged, so a HIT TP /
+  // STOPPED OUT click fills the number instead of making them do entry→exit × size
+  // math by hand. HIT_TP → exit at TP1, STOPPED_OUT → exit at stop, INVALIDATED →
+  // never triggered → $0. It's an estimate at the planned levels (ignores slippage /
+  // partials) — EDIT stays for the exact fill. (Doesn't touch the on-chain grade,
+  // which is computed objectively vs public price regardless of this figure.)
+  const autoPnlFor = (s: ThesisStatus): number | null => {
+    if (s === "INVALIDATED") return 0;
+    const exit = s === "HIT_TP" ? t.takeProfit1 : s === "STOPPED_OUT" ? t.stopLoss : null;
+    if (exit == null) return null;
+    return Math.round(calcUnrealizedPnl(t.direction, t.entryPrice, exit, t.positionSize).pnl * 100) / 100;
+  };
+
   const handleStatusClick = (s: ThesisStatus) => {
     const next = t.status === s ? "ACTIVE" : s;
-    onUpdate(t.id, { status: next });
-    if (CLOSED_STATUSES.includes(next)) setInputVisible(true);
-    else setInputVisible(false);
+    if (CLOSED_STATUSES.includes(next)) {
+      const auto = autoPnlFor(next);
+      onUpdate(t.id, auto !== null ? { status: next, actualPnl: auto } : { status: next });
+      if (auto !== null) setActualInput(String(auto));
+      setInputVisible(false); // auto-filled; EDIT reveals the field for the exact fill
+    } else {
+      onUpdate(t.id, { status: next });
+      setInputVisible(false);
+    }
   };
+
+  const openEdit = () => { setActualInput(t.actualPnl !== null ? String(t.actualPnl) : ""); setInputVisible(true); };
 
   const saveActual = () => {
     const val = parseFloat(actualInput);
@@ -325,13 +346,13 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
                   {accuracy.toFixed(0)}% of plan
                 </div>
               )}
-              <button onClick={() => setInputVisible(true)} style={{ ...navBtnStyle, fontSize: 9, padding: "3px 8px" }}>EDIT</button>
+              <button onClick={openEdit} title="Auto-graded from your entry → exit × size. Click to enter the exact fill (slippage / partials)." style={{ ...navBtnStyle, fontSize: 9, padding: "3px 8px" }}>EDIT</button>
             </div>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <input
                 type="number"
-                placeholder="e.g. 142.50 or -87.00"
+                placeholder="exact fill — e.g. 142.50 or -87.00"
                 value={actualInput}
                 onChange={(e) => setActualInput(e.target.value)}
                 style={{ ...inputStyle, width: 180, padding: "5px 8px", fontSize: 11 }}

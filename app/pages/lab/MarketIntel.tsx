@@ -4,39 +4,12 @@ import { navBtnStyle } from "./styles";
 import { useIsMobile } from "./useIsMobile";
 import IntelPage from "@/pages/intel";
 import { MarketTape } from "./MarketTape";
+import { AGENT_API } from "./agentTypes";
 // Pure + pinned by tests (app/lib/rssDate.test.mjs) — see that file for the "-333m" bug.
-import { parseRssDate, timeAgo } from "@/lib/rssDate.mjs";
+import { timeAgo } from "@/lib/rssDate.mjs";
 
 // ─── News helpers ─────────────────────────────────────────
 interface NewsItem { title: string; description: string; link: string; pubDate: string; source: string; category: string; }
-
-function categorizeNews(title: string, desc: string): string {
-  const t = (title + " " + desc).toLowerCase();
-  if (/\b(fed|fomc|powell|interest rate|inflation|gdp|recession|economy|treasury|cpi|monetary)\b/.test(t)) return "MACRO";
-  if (/\b(defi|dex|perpetual|protocol|yield|aave|uniswap|orderly|gmx|liquidity|onchain)\b/.test(t)) return "DEFI";
-  if (/\b(geopolit|war|sanction|iran|russia|china|tariff|trade war|conflict|military)\b/.test(t)) return "GEOPOLITICS";
-  if (/\b(bitcoin|btc|ethereum|eth|solana|sol|crypto|blockchain|altcoin|token|nft|web3)\b/.test(t)) return "CRYPTO";
-  if (/\b(stocks|equity|nasdaq|s&p|dow|earnings|ipo|nyse|market cap|share)\b/.test(t)) return "MARKETS";
-  return "NEWS";
-}
-
-async function fetchNewsFeed(url: string, sourceName: string): Promise<NewsItem[]> {
-  try {
-    // NB: rss2json's `count` param requires a paid key (free tier 422s + returns
-    // nothing) — omit it and slice client-side instead, else the News tab is empty.
-    const r = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`);
-    const d = await r.json();
-    if (d.status !== "ok") return [];
-    return (d.items as any[]).slice(0, 10).map((item: any) => ({
-      title: item.title?.trim() ?? "",
-      description: (item.description ?? "").replace(/<[^>]*>/g, "").slice(0, 240).trim(),
-      link: item.link ?? "",
-      pubDate: item.pubDate ?? "",
-      source: sourceName,
-      category: categorizeNews(item.title ?? "", item.description ?? ""),
-    }));
-  } catch { return []; }
-}
 
 function NewsTab() {
   const [items,     setItems]     = useState<NewsItem[]>([]);
@@ -52,27 +25,18 @@ function NewsTab() {
   // chip. Colour here would imply state (amber=caution, red=loss, green=profit) it doesn't have.
   const catClr = (_c: string) => TEAL;
 
-  const FEEDS = [
-    { url: "https://www.coindesk.com/arc/outboundfeeds/rss/",             name: "COINDESK"      },
-    { url: "https://cointelegraph.com/rss",                               name: "COINTELEGRAPH" },
-    { url: "https://decrypt.co/feed",                                     name: "DECRYPT"       },
-    { url: "https://thedefiant.io/feed",                                  name: "THE DEFIANT"   },
-    { url: "https://finance.yahoo.com/news/rssindex",                     name: "YAHOO FINANCE" },
-  ];
-
+  // Aggregation now happens SERVER-SIDE (/intel/news): one request instead of 5
+  // concurrent rss2json calls (which the free tier throttled → only 1 feed survived,
+  // usually The Defiant, whose uniform feed-build timestamps pinned stale stories to
+  // the top). The worker fetches sequentially, de-ranks broken-clock feeds, caps per
+  // source and edge-caches 300s. Fail-soft: an error just leaves the list untouched.
   const load = async () => {
     setLoading(true);
-    const results = await Promise.allSettled(FEEDS.map(f => fetchNewsFeed(f.url, f.name)));
-    const all = results.flatMap(r => r.status === "fulfilled" ? r.value : []);
-    const seen = new Set<string>();
-    const deduped = all
-      .filter(i => { const k = i.title.slice(0, 50); if (seen.has(k)) return false; seen.add(k); return !!i.title; })
-      // Same parser as ago() — mixing the two would sort by one clock and label by
-      // another. (Ordering happened to survive the old bug only because every feed was
-      // shifted by the same offset; that was luck, not correctness.)
-      .sort((a, b) => (parseRssDate(b.pubDate) || 0) - (parseRssDate(a.pubDate) || 0))
-      .slice(0, 50);
-    setItems(deduped);
+    try {
+      const r = await fetch(`${AGENT_API}/intel/news`);
+      const d = await r.json();
+      if (Array.isArray(d?.items)) setItems(d.items as NewsItem[]);
+    } catch { /* keep whatever we had */ }
     setLoading(false);
     setCountdown(300);
   };
