@@ -87,3 +87,22 @@ export function effectiveStatus(
   const s = t?.status;
   return s === "HIT_TP" || s === "STOPPED_OUT" || s === "INVALIDATED" ? s : "ACTIVE";
 }
+
+// Whether an ACTIVE call is ready to be resolved, and how authoritative that is:
+// `graded` = Nexus already scored it from public price (first-touch OHLC), the
+// authoritative truth; otherwise it's a provisional call off the live mark. Shared by
+// the per-card nudge AND the "to resolve" strip so the two can never disagree.
+export function resolveSuggestion(
+  t: { status?: string; gradedOutcome?: "WIN" | "LOSS"; direction: "LONG" | "SHORT"; takeProfit1: number; stopLoss: number },
+  markPrice?: number | null,
+): { outcome: "HIT_TP" | "STOPPED_OUT"; graded: boolean } | null {
+  if (t.status !== "ACTIVE") return null;
+  if (t.gradedOutcome === "WIN") return { outcome: "HIT_TP", graded: true };
+  if (t.gradedOutcome === "LOSS") return { outcome: "STOPPED_OUT", graded: true };
+  if (markPrice == null) return null;
+  const isTp = t.direction === "LONG" ? markPrice >= t.takeProfit1 : markPrice <= t.takeProfit1;
+  const isSl = t.direction === "LONG" ? markPrice <= t.stopLoss : markPrice >= t.stopLoss;
+  if (isTp) return { outcome: "HIT_TP", graded: false };
+  if (isSl) return { outcome: "STOPPED_OUT", graded: false };
+  return null;
+}

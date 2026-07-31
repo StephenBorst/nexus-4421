@@ -11,7 +11,7 @@ import { useIsMobile } from "./useIsMobile";
 import type { ThesisTrade, ThesisStatus } from "./types";
 import { cardStyle, labelStyle, navBtnStyle, inputStyle, fieldLabelStyle, STATUS_CONFIG, CLOSED_STATUSES } from "./styles";
 import { deployToAgent, thesisToAgentConfig, thesisAgentNotice, deployDirectiveFromThesis } from "@/utils/agentPrefill";
-import { formatPnl, chartImageSrc, chartImageList, effectiveStatus, CHART_HOST_HINT, MAX_CHARTS } from "./helpers";
+import { formatPnl, chartImageSrc, chartImageList, effectiveStatus, resolveSuggestion, CHART_HOST_HINT, MAX_CHARTS } from "./helpers";
 import { LOSS_REASONS, lossReason } from "@/lib/postmortem.mjs";
 import { parseThesis } from "@/lib/thesisParse.mjs";
 import { AGENT_API } from "./agentTypes";
@@ -302,15 +302,10 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
           (2) Otherwise, if live mark has tagged a level, offer a provisional resolve.
           Never an auto-commit — the graded record stands on its own regardless. */}
       {t.status === "ACTIVE" && (() => {
-        const graded = t.gradedOutcome === "WIN" || t.gradedOutcome === "LOSS";
-        const isTp = graded
-          ? t.gradedOutcome === "WIN"
-          : (markPrice != null && (t.direction === "LONG" ? markPrice >= t.takeProfit1 : markPrice <= t.takeProfit1));
-        const isSl = graded
-          ? t.gradedOutcome === "LOSS"
-          : (markPrice != null && (t.direction === "LONG" ? markPrice <= t.stopLoss : markPrice >= t.stopLoss));
-        if (!isTp && !isSl) return null;
-        const outcome: ThesisStatus = isTp ? "HIT_TP" : "STOPPED_OUT";
+        const sug = resolveSuggestion(t, markPrice);
+        if (!sug) return null;
+        const { outcome, graded } = sug;
+        const isTp = outcome === "HIT_TP";
         const color = isTp ? "#3ecf8e" : "#f7525f";
         const label = graded
           ? `✓ Nexus graded this a ${isTp ? "WIN" : "LOSS"}${t.gradedR != null ? ` (${t.gradedR >= 0 ? "+" : ""}${t.gradedR.toFixed(2)}R)` : ""} — sync your log?`
@@ -1192,6 +1187,25 @@ export function ThesisView() {
   const thesisAccuracy = closedTrades.length ? Math.round((hits / closedTrades.length) * 100) : null;
   const filteredTrades = filter === "ALL" ? trades : trades.filter((t) => t.status === filter);
 
+  // "To resolve" summary — ACTIVE calls that have tagged a level or been graded but not
+  // yet synced, surfaced at the top so they aren't buried below the fold.
+  const resolveList = trades
+    .map((t) => ({ t, sug: resolveSuggestion(t, livePrices[t.symbol]) }))
+    .filter((x): x is { t: ThesisTrade; sug: { outcome: "HIT_TP" | "STOPPED_OUT"; graded: boolean } } => x.sug != null);
+  const gradedReady = resolveList.filter((x) => x.sug.graded).length;
+  // Batch-sync every graded-but-unsynced call in ONE write (looping updateTrade would
+  // clobber, each mapping over stale `trades`). Auto-fills P&L from entry→exit×size.
+  const syncGraded = () => {
+    const updated = trades.map((t) => {
+      const sug = resolveSuggestion(t, livePrices[t.symbol]);
+      if (!sug || !sug.graded) return t;
+      const exit = sug.outcome === "HIT_TP" ? t.takeProfit1 : t.stopLoss;
+      const pnl = Math.round(calcUnrealizedPnl(t.direction, t.entryPrice, exit, t.positionSize).pnl * 100) / 100;
+      return { ...t, status: sug.outcome, actualPnl: pnl };
+    });
+    persist(updated);
+  };
+
   return (
     <div>
       {/* Header */}
@@ -1736,6 +1750,21 @@ export function ThesisView() {
               })}
             </div>
           </div>
+          {resolveList.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", border: "1px solid #33333a", background: "#111114", borderRadius: 4, padding: "9px 12px", marginBottom: 10 }}>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#d4d4d8" }}>
+                ◆ {resolveList.length} call{resolveList.length === 1 ? "" : "s"} ready to resolve
+                {gradedReady > 0 && <span style={{ color: "#71717a" }}> · {gradedReady} already graded by Nexus</span>}
+              </span>
+              {gradedReady > 0 && (
+                <button onClick={syncGraded}
+                  title="Sync every call Nexus has already graded from public price, and auto-fill their P&L"
+                  style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "5px 12px", borderRadius: 3, border: "1px solid #3ecf8e", background: "transparent", color: "#3ecf8e", cursor: "pointer", whiteSpace: "nowrap" }}>
+                  SYNC {gradedReady} GRADED →
+                </button>
+              )}
+            </div>
+          )}
           {filteredTrades.length > 0 && (
             <Coachmark storageKey="nexus_coach_directional_v1" badge="STEP 1 / 2" title="Turn a thesis into a graded trade">
               See <strong style={{ color: "#d4d4d8" }}>▶ TRADE</strong> on a thesis? That hands your exact call to the agent — it executes <strong style={{ color: "#d4d4d8" }}>your</strong> direction with full exit management, then grades the result on-chain. Your read, our rigor, trustless proof. (<strong style={{ color: "#d4d4d8" }}>⚡ AUTOMATE</strong> is different — it lets the agent pick entries from funding/OI signals.)
