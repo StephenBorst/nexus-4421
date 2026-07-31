@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery } from "./logic.mjs";
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./backtest.mjs";
 // Route families lifted out of the 74-route fetch handler (see shared.mjs for the
@@ -35,6 +35,10 @@ import { handleFeed } from "./routes-feed.mjs";
 import { loadOiHistForBacktest, revalidateStrategy, OI_BACKTEST_MIN_DAYS, OI_BACKTEST_MIN_SAMPLES } from "./strategies.mjs";
 import { json, cors, normalizeAddress, recoverEthAddress, ALLOWED_ORIGINS, holdersRoomMessage, appendNotification } from "./shared.mjs";
 import { gradedStatusOf, fetchGradeHistory, gradePublicTheses, computeCallerStats, REGIME_PAD_S, ADVICE_FLAG_TEXT } from "./grading.mjs";
+// The SAME synthesis the Lab + trader page render (pure, dependency-free), so the
+// shareable card can never disagree with the profile it depicts. Bundled cross-dir by
+// wrangler like the other ../ imports.
+import { buildOperatorProfile } from "../../app/lib/operatorProfile.mjs";
 // Directive level validation lives with the exec's money-path logic (single source);
 // wrangler bundles the cross-dir import (same as backtest.mjs).
 import { directiveLevels } from "../nexus-agent-exec/logic.mjs";
@@ -275,6 +279,92 @@ function buildOgSvg({ displayName, wallet, wins, losses, active, total, avgRR, w
   <line x1="48" y1="468" x2="1152" y2="468" stroke="#1a2e1a" stroke-width="1"/>
   <text x="48" y="512" fill="#2a4a3a" font-size="13" letter-spacing="1">on-chain verified · arbitrum</text>
   <text x="1152" y="512" fill="#1a3a1a" font-size="13" text-anchor="end">${esc(wallet)}</text>
+</svg>`;
+}
+
+// ── The TRADING IDENTITY card ─────────────────────────────────────────────────
+// The shareable artifact: a poster of the Operator Profile. Everything on it is
+// GRADED from public price, so the share itself markets the moat — a self-reported
+// card can't make the same claim. Composed from buildOperatorProfile so the poster
+// can never disagree with the profile page it depicts.
+//
+// ⚠️ Cold-start dignity is a REQUIREMENT, not a nicety. Most early cards have <5
+// graded calls, so instead of showing dashes it pivots to a "building a provable
+// record" framing — which is itself a hook ("watch me build it in public") rather
+// than an empty template. A card that looks broken at cold start would be worse than
+// none, because this is the thing people post.
+function buildIdentitySvg({ profile, wallet, displayName, fontFamily = "'JetBrains Mono'" }) {
+  const BONE = "#ededf0", BRIGHT = "#f4f4f5", MUTED = "#71717a", FAINT = "#52525b";
+  const POS = "#3ecf8e", NEG = "#f7525f", BORDER = "#232327", PANEL = "#0f0f11";
+  const shortAddr = `${wallet.slice(0, 6)}…${wallet.slice(-4)}`;
+  const name = esc(displayName || shortAddr);
+  const established = profile.tier !== "UNKNOWN" && !!profile.archetype;
+  const merit = profile.meritRank; // { glyph, title } | null
+
+  // Merit pill (top-right). Earned rank when present, else an honest "building" chip.
+  const rankText = merit ? `${merit.glyph} ${String(merit.title).toUpperCase()}` : "▪ BUILDING";
+  const rankW = rankText.length * 15 + 40;
+
+  // The headline line: archetype when we have one, else the cold-start framing.
+  const headline = established
+    ? profile.archetype.label.toUpperCase()
+    : "BUILDING A PROVABLE RECORD";
+  // Scale the headline down if long so it never overruns the 1104px content width.
+  const hSize = Math.min(58, Math.floor(1090 / (Math.max(headline.length, 1) * 0.6)));
+
+  // One-liner under the headline.
+  const re = profile.reads?.find((r) => r.kind === "REGIME");
+  const subline = established
+    ? (re ? esc(re.text.charAt(0).toUpperCase() + re.text.slice(1)).slice(0, 92)
+          : `${profile.gradedCalls} calls graded from public price`)
+    : `${profile.gradedCalls} graded call${profile.gradedCalls === 1 ? "" : "s"} in · every one scored from public price, not self-reported`;
+
+  // Three stats. Established → the real numbers; cold-start → a progress framing so
+  // the row never shows a wall of em-dashes.
+  const stats = established
+    ? profile.headline.filter((h) => h.key !== "leak").map((h) => ({
+        label: h.label.toUpperCase(),
+        value: h.value ?? "—",
+        color: h.tone === "pos" ? POS : h.tone === "neg" ? NEG : BRIGHT,
+        sub: h.sub,
+      }))
+    : [
+        { label: "GRADED CALLS", value: String(profile.gradedCalls), color: BRIGHT, sub: "resolved vs public price" },
+        { label: "TO RANK UP", value: `${Math.max(0, 5 - profile.gradedCalls)}`, color: BONE, sub: "calls to Signal tier" },
+        { label: "SELF-REPORTED", value: "0", color: POS, sub: "nothing here is claimed" },
+      ];
+  const colX = [96, 500, 872];
+  const statSvg = stats.map((st, i) => `
+  <text x="${colX[i]}" y="452" fill="${FAINT}" font-size="15" letter-spacing="2">${esc(st.label)}</text>
+  <text x="${colX[i]}" y="500" fill="${st.color}" font-size="40" font-weight="bold">${esc(st.value)}</text>
+  <text x="${colX[i]}" y="524" fill="${MUTED}" font-size="14">${esc(st.sub)}</text>`).join("");
+
+  return `<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+  <defs><style>text { font-family: ${fontFamily}; }</style></defs>
+  <rect width="1200" height="630" fill="#0a0a0b"/>
+  <rect x="16" y="16" width="1168" height="598" fill="${PANEL}" stroke="${BORDER}" stroke-width="1" rx="10"/>
+  <rect x="16" y="16" width="1168" height="3" fill="${BONE}" rx="10" opacity="0.5"/>
+
+  <!-- header -->
+  <text x="48" y="86" fill="${BRIGHT}" font-size="24" font-weight="bold" letter-spacing="4">// THE LAB</text>
+  <text x="48" y="112" fill="${MUTED}" font-size="15" letter-spacing="2">TRADING IDENTITY · NEXUS</text>
+  <rect x="${1152 - rankW}" y="60" width="${rankW}" height="40" fill="none" stroke="${BONE}" stroke-width="1.5" rx="6"/>
+  <text x="${1152 - rankW / 2}" y="86" fill="${BONE}" font-size="17" font-weight="bold" letter-spacing="1" text-anchor="middle">${esc(rankText)}</text>
+
+  <line x1="48" y1="150" x2="1152" y2="150" stroke="${BORDER}" stroke-width="1"/>
+
+  <!-- headline -->
+  <text x="48" y="256" fill="${BRIGHT}" font-size="${hSize}" font-weight="bold">${esc(headline)}</text>
+  <text x="48" y="312" fill="#a1a1aa" font-size="20">${subline}</text>
+
+  <line x1="48" y1="372" x2="1152" y2="372" stroke="${BORDER}" stroke-width="1"/>
+
+  <!-- stats -->${statSvg}
+
+  <!-- footer -->
+  <line x1="48" y1="556" x2="1152" y2="556" stroke="${BORDER}" stroke-width="1"/>
+  <text x="48" y="590" fill="${MUTED}" font-size="15">${name} · verify → trade.nexustradinglabs.com</text>
+  <text x="1152" y="590" fill="${FAINT}" font-size="14" text-anchor="end">every number graded from public price</text>
 </svg>`;
 }
 
@@ -728,6 +818,87 @@ export default {
       const svg = buildThesisOgSvg(payload);
       return new Response(svg, { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=300", "Access-Control-Allow-Origin": "*" } });
     }
+
+    // ── /og/identity/:wallet(.png)? — the TRADING IDENTITY card ─────────────────
+    // The shareable poster of the Operator Profile. GRADED data only, composed from
+    // buildOperatorProfile so it can't disagree with the profile page. SVG for most
+    // crawlers; .png for X/Farcaster (raster). Cold-start states handled in the builder.
+    if (parts[0] === "og" && parts[1] === "identity" && parts[2]) {
+      if (request.method !== "GET") return new Response("method not allowed", { status: 405 });
+      const isPng = parts[2].endsWith(".png");
+      const wallet = normalizeAddress(isPng ? parts[2].slice(0, -4) : parts[2]);
+
+      // Same shape /theses/process builds, so the card and the page share one source.
+      let profile;
+      try {
+        const byWallet = await computeCallerStats(env, 30 * 86400, { onlyWallet: wallet });
+        const a = Object.values(byWallet)[0];
+        const process = (a && a.calls) ? {
+          calls: a.calls,
+          hitRate: Math.round((a.wins / a.calls) * 1000) / 10,
+          avgR: Math.round((a.rSum / a.calls) * 100) / 100,
+          expectancy: a.expectancy,
+          regimeEdges: a.regimeEdges,
+          discipline: a.plan,
+          calibration: a.calibration,
+          meritRank: rankCaller(a),
+        } : { calls: 0 };
+        profile = buildOperatorProfile({ process });
+      } catch (e) {
+        console.error("[og identity] profile build failed:", String(e));
+        profile = buildOperatorProfile({});
+      }
+      const profileRaw = await env.LAB_STORE.get(`profile:${wallet}`);
+      const displayName = profileRaw ? (JSON.parse(profileRaw).displayName || null) : null;
+
+      if (isPng) {
+        try {
+          await ensureResvg();
+          const font = await getMonoFont();
+          const svg = buildIdentitySvg({ profile, wallet, displayName, fontFamily: "'JetBrains Mono'" });
+          const resvg = new Resvg(svg, { font: { loadSystemFonts: false, fontBuffers: [font], defaultFontFamily: "JetBrains Mono" } });
+          const png = resvg.render().asPng();
+          return new Response(png, { headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=300, stale-while-revalidate=60", "Access-Control-Allow-Origin": "*" } });
+        } catch (e) {
+          console.error("[og identity PNG] failed, falling back to SVG:", String(e));
+        }
+      }
+      const svg = buildIdentitySvg({ profile, wallet, displayName });
+      return new Response(svg, { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=300", "Access-Control-Allow-Origin": "*" } });
+    }
+
+    // ── GET /share/identity/:wallet — crawler-friendly OG proxy ─────────────────
+    // Mirrors /share/thesis: real OG meta a JS-less crawler can read (unfurling the
+    // identity card), then bounces humans to the trader page. Share links point here.
+    if (parts[0] === "share" && parts[1] === "identity" && parts[2]) {
+      const wallet = normalizeAddress(parts[2]);
+      const appUrl = `https://trade.nexustradinglabs.com/feed/trader/${wallet}`;
+      const img = `https://og.nexustradinglabs.com/og/identity/${wallet}.png`;
+      const shareUrl = `https://og.nexustradinglabs.com/share/identity/${wallet}`;
+      const profileRaw = await env.LAB_STORE.get(`profile:${wallet}`);
+      const name = esc((profileRaw && JSON.parse(profileRaw).displayName) || `${wallet.slice(0, 6)}…${wallet.slice(-4)}`);
+      const title = `${name} · trading identity, graded from public price`;
+      const desc = "Every call scored against public price — not self-reported. See the record on Nexus.";
+      const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${title}</title>
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${esc(desc)}">
+<meta property="og:image" content="${img}">
+<meta property="og:url" content="${shareUrl}">
+<meta property="og:type" content="profile">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:description" content="${esc(desc)}">
+<meta name="twitter:image" content="${img}">
+<meta http-equiv="refresh" content="0; url=${appUrl}">
+<script>location.replace(${JSON.stringify(appUrl)})</script>
+</head><body style="background:#0a0a0b;color:#a1a1aa;font-family:monospace;padding:40px">
+Loading the record… <a style="color:#ededf0" href="${appUrl}">view on Nexus →</a>
+</body></html>`;
+      return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=120", "Access-Control-Allow-Origin": "*" } });
+    }
+
 
     // ── Ph22: /thesis/:wallet/:id → single thesis data ─────
     if (parts[0] === "thesis" && parts[1] && parts[2]) {
