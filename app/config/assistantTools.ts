@@ -88,25 +88,41 @@ export const TOOLS: ToolDef[] = [
       if (!res.ok) return JSON.stringify({ error: `catalyst fetch failed for ${t} (${res.status})` });
       const d = await res.json();
       type HL = { title: string; source: string; link: string; pubDate: string };
-      const mapItems = (items: { title?: string; link?: string; pubDate?: string }[]): HL[] =>
-        (items ?? []).slice(0, 6).map((it) => ({
-          title: String(it.title ?? "").replace(/ - [^-]*$/, ""), // strip trailing " - Source"
-          source: (String(it.title ?? "").split(" - ").pop() ?? "").trim(),
-          link: it.link ?? "", pubDate: it.pubDate ?? "",
-        }));
-      let headlines: HL[] = (d.catalysts ?? []).map((c: HL) => ({ title: c.title, source: c.source, link: c.link, pubDate: c.pubDate }));
-      // The worker's shared Cloudflare egress IP gets rate-limited/blocked by
-      // rss2json (same cloud-IP problem as CoinGecko/GeckoTerminal). If it came
-      // back empty, fetch headlines from the BROWSER (per-user IP, no shared
-      // limit — this is why NewsTab fetches client-side) as a fallback.
-      if (!headlines.length && d.name) {
-        try {
-          const q = d.assetClass === "crypto" && d.name === d.ticker ? `${d.name} crypto` : String(d.name);
-          const gnews = `https://news.google.com/rss/search?q=${encodeURIComponent(q + " when:3d")}&hl=en-US&gl=US&ceid=US:en`;
-          const nd = await (await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(gnews)}`)).json();
-          if (nd?.status === "ok" && Array.isArray(nd.items)) headlines = mapItems(nd.items);
-        } catch { /* ignore — return move-only */ }
-      }
+      // Headlines are fetched HERE, in the browser (per-user IP), NOT in the worker:
+      // rss2json blocks Cloudflare Worker IPs, so /intel/catalysts returns only the live
+      // `move` + meta and leaves the news to us. ⚠ We do NOT use Google News search —
+      // rss2json fetches that feed but extracts ZERO items from it (can't parse Google's
+      // RSS). It DOES parse CoinTelegraph's per-asset TAG feeds, which are the real
+      // asset-specific source (verified 10 relevant items each for BTC/ETH/SOL).
+      const rss = async (u: string) => { try { return await (await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(u)}`)).json(); } catch { return null; } };
+      const toHL = (items: { title?: string; link?: string; pubDate?: string }[], source: string): HL[] =>
+        (items ?? []).map((it) => ({ title: String(it.title ?? "").trim(), source, link: it.link ?? "", pubDate: it.pubDate ?? "" })).filter((h) => h.title);
+      let headlines: HL[] = [];
+      try {
+        if (d.assetClass === "crypto" && d.name) {
+          // CoinTelegraph per-asset tag feed, e.g. .../rss/tag/ethereum
+          const tag = String(d.name).toLowerCase().replace(/\s+/g, "-");
+          const nd = await rss(`https://cointelegraph.com/rss/tag/${tag}`);
+          if (nd?.status === "ok" && nd.items?.length) headlines = toHL(nd.items, "Cointelegraph").slice(0, 6);
+        }
+        if (!headlines.length) {
+          // Non-crypto (or a crypto tag miss): filter the broad finance/crypto feeds by
+          // the asset name/ticker. Thinner coverage, but honest — empty → AI says the
+          // move isn't clearly explained by current news rather than inventing one.
+          const BROAD = [
+            { u: "https://finance.yahoo.com/news/rssindex", s: "Yahoo Finance" },
+            { u: "https://www.coindesk.com/arc/outboundfeeds/rss/", s: "CoinDesk" },
+            { u: "https://cointelegraph.com/rss", s: "Cointelegraph" },
+          ];
+          const results = await Promise.all(BROAD.map((f) => rss(f.u)));
+          const terms = [d.name, d.ticker].filter(Boolean).map((s: string) => String(s).toLowerCase()).filter((s) => s.length >= 2);
+          if (terms.length) {
+            const rx = new RegExp(`\\b(${terms.map((s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\b`, "i");
+            const all = results.flatMap((nd, i) => (nd?.status === "ok" && Array.isArray(nd.items) ? toHL(nd.items, BROAD[i].s) : []));
+            headlines = all.filter((h) => rx.test(`${h.title} ${h.source}`)).slice(0, 6);
+          }
+        }
+      } catch { /* fail-soft — return move-only */ }
       return JSON.stringify({
         asset: d.name, ticker: d.ticker, assetClass: d.assetClass,
         move: d.move, headlines,

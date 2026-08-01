@@ -1891,28 +1891,17 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
             volume24h: d["24h_amount"] ?? d.volume,
           };
         }
-      } catch { /* fail-soft — return catalysts without move */ }
-      // catalysts (fail-soft): recent headlines for the asset, last 3 days
-      let catalysts = [];
-      try {
-        const gnews = `https://news.google.com/rss/search?q=${encodeURIComponent(meta.query + " when:3d")}&hl=en-US&gl=US&ceid=US:en`;
-        // NB: rss2json's `count` param requires a paid key (422s on free tier) —
-        // omit it and slice below. Edge cache (300s) absorbs the free-tier rate limit.
-        const nd = await (await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(gnews)}`, { signal: AbortSignal.timeout(6000) })).json();
-        if (nd?.status === "ok" && Array.isArray(nd.items)) {
-          catalysts = nd.items.slice(0, 6).map((it) => ({
-            title: String(it.title || "").replace(/ - [^-]*$/, ""), // strip trailing " - Source"
-            source: (String(it.title || "").split(" - ").pop() || "").trim() || (nd.feed?.title ?? ""),
-            link: it.link,
-            pubDate: it.pubDate,
-          }));
-        }
-      } catch { /* fail-soft — return move without catalysts */ }
+      } catch { /* fail-soft — return meta without move */ }
+      // ⚠ Headlines are fetched CLIENT-side (explain_move tool in assistantTools.ts),
+      // NOT here: rss2json blocks Cloudflare Worker IPs, so a server-side fetch always
+      // timed out empty and just added ~6s of dead latency per call. We hand the client
+      // the resolved search `query` (so "CL" → "crude oil", not a bare ticker) and let
+      // the browser (per-user IP) fetch the news. catalysts stays [] for back-compat.
       return new Response(JSON.stringify({
         symbol: perpSym, ticker: meta.ticker, name: meta.name, assetClass: meta.assetClass,
-        move, catalysts, asOf: new Date().toISOString(),
+        query: meta.query, move, catalysts: [], asOf: new Date().toISOString(),
         note: "Headlines are candidate context, not confirmed causes — correlation is not causation.",
-      }), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300", ...cors(request) } });
+      }), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=120", ...cors(request) } });
     }
 
     // NB: news aggregation is CLIENT-side (app/pages/lab/MarketIntel.tsx) on purpose —
