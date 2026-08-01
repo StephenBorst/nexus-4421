@@ -22,6 +22,7 @@ import { SmartMoneyView } from "./SmartMoneyView";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
 import { LabStanding } from "./LabStanding";
 import { CommandPalette } from "./CommandPalette";
+import { NexusBriefing } from "./NexusBriefing";
 import { CountUp } from "./components";
 
 export default function TheLabPage() {
@@ -111,6 +112,10 @@ export default function TheLabPage() {
   const openPositions: any[] = ((posData as any)?.rows ?? []).filter((p: any) => Math.abs(parseFloat(p?.position_qty ?? 0)) > 1e-9);
   const openCount = openPositions.length;
   const unrealizedPnl = openPositions.reduce((s: number, p: any) => s + (p.unsettled_pnl ?? 0), 0);
+  // Positions in the shape The Briefing reads (direction from signed qty).
+  const briefingPositions = openPositions
+    .map((p: any) => ({ symbol: String(p.symbol ?? ""), direction: (parseFloat(p.position_qty ?? 0) >= 0 ? "LONG" : "SHORT") as "LONG" | "SHORT" }))
+    .filter((p) => p.symbol);
 
   // ── The loop, made visible ────────────────────────────────────────────────
   // The product's whole claim is a LOOP — observe → plan → execute → prove — but the
@@ -270,7 +275,19 @@ export default function TheLabPage() {
         )}
         {activeTab === "copies" && <CopiesView />}
         {activeTab === "intel" && (
-          connected ? <MarketIntelView /> : <LabWelcome />
+          connected ? (
+            <>
+              <NexusBriefing
+                trades={processedTrades}
+                winRate={winRate}
+                totalPnl={totalPnl}
+                openPositions={briefingPositions}
+                wallet={rootWalletAddress}
+                onSelectTab={setActiveTab}
+              />
+              <MarketIntelView />
+            </>
+          ) : <LabWelcome />
         )}
         {activeTab === "smart" && <SmartMoneyView myPositions={openPositions} />}
         {activeTab === "agent" && <AgentView />}
