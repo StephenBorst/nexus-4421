@@ -58,6 +58,25 @@ export async function handleArena(parts, request, env) {
       return json({ error: "already_registered", hint: "This wallet already has an Arena agent. Pass rotate:true to update the profile and mint a fresh webhook token (the old one is revoked)." }, request, 409);
     }
 
+    // Registration spam guard. A valid walletSig is cheap to mass-produce (generate
+    // wallets), so ownership proof alone doesn't stop roster flooding — rate-limit
+    // registrations per IP on top of it. Sliding hourly window via KV TTL.
+    const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+    const rlKey = `arena:rl:${ip}`;
+    const rlCount = parseInt((await AGENT_KV.get(rlKey)) || "0", 10);
+    if (rlCount >= 5) {
+      return json({ error: "rate_limited", hint: "Max 5 Arena registrations per hour per IP. Try again later." }, request, 429);
+    }
+    await AGENT_KV.put(rlKey, String(rlCount + 1), { expirationTtl: 3600 });
+
+    // Capacity check BEFORE any write. Never evict: shifting the roster would let
+    // a flood of junk wallets push legitimate agents (and their records) off the board.
+    const rosterRaw = await AGENT_KV.get("arena:roster");
+    const roster = rosterRaw ? JSON.parse(rosterRaw) : [];
+    if (!roster.includes(address) && roster.length >= ARENA.rosterCap) {
+      return json({ error: "arena_full", hint: `The Arena roster is at capacity (${ARENA.rosterCap}).` }, request, 409);
+    }
+
     // Agent config + state — mirrors PUT /agent/:address for PAPER (no key, no
     // funds). signalMode EXTERNAL keeps the house brain silent for this agent.
     const config = arenaAgentConfig(body.config || {});
@@ -86,13 +105,12 @@ export async function handleArena(parts, request, env) {
     let createdAt = Date.now();
     if (existingRaw) { try { createdAt = JSON.parse(existingRaw).createdAt || createdAt; } catch { /* ignore */ } }
     await AGENT_KV.put(profileKey, JSON.stringify({ name: v.name, description: v.description, builder: v.builder, wallet: address, createdAt }));
-    const rosterRaw = await AGENT_KV.get("arena:roster");
-    const roster = rosterRaw ? JSON.parse(rosterRaw) : [];
     if (!roster.includes(address)) {
       roster.push(address);
-      while (roster.length > ARENA.rosterCap) roster.shift();
       await AGENT_KV.put("arena:roster", JSON.stringify(roster));
     }
+    // A new/updated agent should show on the board promptly — drop the 30s cache.
+    await AGENT_KV.delete("arena:cache:board");
 
     const base = new URL(request.url).origin;
     return json({
@@ -114,7 +132,16 @@ export async function handleArena(parts, request, env) {
   }
 
   // ── GET /arena/agents — public roster + graded records ─────────────────────
+  // Hot public endpoint (board UI polls it, other agents read it) — a 30s KV cache
+  // keeps the per-agent KV fan-out + Supabase query off every request.
   if (parts[1] === "agents" && !parts[2] && request.method === "GET") {
+    const cacheRaw = await AGENT_KV.get("arena:cache:board");
+    if (cacheRaw) {
+      try {
+        const c = JSON.parse(cacheRaw);
+        if (Date.now() - c.ts < 30000) return json(c.payload, request);
+      } catch { /* recompute */ }
+    }
     const rosterRaw = await AGENT_KV.get("arena:roster");
     const roster = rosterRaw ? JSON.parse(rosterRaw) : [];
     if (!roster.length) return json({ agents: [], count: 0 }, request);
@@ -170,7 +197,70 @@ export async function handleArena(parts, request, env) {
       (b.paper?.score ?? 0) - (a.paper?.score ?? 0) ||
       b.createdAt - a.createdAt
     );
-    return json({ agents, count: agents.length }, request);
+    const payload = { agents, count: agents.length };
+    await AGENT_KV.put("arena:cache:board", JSON.stringify({ ts: Date.now(), payload }), { expirationTtl: 120 });
+    return json(payload, request);
+  }
+
+  // ── GET /arena/agents/:address — one agent's public detail ─────────────────
+  // Profile + risk-config summary + recent graded trades (paper and live) + last
+  // activity. Powers the board's expandable rows and per-agent permalinks. Public
+  // read; no secrets (webhook token/passphrase never appear here).
+  if (parts[1] === "agents" && parts[2] && !parts[3] && request.method === "GET") {
+    const address = normalizeAddress(parts[2]);
+    const [profileRaw, configRaw, stateRaw] = await Promise.all([
+      AGENT_KV.get(`arena:profile:${address}`),
+      AGENT_KV.get(`agent:config:${address}`),
+      AGENT_KV.get(`agent:state:${address}`),
+    ]);
+    if (!profileRaw) return json({ error: "not_found" }, request, 404);
+    let profile, config = null, state = null;
+    try { profile = JSON.parse(profileRaw); } catch { return json({ error: "not_found" }, request, 404); }
+    try { config = configRaw ? JSON.parse(configRaw) : null; } catch { /* ignore */ }
+    try { state = stateRaw ? JSON.parse(stateRaw) : null; } catch { /* ignore */ }
+
+    let liveRows = [];
+    if (env.SUPABASE_URL && env.SUPABASE_ANON_KEY) {
+      try {
+        const r = await fetch(
+          `${env.SUPABASE_URL}/rest/v1/agent_trades?wallet_address=eq.${address}&order=closed_at.desc&limit=20`,
+          { headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` } }
+        );
+        if (r.ok) liveRows = await r.json();
+      } catch (e) { console.error("[arena] supabase detail error:", e); }
+    }
+
+    const paperRows = (state?.paper_trades || []).slice(0, 20);
+    const trimTrade = (t) => ({
+      symbol: t.symbol, direction: t.direction, pnl: Number(t.pnl) || 0,
+      reason: t.reason || null, opened_at: t.opened_at || null, closed_at: t.closed_at || null,
+    });
+    const pos = state?.current_position || null;
+    const lastCloseMs = (rows) => rows.length ? (new Date(rows[0].closed_at).getTime() || 0) : 0;
+    const lastActivity = Math.max(
+      lastCloseMs(paperRows), lastCloseMs(liveRows),
+      pos?.opened_at ? (new Date(pos.opened_at).getTime() || 0) : 0,
+    ) || null;
+
+    return json({
+      wallet: address,
+      name: profile.name,
+      description: profile.description || "",
+      builder: profile.builder || "",
+      createdAt: profile.createdAt || 0,
+      active: !!state?.active,
+      mode: config?.mode || "PAPER",
+      signalMode: config?.signalMode || null,
+      currentPosition: pos ? { symbol: pos.symbol, direction: pos.direction, paper: !!pos.paper, entry_price: Number(pos.entry_price) || null, opened_at: pos.opened_at || null } : null,
+      riskConfig: config ? {
+        leverage: config.leverage, capitalPerTrade: config.capitalPerTrade,
+        tpPercent: config.tpPercent, slPercent: config.slPercent,
+        maxHoldHours: config.maxHoldHours, maxTradesPerDay: config.maxTradesPerDay,
+      } : null,
+      paper: { ...(statBlock(state?.paper_trades) || {}), recent: paperRows.map(trimTrade) },
+      live: { ...(statBlock(liveRows) || {}), recent: liveRows.map(trimTrade) },
+      lastActivity,
+    }, request);
   }
 
   return null;

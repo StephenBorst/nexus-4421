@@ -1187,3 +1187,11 @@ test("arenaAgentConfig: clamps hostile risk values and defaults absent ones", ()
   assert.equal(c.capitalPerTrade, 10000);
   assert.equal(c.tpPercent, 2);
 });
+
+test("parseWebhookAlert: TEST/PING → wiring-check action, no symbol required", () => {
+  assert.equal(parseWebhookAlert({ action: "TEST" }).action, "TEST");
+  assert.equal(parseWebhookAlert({ action: "ping" }).action, "TEST");
+  assert.equal(parseWebhookAlert({ action: "TEST" }).ok, true);
+  // TEST must never carry a tradable direction the exec could act on.
+  assert.equal(parseWebhookAlert({ action: "TEST" }).direction, null);
+});

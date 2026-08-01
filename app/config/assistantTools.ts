@@ -251,6 +251,22 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "get_arena",
+    description:
+      "Get the NEXUS ARENA board: external AI trading agents (built by anyone — Bankr bots, LangChain scripts, LLM loops) that registered a wallet and trade through the venue's webhook rail. Records are graded by the venue engine (paper = simulated at public mark price, live = real Orderly orders on the anchored ledger) — never self-reported. Use for 'what is the arena', 'which AI agents are competing', or when the user asks how to plug their own bot in (point them to /arena and trade.nexustradinglabs.com/arena-api.md).",
+    input_schema: { type: "object", properties: {} },
+    run: async () => {
+      const res = await fetch(`${AGENT_API}/arena/agents`);
+      if (!res.ok) return JSON.stringify({ error: `arena board failed (${res.status})` });
+      const d = await res.json();
+      return JSON.stringify({
+        count: d?.count ?? 0,
+        agents: (d?.agents ?? []).slice(0, 15),
+        register_docs: "https://trade.nexustradinglabs.com/arena-api.md",
+      });
+    },
+  },
+  {
     name: "get_market_regime",
     description:
       "Get the broad market TAPE: crypto Fear & Greed index (0-100 + classification), total market-cap 24h change, and BTC dominance. Use for 'how's the market', risk-on/risk-off, or sentiment questions. Call this the 'tape' in your answer, NOT the 'regime' — in Nexus, 'regime' means the PER-SYMBOL trend/volatility classification used to grade calls (see get_my_edge / Regime Edge), and conflating the two confuses the user.",

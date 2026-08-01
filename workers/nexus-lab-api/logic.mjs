@@ -736,6 +736,9 @@ export function parseWebhookAlert(body) {
   if (!body || typeof body !== "object") return { ok: false, error: "empty body" };
   const raw = String(body.action ?? body.side ?? "").trim().toUpperCase();
   let action, direction = null;
+  // TEST = builder wiring check — the hook route answers with diagnostics and
+  // never queues an intent, so builders can verify token/passphrase safely.
+  if (raw === "TEST" || raw === "PING") return { ok: true, action: "TEST", direction: null, symbol: null, sizeOverride: null };
   if (["CLOSE", "EXIT", "FLAT"].includes(raw)) action = "CLOSE";
   else if (["BUY", "LONG"].includes(raw)) { action = "OPEN"; direction = "LONG"; }
   else if (["SELL", "SHORT"].includes(raw)) { action = "OPEN"; direction = "SHORT"; }

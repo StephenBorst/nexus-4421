@@ -3453,6 +3453,25 @@ document.getElementById("btn").addEventListener("click",go);
       }
       const parsed = parseWebhookAlert(body);
       if (!parsed.ok) return json({ error: parsed.error }, request, 400);
+      // TEST/PING — answer with wiring diagnostics, queue nothing. Lets a builder
+      // verify token + passphrase + agent state without risking a trade.
+      if (parsed.action === "TEST") {
+        const [cfgR, stR] = await Promise.all([
+          AGENT_KV.get(`agent:config:${meta.address}`),
+          AGENT_KV.get(`agent:state:${meta.address}`),
+        ]);
+        let cfg = null, st = null;
+        try { cfg = cfgR ? JSON.parse(cfgR) : null; } catch { /* ignore */ }
+        try { st = stR ? JSON.parse(stR) : null; } catch { /* ignore */ }
+        return json({
+          ok: true, test: true, queued: false,
+          agent: {
+            active: !!st?.active, mode: cfg?.mode || null, signalMode: cfg?.signalMode || null,
+            holding: !!st?.current_position, trades_today: st?.trades_today ?? 0,
+          },
+          hint: "Wiring verified. Send {action: BUY|SELL|CLOSE, symbol, passphrase} to trade.",
+        }, request);
+      }
       const intent = {
         action: parsed.action, direction: parsed.direction, symbol: parsed.symbol,
         sizeOverride: parsed.sizeOverride, timestamp: Date.now(), source: "WEBHOOK",

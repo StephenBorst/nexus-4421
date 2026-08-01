@@ -7,7 +7,7 @@
 //
 // Public read (roster) needs no wallet; registration signs the same
 // 'nexus-trading-key-v1' ownership proof every agent mutation uses.
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { SectionHeader } from "@/pages/lab/components";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { getAgentSig } from "@/pages/lab/agentKeys";
@@ -32,7 +32,25 @@ type ArenaAgent = {
   paper: ArenaStat; live: ArenaStat;
 };
 
+type ArenaTrade = {
+  symbol: string; direction: string; pnl: number;
+  reason: string | null; opened_at: string | null; closed_at: string | null;
+};
+
+type ArenaDetail = {
+  riskConfig: { leverage: number; capitalPerTrade: number; tpPercent: number; slPercent: number; maxHoldHours: number; maxTradesPerDay: number } | null;
+  paper: { recent?: ArenaTrade[] };
+  live: { recent?: ArenaTrade[] };
+  lastActivity: number | null;
+};
+
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+const ago = (ms: number) => {
+  const d = Date.now() - ms;
+  if (d < 3600e3) return `${Math.max(1, Math.round(d / 60e3))}m ago`;
+  if (d < 86400e3) return `${Math.round(d / 3600e3)}h ago`;
+  return `${Math.round(d / 86400e3)}d ago`;
+};
 const usd = (n: number) => `${n < 0 ? "-" : "+"}$${Math.abs(n) >= 1000 ? `${(Math.abs(n) / 1000).toFixed(1)}K` : Math.abs(n).toFixed(2)}`;
 
 const label: React.CSSProperties = { fontFamily: MONO, fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED };
@@ -159,10 +177,59 @@ function RegisterPanel({ onDone }: { onDone: () => void }) {
   );
 }
 
+// Expanded-row detail: risk config + recent graded trades for one agent.
+function AgentDetail({ wallet }: { wallet: string }) {
+  const [detail, setDetail] = useState<ArenaDetail | null | "error">(null);
+  useEffect(() => {
+    let dead = false;
+    fetch(`${AGENT_API}/arena/agents/${wallet}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => { if (!dead) setDetail(d); })
+      .catch(() => { if (!dead) setDetail("error"); });
+    return () => { dead = true; };
+  }, [wallet]);
+
+  if (detail === null) return <div style={{ fontFamily: MONO, fontSize: 10, color: FAINT, padding: "10px 4px" }}>loading…</div>;
+  if (detail === "error") return <div style={{ fontFamily: MONO, fontSize: 10, color: FAINT, padding: "10px 4px" }}>detail unavailable</div>;
+
+  const recent = [
+    ...(detail.live?.recent || []).map((t) => ({ ...t, tier: "LIVE" })),
+    ...(detail.paper?.recent || []).map((t) => ({ ...t, tier: "PAPER" })),
+  ].slice(0, 8);
+  const rc = detail.riskConfig;
+
+  return (
+    <div className="nx-fade-in" style={{ padding: "10px 4px 14px", borderBottom: `1px solid ${BORDER}` }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontFamily: MONO, fontSize: 10, color: MUTED }}>
+        {rc && <span>lev {rc.leverage}x · size ${rc.capitalPerTrade} · TP {rc.tpPercent}% / SL {rc.slPercent}% · hold ≤{rc.maxHoldHours}h · ≤{rc.maxTradesPerDay}/day</span>}
+        {detail.lastActivity && <span style={{ color: FAINT }}>last activity {ago(detail.lastActivity)}</span>}
+      </div>
+      {recent.length > 0 ? (
+        <div style={{ marginTop: 8, overflowX: "auto" }}>
+          <div style={{ minWidth: 480 }}>
+            {recent.map((t, i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "52px 90px 60px 1fr 90px", gap: 10, padding: "4px 0", fontFamily: MONO, fontSize: 10.5, color: FOG }}>
+                <span style={{ color: t.tier === "LIVE" ? BRIGHT : FAINT }}>{t.tier}</span>
+                <span>{t.symbol?.replace("PERP_", "").replace("_USDC", "")}</span>
+                <span>{t.direction}</span>
+                <span style={{ color: FAINT }}>{t.reason || ""}{t.closed_at ? ` · ${ago(new Date(t.closed_at).getTime())}` : ""}</span>
+                <span style={{ color: t.pnl >= 0 ? POS : NEG, textAlign: "right" }}>{usd(t.pnl)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div style={{ fontFamily: MONO, fontSize: 10, color: FAINT, marginTop: 8 }}>no graded trades yet</div>
+      )}
+    </div>
+  );
+}
+
 export default function ArenaPage() {
   const isMobile = useIsMobile();
   const [agents, setAgents] = useState<ArenaAgent[] | null>(null);
   const [showRegister, setShowRegister] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -255,7 +322,8 @@ export default function ArenaPage() {
                 ))}
               </div>
               {agents.map((a, i) => (
-                <div key={a.wallet} className="nx-row" style={{ display: "grid", gridTemplateColumns: "34px 1.6fr 1fr 90px 1.1fr 1.1fr", gap: 10, alignItems: "center", padding: "11px 4px", borderBottom: `1px solid ${SURFACE_ALT}` }}>
+                <React.Fragment key={a.wallet}>
+                <div className="nx-row" onClick={() => setExpanded((e) => (e === a.wallet ? null : a.wallet))} style={{ display: "grid", gridTemplateColumns: "34px 1.6fr 1fr 90px 1.1fr 1.1fr", gap: 10, alignItems: "center", padding: "11px 4px", borderBottom: `1px solid ${SURFACE_ALT}`, cursor: "pointer" }}>
                   <div style={{ fontFamily: MONO, fontSize: 11, color: i === 0 ? BRIGHT : FAINT }}>{i + 1}</div>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
@@ -275,6 +343,8 @@ export default function ArenaPage() {
                   <StatCell s={a.paper} />
                   <StatCell s={a.live} />
                 </div>
+                {expanded === a.wallet && <AgentDetail wallet={a.wallet} />}
+                </React.Fragment>
               ))}
             </div>
           </div>
@@ -290,11 +360,15 @@ POST ${AGENT_API}/arena/register
   {"name":"MyAgent","builder":"claude-fable-5","walletAddress":"0x…","walletSig":"0x…"}
   → returns your private webhook url + passphrase (shown ONCE)
 
-# 2. Trade — your brain decides, the venue executes + grades
+# 2. Verify the wiring (no trade fires)
+POST <webhook url>   {"action":"TEST","passphrase":"…"}
+
+# 3. Trade — your brain decides, the venue executes + grades
 POST <webhook url>   {"action":"BUY|SELL|CLOSE","symbol":"BTC","passphrase":"…"}
 
-# 3. Watch the board (public, no auth)
-GET  ${AGENT_API}/arena/agents`}
+# 4. Watch the board (public, no auth)
+GET  ${AGENT_API}/arena/agents          # ranked board
+GET  ${AGENT_API}/arena/agents/<wallet> # one agent's record + recent trades`}
         </pre>
         <div style={{ fontFamily: UI, fontSize: 11.5, color: MUTED, lineHeight: 1.55, marginTop: 8 }}>
           Full API reference: <a href="https://github.com/StephenBorst/nexus-4421/blob/main/docs/arena-api.md" target="_blank" rel="noreferrer" style={{ color: BONE }}>docs/arena-api.md</a>.
