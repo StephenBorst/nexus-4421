@@ -79,6 +79,134 @@ function bySymbol(trades: BriefingTrade[]) {
   return { best: arr[0], worst: arr[arr.length - 1] };
 }
 
+// ── THE READ — the general (wallet-free) market synthesis ────────────────────
+// The personal Briefing reads YOUR record; this reads THE MARKET, in the same
+// voice, so the Lab feels intelligent to anyone — connected or not. Sourced from
+// the public /signals (funding + OI + confluence, the agent's own rules), the
+// futures tape, and live agent activity. Pure + fail-soft on missing inputs.
+
+export interface MarketSignal {
+  symbol: string;               // bare ticker (BTC, ETH…)
+  funding_rate_8h: number;      // decimal (0.0001 = 0.01%)
+  price_change_pct: number;     // vs ~5-min prior snapshot
+  oi_change_pct: number;
+  funding_signal: "LONG" | "SHORT" | "NONE";
+  oi_signal: "LONG" | "SHORT" | "NONE";
+  confluence: "LONG" | "SHORT" | "NONE";
+}
+
+export interface MarketReadInput {
+  rows: { symbol: string; "24h_open"?: string | number; "24h_close"?: string | number }[] | null;
+  signals: MarketSignal[] | null;
+  liveAgents: number | null;
+  tape: { label: string; score: number } | null;
+}
+
+const pctChange = (o?: string | number, c?: string | number) => {
+  const oo = parseFloat(String(o ?? 0)), cc = parseFloat(String(c ?? 0));
+  if (!oo || !cc) return 0;
+  const p = ((cc - oo) / oo) * 100;
+  return Math.abs(p) > 60 ? 0 : p; // guard bad ticks
+};
+
+export function buildMarketRead(input: MarketReadInput): Insight[] {
+  const { rows, signals, liveAgents, tape } = input;
+  const out: Insight[] = [];
+
+  // 1 — Tape headline: what the whole market is doing + what it favors.
+  if (tape) {
+    const guide =
+      tape.label === "RISK-ON" ? "Broad strength — momentum/trend setups favored; funding fades are riskier into a bid."
+      : tape.label === "RISK-OFF" ? "Broad weakness — mean-reversion fades and tighter stops; don't chase longs."
+      : "Rangebound tape — funding-harvest and confluence setups fit best.";
+    out.push({
+      id: "read-tape",
+      priority: 60,
+      tone: tape.label === "RISK-OFF" ? "caution" : "info",
+      title: `${tape.label} tape · ${tape.score}/100`,
+      detail: guide,
+      action: { label: "Market Intel", tab: "intel" },
+    });
+  }
+
+  // 2 — Confluence setup: the agent's highest-conviction read, surfaced for humans.
+  const conf = (signals || []).find((s) => s.confluence !== "NONE");
+  if (conf) {
+    out.push({
+      id: "read-confluence",
+      priority: 78,
+      tone: "info",
+      title: `Confluence: ${conf.confluence} ${conf.symbol}`,
+      detail: `Funding and open interest agree — the strongest setup on the board, and exactly what the autonomous agent fades. ${conf.funding_signal === conf.confluence ? "Crowd positioning is extended." : ""}`.trim(),
+      action: { label: "Run the agent", tab: "agent" },
+    });
+  }
+
+  // 3 — Crowded funding (fade the crowd — the core edge). Pick the most-stretched
+  // market that ISN'T already shown as the confluence setup, so it's a second read.
+  const byFund = [...(signals || [])].sort((a, b) => Math.abs(b.funding_rate_8h) - Math.abs(a.funding_rate_8h));
+  const hot = byFund.find((s) => !conf || s.symbol !== conf.symbol);
+  if (hot && Math.abs(hot.funding_rate_8h) >= 0.0004) {
+    const heavy = hot.funding_rate_8h > 0 ? "long" : "short";
+    out.push({
+      id: "read-funding",
+      priority: 68,
+      tone: "info",
+      title: `${hot.symbol} funding is stretched (${(hot.funding_rate_8h * 100).toFixed(3)}%/8h)`,
+      detail: `The crowd is heavily ${heavy}. Overcrowded funding is where fades set up — the higher it goes, the more it's paying you to lean the other way.`,
+      action: { label: "See the read", tab: "intel" },
+    });
+  }
+
+  // 4 — Biggest movers across the whole board (all markets, not just majors).
+  if (rows && rows.length) {
+    let top = { sym: "", chg: 0 }, bot = { sym: "", chg: 0 };
+    for (const r of rows) {
+      const c = pctChange(r["24h_open"], r["24h_close"]);
+      if (c > top.chg) top = { sym: r.symbol.replace("PERP_", "").replace("_USDC", ""), chg: c };
+      if (c < bot.chg) bot = { sym: r.symbol.replace("PERP_", "").replace("_USDC", ""), chg: c };
+    }
+    if (top.sym && bot.sym && (Math.abs(top.chg) >= 4 || Math.abs(bot.chg) >= 4)) {
+      out.push({
+        id: "read-movers",
+        priority: 48,
+        tone: "info",
+        title: `${top.sym} +${top.chg.toFixed(1)}% leads · ${bot.sym} ${bot.chg.toFixed(1)}% lags`,
+        detail: "The widest 24h dispersion on the board — where the momentum and the mean-reversion both live.",
+        action: { label: "Market Intel", tab: "intel" },
+      });
+    }
+  }
+
+  // 5 — Live agents in the market right now (ties the scene to the Arena).
+  if (typeof liveAgents === "number" && liveAgents > 0) {
+    out.push({
+      id: "read-live-agents",
+      priority: 44,
+      tone: "info",
+      title: `${liveAgents} autonomous ${liveAgents === 1 ? "agent is" : "agents are"} live in the market`,
+      detail: "Real positions from Nexus agents right now — every entry and exit graded on-chain. Watch them work, or put yours in.",
+      action: { label: "Trading Agent", tab: "agent" },
+    });
+  }
+
+  // 6 — OI surge: conviction building where open interest is expanding fast.
+  const byOi = [...(signals || [])].sort((a, b) => Math.abs(b.oi_change_pct) - Math.abs(a.oi_change_pct));
+  const oiHot = byOi[0];
+  if (oiHot && Math.abs(oiHot.oi_change_pct) >= 3 && oiHot.symbol !== conf?.symbol && oiHot.symbol !== hot?.symbol) {
+    out.push({
+      id: "read-oi",
+      priority: 40,
+      tone: "info",
+      title: `Open interest is ${oiHot.oi_change_pct > 0 ? "surging" : "flushing"} on ${oiHot.symbol} (${oiHot.oi_change_pct > 0 ? "+" : ""}${oiHot.oi_change_pct.toFixed(1)}%)`,
+      detail: oiHot.oi_change_pct > 0 ? "New money is committing — conviction, or a crowd building to fade." : "Positions are unwinding — a squeeze or a reset in progress.",
+      action: { label: "Market Intel", tab: "intel" },
+    });
+  }
+
+  return out.sort((a, b) => b.priority - a.priority);
+}
+
 /**
  * Build the ranked briefing. Returns [] when there's nothing honest to say
  * (e.g. no trades yet) — the caller renders nothing rather than filler.

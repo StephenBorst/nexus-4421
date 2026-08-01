@@ -275,19 +275,20 @@ export default function TheLabPage() {
         )}
         {activeTab === "copies" && <CopiesView />}
         {activeTab === "intel" && (
-          connected ? (
-            <>
-              <NexusBriefing
-                trades={processedTrades}
-                winRate={winRate}
-                totalPnl={totalPnl}
-                openPositions={briefingPositions}
-                wallet={rootWalletAddress}
-                onSelectTab={setActiveTab}
-              />
-              <MarketIntelView />
-            </>
-          ) : <LabWelcome />
+          <>
+            {/* The Briefing reads the MARKET for everyone (wallet-free) and adds a
+                personal lens when connected — so the Lab feels intelligent on the
+                first visit, before any wallet or history. */}
+            <NexusBriefing
+              trades={connected ? processedTrades : []}
+              winRate={winRate}
+              totalPnl={totalPnl}
+              openPositions={connected ? briefingPositions : []}
+              wallet={rootWalletAddress}
+              onSelectTab={setActiveTab}
+            />
+            {connected ? <MarketIntelView /> : <LabWelcome />}
+          </>
         )}
         {activeTab === "smart" && <SmartMoneyView myPositions={openPositions} />}
         {activeTab === "agent" && <AgentView />}
