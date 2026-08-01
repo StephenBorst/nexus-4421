@@ -279,7 +279,10 @@ export default function TheLabPage() {
             of it. Hairline rule separates it from the working surface above. */}
         <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #232327", display: "flex", flexDirection: "column", gap: 12 }}>
           <NexusMarket />
-          <NexusBrokerStats />
+          {/* compact: Orderly's by-broker dashboard endpoint currently 404s, so this
+              only renders the "verify on Orderly" trust link — no reason to give it a
+              full band until the volume/fees source is restored. */}
+          <NexusBrokerStats compact />
           {connected && <NexusPro walletAddress={rootWalletAddress} />}
         </div>
       </div>
