@@ -12,16 +12,38 @@
 // ⚠️ This page deliberately uses NO Orderly private hooks — only public APIs and
 // our own worker proxy. Keep it that way (see the SWR-key-collision incident).
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { AnalyticsView } from "@/pages/lab/AnalyticsView";
+import { SectionHeader } from "@/pages/lab/components";
+import { useIsMobile } from "@/pages/lab/useIsMobile";
 import type { ProcessedTrade } from "@/pages/lab/types";
 import { deployDirectiveFromThesis } from "@/utils/agentPrefill";
 import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
 
-const GREEN = "#ededf0";
-const mono = "var(--nx-font-mono)";
+// Shared design tokens — same set the Arena uses, so the two pages read as one system.
+const MONO = "var(--nx-font-mono)";
+const UI = "var(--nx-font-ui, sans-serif)";
 const AGENT_API = "https://og.nexustradinglabs.com";
+const BONE = "#ededf0";
 const POS = "#3ecf8e", NEG = "#f7525f";
+const FOG = "#a1a1aa", MUTED = "#71717a", FAINT = "#52525b", BRIGHT = "#f4f4f5";
+const BORDER = "#232327", SURFACE = "#141416", SURFACE_ALT = "#0f0f11";
+
+const label: CSSProperties = { fontFamily: MONO, fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED };
+
+// Board-style section head — mono eyebrow + a hairline rule, mirrors the Arena board.
+function SubHead({ title, note }: { title: string; note?: string }) {
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+        <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.22em", color: MUTED }}>{title}</div>
+        {note && <div style={{ fontFamily: MONO, fontSize: 9.5, color: FAINT }}>{note}</div>}
+      </div>
+      <div style={{ height: 1, background: BORDER, margin: "10px 0 14px" }} />
+    </>
+  );
+}
 
 type XraySymbol = {
   sym: string; realized: number; unrealized: number;
@@ -189,15 +211,19 @@ export default function AnalyzePage() {
     };
   }, [trades]);
 
+  const isMobile = useIsMobile();
+
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px 80px", fontFamily: mono, color: "#f4f4f5" }}>
-      <div style={{ marginBottom: 6, fontSize: 11, letterSpacing: "0.15em", color: GREEN }}>// WALLET X-RAY</div>
-      <h1 style={{ fontSize: 26, fontWeight: 800, margin: "0 0 8px", letterSpacing: "-0.01em" }}>
-        X-ray any trader. <span style={{ color: GREEN }}>Grade the tape.</span>
-      </h1>
-      <p style={{ fontSize: 13, color: "#a1a1aa", maxWidth: 660, lineHeight: 1.6, margin: "0 0 20px" }}>
-        Paste any wallet. We read its perp record from <b style={{ color: "#d4d4d8" }}>Hyperliquid</b> and
-        from the <b style={{ color: "#d4d4d8" }}>Orderly network</b> — including Nexus — straight off
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: isMobile ? "20px 14px 60px" : "32px 24px 80px", color: BRIGHT }}>
+      <SectionHeader
+        eyebrow="// WALLET X-RAY"
+        title="X-ray any trader. Grade the tape."
+        note="NO LOGIN · PUBLIC DATA"
+      />
+
+      <p style={{ fontFamily: UI, fontSize: 13.5, color: FOG, maxWidth: 640, lineHeight: 1.65, margin: "0 0 22px" }}>
+        Paste any wallet. We read its perp record from <b style={{ color: BRIGHT }}>Hyperliquid</b> and
+        from the <b style={{ color: BRIGHT }}>Orderly network</b> — including Nexus — straight off
         public data. No login. Then bring your own edge here and prove it on-chain.
       </p>
 
@@ -209,17 +235,19 @@ export default function AnalyzePage() {
           placeholder="0x… any wallet address"
           spellCheck={false}
           style={{
-            flex: "1 1 360px", background: "#0a0a0b", border: `1px solid ${isAddress(input) ? GREEN : "#232327"}`,
-            borderRadius: 6, padding: "12px 14px", color: "#fff", fontFamily: mono, fontSize: 13, outline: "none",
+            flex: "1 1 360px", boxSizing: "border-box", background: "#08080a",
+            border: `1px solid ${isAddress(input) ? BONE : BORDER}`,
+            borderRadius: 4, padding: "10px 12px", color: BRIGHT, fontFamily: MONO, fontSize: 12, outline: "none",
           }}
         />
         <button
           onClick={submit}
           disabled={loading}
+          className="nx-btn"
           style={{
-            background: GREEN, color: "#141416", border: "none", borderRadius: 6, padding: "12px 24px",
-            fontFamily: mono, fontWeight: 700, fontSize: 13, letterSpacing: "0.06em", cursor: loading ? "default" : "pointer",
-            opacity: loading ? 0.6 : 1,
+            fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+            color: "#0a0a0b", background: BONE, border: "none", borderRadius: 4,
+            padding: "11px 20px", cursor: loading ? "default" : "pointer", opacity: loading ? 0.6 : 1,
           }}
         >
           {loading ? "ANALYZING…" : "ANALYZE →"}
@@ -227,24 +255,24 @@ export default function AnalyzePage() {
       </div>
 
       {error && (
-        <div style={{ fontSize: 12, color: "#f7525f", fontFamily: mono, marginBottom: 16 }}>{error}</div>
+        <div style={{ fontFamily: MONO, fontSize: 12, color: NEG, marginBottom: 16 }}>{error}</div>
       )}
 
       {loading && (
-        <div style={{ fontSize: 12, color: "#a1a1aa", fontFamily: mono }}>$ ./xray.sh --wallet {address?.slice(0, 8)}… <span style={{ color: GREEN }}>reading hyperliquid + orderly…</span></div>
+        <div style={{ fontFamily: MONO, fontSize: 12, color: FOG }}>$ ./xray.sh --wallet {address?.slice(0, 8)}… <span style={{ color: BONE }}>reading hyperliquid + orderly…</span></div>
       )}
 
       {trades && trades.length > 0 && (
-        <>
-          <div style={{ fontSize: 11, color: "#a1a1aa", fontFamily: mono, marginBottom: 10 }}>
-            <span style={{ color: GREEN }}>{trades.length}</span> closed perp trades · source: Hyperliquid · {address?.slice(0, 6)}…{address?.slice(-4)}
+        <div className="nx-fade-in">
+          <div style={{ fontFamily: MONO, fontSize: 11, color: FOG, marginBottom: 10 }}>
+            <span style={{ color: BONE }}>{trades.length}</span> closed perp trades · source: Hyperliquid · {address?.slice(0, 6)}…{address?.slice(-4)}
           </div>
           <AnalyticsView orders={trades} totalPnl={totalPnl} winRate={winRate} collateral={0} />
-          <div style={{ marginTop: 24, padding: "16px 18px", border: `1px solid #232327`, borderRadius: 8, background: "#141416", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ fontSize: 13, color: "#f4f4f5" }}>Like what you see? Build a track record nobody can fake.</div>
-            <a href="/lab" style={{ background: GREEN, color: "#141416", textDecoration: "none", borderRadius: 6, padding: "10px 20px", fontFamily: mono, fontWeight: 700, fontSize: 12, letterSpacing: "0.06em" }}>OPEN THE LAB →</a>
+          <div style={{ marginTop: 24, padding: "16px 18px", border: `1px solid ${BORDER}`, borderRadius: 6, background: SURFACE_ALT, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontFamily: UI, fontSize: 13, color: BRIGHT }}>Like what you see? Build a track record nobody can fake.</div>
+            <a href="/lab" className="nx-btn" style={{ background: BONE, color: "#0a0a0b", textDecoration: "none", borderRadius: 4, padding: "10px 20px", fontFamily: MONO, fontWeight: 700, fontSize: 11, letterSpacing: "0.08em" }}>OPEN THE LAB →</a>
           </div>
-        </>
+        </div>
       )}
 
       {/* ── ORDERLY NETWORK RECORD ─────────────────────────────────────────────
@@ -252,29 +280,29 @@ export default function AnalyzePage() {
           DERIVED account_id per broker (see worker /smart/xray). Deliberately not
           fed into <AnalyticsView>: there's no per-trade tape behind it. */}
       {orderly && orderly.venues.length > 0 && (
-        <div style={{ marginTop: trades && trades.length ? 28 : 0 }}>
-          <div style={{ fontSize: 11, letterSpacing: "0.15em", color: "#71717a", marginBottom: 8 }}>// ORDERLY NETWORK RECORD</div>
-          <p style={{ fontSize: 12, color: "#71717a", lineHeight: 1.6, margin: "0 0 14px", maxWidth: 680 }}>
+        <div className="nx-fade-in" style={{ marginTop: trades && trades.length ? 34 : 8 }}>
+          <SubHead title="ORDERLY NETWORK RECORD" note="PUBLIC INDEXER" />
+          <p style={{ fontFamily: UI, fontSize: 12.5, color: MUTED, lineHeight: 1.6, margin: "0 0 16px", maxWidth: 680 }}>
             Settled on-chain, read from Orderly&apos;s public indexer — found on{" "}
-            <b style={{ color: "#d4d4d8" }}>{orderly.venues.length}</b> of {orderly.brokersChecked} venues probed.
+            <b style={{ color: BRIGHT }}>{orderly.venues.length}</b> of {orderly.brokersChecked} venues probed.
             These are per-market totals; Orderly doesn&apos;t publish a per-trade tape, so the
             hold-time and timing analytics above stay Hyperliquid-only.
           </p>
 
           {orderly.venues.map((v) => (
-            <div key={v.brokerId} style={{ border: `1px solid ${v.isNexus ? "#33333a" : "#232327"}`, borderRadius: 8, background: "#141416", padding: "14px 16px", marginBottom: 12 }}>
+            <div key={v.brokerId} style={{ border: `1px solid ${BORDER}`, borderLeft: v.isNexus ? `3px solid ${BONE}` : `1px solid ${BORDER}`, borderRadius: 6, background: SURFACE_ALT, padding: "14px 16px", marginBottom: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-                <span style={{ fontSize: 13, color: "#f4f4f5", fontWeight: 700, letterSpacing: "0.04em" }}>{v.brokerId}</span>
+                <span style={{ fontFamily: MONO, fontSize: 13, color: BRIGHT, fontWeight: 700, letterSpacing: "0.04em" }}>{v.brokerId}</span>
                 {v.isNexus && (
-                  <span style={{ fontSize: 8, letterSpacing: "0.1em", color: "#0a0a0b", background: GREEN, borderRadius: 3, padding: "2px 6px", fontWeight: 700 }}>THIS IS NEXUS</span>
+                  <span style={{ fontFamily: MONO, fontSize: 8, letterSpacing: "0.1em", color: "#0a0a0b", background: BONE, borderRadius: 3, padding: "2px 6px", fontWeight: 700 }}>THIS IS NEXUS</span>
                 )}
-                <span title={v.accountId} style={{ fontSize: 9, color: "#52525b", marginLeft: "auto" }}>
+                <span title={v.accountId} style={{ fontFamily: MONO, fontSize: 9, color: FAINT, marginLeft: "auto" }}>
                   acct {v.accountId.slice(0, 10)}…{v.accountId.slice(-6)}
                 </span>
                 <button
                   onClick={() => toggleWatch(orderly.address)}
                   title={watch.includes(orderly.address) ? "Remove from your Smart Money watchlist" : "Track this wallet in Smart Money"}
-                  style={{ background: "none", border: `1px solid ${watch.includes(orderly.address) ? "#33333a" : "#232327"}`, borderRadius: 3, cursor: "pointer", fontFamily: mono, fontSize: 9, letterSpacing: "0.05em", padding: "3px 8px", color: watch.includes(orderly.address) ? "#ededf0" : "#71717a" }}
+                  style={{ background: "none", border: `1px solid ${BORDER}`, borderRadius: 3, cursor: "pointer", fontFamily: MONO, fontSize: 9, letterSpacing: "0.05em", padding: "3px 8px", color: watch.includes(orderly.address) ? BONE : MUTED }}
                 >
                   {watch.includes(orderly.address) ? "★ WATCHING" : "☆ WATCH"}
                 </button>
@@ -283,29 +311,29 @@ export default function AnalyzePage() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 10, marginBottom: 12 }}>
                 {[
                   { l: "REALIZED", v: usd(v.realized), c: v.realized >= 0 ? POS : NEG },
-                  { l: "UNREALIZED", v: v.unrealized ? usd(v.unrealized) : "—", c: v.unrealized === 0 ? "#52525b" : v.unrealized > 0 ? POS : NEG },
-                  { l: "MARKETS", v: String(v.markets), c: "#f4f4f5" },
-                  { l: "PROFITABLE MKTS", v: `${v.profitableMarketsPct}%`, c: "#f4f4f5" },
-                  { l: "OPEN NOW", v: String(v.openPositions), c: v.openPositions ? "#f4f4f5" : "#52525b" },
+                  { l: "UNREALIZED", v: v.unrealized ? usd(v.unrealized) : "—", c: v.unrealized === 0 ? FAINT : v.unrealized > 0 ? POS : NEG },
+                  { l: "MARKETS", v: String(v.markets), c: BRIGHT },
+                  { l: "PROFITABLE MKTS", v: `${v.profitableMarketsPct}%`, c: BRIGHT },
+                  { l: "OPEN NOW", v: String(v.openPositions), c: v.openPositions ? BRIGHT : FAINT },
                 ].map(({ l, v: val, c }) => (
                   <div key={l}>
-                    <div style={{ fontSize: 8, color: "#52525b", letterSpacing: "0.12em" }}>{l}</div>
-                    <div style={{ fontSize: 15, color: c, fontWeight: 600, marginTop: 2 }}>{val}</div>
+                    <div style={{ ...label, fontSize: 8, letterSpacing: "0.12em" }}>{l}</div>
+                    <div style={{ fontFamily: MONO, fontSize: 15, color: c, fontWeight: 600, marginTop: 2 }}>{val}</div>
                   </div>
                 ))}
               </div>
 
               {/* Columns total ~474px of minWidth — wider than a phone card, so the
                   container SCROLLS instead of clipping the right-hand columns off. */}
-              <div style={{ borderTop: "1px solid #232327", paddingTop: 8, overflowX: "auto" }}>
+              <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 8, overflowX: "auto" }}>
                 {v.bySymbol.slice(0, 12).map((s) => (
-                  <div key={s.sym} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", fontSize: 11, minWidth: 474 }}>
-                    <span style={{ color: "#f4f4f5", flex: "1 1 70px", minWidth: 70 }}>{s.sym}</span>
+                  <div key={s.sym} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", fontFamily: MONO, fontSize: 11, minWidth: 474 }}>
+                    <span style={{ color: BRIGHT, flex: "1 1 70px", minWidth: 70 }}>{s.sym}</span>
                     <span style={{ color: s.realized >= 0 ? POS : NEG, flex: "1 1 90px", minWidth: 90, textAlign: "right" }}>{usd(s.realized)}</span>
-                    <span style={{ color: "#52525b", flex: "1 1 120px", minWidth: 120, textAlign: "right" }}>
+                    <span style={{ color: FAINT, flex: "1 1 120px", minWidth: 120, textAlign: "right" }}>
                       {s.open && s.side ? `${s.side === "LONG" ? "↑" : "↓"} ${usd(s.szUsd)} open` : ""}
                     </span>
-                    <span style={{ color: s.open ? (s.unrealized >= 0 ? POS : NEG) : "#52525b", flex: "1 1 90px", minWidth: 90, textAlign: "right" }}>
+                    <span style={{ color: s.open ? (s.unrealized >= 0 ? POS : NEG) : FAINT, flex: "1 1 90px", minWidth: 90, textAlign: "right" }}>
                       {s.open && s.unrealized ? `${s.unrealized >= 0 ? "+" : ""}${usd(s.unrealized)}` : ""}
                     </span>
                     {/* Actions only on LIVE positions — a closed market has nothing to copy. */}
@@ -313,16 +341,16 @@ export default function AnalyzePage() {
                       {s.open && s.side && (
                         <>
                           <button onClick={() => draftThesis(s, orderly.address)} title="Draft a thesis from this position"
-                            style={{ background: "none", border: "1px solid #232327", borderRadius: 3, color: "#71717a", fontFamily: mono, fontSize: 9, padding: "2px 7px", cursor: "pointer" }}>◆</button>
-                          <button onClick={() => copyPosition(s, orderly.address)} title="Copy this position — the agent enters your direction, manages the exit, and grades it on-chain"
-                            style={{ background: "none", border: "1px solid #33333a", borderRadius: 3, color: GREEN, fontFamily: mono, fontSize: 9, letterSpacing: "0.04em", padding: "2px 7px", cursor: "pointer", whiteSpace: "nowrap" }}>⚡ COPY</button>
+                            style={{ background: "none", border: `1px solid ${BORDER}`, borderRadius: 3, color: MUTED, fontFamily: MONO, fontSize: 9, padding: "2px 7px", cursor: "pointer" }}>◆</button>
+                          <button onClick={() => copyPosition(s, orderly.address)} className="nx-btn" title="Copy this position — the agent enters your direction, manages the exit, and grades it on-chain"
+                            style={{ background: "none", border: `1px solid ${BORDER}`, borderRadius: 3, color: BONE, fontFamily: MONO, fontSize: 9, letterSpacing: "0.04em", padding: "2px 7px", cursor: "pointer", whiteSpace: "nowrap" }}>⚡ COPY</button>
                         </>
                       )}
                     </span>
                   </div>
                 ))}
                 {v.bySymbol.length > 12 && (
-                  <div style={{ fontSize: 10, color: "#52525b", paddingTop: 6 }}>+{v.bySymbol.length - 12} more markets</div>
+                  <div style={{ fontFamily: MONO, fontSize: 10, color: FAINT, paddingTop: 6 }}>+{v.bySymbol.length - 12} more markets</div>
                 )}
               </div>
             </div>
@@ -334,10 +362,10 @@ export default function AnalyzePage() {
           (even with no Hyperliquid history), deep-linking the wallet into Orderly's
           official explorer (trades, deposits/withdrawals, liquidations, PnL). */}
       {address && isAddress(address) && !loading && (
-        <div style={{ marginTop: trades && trades.length ? 16 : 24, padding: "16px 18px", border: "1px solid #33333a", borderRadius: 8, background: "#1a1a1e" }}>
-          <div style={{ fontSize: 11, letterSpacing: "0.15em", color: "#d4d4d8", marginBottom: 8 }}>// CROSS-VERIFY ON ORDERLY</div>
-          <p style={{ fontSize: 12.5, color: "#a1a1aa", lineHeight: 1.6, margin: "0 0 12px", maxWidth: 640 }}>
-            Nexus runs on <b style={{ color: "#d4d4d8" }}>Orderly Network</b>&apos;s omnichain liquidity. Don&apos;t trust our
+        <div style={{ marginTop: trades && trades.length ? 24 : 28, padding: "16px 18px", border: `1px solid ${BORDER}`, borderRadius: 6, background: SURFACE_ALT }}>
+          <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.22em", color: MUTED, marginBottom: 10 }}>CROSS-VERIFY ON ORDERLY</div>
+          <p style={{ fontFamily: UI, fontSize: 12.5, color: FOG, lineHeight: 1.6, margin: "0 0 14px", maxWidth: 640 }}>
+            Nexus runs on <b style={{ color: BRIGHT }}>Orderly Network</b>&apos;s omnichain liquidity. Don&apos;t trust our
             numbers — independently verify this wallet&apos;s on-chain trading (executed trades, deposits &amp;
             withdrawals, liquidations, realized PnL) on Orderly&apos;s official explorer.
           </p>
@@ -345,7 +373,8 @@ export default function AnalyzePage() {
             href={`https://orderly-dashboard.orderly.network/explorer?q=${address}`}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ display: "inline-block", background: "#1a1a1e", color: "#d4d4d8", border: "1px solid #33333a", textDecoration: "none", borderRadius: 6, padding: "10px 18px", fontFamily: mono, fontWeight: 700, fontSize: 12, letterSpacing: "0.06em" }}
+            className="nx-btn"
+            style={{ display: "inline-block", background: SURFACE, color: BRIGHT, border: `1px solid ${BORDER}`, textDecoration: "none", borderRadius: 4, padding: "10px 18px", fontFamily: MONO, fontWeight: 700, fontSize: 11, letterSpacing: "0.08em" }}
           >
             VERIFY {address.slice(0, 6)}…{address.slice(-4)} ON ORDERLY ↗
           </a>
