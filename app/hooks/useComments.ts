@@ -19,11 +19,17 @@ export async function fetchReactions(thesisId: string): Promise<Record<string, s
   return r.json() as Promise<Record<string, string[]>>;
 }
 
-export async function addComment(thesisId: string, wallet: string, text: string): Promise<void> {
+export async function addComment(
+  thesisId: string,
+  wallet: string,
+  text: string,
+  // Ride-along call context so the worker can notify the call's author.
+  ctx?: { authorWallet?: string; symbol?: string; direction?: string },
+): Promise<void> {
   const r = await fetch(`${API_BASE}/comments/${thesisId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ wallet, text }),
+    body: JSON.stringify({ wallet, text, ...(ctx ?? {}) }),
   });
   if (!r.ok) throw new Error(`addComment: ${r.status}`);
 }

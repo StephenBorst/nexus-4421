@@ -16,6 +16,10 @@ interface CommentsPanelProps {
   walletAddress: string | null;
   isOpen: boolean;
   onCountChange?: (count: number) => void;
+  // Call context → lets the worker notify the author when someone comments.
+  authorWallet?: string;
+  symbol?: string;
+  direction?: string;
 }
 
 function relativeTime(ts: number): string {
@@ -38,6 +42,9 @@ export default function CommentsPanel({
   walletAddress,
   isOpen,
   onCountChange,
+  authorWallet,
+  symbol,
+  direction,
 }: CommentsPanelProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [reactions, setReactions] = useState<Record<string, string[]>>({});
@@ -79,7 +86,7 @@ export default function CommentsPanel({
     setSubmitting(true);
     setErr("");
     try {
-      await addComment(thesisId, walletAddress, text.trim());
+      await addComment(thesisId, walletAddress, text.trim(), { authorWallet, symbol, direction });
       const updated = await fetchComments(thesisId);
       setComments(updated);
       onCountChange?.(updated.length);

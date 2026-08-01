@@ -15,6 +15,7 @@ import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePr
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { chartImageList, effectiveStatus } from "@/pages/lab/helpers";
 import { MessageTraderButton } from "@/components/MessageTraderButton";
+import CommentsPanel from "@/components/CommentsPanel";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 const OG_BASE  = "https://og.nexustradinglabs.com";
@@ -483,6 +484,23 @@ export default function ThesisPage() {
             onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#ededf0"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#ededf0"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#52525b"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#232327"; }}
           >VIEW {traderName.toUpperCase()} PROFILE →</button>
+        </div>
+
+        {/* Discussion — the public thread on THIS call. Same primitive as the feed,
+            surfaced here so a shared permalink is a place to talk, not a dead end.
+            Posting notifies the author (comment → lifecycle notification). */}
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", letterSpacing: "0.1em", marginBottom: 8 }}>◆ DISCUSSION</div>
+          <div style={{ background: "#141416", border: "1px solid #232327", borderRadius: 4, overflow: "hidden" }}>
+            <CommentsPanel
+              thesisId={id!}
+              walletAddress={myWallet}
+              isOpen
+              authorWallet={thesis.wallet}
+              symbol={thesis.symbol}
+              direction={thesis.direction}
+            />
+          </div>
         </div>
       </div>
     </div>

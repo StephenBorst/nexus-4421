@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAccount } from "@orderly.network/hooks";
 import { useNotifications, type Notification } from "@/hooks/useNotifications";
 
@@ -17,14 +18,24 @@ function typeIcon(type: Notification["type"]): string {
   if (type === "follow") return "👥";
   if (type === "copy") return "📋";
   if (type === "thesis_closed") return "✅";
+  if (type === "comment") return "💬";
   return "🔔";
 }
 
 export default function NotificationBell() {
+  const navigate = useNavigate();
   const { state: accountState } = useAccount();
   const walletAddress = (accountState as { address?: string })?.address ?? null;
   const { notifications, unreadCount, markAllRead, deleteNotification } =
     useNotifications(walletAddress);
+  // A thesisId-bearing notification (e.g. a comment on your call) is about YOUR call,
+  // so it links to that call's permalink — turning the alert into a one-click return.
+  const openNotif = (n: Notification) => {
+    if (n.thesisId && walletAddress) {
+      setOpen(false);
+      navigate(`/feed/thesis/${walletAddress.toLowerCase()}/${n.thesisId}`);
+    }
+  };
 
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -175,6 +186,7 @@ export default function NotificationBell() {
               notifications.map((n) => (
                 <div
                   key={n.id}
+                  onClick={() => openNotif(n)}
                   style={{
                     padding: "10px 14px",
                     borderBottom: "1px solid #141416",
@@ -182,6 +194,7 @@ export default function NotificationBell() {
                     display: "flex",
                     gap: 10,
                     alignItems: "flex-start",
+                    cursor: n.thesisId ? "pointer" : "default",
                   }}
                 >
                   <span
@@ -213,7 +226,7 @@ export default function NotificationBell() {
                     </div>
                   </div>
                   <button
-                    onClick={() => deleteNotification(n.id)}
+                    onClick={(e) => { e.stopPropagation(); deleteNotification(n.id); }}
                     title="Dismiss"
                     style={{
                       background: "none",

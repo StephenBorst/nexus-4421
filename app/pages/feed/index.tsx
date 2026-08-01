@@ -710,6 +710,9 @@ function FeedCard({
         walletAddress={walletAddress}
         isOpen={commentsOpen}
         onCountChange={setCommentCount}
+        authorWallet={thesis.wallet}
+        symbol={thesis.symbol}
+        direction={thesis.direction}
       />
     </div>
   );

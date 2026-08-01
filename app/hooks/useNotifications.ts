@@ -4,7 +4,7 @@ const API_BASE = "https://og.nexustradinglabs.com";
 
 export interface Notification {
   id: string;
-  type: "follow" | "copy" | "thesis_closed";
+  type: "follow" | "copy" | "thesis_closed" | "comment";
   message: string;
   fromWallet?: string;
   thesisId?: string;

@@ -9,7 +9,7 @@
 // line-count win is not worth the risk without a staging environment.
 //
 // ⚠️ Pure move — logic byte-identical to what shipped.
-import { json, normalizeAddress, recoverEthAddress, holdersRoomMessage } from "./shared.mjs";
+import { json, normalizeAddress, recoverEthAddress, holdersRoomMessage, appendNotification } from "./shared.mjs";
 import { safeChartUrl } from "./logic.mjs";
 import { RESOLVED_FEED_KEY } from "./resolutions.mjs";
 
@@ -175,6 +175,21 @@ export async function handleFeed(parts, request, env) {
         createdAt: Date.now(),
       });
       await env.LAB_STORE.put(commentKey, JSON.stringify(list.slice(0, 50)));
+      // Lifecycle notify: tell the call's author someone is discussing it (skip self).
+      // authorWallet/symbol/direction ride along from the client, which knows the call.
+      const authorWallet = typeof body.authorWallet === "string" ? body.authorWallet.toLowerCase().trim() : null;
+      if (authorWallet && authorWallet !== wallet) {
+        const sym = typeof body.symbol === "string" ? body.symbol.replace("PERP_", "").replace("_USDC", "") : "";
+        const dir = typeof body.direction === "string" ? ` ${body.direction}` : "";
+        await appendNotification(env, authorWallet, {
+          id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          type: "comment",
+          message: sym ? `New comment on your ${sym}${dir} call` : "New comment on your call",
+          fromWallet: wallet,
+          thesisId,
+          createdAt: Date.now(),
+        });
+      }
       return json({ ok: true }, request);
     }
 
