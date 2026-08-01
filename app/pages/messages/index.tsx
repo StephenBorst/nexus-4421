@@ -313,15 +313,19 @@ function ThreadView({
   getMessages,
   streamMessages,
   peerAddressHint,
+  initialDraft,
 }: {
   convo: Conversation;
   myInboxId: string | null;
   getMessages: (c: Conversation) => Promise<DecodedMessage[]>;
   streamMessages: (c: Conversation, onMessage: (msg: DecodedMessage) => void) => Promise<() => void>;
   peerAddressHint?: string;
+  initialDraft?: string;
 }) {
   const [messages, setMessages] = useState<DecodedMessage[]>([]);
-  const [text, setText] = useState("");
+  // Seed the composer with the "Re: your … call" draft when the thread was opened
+  // from a call. ThreadView is keyed by convo.id, so this re-inits per thread.
+  const [text, setText] = useState(initialDraft ?? "");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [peerDisplay, setPeerDisplay] = useState<string>(
@@ -487,6 +491,7 @@ export default function MessagesPage() {
     else navigate("/feed");
   }, [navigate]);
   const dmParam = searchParams.get("dm");
+  const reParam = searchParams.get("re"); // "Re: your ZEC LONG call — " context seed
 
   const xmtp = useXMTP();
   const { ready, initializing, error, init, getConversations, getMessages, streamMessages, myInboxId } = xmtp;
@@ -747,6 +752,9 @@ export default function MessagesPage() {
                 getMessages={getMessages}
                 streamMessages={streamMessages}
                 peerAddressHint={activePeerHint}
+                // Only seed the draft on the thread we auto-opened from a call link,
+                // never when the user hand-picks another conversation.
+                initialDraft={activePeerHint && dmParam && activePeerHint.toLowerCase() === dmParam.toLowerCase() ? (reParam ?? undefined) : undefined}
               />
             </>
           ) : (

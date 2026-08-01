@@ -11,6 +11,7 @@ import { useAccount } from "@orderly.network/hooks";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 import { fetchOnChainRepScore } from "@/hooks/useThesisRegistry";
 import { NexusTierBadge } from "@/components/NexusTierBadge";
+import { MessageTraderButton } from "@/components/MessageTraderButton";
 import type { ThesisTrade } from "@/pages/lab/types";
 import CommentsPanel from "@/components/CommentsPanel";
 import { deployToAgent } from "@/utils/agentPrefill";
@@ -639,28 +640,8 @@ export default function TraderPage() {
         <div style={{ flex: 1, fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#33333a", letterSpacing: "0.05em" }}>
           / TRADER
         </div>
-        {/* DM button — only when viewing another trader */}
-        {walletAddress && !isOwn && (
-          <button
-            onClick={() => navigate(`/messages?dm=${wallet}`)}
-            title="Send encrypted DM via XMTP"
-            style={{
-              background: "none", border: "1px solid #232327", borderRadius: 3,
-              color: "#52525b", fontFamily: "var(--nx-font-mono)", fontSize: 9,
-              padding: "4px 10px", cursor: "pointer", letterSpacing: "0.05em",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#ededf0";
-              (e.currentTarget as HTMLButtonElement).style.color = "#ededf0";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#232327";
-              (e.currentTarget as HTMLButtonElement).style.color = "#52525b";
-            }}
-          >
-            ⬡ MSG
-          </button>
-        )}
+        {/* DM button — shared affordance; hidden for your own profile */}
+        <MessageTraderButton wallet={wallet} myWallet={walletAddress} variant="full" />
         {/* Share link button */}
         <button
           onClick={copyLink}

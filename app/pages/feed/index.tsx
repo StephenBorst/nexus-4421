@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 import { fetchOnChainRepScore } from "@/hooks/useThesisRegistry";
 import { NexusTierBadge } from "@/components/NexusTierBadge";
+import { MessageTraderButton } from "@/components/MessageTraderButton";
 import { NexusTreasuryStack } from "@/components/NexusTreasuryStack";
 import { NexusTreasury } from "@/components/NexusTreasury";
 import { NexusMarket } from "@/components/NexusMarket";
@@ -542,14 +543,12 @@ function FeedCard({
             style={{ flexShrink: 0 }}
           >{isFollowing ? "✓" : "+"}</button>
         )}
-        {walletAddress && !isOwnThesis && (
-          <button
-            className="nx-btn nx-btn-icon"
-            onClick={() => navigate(`/messages?dm=${thesis.wallet}`)}
-            title="Send encrypted DM to trader"
-            style={{ flexShrink: 0 }}
-          >⬡</button>
-        )}
+        <MessageTraderButton
+          wallet={thesis.wallet}
+          myWallet={walletAddress}
+          variant="icon"
+          context={{ symbol: thesis.symbol, direction: thesis.direction }}
+        />
         {walletAddress && !isOwnThesis && (
           <button
             className="nx-btn nx-btn-icon"
@@ -1066,6 +1065,10 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               <div style={{ borderTop: "1px solid #232327", padding: "10px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
                 {/* Profile link */}
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 4 }}>
+                  {/* Message this caller — wrapped so it doesn't toggle the row */}
+                  <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex" }}>
+                    <MessageTraderButton wallet={trader.wallet} myWallet={walletAddress} variant="icon" />
+                  </span>
                   {/* Verify the caller's real venue record before copying them. */}
                   <a
                     href={`/analyze?address=${trader.wallet}`}

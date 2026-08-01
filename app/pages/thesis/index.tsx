@@ -10,9 +10,11 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useAccount } from "@orderly.network/hooks";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { chartImageList, effectiveStatus } from "@/pages/lab/helpers";
+import { MessageTraderButton } from "@/components/MessageTraderButton";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 const OG_BASE  = "https://og.nexustradinglabs.com";
@@ -104,6 +106,8 @@ export default function ThesisPage() {
   const { wallet, id } = useParams<{ wallet: string; id: string }>();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { state: accountState } = useAccount();
+  const myWallet = (accountState as { address?: string })?.address ?? null;
 
   const [thesis, setThesis] = useState<FeedThesis | null>(null);
   const [loading, setLoading] = useState(true);
@@ -257,6 +261,15 @@ export default function ThesisPage() {
           style={{ background: "none", border: "1px solid #232327", borderRadius: 3, color: "#52525b", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 10px", cursor: "pointer" }}
         >← BACK</button>
         <div style={{ flex: 1 }} />
+        {/* Discuss THIS call with its author — seeds the DM with the call context */}
+        <MessageTraderButton
+          wallet={thesis.wallet}
+          myWallet={myWallet}
+          context={{ symbol: thesis.symbol, direction: thesis.direction }}
+          label="⬡ DISCUSS"
+          title="Discuss this call with the trader — encrypted DM"
+          style={{ border: "1px solid #232327", borderRadius: 3, background: "none", color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 9px", letterSpacing: "0.05em", cursor: "pointer" }}
+        />
         {/* Outbound share — X / Farcaster / copy link */}
         <a
           href={shareX} target="_blank" rel="noopener noreferrer"
