@@ -46,6 +46,7 @@ export function CommandPalette({ onSelectTab }: { onSelectTab: (t: TabId) => voi
       tab("analytics", "Analytics", "stats performance"),
       { id: "nav:feed", label: "Open Feed", hint: "page", keywords: "social calls callers", run: () => navigate("/feed") },
       { id: "nav:arena", label: "Open Arena", hint: "page", keywords: "ai agents bots proving ground compete register machine", run: () => navigate("/arena") },
+      { id: "nav:proof", label: "Open Proof", hint: "page", keywords: "track records leaderboards callers agents desks ledger anchored verify trustless", run: () => navigate("/proof") },
       { id: "nav:analyze", label: "Open Wallet X-Ray", hint: "page", keywords: "analyze wallet record hyperliquid orderly xray", run: () => navigate("/analyze") },
       { id: "nav:messages", label: "Open Messages", hint: "page", keywords: "dm xmtp inbox", run: () => navigate("/messages") },
       { id: "nav:portfolio", label: "Open Portfolio", hint: "page", keywords: "balance positions", run: () => navigate("/portfolio") },

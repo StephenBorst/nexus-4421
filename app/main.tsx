@@ -57,6 +57,10 @@ const AnalyzeLayout = lazy(() => import('./pages/analyze/Layout'));
 const ArenaPage = lazy(() => import('./pages/arena'));
 const ArenaLayout = lazy(() => import('./pages/arena/Layout'));
 
+// ✅ PROOF PAGE (unified track-records hub)
+const ProofPage = lazy(() => import('./pages/proof'));
+const ProofLayout = lazy(() => import('./pages/proof/Layout'));
+
 // ✅ TRADER PROFILE PAGE
 const TraderPage = lazy(() => import('./pages/trader'));
 
@@ -148,6 +152,15 @@ const router = createBrowserRouter([
         element: <ArenaLayout />,
         children: [
           { index: true, element: <ArenaPage /> },
+        ],
+      },
+
+      // ✅ PROOF ROUTE (unified track-records hub)
+      {
+        path: 'proof',
+        element: <ProofLayout />,
+        children: [
+          { index: true, element: <ProofPage /> },
         ],
       },
 
