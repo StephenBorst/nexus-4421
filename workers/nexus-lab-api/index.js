@@ -1864,14 +1864,13 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
     }
 
 
-    // ── /intel/catalysts/:symbol — "why is X moving": move context + headlines ─
-    // Powers the explain_move copilot tool + the Market Intel "Why?" chip. Fuses
-    // the Orderly public move (price/funding/OI) with recent headlines for the
-    // ASSET (rss2json → Google News search, keyed by symbolToQuery so "CL" pulls
-    // crude-oil news, not nothing). The copilot does the SYNTHESIS + citation —
-    // this route only supplies grounded data, so there is NO LLM spend here and
-    // it stays public/no-auth. Fail-soft: a news failure still returns the move.
-    // Edge-cached 300s (also protects the rss2json free-tier quota).
+    // ── /intel/catalysts/:symbol — "why is X moving": move context + meta ─────
+    // Powers the explain_move copilot tool + the Market Intel "Why?" chip. Returns
+    // ONLY the Orderly public move (price/funding/OI) + the resolved search `query`
+    // (symbolToQuery: "CL" → "crude oil"). ⚠ Headlines are NOT fetched here — rss2json
+    // blocks Cloudflare Worker IPs, so a server-side fetch always came back empty; the
+    // explain_move tool fetches news client-side (per-user IP) instead. Public/no-auth,
+    // NO LLM spend (the copilot synthesizes + cites). Fail-soft. Edge-cached 120s.
     if (parts[0] === "intel" && parts[1] === "catalysts" && request.method === "GET") {
       const rawSym = parts[2] || new URL(request.url).searchParams.get("symbol") || "";
       const meta = symbolToQuery(rawSym);
