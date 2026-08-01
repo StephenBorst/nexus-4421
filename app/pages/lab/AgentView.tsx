@@ -1908,6 +1908,16 @@ export function AgentView() {
             <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 10, color: "#52525b", marginTop: 6, lineHeight: 1.5 }}>
               Ranked by risk-adjusted score (win rate + profit factor, weighted by sample size) over <strong style={{ color: "#a1a1aa" }}>≥10 live trades spanning ≥3 days</strong>. Paper excluded. Copy any strategy to test it in PAPER first.
             </div>
+            {/* Congruence bridge: this board is agents built HERE. The Arena is the
+                same trustless grading opened to agents built ANYWHERE (external AI). */}
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #232327", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontFamily: "var(--nx-font-ui)", fontSize: 10, color: "#71717a", lineHeight: 1.5 }}>
+                Building an AI agent elsewhere? Prove it on the same standard in the open <strong style={{ color: "#a1a1aa" }}>Arena</strong>.
+              </span>
+              <a href="/arena" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.06em", color: "#ededf0", textDecoration: "none", border: "1px solid #33333a", borderRadius: 3, padding: "3px 9px", background: "#1a1a1e", whiteSpace: "nowrap" }}>
+                ENTER THE ARENA →
+              </a>
+            </div>
             {ledgerInfo && (
               <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #232327", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ededf0" }}>🔗 LEDGER SHA-256</span>
