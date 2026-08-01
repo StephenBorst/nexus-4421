@@ -27,6 +27,7 @@ import Resolved, { type ResolutionEvent } from "./Resolved";
 import LeakReport from "./LeakReport";
 import { lifecycleState, describeUpdate, updateKind } from "@/lib/lifecycle.mjs";
 import Desks from "./Desks";
+import ArenaStrip from "./ArenaStrip";
 import WatchOnlyBanner from "./WatchOnlyBanner";
 
 const API_BASE = "https://og.nexustradinglabs.com";
@@ -1627,6 +1628,7 @@ export default function FeedPage() {
               <LeaderboardView feed={feed} walletAddress={walletAddress} onCopy={setCopyTarget} />
             )}
             {!loading && !error && <Desks walletAddress={walletAddress} />}
+            {!loading && !error && <ArenaStrip />}
             {!loading && !error && <LeakReport />}
           </>
         )}
