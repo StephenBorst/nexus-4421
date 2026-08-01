@@ -128,8 +128,6 @@ export default function TheLabPage() {
     { id: "copies",         label: "[ COPY TRADES ]",        short: "COPY",  phase: "EXECUTE" },
     // Holders Room is community access, not a trading step — it sits between EXECUTE
     // and PROVE so the loop still ENDS on Analytics (which closes it back to the top).
-    // It gets its own divider: an unlabelled tab trailing EXECUTE's items would read
-    // as part of EXECUTE.
     { id: "holders",        label: "[ HOLDERS ROOM ]",       short: "ROOM",  phase: ""        },
     { id: "tradelog",       label: "[ TRADING LOG ]",        short: "LOG",   phase: "PROVE"   },
     { id: "analytics",      label: "[ ANALYTICS ]",          short: "STATS", phase: "PROVE"   },
@@ -183,7 +181,7 @@ export default function TheLabPage() {
               (phase labels would eat the row, and the order alone carries the loop). */}
           {tabGroups.map((group, gi) => (
             <div key={group.phase || `x${gi}`} style={{ display: "contents" }}>
-              {!isMobile && gi > 0 && (
+              {!isMobile && gi > 0 && group.phase && (
                 <span style={{
                   fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.16em",
                   color: "#52525b", flexShrink: 0, padding: "0 8px 0 10px",
