@@ -24,7 +24,7 @@ function pct(open?: string | number, close?: string | number): number {
   return Math.abs(p) > 50 ? 0 : p; // guard bad ticks
 }
 
-export function MarketTape() {
+export function MarketTape({ compact = false }: { compact?: boolean }) {
   const [rows, setRows] = useState<Row[] | null>(null);
 
   useEffect(() => {
@@ -69,6 +69,37 @@ export function MarketTape() {
   }, [rows]);
 
   if (!tape) return null;
+
+  const askAi = () => window.dispatchEvent(new CustomEvent("nexus:assistant-ask", { detail: { prompt: `The market tape is ${tape.label} (score ${tape.score}/100). Use get_market_regime and get_my_edge — what's my best play right now given my strengths, and what should I avoid?` } }));
+
+  // Compact: a thin persistent regime strip for the decision tabs (thesis/agent),
+  // where "what's the tape right now" informs the trade you're about to size — the
+  // signal lives where the decision is, not on a reading tab that already covers it.
+  if (compact) {
+    const div = <span style={{ color: "#232327" }}>·</span>;
+    const stat = (label: string, val: string, color = "#a1a1aa") => (
+      <span style={{ color: "#52525b" }}>{label} <span style={{ color }}>{val}</span></span>
+    );
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "7px 12px", background: "#0f0f11", border: "1px solid #232327", borderRadius: 4, marginBottom: 12, fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+          <span className="nx-live-dot" style={{ width: 5, height: 5 }} />
+          <span style={{ color: tape.color, fontWeight: "bold", letterSpacing: "0.06em" }}>{tape.label}</span>
+          <span style={{ color: tape.color }}>{tape.score}</span>
+        </span>
+        {div}
+        {stat("breadth", `${tape.breadth}%`, tape.breadth >= 50 ? "#ededf0" : "#f7525f")}
+        {stat("BTC", `${tape.btcChg >= 0 ? "+" : ""}${tape.btcChg.toFixed(2)}%`, tape.btcChg >= 0 ? "#ededf0" : "#f7525f")}
+        {stat("funding", `${tape.fundSkew}% long`)}
+        <span style={{ flex: 1, minWidth: 120, color: "#71717a", fontFamily: "var(--nx-font-ui)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={tape.agentNote}>▶ {tape.agentNote}</span>
+        <button type="button" onClick={askAi} title="Ask the copilot for your play in this tape"
+          style={{ flexShrink: 0, background: "transparent", border: "1px solid #232327", borderRadius: 3, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "3px 9px", cursor: "pointer" }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "#ededf0"; e.currentTarget.style.borderColor = "#33333a"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "#a1a1aa"; e.currentTarget.style.borderColor = "#232327"; }}
+        >◆ ask</button>
+      </div>
+    );
+  }
 
   return (
     <div style={{ ...cardStyle, marginBottom: 14 }}>

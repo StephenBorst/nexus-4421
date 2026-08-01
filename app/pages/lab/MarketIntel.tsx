@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { navBtnStyle } from "./styles";
 import { useIsMobile } from "./useIsMobile";
 import IntelPage from "@/pages/intel";
-import { MarketTape } from "./MarketTape";
 // Pure + pinned by tests (app/lib/rssDate.test.mjs) — see that file for the "-333m" bug.
 import { parseRssDate, timeAgo } from "@/lib/rssDate.mjs";
 
@@ -187,7 +186,9 @@ export function MarketIntelView() {
         <div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>Scout</div>
         <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 24, fontWeight: 700, color: "#f4f4f5", lineHeight: 1.1, letterSpacing: "-0.01em" }}>The Market Terminal</div>
       </div>
-      <MarketTape />
+      {/* MarketTape moved to the DECISION tabs (thesis/agent) as a thin regime strip —
+          IntelPage below already leads with sentiment, so a second score here was
+          redundant. Signal belongs where the decision is. */}
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
         {([
           { id: "intel" as const, label: "INTEL" },

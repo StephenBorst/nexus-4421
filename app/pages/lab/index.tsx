@@ -17,6 +17,7 @@ import { ThesisView, ThesisAnalyticsView } from "./ThesisView";
 import { AgentView } from "./AgentView";
 import { CopiesView } from "./CopiesView";
 import { MarketIntelView } from "./MarketIntel";
+import { MarketTape } from "./MarketTape";
 import { SmartMoneyView } from "./SmartMoneyView";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
 import { LabStanding } from "./LabStanding";
@@ -237,6 +238,10 @@ export default function TheLabPage() {
             onGoAnalytics={() => setActiveTab("analytics")}
           />
         )}
+        {/* Regime strip on the DECISION tabs only — the tape informs the trade you're
+            about to size/automate. Outside the keyed div so it stays mounted (no
+            re-fetch) when switching between thesis and agent. */}
+        {connected && (activeTab === "thesis" || activeTab === "agent") && <MarketTape compact />}
         {/* key={activeTab} re-mounts the content on tab switch → the .nx-fade-in
             entrance replays, giving a considered transition instead of a hard swap. */}
         <div key={activeTab} className="nx-fade-in">
