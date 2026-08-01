@@ -17,8 +17,9 @@ function relativeTime(ts: number): string {
 function typeIcon(type: Notification["type"]): string {
   if (type === "follow") return "👥";
   if (type === "copy") return "📋";
-  if (type === "thesis_closed") return "✅";
+  if (type === "thesis_closed" || type === "call_resolved") return "◈";
   if (type === "comment") return "💬";
+  if (type === "challenge") return "⚔";
   return "🔔";
 }
 
@@ -33,7 +34,10 @@ export default function NotificationBell() {
   const openNotif = (n: Notification) => {
     if (n.thesisId && walletAddress) {
       setOpen(false);
-      navigate(`/feed/thesis/${walletAddress.toLowerCase()}/${n.thesisId}`);
+      // Challenge links to the challenger's call (thesisWallet); comment/resolution
+      // link to your own call, so default the owner to you.
+      const owner = (n.thesisWallet ?? walletAddress).toLowerCase();
+      navigate(`/feed/thesis/${owner}/${n.thesisId}`);
     }
   };
 

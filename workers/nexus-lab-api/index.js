@@ -4215,6 +4215,56 @@ document.getElementById("btn").addEventListener("click",go);
         }
       }
 
+      // Challenge fan-out: when a thesis goes PUBLIC, tell active opposing callers on
+      // the same symbol that a counter-view just landed — turning disagreement into a
+      // thread. Fires ONLY on the public transition (compared against the stored copy),
+      // never on ordinary edits, so the caller scan stays off the hot path. Capped both
+      // ways to bound work + spam. (An aggregate symbol→callers index would remove the
+      // scan if publish volume ever grows.)
+      try {
+        const prevRaw = await env.LAB_STORE.get(kvKey);
+        const prevPublic = new Set(
+          prevRaw ? (JSON.parse(prevRaw).theses || []).filter((t) => t.isPublic).map((t) => t.id) : []
+        );
+        const newlyPublic = (body.theses || []).filter(
+          (t) => t.isPublic && t.id && !prevPublic.has(t.id) && t.symbol && t.direction
+        );
+        if (newlyPublic.length) {
+          const listed = await env.LAB_STORE.list({ prefix: "lab:" });
+          for (const nt of newlyPublic.slice(0, 3)) {
+            const sym = String(nt.symbol);
+            const bareSym = sym.replace("PERP_", "").replace("_USDC", "");
+            const dir = String(nt.direction).toUpperCase();
+            const opp = dir === "LONG" ? "SHORT" : "LONG";
+            let notified = 0;
+            for (const k of listed.keys) {
+              if (notified >= 10) break;
+              const w = k.name.replace("lab:", "");
+              if (w === address) continue;
+              const raw2 = await env.LAB_STORE.get(k.name);
+              if (!raw2) continue;
+              let d2; try { d2 = JSON.parse(raw2); } catch { continue; }
+              const opposes = (d2.theses || []).some(
+                (t) => t.isPublic && t.symbol === sym && String(t.direction).toUpperCase() === opp
+                  && (t.status === "ACTIVE" || !t.status)
+                  && t.gradedOutcome !== "WIN" && t.gradedOutcome !== "LOSS"
+              );
+              if (!opposes) continue;
+              await appendNotification(env, w, {
+                id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                type: "challenge",
+                message: `Someone posted an opposing ${bareSym} ${dir} call`,
+                fromWallet: address,
+                thesisId: nt.id,
+                thesisWallet: address,
+                createdAt: Date.now(),
+              });
+              notified++;
+            }
+          }
+        }
+      } catch (e) { console.error("[challenge] fan-out failed", e && e.message); }
+
       // Strip copy metadata fields before persisting
       const { copiedFromWallet: _cfw, copiedThesisSymbol: _cts, copiedThesisDirection: _ctd, copiedThesisId: _cti, ...dataToSave } = body;
       await env.LAB_STORE.put(kvKey, JSON.stringify(dataToSave));

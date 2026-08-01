@@ -4,10 +4,13 @@ const API_BASE = "https://og.nexustradinglabs.com";
 
 export interface Notification {
   id: string;
-  type: "follow" | "copy" | "thesis_closed" | "comment";
+  type: "follow" | "copy" | "thesis_closed" | "call_resolved" | "comment" | "challenge";
   message: string;
   fromWallet?: string;
   thesisId?: string;
+  // Owner of thesisId when it isn't the recipient's own call (e.g. a challenge links to
+  // the challenger's thesis). Defaults to the recipient in the bell's navigation.
+  thesisWallet?: string;
   createdAt: number;
   readAt?: number;
 }
