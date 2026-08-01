@@ -16,11 +16,16 @@ import { parseRssDate, timeAgo } from "@/lib/rssDate.mjs";
 // feed + cap per source) while keeping the fetch client-side where rss2json answers.
 interface NewsItem { title: string; description: string; link: string; pubDate: string; source: string; category: string; }
 
+// ⚠ THE DEFIANT IS DROPPED ON PURPOSE. Its feed re-stamps a cluster of MONTH-OLD
+// stories (SummerFi wind-down, eToro/Extended, NEAR gas rebate…) with the current
+// feed-BUILD time — all 6 shared one identical, always-freshest timestamp — so they
+// pinned the top of the feed indefinitely. That is THE bug behind "same stories from a
+// month ago." The remaining feeds date their articles honestly. (See the cluster guard
+// in fetchFeed for the general defense against any other feed that tries this.)
 const FEEDS = [
   { url: "https://www.coindesk.com/arc/outboundfeeds/rss/", name: "COINDESK" },
   { url: "https://cointelegraph.com/rss",                   name: "COINTELEGRAPH" },
   { url: "https://decrypt.co/feed",                         name: "DECRYPT" },
-  { url: "https://thedefiant.io/feed",                      name: "THE DEFIANT" },
   { url: "https://finance.yahoo.com/news/rssindex",         name: "YAHOO FINANCE" },
 ];
 
@@ -47,11 +52,14 @@ async function fetchFeed(url: string, source: string): Promise<RawItem[]> {
       return { title, description, link: it.link ?? "", pubDate: it.pubDate ?? "",
                ts: parseRssDate(it.pubDate ?? "") || 0, source, category: categorizeNews(title, description), reliableDate: true };
     }).filter((i: RawItem) => i.title);
-    // Broken-clock detection: a feed reporting ONE distinct timestamp across several
-    // items is publishing its build time, not article times (The Defiant does this) —
-    // mark those dates unreliable so they sort BELOW properly-dated stories.
-    const distinct = new Set(items.map((i) => i.ts));
-    if (items.length >= 3 && distinct.size === 1) items.forEach((i) => { i.reliableDate = false; });
+    // Broken-clock detection. A publisher that re-stamps stale stories gives a CLUSTER
+    // of items the exact same (build-time) timestamp — not necessarily the whole feed
+    // (The Defiant poisoned 6 of 10). So mark unreliable any item whose exact ts is
+    // shared by ≥4 items in the feed — real articles almost never publish at the same
+    // second, and this sinks the re-stamped block below honestly-dated stories.
+    const counts = new Map<number, number>();
+    for (const i of items) counts.set(i.ts, (counts.get(i.ts) || 0) + 1);
+    for (const i of items) if ((counts.get(i.ts) || 0) >= 4) i.reliableDate = false;
     return items;
   } catch { return []; }
 }
@@ -126,7 +134,7 @@ function NewsTab() {
       {loading && items.length === 0 && (
         <div style={{ color: DIM, padding: "40px 0", textAlign: "center", fontSize: 12 }}>
           CONNECTING TO FEEDS…<br />
-          <span style={{ fontSize: 10, opacity: 0.5 }}>coindesk · cointelegraph · decrypt · the defiant · yahoo finance</span>
+          <span style={{ fontSize: 10, opacity: 0.5 }}>coindesk · cointelegraph · decrypt · yahoo finance</span>
         </div>
       )}
 
@@ -160,7 +168,7 @@ function NewsTab() {
       )}
 
       <div style={{ color: DIM, fontSize: 10, marginTop: 12, letterSpacing: "0.05em" }}>
-        // COINDESK · COINTELEGRAPH · DECRYPT · THE DEFIANT · YAHOO FINANCE · AUTO-REFRESH 5MIN
+        // COINDESK · COINTELEGRAPH · DECRYPT · YAHOO FINANCE · AUTO-REFRESH 5MIN
       </div>
     </div>
   );
