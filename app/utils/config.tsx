@@ -270,6 +270,7 @@ export const useOrderlyConfig = () => {
 
   const labMenu      = [{ name: "Lab",      href: "/lab"      }];
   const feedMenu     = [{ name: "Feed",     href: "/feed"     }];
+  const arenaMenu    = [{ name: "Arena",    href: "/arena"    }];
   const analyzeMenu  = [{ name: "Wallet X-Ray",  href: "/analyze"  }];
   const messagesMenu = [{ name: "MESSAGES", href: "/messages" }];
   // INTEL lives as a tab inside LAB — not in the top nav
@@ -280,6 +281,7 @@ const allMenuItems = [
   ...NAV_HREF_ORDER.slice(0, 5).map(byHref).filter(Boolean),
   ...labMenu,
   ...feedMenu,
+  ...arenaMenu,
   ...analyzeMenu,
   ...NAV_HREF_ORDER.slice(5).map(byHref).filter(Boolean),
   ...customMenus,

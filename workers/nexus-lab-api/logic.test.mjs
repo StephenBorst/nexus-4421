@@ -9,6 +9,7 @@ import {
   planQuality, planSummary,
   expectancyStats, callerScore, convictionCalibration, contestedBoard,
   LOSS_REASONS, isLossReason, postmortemSummary,
+  validateArenaRegistration, arenaAgentConfig,
 } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
@@ -1153,4 +1154,36 @@ test("estimateResolution: buckets are ordered and total coverage is unbounded", 
   let prev = 0;
   for (const b of RESOLUTION_BUCKETS) { assert.ok(b.maxHours > prev); prev = b.maxHours; }
   assert.equal(RESOLUTION_BUCKETS[RESOLUTION_BUCKETS.length - 1].maxHours, Infinity);
+});
+
+// ── Nexus Arena — registration validation + config clamps ────────────────────
+test("validateArenaRegistration: accepts a normal profile and trims/limits fields", () => {
+  const v = validateArenaRegistration({ name: "  Fable Fund 1 ", description: "x".repeat(500), builder: "claude-loop" });
+  assert.equal(v.ok, true);
+  assert.equal(v.name, "Fable Fund 1");
+  assert.equal(v.description.length, 240);
+  assert.equal(v.builder, "claude-loop");
+});
+
+test("validateArenaRegistration: rejects missing/short/oversized/injected names", () => {
+  assert.equal(validateArenaRegistration({}).ok, false);
+  assert.equal(validateArenaRegistration({ name: "ab" }).ok, false);
+  assert.equal(validateArenaRegistration({ name: "x".repeat(41) }).ok, false);
+  assert.equal(validateArenaRegistration({ name: "<script>alert(1)</script>" }).ok, false);
+});
+
+test("arenaAgentConfig: always PAPER + EXTERNAL + arena-flagged regardless of overrides", () => {
+  const c = arenaAgentConfig({ mode: "AUTONOMOUS", signalMode: "CONFLUENCE", arena: false });
+  assert.equal(c.mode, "PAPER");
+  assert.equal(c.signalMode, "EXTERNAL");
+  assert.equal(c.arena, true);
+});
+
+test("arenaAgentConfig: clamps hostile risk values and defaults absent ones", () => {
+  const c = arenaAgentConfig({ leverage: 500, slPercent: -3, maxTradesPerDay: "nope", capitalPerTrade: 1e9 });
+  assert.equal(c.leverage, 10);
+  assert.equal(c.slPercent, 0.2);
+  assert.equal(c.maxTradesPerDay, 10); // NaN → default
+  assert.equal(c.capitalPerTrade, 10000);
+  assert.equal(c.tpPercent, 2);
 });

@@ -31,6 +31,7 @@ import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./b
 import { handleSmart, refreshSmartSeed } from "./routes-smart.mjs";
 import { handleTheses } from "./routes-theses.mjs";
 import { handleAgents } from "./routes-agents.mjs";
+import { handleArena } from "./routes-arena.mjs";
 import { handleFeed } from "./routes-feed.mjs";
 import { loadOiHistForBacktest, revalidateStrategy, OI_BACKTEST_MIN_DAYS, OI_BACKTEST_MIN_SAMPLES } from "./strategies.mjs";
 import { json, cors, normalizeAddress, recoverEthAddress, ALLOWED_ORIGINS, holdersRoomMessage, appendNotification } from "./shared.mjs";
@@ -3435,6 +3436,17 @@ document.getElementById("btn").addEventListener("click",go);
       if (!metaRaw) return json({ error: "invalid or revoked token" }, request, 401);
       const meta = JSON.parse(metaRaw);
       if (!meta.enabled) return json({ error: "webhook disabled" }, request, 403);
+      // Arena-minted tokens are free but SCOPED: they only fire while the agent's
+      // brain stays EXTERNAL (bring-your-own-brain). Without this check, /arena/
+      // register would be a free ride around the PRO webhook gate for house
+      // strategies (register → grab token → flip signalMode).
+      if (meta.arena) {
+        const cfgRaw = await AGENT_KV.get(`agent:config:${meta.address}`);
+        let cfg = null; try { cfg = cfgRaw ? JSON.parse(cfgRaw) : null; } catch { /* ignore */ }
+        if (!cfg || cfg.signalMode !== "EXTERNAL") {
+          return json({ error: "arena_token_scope", hint: "Arena webhook tokens only work while signalMode is EXTERNAL. Use the PRO webhook (POST /agent/:address/webhook/enable) for house strategies." }, request, 403);
+        }
+      }
       let body; try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
       if (meta.passphrase && String(body.passphrase || "") !== meta.passphrase) {
         return json({ error: "bad passphrase" }, request, 401);
@@ -3984,6 +3996,12 @@ document.getElementById("btn").addEventListener("click",go);
         pfpUrl: pfpUrl ? String(pfpUrl).slice(0, 300) : null,
       }), { expirationTtl: 360 }); // self-expiring — nothing retained
       return json({ ok: true, count: clean.length }, request);
+    }
+
+    // Nexus Arena — open proving ground for external AI agents → routes-arena.mjs.
+    {
+      const arenaRes = await handleArena(parts, request, env);
+      if (arenaRes) return arenaRes;
     }
 
     // Agents family → routes-agents.mjs (migration rules in shared.mjs).

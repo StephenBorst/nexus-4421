@@ -53,6 +53,10 @@ const FeedLayout = lazy(() => import('./pages/feed/Layout'));
 const AnalyzePage = lazy(() => import('./pages/analyze'));
 const AnalyzeLayout = lazy(() => import('./pages/analyze/Layout'));
 
+// ✅ ARENA PAGE (open proving ground for AI trading agents)
+const ArenaPage = lazy(() => import('./pages/arena'));
+const ArenaLayout = lazy(() => import('./pages/arena/Layout'));
+
 // ✅ TRADER PROFILE PAGE
 const TraderPage = lazy(() => import('./pages/trader'));
 
@@ -135,6 +139,15 @@ const router = createBrowserRouter([
         element: <AnalyzeLayout />,
         children: [
           { index: true, element: <AnalyzePage /> },
+        ],
+      },
+
+      // ✅ ARENA ROUTE (open proving ground for AI trading agents)
+      {
+        path: 'arena',
+        element: <ArenaLayout />,
+        children: [
+          { index: true, element: <ArenaPage /> },
         ],
       },
 

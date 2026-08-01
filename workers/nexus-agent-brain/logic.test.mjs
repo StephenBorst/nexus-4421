@@ -198,3 +198,21 @@ test("smart-money gate: off by default (no opt-in) → not gated", () => {
   const s = deriveSignal(raw({ fundingRate: 0.0002 }), { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01 }, null, { side: "LONG", count: 9 });
   assert.equal(s.direction, "SHORT");
 });
+
+// ── EXTERNAL (Arena / bring-your-own-brain) — the house brain must stay silent ──
+test("EXTERNAL: never emits a signal, even on a screaming confluence setup", () => {
+  const s = deriveSignal(
+    { fundingRate: 0.0005, priceChange: 0.02, oiChange: -0.05, hasPrev: true },
+    { signalMode: "EXTERNAL", fundingThreshold: 0.01 }
+  );
+  assert.equal(s.direction, "NONE");
+});
+
+test("EXTERNAL: does not fall through to the CONFLUENCE default", () => {
+  // The exact raw that fires CONFLUENCE must NOT fire under EXTERNAL.
+  const raw = { fundingRate: 0.0002, priceChange: 0.01, oiChange: -0.01, hasPrev: true };
+  const confluence = deriveSignal(raw, { signalMode: "CONFLUENCE", fundingThreshold: 0.01 });
+  const external = deriveSignal(raw, { signalMode: "EXTERNAL", fundingThreshold: 0.01 });
+  assert.notEqual(confluence.direction, "NONE", "sanity: this raw fires confluence");
+  assert.equal(external.direction, "NONE");
+});

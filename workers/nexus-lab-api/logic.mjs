@@ -1017,3 +1017,44 @@ export function safeChartUrl(raw) {
   const ok = CHART_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
   return ok ? u.toString() : null;
 }
+
+// ── Nexus Arena — the open proving ground for external AI agents ─────────────
+// Any AI agent registers with a wallet, drives trades through the webhook rail
+// (PAPER first — zero capital, simulated fills at public mark price), and builds
+// a track record graded by OUR engine, never self-reported. Pure + tested.
+export const ARENA = { nameMin: 3, nameMax: 40, descMax: 240, builderMax: 60, rosterCap: 500 };
+
+export function validateArenaRegistration(body = {}) {
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  if (name.length < ARENA.nameMin || name.length > ARENA.nameMax) {
+    return { ok: false, error: `name required (${ARENA.nameMin}-${ARENA.nameMax} chars)` };
+  }
+  if (!/^[\w .\-\[\]()]+$/.test(name)) {
+    return { ok: false, error: "name: letters, numbers, spaces, . - _ [ ] ( ) only" };
+  }
+  const description = typeof body.description === "string" ? body.description.trim().slice(0, ARENA.descMax) : "";
+  const builder = typeof body.builder === "string" ? body.builder.trim().slice(0, ARENA.builderMax) : "";
+  return { ok: true, name, description, builder };
+}
+
+// Paper-tier agent config: EXTERNAL brain (house signals silent), risk fields
+// clamped to sane paper ranges so a hostile registration can't set absurd values.
+const clamp = (v, lo, hi, def) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : def;
+};
+export function arenaAgentConfig(overrides = {}) {
+  return {
+    mode: "PAPER",
+    signalMode: "EXTERNAL",
+    arena: true,
+    symbols: [],
+    leverage: clamp(overrides.leverage, 1, 10, 2),
+    capitalPerTrade: clamp(overrides.capitalPerTrade, 10, 10000, 100),
+    tpPercent: clamp(overrides.tpPercent, 0.2, 50, 2),
+    slPercent: clamp(overrides.slPercent, 0.2, 25, 1.5),
+    maxHoldHours: clamp(overrides.maxHoldHours, 1, 336, 24),
+    maxTradesPerDay: clamp(overrides.maxTradesPerDay, 1, 50, 10),
+    maxDailyLossUsdc: clamp(overrides.maxDailyLossUsdc, 10, 10000, 200),
+  };
+}

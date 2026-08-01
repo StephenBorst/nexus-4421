@@ -85,6 +85,11 @@ export function deriveSignal(raw, config = {}, regime = null, smartConsensus = n
         direction = priceChange > 0 ? "SHORT" : "LONG"; confidence = 60; why = "mean-reversion";
       }
       break;
+    case "EXTERNAL":
+      // Arena / bring-your-own-brain — the house brain stays silent for this agent;
+      // entries come ONLY from its own webhook intents. Explicit case so it can
+      // never fall through to the CONFLUENCE default and fire house signals.
+      break;
     case "CONFLUENCE":
     default:
       if (fundingSignal !== "NONE" && fundingSignal === oiSignal) { direction = fundingSignal; confidence = 80; why = "confluence"; }
