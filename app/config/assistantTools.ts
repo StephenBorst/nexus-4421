@@ -240,7 +240,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "get_top_agents",
     description:
-      "Get the public TRUSTLESS autonomous-agent leaderboard: agents ranked by risk-adjusted score over their real on-chain-anchored trade ledger. Use to compare agent strategies or answer 'who are the top agents'.",
+      "Get the public TRUSTLESS autonomous-agent leaderboard: agents ranked by risk-adjusted score over their real on-chain-anchored trade ledger. Use to compare agent strategies or answer 'who are the top agents'. The user can ⚡ Autocopy any of these — their own agent mirrors the leader's trades at their own risk (see open_autocopy).",
     input_schema: { type: "object", properties: {} },
     run: async () => {
       const res = await fetch(`${AGENT_API}/agents/leaderboard`);
@@ -490,6 +490,17 @@ TOOLS.push(
     run: async (_args, ctx) => {
       ctx.navigate?.(`/feed`);
       return JSON.stringify({ navigated: "/feed" });
+    },
+  },
+  {
+    name: "open_autocopy",
+    description:
+      "Open the autonomous-agent leaderboard (TOP AGENTS) in the Lab, where the user can ⚡ Autocopy a proven agent — their OWN agent then mirrors the leader's trades at their own size, mode and guardrails, graded on-chain (trustless copy-trading). Use when the user wants to copy/follow a top-performing agent, or asks 'who should I copy' after get_top_agents.",
+    input_schema: { type: "object", properties: {} },
+    run: async (_args, ctx) => {
+      ctx.navigate?.(`/lab?tab=agent`);
+      try { window.dispatchEvent(new CustomEvent("nexus:lab-tab", { detail: { tab: "agent" } })); } catch { /* not in Lab yet — the ?tab= deep-link handles it */ }
+      return JSON.stringify({ navigated: "/lab?tab=agent", note: "TOP AGENTS board — tap ⚡ Autocopy on any ranked agent to mirror it with your own agent" });
     },
   },
   {
