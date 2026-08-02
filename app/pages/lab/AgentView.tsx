@@ -423,6 +423,32 @@ export function AgentView() {
     }
   }
 
+  // ⚡ AUTOCOPY — follow/unfollow a leader agent. Trustless copy-trading: adds their
+  // wallet to config.autocopy.leaders and persists via the owner-authed config path.
+  // Your OWN agent then mirrors their trades at your mode/size/guardrails (exec side).
+  async function toggleAutocopy(leaderWallet: string) {
+    if (!walletAddress) { setError("Connect wallet first"); return; }
+    const lw = leaderWallet.toLowerCase();
+    const cur = (config.autocopy?.leaders || []).map((w) => w.toLowerCase());
+    const following = cur.includes(lw);
+    const nextLeaders = following ? cur.filter((w) => w !== lw) : [...cur, lw];
+    const nextConfig = { ...config, autocopy: { enabled: nextLeaders.length > 0, leaders: nextLeaders } };
+    setConfig(nextConfig);
+    setSaving(true);
+    try {
+      const walletSig = await getAgentSig(walletAddress);
+      const res = await fetch(`${AGENT_API}/agent/${walletAddress}/config`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config: nextConfig, walletSig }),
+      });
+      if (!res.ok) throw new Error("Failed to update autocopy");
+      setSuccess(following
+        ? "Stopped autocopying"
+        : agentState?.active ? "Autocopying — your agent will mirror their trades" : "Autocopy set — activate your agent to start mirroring");
+      setTimeout(() => setSuccess(null), 3500);
+    } catch (e: any) { setError(e.message); } finally { setSaving(false); }
+  }
+
   async function resetPaperRecord() {
     if (!walletAddress) return;
     if (!window.confirm("Clear your paper track record? This wipes all simulated trades and resets paper daily stats. Your live record is untouched.")) return;
@@ -1906,8 +1932,15 @@ export function AgentView() {
               </button>
             </div>
             <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 10, color: "#52525b", marginTop: 6, lineHeight: 1.5 }}>
-              Ranked by risk-adjusted score (win rate + profit factor, weighted by sample size) over <strong style={{ color: "#a1a1aa" }}>≥10 live trades spanning ≥3 days</strong>. Paper excluded. Copy any strategy to test it in PAPER first.
+              Ranked by risk-adjusted score (win rate + profit factor, weighted by sample size) over <strong style={{ color: "#a1a1aa" }}>≥10 live trades spanning ≥3 days</strong>. Paper excluded.
+              {" "}<strong style={{ color: "#a1a1aa" }}>⚡ Autocopy</strong> mirrors an agent's trades with YOUR agent — at your size, mode &amp; guardrails. Trustless: their record is graded on-chain.
             </div>
+            {(config.autocopy?.leaders?.length ?? 0) > 0 && (
+              <div style={{ marginTop: 8, fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#ededf0", letterSpacing: "0.02em" }}>
+                ⚡ Autocopying {config.autocopy!.leaders.length} agent{config.autocopy!.leaders.length === 1 ? "" : "s"}
+                {!agentState?.active && <span style={{ color: "#fbbf24" }}> — activate your agent to start mirroring</span>}
+              </div>
+            )}
             {/* Congruence bridge: this board is agents built HERE. The Arena is the
                 same trustless grading opened to agents built ANYWHERE (external AI). */}
             <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #232327", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
@@ -1952,10 +1985,11 @@ export function AgentView() {
             <div style={{ display: "flex", flexDirection: "column", gap: 8, overflowX: "auto" }}>
               {leaderboard.map((e) => {
                 const isMe = e.wallet.toLowerCase() === (walletAddress ?? "").toLowerCase();
+                const isCopying = (config.autocopy?.leaders || []).map((w) => w.toLowerCase()).includes(e.wallet.toLowerCase());
                 const who = e.displayName || `${e.wallet.slice(0, 6)}…${e.wallet.slice(-4)}`;
                 const medal = e.rank === 1 ? "#ffd700" : e.rank === 2 ? "#d4d4d8" : e.rank === 3 ? "#cd7f32" : "#52525b";
                 return (
-                  <div key={e.wallet} style={{ ...agentCardStyle, borderColor: isMe ? "#ededf0" : "#232327", display: "grid", gridTemplateColumns: "34px 1fr repeat(4, auto) 110px", gap: 12, minWidth: 520, alignItems: "center" }}>
+                  <div key={e.wallet} style={{ ...agentCardStyle, borderColor: isMe ? "#ededf0" : "#232327", display: "grid", gridTemplateColumns: "34px 1fr repeat(4, auto) 134px", gap: 12, minWidth: 540, alignItems: "center" }}>
                     <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: medal, textAlign: "center" }}>{e.rank}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                       {e.pfp
@@ -1986,19 +2020,39 @@ export function AgentView() {
                         {label === "SCORE" && <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{e.trades}t · {e.daysActive}d</div>}
                       </div>
                     ))}
-                    <button
-                      onClick={() => copyAgentConfig(e)}
-                      disabled={!e.config || isMe}
-                      style={{
-                        background: e.config && !isMe ? "#ededf015" : "#0a0a0b",
-                        border: `1px solid ${e.config && !isMe ? "#ededf0" : "#232327"}`,
-                        borderRadius: 4, color: e.config && !isMe ? "#ededf0" : "#52525b",
-                        fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "7px 10px",
-                        cursor: e.config && !isMe ? "pointer" : "default", letterSpacing: "0.03em",
-                      }}
-                    >
-                      {isMe ? "YOUR AGENT" : "COPY CONFIG"}
-                    </button>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {/* ⚡ AUTOCOPY — the flagship: your agent mirrors theirs, trustlessly. */}
+                      <button
+                        onClick={() => toggleAutocopy(e.wallet)}
+                        disabled={isMe || saving}
+                        title={isMe ? "This is your agent" : "Your agent mirrors this agent's trades — at your own size, mode & guardrails"}
+                        style={{
+                          background: isMe ? "#0a0a0b" : isCopying ? "#ededf0" : "#ededf015",
+                          border: `1px solid ${isMe ? "#232327" : "#ededf0"}`,
+                          borderRadius: 4, color: isMe ? "#52525b" : isCopying ? "#0a0a0b" : "#ededf0",
+                          fontFamily: "var(--nx-font-mono)", fontSize: 10, fontWeight: 600, padding: "7px 10px",
+                          cursor: isMe ? "default" : "pointer", letterSpacing: "0.03em", whiteSpace: "nowrap",
+                        }}
+                      >
+                        {isMe ? "YOUR AGENT" : isCopying ? "⚡ COPYING" : "⚡ AUTOCOPY"}
+                      </button>
+                      {!isMe && (
+                        <button
+                          onClick={() => copyAgentConfig(e)}
+                          disabled={!e.config}
+                          title="Copy this agent's strategy settings into your config (edit before use)"
+                          style={{
+                            background: "#0a0a0b",
+                            border: `1px solid ${e.config ? "#33333a" : "#232327"}`,
+                            borderRadius: 4, color: e.config ? "#a1a1aa" : "#52525b",
+                            fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 10px",
+                            cursor: e.config ? "pointer" : "default", letterSpacing: "0.03em", whiteSpace: "nowrap",
+                          }}
+                        >
+                          COPY CONFIG
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}

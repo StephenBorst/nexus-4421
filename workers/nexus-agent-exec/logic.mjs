@@ -381,3 +381,38 @@ export function directiveLevels(directive, fillPrice) {
   }
   return { tpPercent: tp1Percent, slPercent, takeProfits };
 }
+
+// ── AUTOCOPY — trustless copy-trading ────────────────────────────────────────
+// A follower opts into mirroring one or more LEADERS by adding their wallets to
+// config.autocopy.leaders (written through the normal owner-authed config path —
+// no new money-path). When the follower is FLAT, the exec adopts a followed
+// leader's currently-OPEN position as its own entry signal: the copy supplies only
+// SYMBOL + DIRECTION, so it flows through the exact same enterPosition path and
+// inherits the FOLLOWER's mode (PAPER simulates / AUTONOMOUS trades), sizing
+// (capitalPerTrade), TP/SL, cooldown-exempt priority, and every guardrail (daily-
+// loss cap, max trades/day, kill switch). This is why copy-trading here is
+// trustless AND safe: the leader's record is graded from public price, and the
+// follower's own risk model governs execution.
+export const AUTOCOPY_MAX_LEADERS = 20;
+
+// leaders = [{ wallet, position }] where position is the leader's current_position
+// (or null when flat). alreadyCopiedKey = follower state.last_copy_key (dedupe).
+// Returns { symbol, direction, leader, key } for the first followed leader holding a
+// NEW (not-yet-copied) real position, or null. Paper leader positions are skipped —
+// you copy REAL, on-chain-graded trades, not another paper sim.
+export function selectCopySignal(config, leaders, alreadyCopiedKey) {
+  const ac = config?.autocopy;
+  if (!ac || !ac.enabled || !Array.isArray(ac.leaders) || !ac.leaders.length) return null;
+  const follow = new Set(ac.leaders.map((a) => String(a).toLowerCase()));
+  for (const entry of leaders || []) {
+    const wallet = String(entry?.wallet || "").toLowerCase();
+    if (!follow.has(wallet)) continue;
+    const p = entry?.position;
+    if (!p || p.paper) continue;                                   // real positions only
+    if (!p.symbol || (p.direction !== "LONG" && p.direction !== "SHORT")) continue;
+    const key = `${wallet}:${p.symbol}:${p.opened_at || p.entry_price || ""}`;
+    if (alreadyCopiedKey && key === alreadyCopiedKey) continue;    // already mirrored this one
+    return { symbol: p.symbol, direction: p.direction, leader: wallet, key };
+  }
+  return null;
+}

@@ -120,6 +120,10 @@ export interface AgentConfig {
     safetyOrderVolumeScale: number;// scale each safety order's size (martingale)
   };
   mode: "ASSISTED" | "AUTONOMOUS" | "PAPER";
+  // Autocopy — trustless copy-trading. When enabled, a FLAT agent mirrors a followed
+  // leader's currently-open position (symbol+direction), executed at THIS agent's own
+  // mode/sizing/guardrails. Written through the normal config path; consumed by exec.
+  autocopy?: { enabled: boolean; leaders: string[] };
 }
 
 export interface AgentState {

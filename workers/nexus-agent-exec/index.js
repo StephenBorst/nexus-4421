@@ -13,7 +13,7 @@
 
 import * as ed from "@noble/ed25519";
 import bs58 from "bs58";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice, breakevenArmed, directiveExpired, directiveShouldFill, directiveLevels, volScaledCapital, realizedVolPct } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice, breakevenArmed, directiveExpired, directiveShouldFill, directiveLevels, volScaledCapital, realizedVolPct, selectCopySignal, AUTOCOPY_MAX_LEADERS } from "./logic.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const COOLDOWN_MS = 15 * 60 * 1000; // 15 min between trades
@@ -483,9 +483,38 @@ async function processUser(address, env, cache) {
   // Flat: make sure no published feed card is still stuck ACTIVE (zombie cleanup).
   if (PUBLISH_AGENT_FEED) await reconcileStaleFeed(address, env);
 
+  // ── AUTOCOPY — mirror a followed leader's OPEN position ───
+  // Trustless copy-trading: the follower opted into config.autocopy.leaders (via the
+  // owner-authed config path). We adopt a followed leader's real open position as a
+  // signal (symbol + direction only) — it then flows through the SAME enterPosition
+  // path, inheriting THIS agent's mode (PAPER/AUTONOMOUS), sizing, TP/SL and every
+  // guardrail. Only when flat + no webhook/directive; capped subrequests; deduped by
+  // state.last_copy_key so we mirror each NEW leader position exactly once.
+  let copySignal = null;
+  if (!whSignal && !directiveSignal && !state.current_position && config.autocopy?.enabled) {
+    const leaderWallets = (config.autocopy.leaders || [])
+      .map((w) => String(w).toLowerCase())
+      .filter((w) => w !== address)               // can't copy yourself
+      .slice(0, AUTOCOPY_MAX_LEADERS);
+    const leaders = await Promise.all(leaderWallets.map(async (lw) => {
+      let position = null;
+      try {
+        const s = await env.NEXUS_AGENT.get(`agent:state:${lw}`);
+        position = s ? (JSON.parse(s).current_position || null) : null;
+      } catch { /* leader unreadable → treated as flat */ }
+      return { wallet: lw, position };
+    }));
+    const pick = selectCopySignal(config, leaders, state.last_copy_key);
+    if (pick) {
+      copySignal = { symbol: pick.symbol, direction: pick.direction, confidence: 100, price: 0, funding: 0, timestamp: now, source: "COPY", leader: pick.leader };
+      state.last_copy_key = pick.key;             // persisted by enterPosition → mirror once
+      console.log(`[exec] ${address.slice(0, 10)} AUTOCOPY ${pick.direction} ${pick.symbol} from ${pick.leader.slice(0, 10)}`);
+    }
+  }
+
   // ── NO POSITION — CHECK FOR SIGNAL ────────────────────
-  // Prefer the user's own intent (webhook, then directive); otherwise the brain's.
-  let signal = whSignal || directiveSignal;
+  // Prefer the user's own intent (webhook, directive, autocopy); otherwise the brain's.
+  let signal = whSignal || directiveSignal || copySignal;
   if (!signal) {
     const signalRaw = await env.NEXUS_AGENT.get(`agent:signal:${address}`);
     if (!signalRaw) return;
@@ -495,9 +524,9 @@ async function processUser(address, env, cache) {
     if (signal.confidence < 50) return;
   }
 
-  // Cooldown check — user-authored intents (webhook / directive) are explicit, so
-  // they bypass it; only the brain's own signals are cooldown-gated.
-  const userAuthored = signal.source === "WEBHOOK" || signal.source === "DIRECTIVE";
+  // Cooldown check — user-authored intents (webhook / directive / autocopy) are
+  // explicit, so they bypass it; only the brain's own signals are cooldown-gated.
+  const userAuthored = signal.source === "WEBHOOK" || signal.source === "DIRECTIVE" || signal.source === "COPY";
   if (!userAuthored && state.last_trade_time && now - state.last_trade_time < COOLDOWN_MS) return;
 
   // Mode check

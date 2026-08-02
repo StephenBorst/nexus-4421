@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-agent-exec/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice, breakevenArmed, directiveExpired, directiveShouldFill, directiveLevels, volScaledCapital, realizedVolPct } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, exitReason, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice, breakevenArmed, directiveExpired, directiveShouldFill, directiveLevels, volScaledCapital, realizedVolPct, selectCopySignal } from "./logic.mjs";
 
 // ─── snapQty ───────────────────────────────────────────────
 test("snapQty: snaps cleanly to base_tick (no float artifacts)", () => {
@@ -396,4 +396,40 @@ test("realizedVolPct: flat series → ~0 vol", () => {
 test("realizedVolPct: computes a positive vol for a moving series", () => {
   const v = realizedVolPct([100, 102, 99, 103, 98]);
   assert.ok(v !== null && v > 0);
+});
+
+// ── Autocopy — selectCopySignal ──────────────────────────────────────────────
+const acCfg = (leaders) => ({ autocopy: { enabled: true, leaders } });
+const leaderLong = { wallet: "0xLEAD", position: { symbol: "PERP_BTC_USDC", direction: "LONG", opened_at: 111, entry_price: 60000 } };
+
+test("selectCopySignal: off / empty → null", () => {
+  assert.equal(selectCopySignal({}, [leaderLong], null), null);
+  assert.equal(selectCopySignal({ autocopy: { enabled: false, leaders: ["0xlead"] } }, [leaderLong], null), null);
+  assert.equal(selectCopySignal(acCfg([]), [leaderLong], null), null);
+});
+
+test("selectCopySignal: mirrors a followed leader's open position (case-insensitive)", () => {
+  const s = selectCopySignal(acCfg(["0xLEAD"]), [leaderLong], null);
+  assert.equal(s.symbol, "PERP_BTC_USDC");
+  assert.equal(s.direction, "LONG");
+  assert.equal(s.leader, "0xlead");
+});
+
+test("selectCopySignal: ignores un-followed leaders + flat leaders", () => {
+  assert.equal(selectCopySignal(acCfg(["0xOTHER"]), [leaderLong], null), null);
+  assert.equal(selectCopySignal(acCfg(["0xLEAD"]), [{ wallet: "0xLEAD", position: null }], null), null);
+});
+
+test("selectCopySignal: never copies a PAPER leader position (real trades only)", () => {
+  const paper = { wallet: "0xLEAD", position: { ...leaderLong.position, paper: true } };
+  assert.equal(selectCopySignal(acCfg(["0xLEAD"]), [paper], null), null);
+});
+
+test("selectCopySignal: dedupes an already-copied leader position by key", () => {
+  const first = selectCopySignal(acCfg(["0xLEAD"]), [leaderLong], null);
+  assert.equal(selectCopySignal(acCfg(["0xLEAD"]), [leaderLong], first.key), null); // same position → skip
+  // leader opens a NEW position (different opened_at) → copies again
+  const next = { wallet: "0xLEAD", position: { symbol: "PERP_ETH_USDC", direction: "SHORT", opened_at: 222 } };
+  const s2 = selectCopySignal(acCfg(["0xLEAD"]), [next], first.key);
+  assert.equal(s2.symbol, "PERP_ETH_USDC");
 });
