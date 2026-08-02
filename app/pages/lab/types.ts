@@ -177,6 +177,7 @@ export interface AgentLeaderboardEntry {
   daysActive: number;
   score: number;
   config: Partial<AgentConfig> | null;
+  copiers?: number; // how many traders autocopy this agent (public social proof)
 }
 
 export interface AgentPendingThesis {

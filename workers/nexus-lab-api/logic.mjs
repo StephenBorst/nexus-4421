@@ -1061,3 +1061,20 @@ export function arenaAgentConfig(overrides = {}) {
     maxDailyLossUsdc: clamp(overrides.maxDailyLossUsdc, 10, 10000, 200),
   };
 }
+
+// ── Autocopy copiers reverse-index diff ──────────────────────────────────────
+// Autocopy follows live in each follower's config.autocopy.leaders. To show a
+// public "N copiers" per leader we keep a reverse index (copy:copiers:{leader})
+// updated at config-write time. Given a follower's OLD vs NEW leader list, this
+// returns which leaders they started/stopped following — normalized lowercase,
+// deduped, with self excluded (you can't copy yourself). Pure + tested.
+export function diffCopyLeaders(oldLeaders, newLeaders, self) {
+  const me = String(self || "").toLowerCase();
+  const norm = (a) => [...new Set((Array.isArray(a) ? a : []).map((x) => String(x).toLowerCase()).filter((x) => x && x !== me))];
+  const o = new Set(norm(oldLeaders));
+  const n = new Set(norm(newLeaders));
+  return {
+    added: [...n].filter((x) => !o.has(x)),
+    removed: [...o].filter((x) => !n.has(x)),
+  };
+}

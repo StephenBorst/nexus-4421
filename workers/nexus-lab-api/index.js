@@ -23,7 +23,31 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders } from "./logic.mjs";
+
+// ── Autocopy copiers reverse-index ───────────────────────────────────────────
+// Keep copy:copiers:{leader} = [followers] in sync when a follower's config
+// (autocopy.leaders) changes. Read-modify-write per changed leader (small N).
+// Fail-soft — a bookkeeping miss must never block a config save.
+async function applyCopiersDiff(env, follower, added, removed) {
+  const KV = env.NEXUS_AGENT || env.LAB_STORE;
+  const f = String(follower).toLowerCase();
+  const upd = async (leader, add) => {
+    const key = `copy:copiers:${leader}`;
+    let set;
+    try { set = new Set((JSON.parse((await KV.get(key)) || "[]") || []).map((x) => String(x).toLowerCase())); }
+    catch { set = new Set(); }
+    if (add) set.add(f); else set.delete(f);
+    await KV.put(key, JSON.stringify([...set]));
+  };
+  await Promise.all([...added.map((l) => upd(l, true)), ...removed.map((l) => upd(l, false))]);
+}
+// Read the follower's previously-stored autocopy leaders (for the diff).
+async function prevCopyLeaders(env, address) {
+  const KV = env.NEXUS_AGENT || env.LAB_STORE;
+  try { const c = await KV.get(`agent:config:${address}`); return c ? (JSON.parse(c).autocopy?.leaders || []) : []; }
+  catch { return []; }
+}
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./backtest.mjs";
 // Route families lifted out of the 74-route fetch handler (see shared.mjs for the
@@ -3702,7 +3726,11 @@ document.getElementById("btn").addEventListener("click",go);
         if (config.dcaEnabled && !(await walletIsPro(address, env))) {
           return json({ error: "pro_dca_locked", hint: "DCA / safety-order mode requires Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
         }
+        const prevLeadersAct = await prevCopyLeaders(env, address);
         await AGENT_KV.put(`agent:config:${address}`, JSON.stringify(config));
+        // Keep the public copiers count in sync (activate can also change autocopy).
+        const cdAct = diffCopyLeaders(prevLeadersAct, config.autocopy?.leaders, address);
+        if (cdAct.added.length || cdAct.removed.length) await applyCopiersDiff(env, address, cdAct.added, cdAct.removed).catch((e) => console.error("[copiers] sync", e));
         if (!isPaper) {
           // Encrypt the trading key at rest — KV never holds it in plaintext.
           const encryptedKey = await encryptSecret(tradingKey, env);
@@ -3731,7 +3759,11 @@ document.getElementById("btn").addEventListener("click",go);
         if (config.dcaEnabled && !(await walletIsPro(address, env))) {
           return json({ error: "pro_dca_locked", hint: "DCA / safety-order mode requires Nexus PRO — hold ARCHITECT-tier $NEXUS or subscribe." }, request, 402);
         }
+        const prevLeaders = await prevCopyLeaders(env, address);
         await AGENT_KV.put(`agent:config:${address}`, JSON.stringify(config));
+        // Keep the public copiers count in sync with autocopy follow/unfollow.
+        const cd = diffCopyLeaders(prevLeaders, config.autocopy?.leaders, address);
+        if (cd.added.length || cd.removed.length) await applyCopiersDiff(env, address, cd.added, cd.removed).catch((e) => console.error("[copiers] sync", e));
         return json({ ok: true }, request);
       }
 

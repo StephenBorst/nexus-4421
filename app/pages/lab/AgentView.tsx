@@ -2006,6 +2006,11 @@ export function AgentView() {
                             </span>
                           ))}
                         </div>
+                        {(e.copiers ?? 0) > 0 && (
+                          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8.5, color: "#a1a1aa", marginTop: 3, letterSpacing: "0.02em" }}>
+                            ⚡ {e.copiers} copier{e.copiers === 1 ? "" : "s"}
+                          </div>
+                        )}
                       </div>
                     </div>
                     {[

@@ -1195,3 +1195,30 @@ test("parseWebhookAlert: TEST/PING → wiring-check action, no symbol required",
   // TEST must never carry a tradable direction the exec could act on.
   assert.equal(parseWebhookAlert({ action: "TEST" }).direction, null);
 });
+
+// ── Autocopy — diffCopyLeaders (copiers reverse index) ───────────────────────
+import { diffCopyLeaders } from "./logic.mjs";
+
+test("diffCopyLeaders: added + removed computed from old vs new", () => {
+  const d = diffCopyLeaders(["0xA", "0xB"], ["0xB", "0xC"], "0xME");
+  assert.deepEqual(d.added, ["0xc"]);
+  assert.deepEqual(d.removed, ["0xa"]);
+});
+
+test("diffCopyLeaders: no change → empty", () => {
+  const d = diffCopyLeaders(["0xA"], ["0xa"], "0xME"); // case-insensitive same
+  assert.deepEqual(d.added, []);
+  assert.deepEqual(d.removed, []);
+});
+
+test("diffCopyLeaders: first follow (no old) + self is excluded + deduped", () => {
+  const d = diffCopyLeaders(null, ["0xLEAD", "0xLEAD", "0xME"], "0xme");
+  assert.deepEqual(d.added, ["0xlead"]);
+  assert.deepEqual(d.removed, []);
+});
+
+test("diffCopyLeaders: unfollow-all → all removed", () => {
+  const d = diffCopyLeaders(["0xA", "0xB"], [], "0xME");
+  assert.deepEqual(d.added, []);
+  assert.deepEqual(new Set(d.removed), new Set(["0xa", "0xb"]));
+});

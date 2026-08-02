@@ -176,12 +176,15 @@ export async function handleAgents(parts, request, env, ctx) {
 
     // Enrich top entries with profile + copyable (strategy-only) config.
     const enriched = await Promise.all(top.map(async (e, i) => {
-      const [configRaw, profileRaw] = await Promise.all([
+      const [configRaw, profileRaw, copiersRaw] = await Promise.all([
         AGENT_KV.get(`agent:config:${e.wallet}`),
         env.LAB_STORE.get(`profile:${e.wallet}`),
+        AGENT_KV.get(`copy:copiers:${e.wallet}`),
       ]);
       const cfg = configRaw ? JSON.parse(configRaw) : null;
       const profile = profileRaw ? JSON.parse(profileRaw) : {};
+      let copiers = 0;
+      try { copiers = copiersRaw ? (JSON.parse(copiersRaw) || []).length : 0; } catch { copiers = 0; }
       const sharedConfig = cfg ? {
         symbols: cfg.symbols, leverage: cfg.leverage, tpPercent: cfg.tpPercent,
         slPercent: cfg.slPercent, maxHoldHours: cfg.maxHoldHours,
@@ -192,7 +195,7 @@ export async function handleAgents(parts, request, env, ctx) {
         displayName: profile.displayName || null, pfp: profile.pfp || null,
         trades: e.trades, winRate: e.winRate, netPnl: e.netPnl,
         profitFactor: e.profitFactor, daysActive: e.daysActive, score: e.score,
-        config: sharedConfig,
+        config: sharedConfig, copiers,
       };
     }));
 
