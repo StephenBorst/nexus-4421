@@ -1330,6 +1330,7 @@ type DirFilter = "ALL" | "LONG" | "SHORT";
 
 export default function FeedPage() {
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const [feed, setFeed] = useState<FeedThesis[]>([]);
   // Resolution events ride in the same /feed payload but are NOT thesis-shaped — they
   // carry no levels or status. Split out so FeedCard never sees one and so they can't
@@ -1621,6 +1622,17 @@ export default function FeedPage() {
             {error && !loading && (
               <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#f7525f" }}>
                 failed to load feed — check connection
+              </div>
+            )}
+            {/* Bridge to the unified Proof hub — these boards are the social slice;
+                /proof is every trustless record (callers, agents, arena, desks) under
+                the on-chain ledger, in one place. */}
+            {!loading && !error && (
+              <div onClick={() => navigate("/proof")} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "#0f0f11", border: "1px solid #232327", borderLeft: "2px solid #ededf0", borderRadius: 6, padding: "10px 12px", marginBottom: 14, cursor: "pointer" }}>
+                <span style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: 12, color: "#a1a1aa", lineHeight: 1.5 }}>
+                  <b style={{ color: "#f4f4f5" }}>The Proof</b> — every track record on Nexus (callers, agents, Arena, desks) under the on-chain ledger, in one place.
+                </span>
+                <span style={{ flexShrink: 0, fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.06em", color: "#ededf0", background: "#1a1a1e", border: "1px solid #33333a", borderRadius: 4, padding: "5px 10px" }}>OPEN PROOF →</span>
               </div>
             )}
             {!loading && !error && <Contested />}
