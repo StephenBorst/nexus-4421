@@ -416,6 +416,19 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
         );
       })()}
 
+      {/* Signal framing — catalyst (why now) + defined exit window, when present. */}
+      {(t.catalyst || t.targetWindow) && (
+        <div style={{ marginTop: 6, paddingTop: 8, borderTop: "1px solid #232327", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          {t.catalyst && (
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#a1a1aa", background: "#141416", border: "1px solid #232327", borderRadius: 3, padding: "2px 7px" }}>
+              ⚡ {t.catalyst}
+            </span>
+          )}
+          {t.targetWindow && (
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a" }}>⌛ exit by {t.targetWindow}</span>
+          )}
+        </div>
+      )}
       {/* Notes */}
       {t.notes && (
         <div style={{ marginTop: 6, paddingTop: 8, borderTop: "1px solid #232327", fontSize: 11, color: "#52525b", fontFamily: "var(--nx-font-mono)", fontStyle: "italic" }}>
@@ -814,6 +827,8 @@ export function ThesisView() {
     accountSize: "",
     fundingRate: "0.01",
     notes: "",
+    catalyst: "",
+    targetWindow: "",
     chartUrls: [""] as string[],
   });
 
@@ -1006,6 +1021,8 @@ export function ThesisView() {
     accountSize: parseFloat(form.accountSize),
     fundingRate: parseFloat(form.fundingRate),
     notes: form.notes,
+    catalyst: form.catalyst.trim() || undefined,
+    targetWindow: form.targetWindow.trim() || undefined,
     chartUrls: (() => { const v = form.chartUrls.map((u) => u.trim()).filter(Boolean); return v.length ? v : undefined; })(),
     createdAt: Date.now(),
     positionSize: calc!.positionSize,
@@ -1019,7 +1036,7 @@ export function ThesisView() {
   });
 
   const resetForm = () =>
-    setForm((f) => ({ ...f, symbol: "", entryPrice: "", stopLoss: "", takeProfit1: "", takeProfit2: "", notes: "", chartUrls: [""] }));
+    setForm((f) => ({ ...f, symbol: "", entryPrice: "", stopLoss: "", takeProfit1: "", takeProfit2: "", notes: "", catalyst: "", targetWindow: "", chartUrls: [""] }));
 
   // Saves the thesis PRIVATELY. Places no order of any kind — it was called
   // "deployPaper" and labelled "DEPLOY (PAPER)", which read as paper *trading* and
@@ -1427,6 +1444,28 @@ export function ThesisView() {
               placeholder="Why are you taking this trade? What needs to be true for it to work? What invalidates it?"
               value={form.notes} onChange={(e) => set("notes", e.target.value)}
             />
+
+            {/* Signal framing — a thesis becomes a "Signal" when it names the near-term
+                CATALYST (why now) and a defined EXIT WINDOW (when you'll know). Both
+                optional; they sharpen the call and surface on Proof of Edge. */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 8, marginTop: 10 }}>
+              <div>
+                <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 5 }}>⚡ CATALYST <span style={{ color: "#33333a" }}>(why now · optional)</span></div>
+                <input
+                  style={inputStyle} type="text"
+                  placeholder="the near-term trigger — e.g. CPI Thu, funding reset, range breakout"
+                  value={form.catalyst} onChange={(e) => set("catalyst", e.target.value)}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 5 }}>⌛ EXIT BY <span style={{ color: "#33333a" }}>(optional)</span></div>
+                <input
+                  style={inputStyle} type="text"
+                  placeholder="7D · 48h · FOMC"
+                  value={form.targetWindow} onChange={(e) => set("targetWindow", e.target.value)}
+                />
+              </div>
+            </div>
 
             {/* Charts — the levels are the claim, the charts are the reasoning. Traders
                 usually show more than one timeframe, so this takes up to MAX_CHARTS.

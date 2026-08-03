@@ -28,6 +28,14 @@ type Agent = { rank: number; wallet: string; displayName?: string; pfp?: string;
 type ArenaAgent = { wallet: string; name: string; builder?: string; currentPosition?: { symbol: string; direction: string } | null; paper?: { trades: number; winRate: number; netPnl: number } | null; live?: { trades: number; winRate: number; netPnl: number } | null };
 type Desk = { id: string; name: string; rank: number; members: number; calls: number; hitRate: number; totalR: number; score: number };
 type Ledger = { ledgerHash?: string; count?: number; onChain?: { txHash?: string; explorer?: string; verified?: boolean } | null };
+type ProofCard = {
+  wallet: string; displayName?: string | null; pfp?: string | null;
+  coin: string; direction: "LONG" | "SHORT"; entryPrice?: number; stopLoss?: number; takeProfit1?: number;
+  outcome: "WIN" | "LOSS"; r: number; createdAt?: number | null; gradedAt?: number | null;
+  thesis?: string | null; catalyst?: string | null; targetWindow?: string | null;
+  regimeTrend?: string | null; planScore?: number | null;
+};
+type ProofOfEdge = { cards: ProofCard[]; summary?: { resolved: number; wins: number; hitRate: number; avgR: number } };
 
 function BoardShell({ title, count, children }: { title: string; count?: number | null; children: React.ReactNode }) {
   return (
@@ -58,6 +66,59 @@ function Pfp({ src }: { src?: string }) {
     : <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#1a1a1e", border: `1px solid ${BORDER}`, flexShrink: 0 }} />;
 }
 
+const fmtDate = (ms?: number | null) => ms ? new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+
+// ── PROOF OF EDGE card — one resolved call, traced through the public record ──
+// Borrowed framing (Quotient): the thesis → the levels → the first-touch outcome,
+// none of it self-reported. Directional chips stay monochrome (positioning, not P&L);
+// only the WIN/LOSS outcome + R carry the pos/neg chroma.
+function ProofEdgeCard({ c, onClick }: { c: ProofCard; onClick: () => void }) {
+  const win = c.outcome === "WIN";
+  const tone = win ? POS : NEG;
+  const chip: React.CSSProperties = { fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.05em", color: BRIGHT, background: "#141416", border: `1px solid ${BORDER}`, borderRadius: 3, padding: "2px 6px", whiteSpace: "nowrap" };
+  return (
+    <div onClick={onClick} style={{
+      background: SURFACE_ALT, border: `1px solid ${BORDER}`, borderLeft: `2px solid ${tone}`,
+      borderRadius: 6, padding: 12, cursor: "pointer", display: "flex", flexDirection: "column", gap: 8,
+    }}>
+      {/* Author + outcome */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Pfp src={c.pfp || undefined} />
+        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.displayName || short(c.wallet)}</span>
+        <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 10, fontWeight: 700, color: tone, whiteSpace: "nowrap" }}>
+          {win ? "✓ WIN" : "✗ LOSS"} {c.r >= 0 ? "+" : ""}{c.r}R
+        </span>
+      </div>
+      {/* Market line */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: BONE }}>{c.coin}</span>
+        <span style={chip}>{c.direction}</span>
+        {c.regimeTrend && <span style={{ fontFamily: MONO, fontSize: 8, color: MUTED, border: `1px solid ${BORDER}`, borderRadius: 3, padding: "1px 5px" }}>{c.regimeTrend.replace("TREND_", "").replace("_", " ")}</span>}
+        {c.gradedAt && <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, color: FAINT }}>{fmtDate(c.createdAt)} → {fmtDate(c.gradedAt)}</span>}
+      </div>
+      {/* Thesis */}
+      {c.thesis && (
+        <div style={{ fontFamily: UI, fontSize: 12, color: FOG, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          "{c.thesis}"
+        </div>
+      )}
+      {/* Catalyst + exit window (the Signal framing) */}
+      {(c.catalyst || c.targetWindow) && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+          {c.catalyst && <span style={{ fontFamily: MONO, fontSize: 9.5, color: FOG, background: "#141416", border: `1px solid ${BORDER}`, borderRadius: 3, padding: "2px 6px" }}>⚡ {c.catalyst}</span>}
+          {c.targetWindow && <span style={{ fontFamily: MONO, fontSize: 9, color: MUTED }}>⌛ {c.targetWindow}</span>}
+        </div>
+      )}
+      {/* Levels — the claim that was graded */}
+      {c.entryPrice != null && (
+        <div style={{ fontFamily: MONO, fontSize: 9.5, color: FAINT, borderTop: `1px solid ${BORDER}`, paddingTop: 7 }}>
+          entry {c.entryPrice} · target {c.takeProfit1 ?? "—"} · stop {c.stopLoss ?? "—"}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProofPage() {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
@@ -67,6 +128,7 @@ export default function ProofPage() {
   const [arena, setArena] = useState<ArenaAgent[] | null>(null);
   const [desks, setDesks] = useState<Desk[] | null>(null);
   const [ledger, setLedger] = useState<Ledger | null>(null);
+  const [proof, setProof] = useState<ProofOfEdge | null>(null);
 
   const load = useCallback(() => {
     fetch(`${API}/theses/leaderboard`).then((r) => r.json()).then((d) => setCallers(Array.isArray(d?.leaderboard) ? d.leaderboard : [])).catch(() => setCallers([]));
@@ -74,6 +136,7 @@ export default function ProofPage() {
     fetch(`${API}/arena/agents`).then((r) => r.json()).then((d) => setArena(Array.isArray(d?.agents) ? d.agents : [])).catch(() => setArena([]));
     fetch(`${API}/desks`).then((r) => r.json()).then((d) => setDesks(Array.isArray(d?.desks) ? d.desks : [])).catch(() => setDesks([]));
     fetch(`${API}/agents/ledger`).then((r) => r.json()).then(setLedger).catch(() => setLedger(null));
+    fetch(`${API}/theses/proof-of-edge`).then((r) => r.json()).then((d) => setProof({ cards: Array.isArray(d?.cards) ? d.cards : [], summary: d?.summary })).catch(() => setProof({ cards: [] }));
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -120,6 +183,31 @@ export default function ProofPage() {
               ⛓ ANCHORED ON-CHAIN ↗
             </a>
           )}
+        </div>
+      )}
+
+      {/* PROOF OF EDGE — resolved calls traced through the public record. The flagship
+          trust artifact: not a leaderboard number, the actual calls behind it. */}
+      {proof && proof.cards.length > 0 && (
+        <div style={{ marginTop: 26 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", color: BONE }}>PROOF OF EDGE</span>
+            {proof.summary && proof.summary.resolved > 0 && (
+              <span style={{ fontFamily: MONO, fontSize: 9.5, color: FAINT }}>
+                {proof.summary.resolved} resolved · {proof.summary.hitRate}% hit · {proof.summary.avgR >= 0 ? "+" : ""}{proof.summary.avgR}R avg
+              </span>
+            )}
+          </div>
+          <div style={{ height: 1, background: BORDER, marginBottom: 12 }} />
+          <div style={{ fontFamily: UI, fontSize: 12.5, color: FOG, lineHeight: 1.6, maxWidth: 660, marginBottom: 14 }}>
+            The calls behind the record — thesis, levels, and first-touch outcome, graded from public price.
+            Ranked by graded R; the aggregate above is every resolved public call, not just these.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))", gap: 10 }}>
+            {proof.cards.slice(0, 12).map((c) => (
+              <ProofEdgeCard key={`${c.wallet}-${c.coin}-${c.gradedAt ?? c.createdAt}`} c={c} onClick={() => navigate(`/feed/trader/${c.wallet}`)} />
+            ))}
+          </div>
         </div>
       )}
 

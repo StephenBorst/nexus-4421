@@ -19,6 +19,7 @@ import { CopiesView } from "./CopiesView";
 import { MarketIntelView } from "./MarketIntel";
 import { MarketTape } from "./MarketTape";
 import { SmartMoneyView } from "./SmartMoneyView";
+import { MispricedBoard } from "./MispricedBoard";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
 import { LabStanding } from "./LabStanding";
 import { CommandPalette } from "./CommandPalette";
@@ -126,6 +127,7 @@ export default function TheLabPage() {
   // and pretending otherwise would be the same dishonesty in the other direction.)
   const tabs: { id: TabId; label: string; short: string; phase: string }[] = [
     { id: "intel",          label: "[ MARKET INTEL ]",       short: "INTEL", phase: "OBSERVE" },
+    { id: "mispriced",      label: "[ MISPRICED ]",          short: "GAPS",  phase: "OBSERVE" },
     { id: "smart",          label: "[ SMART MONEY ]",        short: "SMART", phase: "OBSERVE" },
     { id: "thesis",         label: "[ NEXUS THESIS ENGINE ]", short: "LAB",  phase: "PLAN"    },
     { id: "agent",          label: "[ TRADING AGENT ]",      short: "AGENT", phase: "EXECUTE" },
@@ -290,6 +292,7 @@ export default function TheLabPage() {
             {connected ? <MarketIntelView /> : <LabWelcome />}
           </>
         )}
+        {activeTab === "mispriced" && <MispricedBoard />}
         {activeTab === "smart" && <SmartMoneyView myPositions={openPositions} />}
         {activeTab === "agent" && <AgentView />}
         {activeTab === "holders" && <HoldersRoom walletAddress={rootWalletAddress} />}

@@ -21,6 +21,12 @@ export interface ThesisTrade {
   accountSize: number;
   fundingRate: number;
   notes: string;
+  // Signal framing (borrowed from Quotient): a thesis becomes a "Signal" when it
+  // names a near-term CATALYST (why the market may move to your levels NOW) and a
+  // defined EXIT WINDOW (when you'll know you were right or wrong). Both optional +
+  // free-text; they ride along in KV and surface on cards / Proof of Edge.
+  catalyst?: string;      // the near-term "why now"
+  targetWindow?: string;  // defined exit horizon — e.g. "7D", "48h", "by FOMC"
   createdAt: number;
   positionSize: number;
   leverage: number;
@@ -59,7 +65,7 @@ export interface ThesisTrade {
 }
 
 // ─── Lab view + agent types (extracted from index.tsx) ───────────────────────
-export type TabId = "analytics" | "tradelog" | "thesis" | "copies" | "intel" | "agent" | "holders" | "quicktrade" | "smart";
+export type TabId = "analytics" | "tradelog" | "thesis" | "copies" | "intel" | "agent" | "holders" | "quicktrade" | "smart" | "mispriced";
 
 export interface DayGroup {
   pnl: number;

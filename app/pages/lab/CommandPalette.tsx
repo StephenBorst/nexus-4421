@@ -36,6 +36,7 @@ export function CommandPalette({ onSelectTab }: { onSelectTab: (t: TabId) => voi
     });
     return [
       tab("intel", "Market Intel", "scan funding oi movers"),
+      tab("mispriced", "Mispriced Board", "funding edge fade crowd overpaying gaps mispricing signal watching"),
       tab("smart", "Smart Money", "top traders hyperliquid whales copy signal"),
       tab("thesis", "Nexus Thesis Engine", "plan position size r:r"),
       tab("agent", "Trading Agent", "autonomous bot automate"),
