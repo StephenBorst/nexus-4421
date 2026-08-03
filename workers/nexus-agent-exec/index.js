@@ -497,18 +497,22 @@ async function processUser(address, env, cache) {
       .filter((w) => w !== address)               // can't copy yourself
       .slice(0, AUTOCOPY_MAX_LEADERS);
     const leaders = await Promise.all(leaderWallets.map(async (lw) => {
-      let position = null;
+      let position = null, latestCall = null;
       try {
         const s = await env.NEXUS_AGENT.get(`agent:state:${lw}`);
         position = s ? (JSON.parse(s).current_position || null) : null;
       } catch { /* leader unreadable → treated as flat */ }
-      return { wallet: lw, position };
+      try {
+        const c = await env.NEXUS_AGENT.get(`caller:latest:${lw}`);
+        latestCall = c ? JSON.parse(c) : null;    // human caller's freshest public call
+      } catch { /* no recent call */ }
+      return { wallet: lw, position, latestCall };
     }));
-    const pick = selectCopySignal(config, leaders, state.last_copy_key);
+    const pick = selectCopySignal(config, leaders, state.last_copy_key, now);
     if (pick) {
       copySignal = { symbol: pick.symbol, direction: pick.direction, confidence: 100, price: 0, funding: 0, timestamp: now, source: "COPY", leader: pick.leader };
       state.last_copy_key = pick.key;             // persisted by enterPosition → mirror once
-      console.log(`[exec] ${address.slice(0, 10)} AUTOCOPY ${pick.direction} ${pick.symbol} from ${pick.leader.slice(0, 10)}`);
+      console.log(`[exec] ${address.slice(0, 10)} AUTOCOPY ${pick.kind} ${pick.direction} ${pick.symbol} from ${pick.leader.slice(0, 10)}`);
     }
   }
 

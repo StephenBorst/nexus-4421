@@ -394,25 +394,43 @@ export function directiveLevels(directive, fillPrice) {
 // trustless AND safe: the leader's record is graded from public price, and the
 // follower's own risk model governs execution.
 export const AUTOCOPY_MAX_LEADERS = 20;
+export const AUTOCOPY_CALL_FRESH_MS = 15 * 60 * 1000; // only mirror a call published in the last 15 min
 
-// leaders = [{ wallet, position }] where position is the leader's current_position
-// (or null when flat). alreadyCopiedKey = follower state.last_copy_key (dedupe).
-// Returns { symbol, direction, leader, key } for the first followed leader holding a
-// NEW (not-yet-copied) real position, or null. Paper leader positions are skipped —
-// you copy REAL, on-chain-graded trades, not another paper sim.
-export function selectCopySignal(config, leaders, alreadyCopiedKey) {
+// A followed LEADER is either an AGENT (mirror its real open position) or a human
+// CALLER (mirror its newest public call). leaders = [{ wallet, position, latestCall }]
+//   • position   = leader's agent current_position (or null when flat)
+//   • latestCall = { symbol(PERP_), direction, id, stampedAt } — the caller's freshest
+//                  public call (lab-api stamps it on publish; self-expiring)
+// alreadyCopiedKey = follower state.last_copy_key (dedupe). Returns { symbol, direction,
+// leader, key, kind } for the first followed leader with a NEW thing to copy, or null.
+// Paper positions are skipped (copy REAL graded trades); stale calls are skipped.
+export function selectCopySignal(config, leaders, alreadyCopiedKey, now = Date.now()) {
   const ac = config?.autocopy;
   if (!ac || !ac.enabled || !Array.isArray(ac.leaders) || !ac.leaders.length) return null;
   const follow = new Set(ac.leaders.map((a) => String(a).toLowerCase()));
   for (const entry of leaders || []) {
     const wallet = String(entry?.wallet || "").toLowerCase();
     if (!follow.has(wallet)) continue;
+
+    // 1) AGENT leader — mirror a real, currently-open position.
     const p = entry?.position;
-    if (!p || p.paper) continue;                                   // real positions only
-    if (!p.symbol || (p.direction !== "LONG" && p.direction !== "SHORT")) continue;
-    const key = `${wallet}:${p.symbol}:${p.opened_at || p.entry_price || ""}`;
-    if (alreadyCopiedKey && key === alreadyCopiedKey) continue;    // already mirrored this one
-    return { symbol: p.symbol, direction: p.direction, leader: wallet, key };
+    if (p && !p.paper && p.symbol && (p.direction === "LONG" || p.direction === "SHORT")) {
+      const key = `${wallet}:${p.symbol}:${p.opened_at || p.entry_price || ""}`;
+      if (!alreadyCopiedKey || key !== alreadyCopiedKey) {
+        return { symbol: p.symbol, direction: p.direction, leader: wallet, key, kind: "agent" };
+      }
+    }
+
+    // 2) HUMAN CALLER — mirror a FRESH public call (freshness gate stops a first-time
+    //    follow from back-entering a stale call).
+    const c = entry?.latestCall;
+    if (c && c.symbol && (c.direction === "LONG" || c.direction === "SHORT") &&
+        Number.isFinite(c.stampedAt) && (now - c.stampedAt) <= AUTOCOPY_CALL_FRESH_MS) {
+      const key = `${wallet}:call:${c.id || c.stampedAt}`;
+      if (!alreadyCopiedKey || key !== alreadyCopiedKey) {
+        return { symbol: c.symbol, direction: c.direction, leader: wallet, key, kind: "call" };
+      }
+    }
   }
   return null;
 }

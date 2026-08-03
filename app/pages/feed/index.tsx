@@ -20,6 +20,7 @@ import type { ThesisTrade } from "@/pages/lab/types";
 import CommentsPanel from "@/components/CommentsPanel";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { Sparkline } from "@/pages/lab/components";
+import { getAgentSig } from "@/pages/lab/agentKeys";
 import { chartImageList, effectiveStatus } from "@/pages/lab/helpers";
 import LiveNow from "./LiveNow";
 import Contested from "./Contested";
@@ -807,6 +808,43 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
   const [onChainStats, setOnChainStats] = useState<Map<string, { wins: number; losses: number; active: number; repScore: number; avgRR: number }>>(new Map());
   const [onChainLoading, setOnChainLoading] = useState(false);
 
+  // ⚡ Autocopy a verified caller — your agent mirrors their next public call at your
+  // own risk (backend reads config.autocopy.leaders → caller:latest). Load who you
+  // already copy from your agent config; toggle by GET→merge→PUT (owner-authed).
+  const [copyLeaders, setCopyLeaders] = useState<Set<string>>(new Set());
+  const [copyBusy, setCopyBusy] = useState<string | null>(null);
+  const [copyMsg, setCopyMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (!walletAddress) { setCopyLeaders(new Set()); return; }
+    let dead = false;
+    fetch(`${API_BASE}/agent/${walletAddress}`).then((r) => r.json())
+      .then((d) => { if (!dead) setCopyLeaders(new Set((d?.config?.autocopy?.leaders || []).map((w: string) => w.toLowerCase()))); })
+      .catch(() => { /* no agent yet */ });
+    return () => { dead = true; };
+  }, [walletAddress]);
+  async function toggleCopyCaller(callerWallet: string) {
+    if (!walletAddress) return;
+    const lw = callerWallet.toLowerCase();
+    setCopyBusy(lw); setCopyMsg(null);
+    try {
+      const cur = await fetch(`${API_BASE}/agent/${walletAddress}`).then((r) => r.json()).catch(() => null);
+      const config = cur?.config;
+      if (!config) { setCopyMsg("Set up your agent in the Lab first — Autocopy runs through it."); return; }
+      const leaders = (config.autocopy?.leaders || []).map((w: string) => w.toLowerCase());
+      const following = leaders.includes(lw);
+      const next = following ? leaders.filter((w: string) => w !== lw) : [...leaders, lw];
+      const sig = await getAgentSig(walletAddress);
+      const res = await fetch(`${API_BASE}/agent/${walletAddress}/config`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config: { ...config, autocopy: { enabled: next.length > 0, leaders: next } }, walletSig: sig }),
+      });
+      if (!res.ok) throw new Error();
+      setCopyLeaders(new Set(next));
+      setCopyMsg(following ? "Stopped copying" : cur?.state?.active ? "Autocopying — your agent will mirror their next call" : "Autocopy set — activate your agent to start");
+      setTimeout(() => setCopyMsg(null), 3500);
+    } catch { setCopyMsg("Couldn't update autocopy"); } finally { setCopyBusy(null); }
+  }
+
   useEffect(() => {
     if (board.length === 0) return;
     setOnChainLoading(true);
@@ -913,6 +951,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
           )}
         </div>
       )}
+    {copyMsg && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#ededf0", marginBottom: 8, paddingLeft: 2 }}>⚡ {copyMsg}</div>}
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {sortedBoard.map((trader, i) => {
         const rank = i + 1;
@@ -1057,6 +1096,23 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                   </div>
                 );
               })()}
+
+              {/* ⚡ Autocopy this caller — your agent mirrors their next public call */}
+              {walletAddress && !isOwn && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleCopyCaller(trader.wallet); }}
+                  disabled={copyBusy === trader.wallet.toLowerCase()}
+                  title="Your agent mirrors this caller's next public call — at your own size, mode & guardrails"
+                  style={{
+                    flexShrink: 0, fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: 600, letterSpacing: "0.03em",
+                    background: copyLeaders.has(trader.wallet.toLowerCase()) ? "#ededf0" : "#ededf015",
+                    color: copyLeaders.has(trader.wallet.toLowerCase()) ? "#0a0a0b" : "#ededf0",
+                    border: "1px solid #ededf0", borderRadius: 4, padding: "6px 9px", cursor: "pointer", whiteSpace: "nowrap",
+                  }}
+                >
+                  {copyLeaders.has(trader.wallet.toLowerCase()) ? "⚡ COPYING" : "⚡ AUTOCOPY"}
+                </button>
+              )}
 
               {/* Expand chevron */}
               <div style={{ color: "#33333a", fontSize: 10, fontFamily: "var(--nx-font-mono)", flexShrink: 0, paddingLeft: 4 }}>

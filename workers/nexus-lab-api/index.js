@@ -4298,6 +4298,20 @@ document.getElementById("btn").addEventListener("click",go);
         const newlyPublic = (body.theses || []).filter(
           (t) => t.isPublic && t.id && !prevPublic.has(t.id) && t.symbol && t.direction
         );
+        // Autocopy fan-out: stamp the caller's NEWEST just-published call into the
+        // agent namespace so followers' agents can mirror it (exec reads
+        // caller:latest:{addr}). Self-expiring; the exec gates on stampedAt freshness
+        // so a stale call never fires late. Symbol → canonical PERP_ id the exec trades.
+        if (newlyPublic.length && env.NEXUS_AGENT) {
+          const nt = newlyPublic.reduce((a, b) => ((b.createdAt || 0) > (a.createdAt || 0) ? b : a));
+          const sym = normalizeSymbol(nt.symbol);
+          if (sym) {
+            await env.NEXUS_AGENT.put(`caller:latest:${address}`, JSON.stringify({
+              symbol: sym, direction: String(nt.direction).toUpperCase(), id: nt.id,
+              createdAt: nt.createdAt || Date.now(), stampedAt: Date.now(),
+            }), { expirationTtl: 6 * 3600 });
+          }
+        }
         if (newlyPublic.length) {
           const listed = await env.LAB_STORE.list({ prefix: "lab:" });
           for (const nt of newlyPublic.slice(0, 3)) {

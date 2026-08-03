@@ -433,3 +433,31 @@ test("selectCopySignal: dedupes an already-copied leader position by key", () =>
   const s2 = selectCopySignal(acCfg(["0xLEAD"]), [next], first.key);
   assert.equal(s2.symbol, "PERP_ETH_USDC");
 });
+
+// ── Autocopy — copy human CALLERS (fresh public calls) ───────────────────────
+const NOW = 1_800_000_000_000;
+const freshCall = { wallet: "0xCALLER", latestCall: { symbol: "PERP_SOL_USDC", direction: "LONG", id: "th_1", stampedAt: NOW - 60_000 } };
+
+test("selectCopySignal: mirrors a followed caller's FRESH public call", () => {
+  const s = selectCopySignal(acCfg(["0xCALLER"]), [freshCall], null, NOW);
+  assert.equal(s.symbol, "PERP_SOL_USDC");
+  assert.equal(s.direction, "LONG");
+  assert.equal(s.kind, "call");
+});
+
+test("selectCopySignal: skips a STALE call (published >15 min ago)", () => {
+  const stale = { wallet: "0xCALLER", latestCall: { symbol: "PERP_SOL_USDC", direction: "LONG", id: "th_1", stampedAt: NOW - 20 * 60_000 } };
+  assert.equal(selectCopySignal(acCfg(["0xCALLER"]), [stale], null, NOW), null);
+});
+
+test("selectCopySignal: dedupes an already-copied call by key", () => {
+  const first = selectCopySignal(acCfg(["0xCALLER"]), [freshCall], null, NOW);
+  assert.equal(selectCopySignal(acCfg(["0xCALLER"]), [freshCall], first.key, NOW), null);
+});
+
+test("selectCopySignal: an agent's open position wins over a caller's call on the same leader", () => {
+  const both = { wallet: "0xLEAD", position: { symbol: "PERP_BTC_USDC", direction: "SHORT", opened_at: 1 }, latestCall: freshCall.latestCall };
+  const s = selectCopySignal(acCfg(["0xLEAD"]), [both], null, NOW);
+  assert.equal(s.kind, "agent");
+  assert.equal(s.symbol, "PERP_BTC_USDC");
+});
