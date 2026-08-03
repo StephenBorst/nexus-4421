@@ -540,6 +540,114 @@ export function contestedBoard(entries, cfg = CONTESTED) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// MISPRICED BOARD  (the funding-edge lens — price every market, surface the gap)
+// ═══════════════════════════════════════════════════════════════════════════
+// Borrowed framing (Quotient): don't just list calls — price every market and
+// surface where the MARKET diverges from FAIR. A perp has no oracle "fair value",
+// but the funding rate IS the crowd's mispricing made explicit: persistently
+// positive funding = longs paying to hold = the book is lopsided long = a
+// mean-revert (fade) edge to the SHORT side, and vice-versa. We annualize the
+// per-8h funding rate into a comparable "edge %/yr", rank markets by |edge|, and
+// mark the extreme tail MISPRICED · WATCHING and the rest PRICED FAIR — a market
+// dashboard where the sort order itself is the signal.
+//
+// rows: Orderly /v1/public/futures rows (symbol, mark_price, last_funding_rate,
+//       open_interest, 24h_open). Pure + tested — the route just feeds it live rows.
+export const MISPRICED = {
+  fundingPeriodsPerYear: 3 * 365, // Orderly funds every 8h → 1095 periods/yr
+  minEdgePct: 8,     // |annualized funding| ≥ this ⇒ flagged MISPRICED · WATCHING
+  minOiUsd: 50_000,  // liquidity floor — a wide funding print on a dust market is noise, not edge
+  maxMarkets: 40,    // board cap (returned already ranked by edge)
+};
+
+export function mispricedBoard(rows, cfg = MISPRICED) {
+  const bare = (s) => String(s || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+  const markets = [];
+  let scanned = 0;
+  for (const r of rows || []) {
+    const symbol = r && r.symbol;
+    if (!symbol || !String(symbol).startsWith("PERP_")) continue;
+    const mark = Number(r.mark_price);
+    const funding = Number(r.last_funding_rate);
+    if (!Number.isFinite(mark) || mark <= 0 || !Number.isFinite(funding)) continue;
+    // open_interest is in BASE units → price it in USD for a comparable liquidity floor.
+    const oiUsd = (Number(r.open_interest) || 0) * mark;
+    if (oiUsd < cfg.minOiUsd) continue;
+    scanned++;
+    const open24 = Number(r["24h_open"]);
+    const change24hPct = (Number.isFinite(open24) && open24 > 0) ? round(((mark - open24) / open24) * 100, 2) : null;
+    const fundingAnnualPct = round(funding * cfg.fundingPeriodsPerYear * 100, 2);
+    markets.push({
+      symbol, coin: bare(symbol),
+      markPrice: mark,
+      funding8hPct: round(funding * 100, 5),  // % per 8h period (the raw crowd cost)
+      fundingAnnualPct,
+      oiUsd: Math.round(oiUsd),
+      change24hPct,
+      // Fade the crowd: they pay to be long → the edge is SHORT, and vice-versa.
+      direction: funding > 0 ? "SHORT" : funding < 0 ? "LONG" : "NONE",
+      edge: Math.abs(fundingAnnualPct),
+      status: "PRICED_FAIR",
+    });
+  }
+  markets.sort((a, b) => b.edge - a.edge);
+  for (const m of markets) {
+    if (m.edge >= cfg.minEdgePct && m.direction !== "NONE") m.status = "MISPRICED";
+  }
+  return {
+    scanned,
+    mispricedCount: markets.filter((m) => m.status === "MISPRICED").length,
+    markets: markets.slice(0, cfg.maxMarkets),
+  };
+}
+
+// ── Per-symbol merit-weighted caller LEAN (the consensus companion to the board) ──
+// The mispriced board reads the FUNDING crowd; this reads the graded, credible
+// CALLERS. Same weighted stances as the disagreement board (open positions + active
+// public calls, weighted by earned merit tier), collapsed to ONE lean per symbol
+// instead of only the contested ones — so a market can show the interesting
+// divergence ("funding fade = SHORT, sharp callers lean LONG") or agreement. A
+// wallet on both sides of a symbol is voided there (same rule as contestedBoard).
+//
+// entries: [{ wallet, symbol, direction:"LONG"|"SHORT", weight? }] — symbol should be
+// the BARE coin so it joins the board's coin key. Returns { [coin]: { side, lean, … } }.
+export function consensusBySymbol(entries, cfg = { minLean: 0.15 }) {
+  const perWalletSym = new Map();
+  for (const e of entries || []) {
+    if (!e || !e.wallet || !e.symbol) continue;
+    const dir = String(e.direction).toUpperCase();
+    if (dir !== "LONG" && dir !== "SHORT") continue;
+    const key = `${String(e.wallet).toLowerCase()}|${e.symbol}`;
+    const w = Number(e.weight) > 0 ? Number(e.weight) : 1;
+    const cur = perWalletSym.get(key);
+    if (!cur) { perWalletSym.set(key, { symbol: e.symbol, direction: dir, weight: w, conflict: false }); continue; }
+    if (cur.conflict) continue;
+    if (cur.direction !== dir) { cur.conflict = true; continue; } // self-contradiction → void
+    cur.weight = Math.max(cur.weight, w); // same side twice → strongest weight, not double
+  }
+  const bySym = {};
+  for (const s of perWalletSym.values()) {
+    if (s.conflict) continue;
+    const g = bySym[s.symbol] || (bySym[s.symbol] = { longWeight: 0, shortWeight: 0, longCount: 0, shortCount: 0 });
+    if (s.direction === "LONG") { g.longWeight += s.weight; g.longCount++; }
+    else { g.shortWeight += s.weight; g.shortCount++; }
+  }
+  const out = {};
+  for (const [sym, g] of Object.entries(bySym)) {
+    const total = g.longWeight + g.shortWeight;
+    const lean = total > 0 ? (g.longWeight - g.shortWeight) / total : 0;
+    out[sym] = {
+      side: lean >= cfg.minLean ? "LONG" : lean <= -cfg.minLean ? "SHORT" : "SPLIT",
+      lean: round(lean, 2),
+      longWeight: round(g.longWeight, 2), shortWeight: round(g.shortWeight, 2),
+      longCount: g.longCount, shortCount: g.shortCount,
+      participants: g.longCount + g.shortCount,
+    };
+  }
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // LOSS POSTMORTEMS  (why did it lose — from a FIXED taxonomy, so it aggregates)
 // ═══════════════════════════════════════════════════════════════════════════
 // Grading tells a trader THAT a call lost; it can't tell them WHY, and "why" is

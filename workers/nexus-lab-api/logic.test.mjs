@@ -8,6 +8,7 @@ import {
   classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge,
   planQuality, planSummary,
   expectancyStats, callerScore, convictionCalibration, contestedBoard,
+  mispricedBoard, consensusBySymbol, MISPRICED,
   LOSS_REASONS, isLossReason, postmortemSummary,
   validateArenaRegistration, arenaAgentConfig,
 } from "./logic.mjs";
@@ -1221,4 +1222,98 @@ test("diffCopyLeaders: unfollow-all → all removed", () => {
   const d = diffCopyLeaders(["0xA", "0xB"], [], "0xME");
   assert.deepEqual(d.added, []);
   assert.deepEqual(new Set(d.removed), new Set(["0xa", "0xb"]));
+});
+
+// ── Mispriced board (funding-edge lens) ──────────────────────────────────────
+const futuresRow = (symbol, mark, funding8h, oiBase, open24) =>
+  ({ symbol, mark_price: mark, last_funding_rate: funding8h, open_interest: oiBase, "24h_open": open24 });
+
+test("mispricedBoard: positive funding → fade SHORT, annualized edge, flagged", () => {
+  // +0.02%/8h → *1095 = +21.9%/yr, well past minEdgePct(8).
+  const { markets, scanned, mispricedCount } = mispricedBoard([
+    futuresRow("PERP_BTC_USDC", 60000, 0.0002, 100, 59000),
+  ]);
+  assert.equal(scanned, 1);
+  assert.equal(markets.length, 1);
+  const m = markets[0];
+  assert.equal(m.coin, "BTC");
+  assert.equal(m.direction, "SHORT");
+  assert.equal(m.fundingAnnualPct, 21.9);
+  assert.equal(m.edge, 21.9);
+  assert.equal(m.status, "MISPRICED");
+  assert.equal(mispricedCount, 1);
+  assert.equal(m.change24hPct, 1.69); // (60000-59000)/59000
+});
+
+test("mispricedBoard: negative funding → fade LONG", () => {
+  const { markets } = mispricedBoard([futuresRow("PERP_ETH_USDC", 3000, -0.0003, 5000, 3000)]);
+  assert.equal(markets[0].direction, "LONG");
+  assert.ok(markets[0].fundingAnnualPct < 0);
+});
+
+test("mispricedBoard: small funding stays PRICED_FAIR", () => {
+  // +0.001%/8h → ~3.3%/yr, below minEdgePct.
+  const { markets, mispricedCount } = mispricedBoard([futuresRow("PERP_SOL_USDC", 150, 0.00001, 100000, 150)]);
+  assert.equal(markets[0].status, "PRICED_FAIR");
+  assert.equal(mispricedCount, 0);
+});
+
+test("mispricedBoard: illiquid market below OI floor is skipped", () => {
+  // 0.1 base * $100 = $10 OI, well under minOiUsd(50k).
+  const { markets, scanned } = mispricedBoard([futuresRow("PERP_DUST_USDC", 100, 0.01, 0.1, 100)]);
+  assert.equal(scanned, 0);
+  assert.equal(markets.length, 0);
+});
+
+test("mispricedBoard: ranks by |edge| descending", () => {
+  const { markets } = mispricedBoard([
+    futuresRow("PERP_A_USDC", 100, 0.0001, 100000, 100),  // ~11%/yr
+    futuresRow("PERP_B_USDC", 100, -0.0005, 100000, 100), // ~-55%/yr → biggest |edge|
+    futuresRow("PERP_C_USDC", 100, 0.00002, 100000, 100), // ~2%/yr
+  ]);
+  assert.deepEqual(markets.map((m) => m.coin), ["B", "A", "C"]);
+});
+
+test("mispricedBoard: junk rows ignored (no symbol / bad price)", () => {
+  const { scanned } = mispricedBoard([{}, { symbol: "PERP_X_USDC", mark_price: 0, last_funding_rate: 0.01, open_interest: 1e6 }, null]);
+  assert.equal(scanned, 0);
+});
+
+// ── Consensus by symbol (merit-weighted caller lean) ─────────────────────────
+test("consensusBySymbol: weighted lean picks the heavier side", () => {
+  const c = consensusBySymbol([
+    { wallet: "0xA", symbol: "BTC", direction: "LONG", weight: 3 },  // Apex
+    { wallet: "0xB", symbol: "BTC", direction: "SHORT", weight: 1 },
+  ]);
+  assert.equal(c.BTC.side, "LONG");
+  assert.equal(c.BTC.lean, 0.5); // (3-1)/4
+  assert.equal(c.BTC.participants, 2);
+});
+
+test("consensusBySymbol: even split → SPLIT", () => {
+  const c = consensusBySymbol([
+    { wallet: "0xA", symbol: "ETH", direction: "LONG", weight: 2 },
+    { wallet: "0xB", symbol: "ETH", direction: "SHORT", weight: 2 },
+  ]);
+  assert.equal(c.ETH.side, "SPLIT");
+  assert.equal(c.ETH.lean, 0);
+});
+
+test("consensusBySymbol: a wallet on both sides is voided for that symbol", () => {
+  const c = consensusBySymbol([
+    { wallet: "0xA", symbol: "SOL", direction: "LONG", weight: 2 },
+    { wallet: "0xA", symbol: "SOL", direction: "SHORT", weight: 2 }, // self-contradiction
+    { wallet: "0xB", symbol: "SOL", direction: "LONG", weight: 1 },
+  ]);
+  assert.equal(c.SOL.longCount, 1); // only 0xB survives
+  assert.equal(c.SOL.side, "LONG");
+});
+
+test("consensusBySymbol: same wallet same side twice → strongest weight, not doubled", () => {
+  const c = consensusBySymbol([
+    { wallet: "0xA", symbol: "BTC", direction: "LONG", weight: 1, source: "thesis" },
+    { wallet: "0xA", symbol: "BTC", direction: "LONG", weight: 3, source: "position" },
+  ]);
+  assert.equal(c.BTC.longWeight, 3);
+  assert.equal(c.BTC.longCount, 1);
 });

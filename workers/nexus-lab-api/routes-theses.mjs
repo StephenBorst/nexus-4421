@@ -17,11 +17,11 @@
 // remaining routes get their turn.
 import { json } from "./shared.mjs";
 import {
-  rankCaller, callerScore, contestedBoard, classifyRegime, callAlignment,
+  rankCaller, callerScore, contestedBoard, consensusBySymbol, classifyRegime, callAlignment,
   planQuality, normalizeSymbol, REGIME, postmortemSummary, isLossReason, LOSS_REASONS,
   estimateResolution,
 } from "./logic.mjs";
-import { computeCallerStats, REGIME_PAD_S, ADVICE_FLAG_TEXT } from "./grading.mjs";
+import { computeCallerStats, gatherStanceEntries, REGIME_PAD_S, ADVICE_FLAG_TEXT } from "./grading.mjs";
 
 export async function handleTheses(parts, request, env) {
   if (parts[0] !== "theses") return null;
@@ -161,62 +161,9 @@ export async function handleTheses(parts, request, env) {
   // public read; the weighting is the same graded record the leaderboard uses.
   if (parts[0] === "theses" && parts[1] === "contested") {
     if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
-    const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
-    const bare = (s) => String(s || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
-    const MERIT_WEIGHT = { APEX: 3, SHARP: 2, SIGNAL: 1 };
-    const FRESH_MS = 14 * 86400 * 1000; // an "active" call older than this is stale — ignore
-
-    // Merit weight per wallet, from the same graded record the board ranks on. A
-    // caller with no earned rank (or a non-caller agent/human) weighs 1.
-    const byWallet = await computeCallerStats(env, 30 * 86400);
-    const weightOf = (w) => {
-      const r = rankCaller(byWallet[w?.toLowerCase?.()] || byWallet[w] || null);
-      return r ? (MERIT_WEIGHT[r.tier] || 1) : 1;
-    };
-
-    const entries = [];
-    const now = Date.now();
-
-    // 1) Open positions (agents + opted-in humans) → directional stances.
-    try {
-      const usersRaw = await AGENT_KV.get("agent:users");
-      const users = usersRaw ? JSON.parse(usersRaw) : [];
-      const states = await Promise.all(users.map(async (w) => {
-        const s = await AGENT_KV.get(`agent:state:${w}`);
-        return { w, p: s ? (JSON.parse(s).current_position || null) : null };
-      }));
-      for (const { w, p } of states) {
-        if (p && !p.paper && p.symbol && p.direction) entries.push({ wallet: w, symbol: bare(p.symbol), direction: p.direction, weight: weightOf(w), source: "position" });
-      }
-      const humanList = await AGENT_KV.list({ prefix: "live:human:", limit: 1000 });
-      const snaps = await Promise.all(humanList.keys.map(async (k) => {
-        const raw = await AGENT_KV.get(k.name);
-        return raw ? { wallet: k.name.slice("live:human:".length), ...JSON.parse(raw) } : null;
-      }));
-      for (const sn of snaps) {
-        for (const p of (sn?.positions || [])) {
-          if (p.symbol && p.direction) entries.push({ wallet: sn.wallet, symbol: bare(p.symbol), direction: p.direction, weight: weightOf(sn.wallet), source: "position" });
-        }
-      }
-    } catch (e) { console.error("[contested] live positions", e.message); }
-
-    // 2) Active (unresolved, fresh) public calls → directional stances.
-    try {
-      const listed = await env.LAB_STORE.list({ prefix: "lab:" });
-      for (const key of listed.keys) {
-        const raw = await env.LAB_STORE.get(key.name);
-        if (!raw) continue;
-        let data; try { data = JSON.parse(raw); } catch { continue; }
-        const wallet = key.name.replace("lab:", "");
-        for (const t of (data.theses || [])) {
-          if (!t.isPublic || !t.symbol || !t.direction) continue;
-          if (t.gradedOutcome === "WIN" || t.gradedOutcome === "LOSS") continue; // resolved → no longer a live stance
-          if (t.status === "HIT_TP" || t.status === "STOPPED_OUT" || t.status === "INVALIDATED") continue;
-          if ((now - (t.createdAt || 0)) > FRESH_MS) continue; // stale
-          entries.push({ wallet, symbol: bare(t.symbol), direction: t.direction, weight: weightOf(wallet), source: "thesis" });
-        }
-      }
-    } catch (e) { console.error("[contested] active theses", e.message); }
+    // Shared stance universe (open positions + active calls, merit-weighted) — the
+    // SAME source the consensus lean reads, so the two boards can never disagree.
+    const { entries, byWallet } = await gatherStanceEntries(env);
 
     const board = contestedBoard(entries).slice(0, 12);
 
@@ -243,6 +190,79 @@ export async function handleTheses(parts, request, env) {
       contested: enriched,
       criteria: {
         note: "Symbols where credible callers hold OPPOSING directions right now, from open positions + active (unresolved, <14d) public calls. Ranked by tension = weight balance × total weight; participants weighted by earned merit tier (Apex 3 / Sharp 2 / Signal 1). A wallet on both sides of a symbol is voided there.",
+      },
+    }, request);
+  }
+
+  // ── /theses/consensus — merit-weighted caller LEAN per symbol ──
+  // The companion to the mispriced board: where do the graded, credible callers lean
+  // right now? Same weighted stance universe as /theses/contested, collapsed to ONE
+  // lean per symbol (not only the contested ones) so the Lab can show the funding-edge
+  // direction beside the human read — agreement, or the interesting divergence.
+  // Pure public read, recomputable from public price.
+  if (parts[0] === "theses" && parts[1] === "consensus") {
+    if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+    const { entries } = await gatherStanceEntries(env);
+    return json({
+      consensus: consensusBySymbol(entries),
+      participants: entries.length,
+      criteria: {
+        note: "Per-symbol lean from open positions + active (unresolved, <14d) public calls, each weighted by the wallet's earned merit tier (Apex 3 / Sharp 2 / Signal 1). lean = (longWeight − shortWeight) / total, in [−1,1]; |lean| < 0.15 = SPLIT. A wallet on both sides of a symbol is voided there.",
+      },
+    }, request);
+  }
+
+  // ── /theses/proof-of-edge — resolved calls as case studies ──
+  // Borrowed framing (Quotient's "Proof of Edge"): trace RESOLVED public calls through
+  // the thesis → the levels → the first-touch outcome, all in the public record. Ranked
+  // by graded R so the strongest calls lead, but sat on the honest aggregate (total
+  // resolved / hit-rate / avg-R) so it reads as a track record, not a highlight reel.
+  if (parts[0] === "theses" && parts[1] === "proof-of-edge") {
+    if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+    const TOP_N = 15;
+    const listed = await env.LAB_STORE.list({ prefix: "lab:" });
+    const resolved = [];
+    let wins = 0, rSum = 0;
+    for (const key of listed.keys) {
+      const raw = await env.LAB_STORE.get(key.name);
+      if (!raw) continue;
+      let data; try { data = JSON.parse(raw); } catch { continue; }
+      const wallet = key.name.replace("lab:", "");
+      for (const t of (data.theses || [])) {
+        if (!t.isPublic || !t.symbol) continue;
+        if (t.gradedOutcome !== "WIN" && t.gradedOutcome !== "LOSS") continue;
+        if (t.holdersOnly) continue; // holders-only calls stay out of the public record
+        if (t.gradedOutcome === "WIN") wins++;
+        rSum += Number(t.gradedR) || 0;
+        resolved.push({ wallet, t });
+      }
+    }
+    // Best calls lead (graded R), ties broken by recency.
+    resolved.sort((a, b) => (Number(b.t.gradedR) || 0) - (Number(a.t.gradedR) || 0) || (b.t.gradedAt || 0) - (a.t.gradedAt || 0));
+    const cards = await Promise.all(resolved.slice(0, TOP_N).map(async ({ wallet, t }) => {
+      const profileRaw = await env.LAB_STORE.get(`profile:${wallet}`);
+      const p = profileRaw ? (() => { try { return JSON.parse(profileRaw); } catch { return {}; } })() : {};
+      const coin = String(t.symbol).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+      return {
+        wallet, displayName: p.displayName || null, pfp: p.pfp || null,
+        id: t.id, symbol: t.symbol, coin, direction: t.direction,
+        entryPrice: t.entryPrice, stopLoss: t.stopLoss, takeProfit1: t.takeProfit1,
+        outcome: t.gradedOutcome, r: Math.round((Number(t.gradedR) || 0) * 100) / 100,
+        createdAt: t.createdAt || null, gradedAt: t.gradedAt || null,
+        thesis: t.notes || null, catalyst: t.catalyst || null, targetWindow: t.targetWindow || null,
+        regimeTrend: t.regimeTrend || null, planScore: t.planScore ?? null,
+      };
+    }));
+    const total = resolved.length;
+    return json({
+      cards,
+      summary: {
+        resolved: total, wins,
+        hitRate: total ? Math.round((wins / total) * 1000) / 10 : 0,
+        avgR: total ? Math.round((rSum / total) * 100) / 100 : 0,
+      },
+      criteria: {
+        note: "Resolved PUBLIC calls, graded by first-touch of target vs. stop against public Orderly 1h price (same grade as the caller leaderboard). Ranked by graded R. The summary is the honest aggregate over every resolved public call, not just the cards shown.",
       },
     }, request);
   }

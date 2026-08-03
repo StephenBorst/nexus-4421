@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -1926,6 +1926,46 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         query: meta.query, move, catalysts: [], asOf: new Date().toISOString(),
         note: "Headlines are candidate context, not confirmed causes — correlation is not causation.",
       }), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=120", ...cors(request) } });
+    }
+
+    // ── /intel/mispriced — the funding-edge board (price every market, show the gap) ──
+    // Borrowed framing (Quotient): don't just list calls — price every market and surface
+    // where it diverges from fair. Reads ONE Orderly public-futures snapshot (all symbols),
+    // annualizes each funding rate into a comparable edge %/yr (the crowd's mispricing made
+    // explicit), and marks the extreme tail MISPRICED · WATCHING. Pure market data, no auth,
+    // fail-soft. KV-cached 180s so the board is cheap under the Lab's polling. The
+    // caller-consensus companion is /theses/consensus, merged client-side — kept separate so
+    // this stays a fast public read.
+    if (parts[0] === "intel" && parts[1] === "mispriced" && request.method === "GET") {
+      const CACHE_KEY = "intel:mispriced:v1", TTL_MS = 180 * 1000;
+      const respond = (payload) => new Response(JSON.stringify(payload), {
+        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=120", ...cors(request) },
+      });
+      try {
+        const cached = await env.LAB_STORE.get(CACHE_KEY);
+        if (cached) {
+          const c = JSON.parse(cached);
+          if (c && (Date.now() - (c.asOfMs || 0)) < TTL_MS) return respond(c);
+        }
+      } catch { /* cache miss → recompute */ }
+      try {
+        // Realistic UA — Orderly's edge intermittently serves an HTML 403 to header-light
+        // Worker fetches (same reason the brain sends browser headers).
+        const res = await fetch("https://api-evm.orderly.org/v1/public/futures", {
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36", "Accept": "application/json, text/plain, */*" },
+        });
+        const j = await res.json();
+        const board = mispricedBoard(j?.data?.rows || []);
+        const payload = {
+          asOf: new Date().toISOString(), asOfMs: Date.now(), ...board,
+          criteria: { note: "Funding rate annualized (per-8h × 1095) = the crowd's mispricing pressure. Positive funding ⇒ book is lopsided LONG ⇒ fade edge is SHORT (and vice-versa). |edge| ≥ 8%/yr on a market with ≥ $50k open interest ⇒ MISPRICED · WATCHING; else PRICED FAIR. Ranked by |edge|. Not advice — a mean-reversion lens on positioning." },
+        };
+        try { await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 600 }); } catch { /* cache write best-effort */ }
+        return respond(payload);
+      } catch (e) {
+        // Fail-soft: 200 with an empty board so the Lab renders "no data", not an error.
+        return json({ asOf: new Date().toISOString(), scanned: 0, mispricedCount: 0, markets: [], error: String(e) }, request);
+      }
     }
 
     // NB: news aggregation is CLIENT-side (app/pages/lab/MarketIntel.tsx) on purpose —

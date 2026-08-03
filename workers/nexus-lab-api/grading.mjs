@@ -13,7 +13,7 @@
 import { notifyResolution } from "./resolutions.mjs";
 import {
   gradeCall, REGIME, classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets,
-  regimeEdge, planQuality, planSummary, expectancyStats, convictionCalibration,
+  regimeEdge, planQuality, planSummary, expectancyStats, convictionCalibration, rankCaller,
 } from "./logic.mjs";
 
 // Grade every PUBLIC thesis call against public price (first-touch TP-vs-SL via
@@ -204,4 +204,71 @@ export async function computeCallerStats(env, maxHorizonS = 30 * 86400, opts = {
     delete a.resolved; delete a.regimeRows; delete a.planScored; delete a.expRows; // internal only — keep the shape lean
   }
   return byWallet;
+}
+
+// Merit weight per earned tier — a standoff between two Apex callers should outrank
+// two anonymous wallets. Shared by every surface that weights live stances.
+const MERIT_WEIGHT = { APEX: 3, SHARP: 2, SIGNAL: 1 };
+
+// Gather every current directional STANCE across the platform — open positions
+// (agents + opted-in humans) and active (unresolved, fresh) public calls — each
+// weighted by the wallet's EARNED merit tier. Extracted so the disagreement board
+// (/theses/contested) and the per-symbol consensus lean (/theses/consensus) read
+// the SAME universe of stances and can never drift. Symbols are returned BARE
+// (BTC, not PERP_BTC_USDC) so they join the mispriced board's coin key.
+// Returns { entries, byWallet } — byWallet is the graded record (reused for merit
+// enrichment by the caller).
+export async function gatherStanceEntries(env, { freshMs = 14 * 86400 * 1000 } = {}) {
+  const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+  const bare = (s) => String(s || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+  const byWallet = await computeCallerStats(env, 30 * 86400);
+  const weightOf = (w) => {
+    const r = rankCaller(byWallet[w?.toLowerCase?.()] || byWallet[w] || null);
+    return r ? (MERIT_WEIGHT[r.tier] || 1) : 1;
+  };
+  const entries = [];
+  const now = Date.now();
+
+  // 1) Open positions (agents + opted-in humans) → directional stances.
+  try {
+    const usersRaw = await AGENT_KV.get("agent:users");
+    const users = usersRaw ? JSON.parse(usersRaw) : [];
+    const states = await Promise.all(users.map(async (w) => {
+      const s = await AGENT_KV.get(`agent:state:${w}`);
+      return { w, p: s ? (JSON.parse(s).current_position || null) : null };
+    }));
+    for (const { w, p } of states) {
+      if (p && !p.paper && p.symbol && p.direction) entries.push({ wallet: w, symbol: bare(p.symbol), direction: p.direction, weight: weightOf(w), source: "position" });
+    }
+    const humanList = await AGENT_KV.list({ prefix: "live:human:", limit: 1000 });
+    const snaps = await Promise.all(humanList.keys.map(async (k) => {
+      const raw = await AGENT_KV.get(k.name);
+      return raw ? { wallet: k.name.slice("live:human:".length), ...JSON.parse(raw) } : null;
+    }));
+    for (const sn of snaps) {
+      for (const p of (sn?.positions || [])) {
+        if (p.symbol && p.direction) entries.push({ wallet: sn.wallet, symbol: bare(p.symbol), direction: p.direction, weight: weightOf(sn.wallet), source: "position" });
+      }
+    }
+  } catch (e) { console.error("[stances] live positions", e.message); }
+
+  // 2) Active (unresolved, fresh) public calls → directional stances.
+  try {
+    const listed = await env.LAB_STORE.list({ prefix: "lab:" });
+    for (const key of listed.keys) {
+      const raw = await env.LAB_STORE.get(key.name);
+      if (!raw) continue;
+      let data; try { data = JSON.parse(raw); } catch { continue; }
+      const wallet = key.name.replace("lab:", "");
+      for (const t of (data.theses || [])) {
+        if (!t.isPublic || !t.symbol || !t.direction) continue;
+        if (t.gradedOutcome === "WIN" || t.gradedOutcome === "LOSS") continue; // resolved → no longer a live stance
+        if (t.status === "HIT_TP" || t.status === "STOPPED_OUT" || t.status === "INVALIDATED") continue;
+        if ((now - (t.createdAt || 0)) > freshMs) continue; // stale
+        entries.push({ wallet, symbol: bare(t.symbol), direction: t.direction, weight: weightOf(wallet), source: "thesis" });
+      }
+    }
+  } catch (e) { console.error("[stances] active theses", e.message); }
+
+  return { entries, byWallet };
 }
