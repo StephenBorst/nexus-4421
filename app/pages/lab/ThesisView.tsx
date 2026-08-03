@@ -908,6 +908,8 @@ export function ThesisView() {
           stopLoss: d.stopLoss ?? f.stopLoss,
           takeProfit1: d.takeProfit1 ?? f.takeProfit1,
           notes: d.notes ?? f.notes,
+          catalyst: d.catalyst ?? f.catalyst,
+          targetWindow: d.targetWindow ?? f.targetWindow,
         }));
         window.localStorage.removeItem(THESIS_DRAFT_KEY);
       } catch { /* ignore malformed draft */ }

@@ -67,6 +67,26 @@ export function MispricedBoard() {
   const scanned = board?.scanned ?? 0;
   const mispricedCount = board?.mispricedCount ?? 0;
 
+  // Weave OBSERVE → PLAN: a stretched market is a thesis waiting to be written. Draft
+  // the fade (symbol + direction + a funding catalyst) into the Thesis Engine for the
+  // user to add levels + save. Reuses the assistant's draft contract (nexus_thesis_draft
+  // + the tab/draft events the Lab already listens for) — no order, no auth.
+  const draftFade = (m: Market) => {
+    if (m.direction === "NONE") return;
+    const crowd = m.direction === "SHORT" ? "long" : "short";
+    const draft = {
+      symbol: m.coin,
+      direction: m.direction,
+      catalyst: `Funding fade · ${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr, crowd offside ${crowd}`,
+      notes: `Funding is ${m.funding8hPct}%/8h — the book is lopsided ${crowd}. Fading the crowd for the mean-revert; set your own entry, stop and target.`,
+    };
+    try { window.localStorage.setItem("nexus_thesis_draft", JSON.stringify(draft)); } catch { /* private mode */ }
+    try {
+      window.dispatchEvent(new CustomEvent("nexus:lab-tab", { detail: { tab: "thesis" } }));
+      window.dispatchEvent(new CustomEvent("nexus:thesis-draft"));
+    } catch { /* non-browser — ignore */ }
+  };
+
   return (
     <div>
       <SectionHeader
@@ -92,7 +112,7 @@ export function MispricedBoard() {
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {/* Column header (desktop) */}
           {!isMobile && (
-            <div style={{ display: "grid", gridTemplateColumns: "120px 96px 1fr 150px 128px", gap: 12, padding: "0 12px", alignItems: "center" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "120px 96px 1fr 150px 150px", gap: 12, padding: "0 12px", alignItems: "center" }}>
               {["MARKET", "PRICE", "FUNDING EDGE (ANNUALIZED)", "FADE / STATUS", "SHARP CALLERS"].map((h) => (
                 <span key={h} style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.12em", color: C.text.faint }}>{h}</span>
               ))}
@@ -103,17 +123,60 @@ export function MispricedBoard() {
             const mispriced = m.status === "MISPRICED";
             const barPct = Math.min(100, (m.edge / maxEdge) * 100);
             // Divergence: the funding fade and the sharp callers point opposite ways.
-            const diverges = l && l.side !== "SPLIT" && m.direction !== "NONE" && l.side !== m.direction;
+            const diverges = !!l && l.side !== "SPLIT" && m.direction !== "NONE" && l.side !== m.direction;
+            const canDraft = m.direction !== "NONE";
+            const shell: React.CSSProperties = {
+              background: mispriced ? C.surface : C.inset,
+              border: `1px solid ${mispriced ? C.borderStrong : C.border}`,
+              borderLeft: `2px solid ${mispriced ? C.accent : "transparent"}`,
+              borderRadius: RADIUS.md, cursor: canDraft ? "pointer" : "default",
+            };
+            const onDraft = canDraft ? () => draftFade(m) : undefined;
+            const callers = l ? (
+              <>
+                <span style={dirChip(l.side)}>{l.side}</span>
+                <span style={{ fontFamily: MONO, fontSize: 8.5, color: C.text.faint }}>{l.participants}</span>
+                {diverges && <span title="Funding fade and the sharp callers disagree" style={{ fontFamily: MONO, fontSize: 9, color: C.warn }}>⚡</span>}
+              </>
+            ) : <span style={{ fontFamily: MONO, fontSize: 9, color: C.text.faint }}>—</span>;
+            const statusChip = (
+              <span style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.06em", whiteSpace: "nowrap", color: mispriced ? C.accent : C.text.faint }}>
+                {mispriced ? "◆ WATCHING" : "PRICED FAIR"}
+              </span>
+            );
+
+            // ── Mobile: a purpose-built compact card (not 5 stacked, unlabeled cells) ──
+            if (isMobile) {
+              return (
+                <div key={m.symbol} onClick={onDraft} title={canDraft ? "Draft a thesis to fade this" : undefined}
+                  style={{ ...shell, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: C.text.bright }}>{m.coin}</span>
+                    {statusChip}
+                    <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 13, fontWeight: 700, color: mispriced ? C.text.bright : C.text.muted }}>
+                      {m.fundingAnnualPct >= 0 ? "+" : ""}{m.fundingAnnualPct}%<span style={{ fontSize: 8, color: C.text.faint }}>/yr</span>
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    {m.direction !== "NONE" && <span style={dirChip(m.direction)}>FADE {m.direction}</span>}
+                    <span style={{ fontFamily: MONO, fontSize: 10, color: C.text.fog }}>${fmtPrice(m.markPrice)}</span>
+                    {m.change24hPct != null && (
+                      <span style={{ fontFamily: MONO, fontSize: 9, color: m.change24hPct >= 0 ? C.pos : C.neg }}>{m.change24hPct >= 0 ? "+" : ""}{m.change24hPct}%</span>
+                    )}
+                    <span style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: "auto" }}>{callers}</span>
+                  </div>
+                  {canDraft && (
+                    <div style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.08em", color: mispriced ? C.accent : C.text.faint }}>→ TAP TO DRAFT A FADE</div>
+                  )}
+                </div>
+              );
+            }
+
+            // ── Desktop: the dashboard grid (sort order is the signal) ──
             return (
-              <div key={m.symbol} style={{
-                display: "grid",
-                gridTemplateColumns: isMobile ? "1fr" : "120px 96px 1fr 150px 128px",
-                gap: isMobile ? 8 : 12, alignItems: "center",
-                background: mispriced ? C.surface : C.inset,
-                border: `1px solid ${mispriced ? C.borderStrong : C.border}`,
-                borderLeft: `2px solid ${mispriced ? C.accent : "transparent"}`,
-                borderRadius: RADIUS.md, padding: isMobile ? "10px 12px" : "9px 12px",
-              }}>
+              <div key={m.symbol} onClick={onDraft} title={canDraft ? "Draft a thesis to fade this" : undefined}
+                className={canDraft ? "nx-card-interactive" : undefined}
+                style={{ ...shell, display: "grid", gridTemplateColumns: "120px 96px 1fr 150px 150px", gap: 12, alignItems: "center", padding: "9px 12px" }}>
                 {/* Market */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: C.text.bright }}>{m.coin}</span>
@@ -140,22 +203,12 @@ export function MispricedBoard() {
                 {/* Fade direction + status */}
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   {m.direction !== "NONE" && <span style={dirChip(m.direction)}>FADE {m.direction}</span>}
-                  <span style={{
-                    fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.06em", whiteSpace: "nowrap",
-                    color: mispriced ? C.accent : C.text.faint,
-                  }}>{mispriced ? "◆ WATCHING" : "PRICED FAIR"}</span>
+                  {statusChip}
                 </div>
-                {/* Sharp-callers lean */}
+                {/* Sharp-callers lean + draft affordance */}
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {l ? (
-                    <>
-                      <span style={dirChip(l.side)}>{l.side}</span>
-                      <span style={{ fontFamily: MONO, fontSize: 8.5, color: C.text.faint }}>{l.participants}</span>
-                      {diverges && <span title="Funding fade and the sharp callers disagree" style={{ fontFamily: MONO, fontSize: 9, color: C.warn }}>⚡</span>}
-                    </>
-                  ) : (
-                    <span style={{ fontFamily: MONO, fontSize: 9, color: C.text.faint }}>—</span>
-                  )}
+                  {callers}
+                  {canDraft && <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 9, color: mispriced ? C.accent : C.text.faint }}>→ draft</span>}
                 </div>
               </div>
             );

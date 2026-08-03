@@ -327,6 +327,43 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "get_mispriced",
+    description:
+      "Get the MISPRICED BOARD — every liquid perp priced by its funding rate as a mispricing signal. Persistently positive funding means the book is lopsided LONG, so the mean-revert (fade) edge is SHORT — and vice-versa; rates are annualized so |edge| is comparable across markets. Returns the most stretched markets (fade direction + annualized edge %/yr + raw 8h funding + 24h move), the scan counts, and — where the graded, credible CALLERS have a stance — their merit-weighted lean beside each, flagging DIVERGENCE (funding fade vs. the sharp callers disagree). Use for 'what's mispriced', 'where is funding extreme', 'what should I fade', 'where is the crowd offside'. Pass a symbol to read one market even if it's priced fair. This is a POSITIONING lens, NOT advice — the fade is a mean-reversion tendency, not a guarantee, and a market can stay stretched for a long time; say so. Offer to draft a thesis on a standout (draft_thesis).",
+    input_schema: {
+      type: "object",
+      properties: { symbol: { type: "string", description: "Optional ticker (BTC, ETH…) to focus on one market." } },
+    },
+    run: async (args) => {
+      const [board, cons] = await Promise.all([
+        fetch(`${AGENT_API}/intel/mispriced`).then((r) => r.json()).catch(() => null),
+        fetch(`${AGENT_API}/theses/consensus`).then((r) => r.json()).catch(() => null),
+      ]);
+      type M = { coin: string; direction: string; fundingAnnualPct: number; funding8hPct: number; change24hPct: number | null; status: string };
+      const markets: M[] = board?.markets ?? [];
+      if (!markets.length) return JSON.stringify({ error: "mispriced board unavailable" });
+      const lean: Record<string, { side: string; participants: number }> = cons?.consensus ?? {};
+      const focus = shortTicker(String(args.symbol ?? ""));
+      const picked = focus ? markets.filter((m) => m.coin === focus) : markets.filter((m) => m.status === "MISPRICED");
+      const rows = picked.slice(0, 12).map((m) => {
+        const l = lean[m.coin];
+        const diverges = !!l && l.side !== "SPLIT" && m.direction !== "NONE" && l.side !== m.direction;
+        return {
+          coin: m.coin, fade: m.direction, edge_annual_pct: m.fundingAnnualPct,
+          funding_8h_pct: m.funding8hPct, change_24h_pct: m.change24hPct, status: m.status,
+          sharp_callers: l ? { lean: l.side, n: l.participants } : null,
+          divergence: diverges || undefined,
+        };
+      });
+      return JSON.stringify({
+        scanned: board?.scanned ?? null,
+        mispriced_count: board?.mispricedCount ?? null,
+        markets: rows,
+        note: "Funding annualized = the crowd's mispricing; fade = the mean-revert edge. Positioning lens, not advice — a market can stay stretched. 'divergence' = the sharp callers lean the OTHER way (worth flagging, not resolving).",
+      });
+    },
+  },
+  {
     name: "get_trader",
     description:
       "Analyze a specific trader by wallet: their PUBLIC published theses and a win/loss summary (graded by status). Use when the user is viewing or asks about a trader's track record. Only public theses are returned.",
@@ -504,6 +541,17 @@ TOOLS.push(
     },
   },
   {
+    name: "open_mispriced",
+    description:
+      "Open the MISPRICED BOARD in the Lab — the funding-edge lens, markets ranked by how stretched positioning is, with the sharp-callers' merit-weighted lean beside each. Use when the user wants to browse what's mispriced / where funding is extreme. Read-only view; places no order.",
+    input_schema: { type: "object", properties: {} },
+    run: async (_args, ctx) => {
+      ctx.navigate?.(`/lab?tab=mispriced`);
+      try { window.dispatchEvent(new CustomEvent("nexus:lab-tab", { detail: { tab: "mispriced" } })); } catch { /* deep-link handles it */ }
+      return JSON.stringify({ navigated: "/lab?tab=mispriced", note: "Opened the Mispriced Board. Each row can be drafted into a thesis." });
+    },
+  },
+  {
     name: "draft_thesis",
     description:
       "Pre-fill the Nexus Thesis Engine with a trade plan (symbol, direction, entry, stop, take-profit, notes) and open it for the user to review. This DRAFTS a plan only — it never places an order; the user reviews, adjusts sizing/risk, and saves or executes themselves.",
@@ -516,6 +564,8 @@ TOOLS.push(
         stopLoss: { type: "number" },
         takeProfit1: { type: "number" },
         notes: { type: "string", description: "Short rationale for the thesis." },
+        catalyst: { type: "string", description: "Optional near-term 'why now' — the trigger the market may move on (e.g. 'CPI Thu', 'funding reset', 'range breakout'). Makes it a Signal, not just a plan." },
+        targetWindow: { type: "string", description: "Optional defined exit horizon — when the trader will know they were right or wrong (e.g. '7D', '48h', 'by FOMC')." },
       },
       required: ["symbol", "direction", "entryPrice", "stopLoss", "takeProfit1"],
     },
@@ -531,6 +581,8 @@ TOOLS.push(
         stopLoss: String(stop),
         takeProfit1: String(tp),
         notes: String(args.notes ?? ""),
+        catalyst: args.catalyst ? String(args.catalyst) : undefined,
+        targetWindow: args.targetWindow ? String(args.targetWindow) : undefined,
       };
       try { window.localStorage.setItem(THESIS_DRAFT_KEY, JSON.stringify(draft)); } catch { /* ignore */ }
       ctx.navigate?.(`/lab?tab=thesis`);
