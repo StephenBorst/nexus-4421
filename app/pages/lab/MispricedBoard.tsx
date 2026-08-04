@@ -32,6 +32,8 @@ type Market = {
 type BoardResp = { asOf?: string; scanned?: number; mispricedCount?: number; markets?: Market[] };
 type Lean = { side: "LONG" | "SHORT" | "SPLIT"; lean: number; longCount: number; shortCount: number; participants: number };
 type ConsensusResp = { consensus?: Record<string, Lean> };
+type Reversion = { samples: number; horizonDays: number; avgReversionPct: number; medianReversionPct: number; revertedPct: number; crowd: "long" | "short" };
+type PosResp = { coin: string; points: { t: number; f: number }[]; reversion: Reversion | null };
 
 const fmtUsd = (n: number) =>
   n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${(n / 1e3).toFixed(0)}K` : `$${n.toFixed(0)}`;
@@ -81,6 +83,47 @@ function PositionBar({ m, maxEdge, big }: { m: Market; maxEdge: number; big?: bo
   );
 }
 
+// The funding-history STORY-LINE (tier 2) — the crowd's positioning over time, plotted
+// between the two fade poles (balanced = center). The end dot is now. This is the
+// Quotient "narrative between two poles" idea, honest to our data: it only renders when
+// the brain has actually recorded enough hourly funding history for the market.
+function FundingStory({ points, direction }: { points: { t: number; f: number }[]; direction: string }) {
+  const W = 300, H = 140, cy = H / 2;
+  const maxAbs = Math.max(1e-9, ...points.map((p) => Math.abs(p.f)));
+  const n = points.length;
+  const coords = points.map((p, i) => {
+    const x = n === 1 ? W : (i / (n - 1)) * W;
+    const y = cy - (p.f / maxAbs) * (cy * 0.86);
+    return [x, y] as const;
+  });
+  const [ex, ey] = coords[coords.length - 1];
+  const pole: React.CSSProperties = { fontFamily: MONO, fontSize: 9, letterSpacing: "0.05em" };
+  return (
+    <div>
+      <div style={{ ...pole, color: direction === "SHORT" ? C.text.bright : C.text.faint, marginBottom: 5 }}>▲ FADE SHORT · crowd piled long</div>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ display: "block", width: "100%", height: 128 }} aria-label="Funding over time — how stretched the crowd has been; the dot is now.">
+        <line x1="0" y1={cy} x2={W} y2={cy} stroke={C.borderStrong} strokeWidth="1" strokeDasharray="3 4" />
+        <text x="4" y={cy - 5} fill={C.text.faint} fontFamily="ui-monospace,monospace" fontSize="8" letterSpacing="1">BALANCED</text>
+        <polyline points={coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ")}
+          fill="none" stroke={C.text.bright} strokeWidth="2.2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+        <circle cx={ex} cy={ey} r="7" fill={C.accent} opacity="0.12" />
+        <circle cx={ex} cy={ey} r="3.2" fill={C.accent} />
+      </svg>
+      <div style={{ ...pole, color: direction === "LONG" ? C.text.bright : C.text.faint, marginTop: 5 }}>▼ FADE LONG · crowd piled short</div>
+    </div>
+  );
+}
+
+// The reversion proof stat (tier 2), phrased plainly — and HONESTLY when the fade
+// historically failed (positive = price gave back / reverted; negative = it kept going).
+function reversionSentence(coin: string, r: Reversion): string {
+  const mag = Math.abs(r.avgReversionPct);
+  const d = `${r.horizonDays} day${r.horizonDays === 1 ? "" : "s"}`;
+  if (r.avgReversionPct > 0)
+    return `The last ${r.samples} times ${coin} funding ran this hot, price gave back an average of ${mag}% over ${d} — it reverted ${r.revertedPct}% of the time.`;
+  return `Careful: the last ${r.samples} times ${coin} funding ran this hot, price kept going the crowd's way by ${mag}% on average over ${d} — the fade only worked ${r.revertedPct}% of the time.`;
+}
+
 // The sharp callers' second opinion (merit-weighted lean), phrased plainly.
 function Callers({ m, lean }: { m: Market; lean?: Lean }) {
   if (!lean) return <span style={{ fontFamily: MONO, fontSize: 9.5, color: C.text.faint }}>— no one's called it yet</span>;
@@ -102,6 +145,18 @@ export function MispricedBoard() {
   const [lean, setLean] = useState<Record<string, Lean>>({});
   const [err, setErr] = useState(false);
   const [openCoin, setOpenCoin] = useState<string | null>(null);
+  const [pos, setPos] = useState<PosResp | null>(null);
+
+  // Tier 2: on opening a market, pull its funding history (story-line) + reversion stat.
+  // Fail-soft; a market with no recorded history just falls back to the static gauge.
+  useEffect(() => {
+    if (!openCoin) { setPos(null); return; }
+    let live = true; setPos(null);
+    fetch(`${AGENT_API}/intel/positioning/${openCoin}`).then((r) => r.json())
+      .then((d: PosResp) => { if (live) setPos(d); })
+      .catch(() => { if (live) setPos({ coin: openCoin, points: [], reversion: null }); });
+    return () => { live = false; };
+  }, [openCoin]);
 
   useEffect(() => {
     let live = true;
@@ -186,12 +241,22 @@ export function MispricedBoard() {
                   {m.fundingAnnualPct >= 0 ? "+" : ""}{m.fundingAnnualPct}%<span style={{ fontSize: 11, color: C.text.faint }}>/yr</span>
                 </span>
               </div>
-              <PositionBar m={m} maxEdge={maxEdge} big />
+              {pos && pos.points.length >= 8
+                ? <FundingStory points={pos.points} direction={m.direction} />
+                : <PositionBar m={m} maxEdge={maxEdge} big />}
             </div>
 
             <p style={{ fontFamily: UI, fontSize: 13, lineHeight: 1.55, color: C.text.fog, marginTop: 14, padding: "11px 12px", background: "rgba(237,237,240,0.03)", border: `1px solid ${C.border}`, borderRadius: RADIUS.md }}>
               {plainRead(m)}
             </p>
+
+            {/* Reversion proof — what happened the last times it looked this stretched. */}
+            {pos?.reversion && (
+              <p style={{ fontFamily: UI, fontSize: 12.5, lineHeight: 1.5, color: C.text.fog, marginTop: 10, padding: "11px 12px", background: "rgba(237,237,240,0.03)", border: `1px solid ${C.border}`, borderRadius: RADIUS.md }}>
+                {reversionSentence(m.coin, pos.reversion)}
+                <span style={{ display: "block", fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", textTransform: "uppercase", color: C.text.faint, marginTop: 6 }}>{m.coin} · from recorded funding history</span>
+              </p>
+            )}
 
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, fontFamily: MONO, fontSize: 10 }}>
               <span style={{ color: C.text.faint, textTransform: "uppercase", letterSpacing: "0.12em", fontSize: 8.5 }}>Second opinion</span>
@@ -223,9 +288,11 @@ export function MispricedBoard() {
                 <div style={{ fontFamily: UI, fontSize: 12.5, lineHeight: 1.5, color: C.text.fog, marginTop: 2 }}>{d}</div>
               </div>
             ))}
-            <div style={{ fontFamily: MONO, fontSize: 9, color: C.text.faint, letterSpacing: "0.05em", marginTop: 4, lineHeight: 1.6 }}>
-              Coming next: a funding-history line through the poles + what price did the last time it looked this stretched.
-            </div>
+            {pos && pos.points.length < 8 && !pos.reversion && (
+              <div style={{ fontFamily: MONO, fontSize: 9, color: C.text.faint, letterSpacing: "0.05em", marginTop: 4, lineHeight: 1.6 }}>
+                Not enough funding history recorded for {m.coin} yet — the story-line and reversion stat light up as it accumulates.
+              </div>
+            )}
           </div>
         </div>
       </div>

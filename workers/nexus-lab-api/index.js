@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -1966,6 +1966,30 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         // Fail-soft: 200 with an empty board so the Lab renders "no data", not an error.
         return json({ asOf: new Date().toISOString(), scanned: 0, mispricedCount: 0, markets: [], error: String(e) }, request);
       }
+    }
+
+    // ── /intel/positioning/:coin — the funding story-line + reversion proof stat ──
+    // Powers the Mispriced Board DETAIL view (tier 2). Reads the brain's hourly
+    // oi:hist:{symbol} series ({t,price,funding}) — the ONLY funding history we have
+    // (Orderly exposes none) — and returns (1) a compact funding series for the
+    // two-pole story-line and (2) fundingReversion: "the last N times funding ran this
+    // hot, what did price do over the next ~3 days". Only the core + watchlisted
+    // symbols accumulate history, so long-tail coins return empty (the UI hides the
+    // line + stat rather than faking them). Public, fail-soft, edge-cached 5 min.
+    if (parts[0] === "intel" && parts[1] === "positioning" && parts[2] && request.method === "GET") {
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+      const coin = String(parts[2]).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+      const symbol = `PERP_${coin}_USDC`;
+      let hist = [];
+      try { const raw = await AGENT_KV.get(`oi:hist:${symbol}`); hist = raw ? JSON.parse(raw) : []; } catch { /* absent → empty */ }
+      // story-line: last ~180 hourly points, minimal payload ({t, f}).
+      const points = hist.slice(-180)
+        .map((p) => ({ t: p.t, f: Number(p.funding) }))
+        .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.f));
+      return new Response(JSON.stringify({
+        coin, symbol, points, reversion: fundingReversion(hist),
+        note: "Funding recorded hourly by Nexus (Orderly has no funding/OI history endpoint). Reversion = how price moved AGAINST the crowd over the next ~3 days the last times funding was this extreme.",
+      }), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300", ...cors(request) } });
     }
 
     // NB: news aggregation is CLIENT-side (app/pages/lab/MarketIntel.tsx) on purpose —

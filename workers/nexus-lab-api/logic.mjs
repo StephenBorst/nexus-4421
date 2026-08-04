@@ -647,6 +647,60 @@ export function consensusBySymbol(entries, cfg = { minLean: 0.15 }) {
   return out;
 }
 
+// ── Funding reversion — the learnable "proof" stat ────────────────────────────
+// "The last N times funding ran THIS hot, what did price do?" From the brain's
+// oi:hist series ({t,price,funding}), find PAST moments where funding was in the same
+// extreme (same sign, ≥ band × the current rate), then measure the price move over the
+// next `horizonH` hours AGAINST the crowd (crowd long → a DROP is reversion; crowd
+// short → a RISE is). Samples are NON-OVERLAPPING (jump past each window) so the count
+// isn't inflated by one long funding streak. Returns null below minSamples — an honest
+// "not enough history" beats a confident number drawn from three correlated bars.
+export const REVERSION = { horizonH: 72, band: 0.7, minSamples: 4 };
+
+export function fundingReversion(points, cfg = REVERSION) {
+  if (!Array.isArray(points) || points.length < 12) return null;
+  const pts = points
+    .map((p) => ({ t: Number(p.t), price: Number(p.price), funding: Number(p.funding) }))
+    .filter((p) => Number.isFinite(p.t) && p.price > 0 && Number.isFinite(p.funding))
+    .sort((a, b) => a.t - b.t);
+  if (pts.length < 12) return null;
+  const curF = pts[pts.length - 1].funding;
+  if (!curF) return null;
+  const sign = curF > 0 ? 1 : -1;
+  const thresh = Math.abs(curF) * cfg.band;
+  const horizonMs = cfg.horizonH * 3600 * 1000;
+
+  // First index whose timestamp is ≥ t+horizon (the price we compare against), or -1.
+  const forwardIdx = (i) => {
+    const target = pts[i].t + horizonMs;
+    for (let j = i + 1; j < pts.length; j++) if (pts[j].t >= target) return j;
+    return -1;
+  };
+
+  const against = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p = pts[i];
+    if (Math.sign(p.funding) !== sign || Math.abs(p.funding) < thresh) continue;
+    const j = forwardIdx(i);
+    if (j < 0) break; // no full horizon remaining
+    const movePct = ((pts[j].price - p.price) / p.price) * 100;
+    against.push(sign > 0 ? -movePct : movePct); // + = price moved AGAINST the crowd (reverted)
+    i = j; // non-overlapping — jump past this window
+  }
+  if (against.length < cfg.minSamples) return null;
+  const avg = against.reduce((s, x) => s + x, 0) / against.length;
+  const reverted = against.filter((x) => x > 0).length;
+  const sorted = [...against].sort((a, b) => a - b);
+  return {
+    samples: against.length,
+    horizonDays: Math.round(cfg.horizonH / 24),
+    avgReversionPct: round(avg, 2),                 // + = price gave back (reverted) on average
+    medianReversionPct: round(sorted[Math.floor((sorted.length - 1) / 2)], 2),
+    revertedPct: Math.round((reverted / against.length) * 100),
+    crowd: sign > 0 ? "long" : "short",
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // LOSS POSTMORTEMS  (why did it lose — from a FIXED taxonomy, so it aggregates)
 // ═══════════════════════════════════════════════════════════════════════════

@@ -8,7 +8,7 @@ import {
   classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge,
   planQuality, planSummary,
   expectancyStats, callerScore, convictionCalibration, contestedBoard,
-  mispricedBoard, consensusBySymbol, MISPRICED,
+  mispricedBoard, consensusBySymbol, MISPRICED, fundingReversion,
   LOSS_REASONS, isLossReason, postmortemSummary,
   validateArenaRegistration, arenaAgentConfig,
 } from "./logic.mjs";
@@ -1316,4 +1316,41 @@ test("consensusBySymbol: same wallet same side twice → strongest weight, not d
   ]);
   assert.equal(c.BTC.longWeight, 3);
   assert.equal(c.BTC.longCount, 1);
+});
+
+// ── Funding reversion (the "proof" stat) ─────────────────────────────────────
+const HOUR = 3600 * 1000;
+// n hourly points, positive (crowd-long) funding, price falling `dropPctPerHr` each hr.
+const revSeries = (n, funding, startPrice, dropPctPerHr) =>
+  Array.from({ length: n }, (_, i) => ({ t: 1_000_000_000_000 + i * HOUR, funding, price: startPrice * (1 - dropPctPerHr / 100 * i) }));
+
+test("fundingReversion: crowd-long + price falls → positive reversion, reverted 100%", () => {
+  const r = fundingReversion(revSeries(24, 0.001, 100, 1), { horizonH: 3, band: 0.7, minSamples: 2 });
+  assert.ok(r, "expected a result");
+  assert.equal(r.crowd, "long");
+  assert.ok(r.avgReversionPct > 0, `avg should be positive, got ${r.avgReversionPct}`);
+  assert.equal(r.revertedPct, 100);
+  assert.equal(r.horizonDays, 0); // 3h rounds to 0 days — fine for the test
+});
+
+test("fundingReversion: crowd-long + price RISES → negative reversion (fade failed)", () => {
+  // price rises 1%/hr → move is +, against-crowd is negative.
+  const r = fundingReversion(revSeries(24, 0.001, 100, -1), { horizonH: 3, band: 0.7, minSamples: 2 });
+  assert.ok(r);
+  assert.ok(r.avgReversionPct < 0, `avg should be negative, got ${r.avgReversionPct}`);
+  assert.equal(r.revertedPct, 0);
+});
+
+test("fundingReversion: too few samples → null", () => {
+  // Only ~2 non-overlapping windows over a huge horizon → below minSamples(4 default).
+  assert.equal(fundingReversion(revSeries(20, 0.001, 100, 1)), null);
+});
+
+test("fundingReversion: flat/zero current funding → null", () => {
+  const pts = revSeries(24, 0.001, 100, 1); pts[pts.length - 1].funding = 0;
+  assert.equal(fundingReversion(pts, { horizonH: 3, band: 0.7, minSamples: 2 }), null);
+});
+
+test("fundingReversion: short history → null", () => {
+  assert.equal(fundingReversion(revSeries(6, 0.001, 100, 1)), null);
 });
