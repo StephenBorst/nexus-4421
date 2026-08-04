@@ -251,6 +251,16 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
         </div>
       </div>
 
+      {/* How to read this — plain, congruent with Intel + the Mispriced Board. */}
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 12, padding: "11px 13px", border: "1px solid #232327", borderLeft: "2px solid #71717a", borderRadius: 6, background: "#0f0f11" }}>
+        <span style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 12, flexShrink: 0 }}>?</span>
+        <span style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: 12.5, lineHeight: 1.55, color: "#a1a1aa" }}>
+          <b style={{ color: "#f4f4f5" }}>How to read this:</b> the strongest signal isn't one whale — it's <b style={{ color: "#f4f4f5" }}>agreement</b>. Consensus
+          shows the coins several top traders are positioned the same way on. Smart money is often early and often wrong, so treat it as
+          context — then copy a move into a trade your agent manages and grades.
+        </span>
+      </div>
+
       {/* #3 convert-loop framing — one-time */}
       <Coachmark storageKey="nexus_coach_smart_v1" badge="THE LOOP" title="From watcher to ranked trader">
         Copy any move → the agent manages the exit → every close joins <strong style={{ color: "#d4d4d8" }}>your</strong> on-chain track record.

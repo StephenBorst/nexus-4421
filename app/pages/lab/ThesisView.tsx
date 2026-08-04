@@ -1257,6 +1257,16 @@ export function ThesisView() {
         )}
       </div>
 
+      {/* What makes a Signal — the plain recipe (congruent with the Mispriced Board). */}
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 14, padding: "11px 13px", border: "1px solid #232327", borderLeft: "2px solid #71717a", borderRadius: 6, background: "#0f0f11" }}>
+        <span style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 12, flexShrink: 0 }}>?</span>
+        <span style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: 12.5, lineHeight: 1.55, color: "#a1a1aa" }}>
+          <b style={{ color: "#f4f4f5" }}>A good call is a Signal, not a guess</b> — it names three things: an <b style={{ color: "#f4f4f5" }}>edge</b> (why
+          the market is wrong — your levels + the funding read), a <b style={{ color: "#f4f4f5" }}>catalyst</b> (why it moves now), and a{" "}
+          <b style={{ color: "#f4f4f5" }}>defined exit</b> (target, stop, and when you'll know). Fill those in and it grades itself against real price.
+        </span>
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 320px", gap: 12, alignItems: "start" }}>
         {/* Form */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
