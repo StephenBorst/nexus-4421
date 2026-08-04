@@ -188,14 +188,6 @@ const lsColor = (ls: number | null) =>
 const signalColor = (sig: string) =>
   sig.includes("LONGS") || sig.includes("SHORTS") || sig.includes("CONCENTRATION") || sig.includes("ELEVATED") ? TEAL : MUTED;
 
-function assetSignalLabel(a: HLAsset): string {
-  if (a.signal === "CROWDED LONGS")      return `${a.name} Crowded Longs`;
-  if (a.signal === "CROWDED SHORTS")     return `${a.name} Crowded Shorts`;
-  if (a.signal === "HIGH CONCENTRATION") return `${a.name} High OI Concentration`;
-  if (a.signal === "ELEVATED OI")        return `${a.name} Elevated OI/Vol Ratio`;
-  return `${a.name} Neutral`;
-}
-
 function assetDescription(a: HLAsset): string {
   const ratio = a.volume > 0 ? (a.oi / a.volume).toFixed(1) : "N/A";
   if (a.signal === "CROWDED LONGS")      return `Extreme long crowding — high squeeze risk if price reverses`;
