@@ -205,6 +205,35 @@ function assetDescription(a: HLAsset): string {
   return `Neutral positioning at ${fmtOI(a.oi)} OI`;
 }
 
+// ─── Alert Signal-Card helpers (the deeper pass) ──────────────
+// Turn each crowding/OI signal into a graspable card: a severity, a hero metric, and
+// a plain-English "what it means + what to do" — congruent with the Mispriced Board.
+function alertKind(signal: string): string {
+  return signal === "CROWDED LONGS" ? "Crowded longs"
+    : signal === "CROWDED SHORTS" ? "Crowded shorts"
+    : signal === "HIGH CONCENTRATION" ? "High OI concentration"
+    : signal === "ELEVATED OI" ? "Elevated OI vs volume" : "Signal";
+}
+function alertSeverity(signal: string): { text: string; hot: boolean } {
+  if (signal === "CROWDED LONGS" || signal === "CROWDED SHORTS") return { text: "SQUEEZE RISK", hot: true };
+  if (signal === "HIGH CONCENTRATION") return { text: "THIN LIQUIDITY", hot: true };
+  if (signal === "ELEVATED OI") return { text: "BUILDING", hot: false };
+  return { text: "WATCH", hot: false };
+}
+function alertMetric(a: HLAsset): { n: string; label: string } {
+  const ratio = a.volume > 0 ? `${(a.oi / a.volume).toFixed(1)}×` : "—";
+  if (a.signal === "CROWDED LONGS" || a.signal === "CROWDED SHORTS") return { n: fmtFunding(a.funding), label: "Funding 8h" };
+  return { n: ratio, label: "OI ÷ 24h volume" };
+}
+function alertRead(a: HLAsset): string {
+  const ratio = a.volume > 0 ? (a.oi / a.volume).toFixed(1) : "—";
+  if (a.signal === "CROWDED LONGS")      return `Almost everyone is long ${a.name}. If price turns, those longs get forced out fast — a sharp drop. Trail your stops if you're long, or watch for the flush.`;
+  if (a.signal === "CROWDED SHORTS")     return `The crowd is short ${a.name}. Any rally can force those shorts to buy back — fuel for a squeeze up. Careful pressing shorts here.`;
+  if (a.signal === "HIGH CONCENTRATION") return `Big positions, little trading (${ratio}× open interest vs 24h volume). Moves here can be violent and gappy — size down.`;
+  if (a.signal === "ELEVATED OI")        return `Positions are building faster than volume (${ratio}× OI vs 24h volume) — watch for a resolution.`;
+  return assetDescription(a);
+}
+
 // ─── Sub-components ───────────────────────────────────────────
 function BarBlock({ value, total = 100, color = TEAL, len = 18 }: { value: number; total?: number; color?: string; len?: number }) {
   const filled = Math.round(Math.min(1, Math.max(0, value / total)) * len);
@@ -407,7 +436,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
 
   const grid3: React.CSSProperties = {
     display: "grid",
-    gridTemplateColumns: isMobile ? "1fr" : "1.3fr 0.85fr 0.85fr",
+    gridTemplateColumns: isMobile ? "1fr" : "1.1fr 0.9fr",
     gap: "10px",
     marginBottom: "10px",
   };
@@ -562,6 +591,49 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
           </div>
         </div>
       </Card>
+
+      {/* ── ALERTS — the crowding/OI signals as Signal Cards ──────────────── */}
+      {signals.length > 0 && (
+        <div style={{ marginBottom: "10px" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "10px", margin: "2px 0 10px" }}>
+            <span style={{ color: BRIGHT, fontFamily: "var(--nx-font-mono)", fontSize: "12px", fontWeight: 700, letterSpacing: "0.12em" }}>◆ ALERTS — WORTH A LOOK</span>
+            <span style={{ color: DIM, fontFamily: "var(--nx-font-mono)", fontSize: "10px" }}>{signals.length}</span>
+            <span style={{ flex: 1, height: 1, background: C.border }} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: "12px" }}>
+            {signals.map(a => {
+              const sev = alertMetric(a), sv = alertSeverity(a.signal);
+              return (
+                <div key={a.name} className="nx-card-interactive" onClick={() => navigate(`/perp/${a.symbol}`)} title={`Open ${a.name}`}
+                  style={{ position: "relative", border: `1px solid ${C.border}`, borderLeft: `2px solid ${sv.hot ? YELLOW : C.borderStrong}`, borderRadius: "8px", padding: "14px", background: `linear-gradient(180deg, ${C.surface}, ${C.surfaceAlt})`, cursor: "pointer" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+                    <span style={{ color: BRIGHT, fontFamily: "var(--nx-font-mono)", fontWeight: 700, fontSize: "14px" }}>{a.name}</span>
+                    <span style={{ color: DIM, fontFamily: "var(--nx-font-mono)", fontSize: "8.5px", letterSpacing: "0.08em", textTransform: "uppercase" }}>{alertKind(a.signal)}</span>
+                    <span style={{ marginLeft: "auto", color: sv.hot ? YELLOW : DIM, fontFamily: "var(--nx-font-mono)", fontSize: "8.5px", fontWeight: 700, letterSpacing: "0.08em" }}>{sv.text}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: "8px" }}>
+                    <div>
+                      <div style={{ color: DIM, fontFamily: "var(--nx-font-mono)", fontSize: "8.5px", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "3px" }}>{sev.label}</div>
+                      <div style={{ color: BRIGHT, fontFamily: "var(--nx-font-mono)", fontSize: "26px", fontWeight: 600, lineHeight: 0.9 }}>{sev.n}</div>
+                    </div>
+                    <span style={{ marginLeft: "auto", color: DIM, fontFamily: "var(--nx-font-mono)", fontSize: "10px" }}>OI {fmtOI(a.oi)}</span>
+                  </div>
+                  <p style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: "12.5px", lineHeight: 1.5, color: MUTED, margin: "12px 0 0", padding: "9px 11px", background: "rgba(237,237,240,0.03)", border: `1px solid ${C.border}`, borderRadius: "6px" }}>
+                    {alertRead(a)}
+                  </p>
+                  <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+                    <button onClick={(e) => { e.stopPropagation(); navigate(`/perp/${a.symbol}`); }}
+                      style={{ flex: 1, background: "none", border: `1px solid ${C.borderStrong}`, color: C.accent, fontFamily: "var(--nx-font-mono)", fontSize: "9.5px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "8px", borderRadius: "6px", cursor: "pointer" }}>→ Open {a.name}</button>
+                    <button onClick={(e) => { e.stopPropagation(); deployToAgent({ symbols: [a.symbol] }, `the ${a.name} ${alertKind(a.signal).toLowerCase()} alert`, undefined, navigate); }}
+                      title={`Set the agent to watch ${a.name}`}
+                      style={{ background: "none", border: `1px solid ${C.border}`, color: MUTED, fontFamily: "var(--nx-font-mono)", fontSize: "9.5px", letterSpacing: "0.05em", padding: "8px 10px", borderRadius: "6px", cursor: "pointer" }}>⚡ Agent</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Portfolio Context ──────────────────────────────────── */}
       {portfolioLongPct !== null && accountState?.status === "SignedIn" && (() => {
@@ -741,56 +813,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
           </div>
         </Card>
 
-        {/* ── Live Signals ──────────────────────────────────── */}
-        <Card>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <SectionTitle style={{ marginBottom: 0 }}>// LIVE SIGNALS</SectionTitle>
-            {signals.length > 0 && (
-              <span style={{ color: DIM, fontSize: "11px" }}>{signals.length} active</span>
-            )}
-          </div>
-
-          {loading && signals.length === 0 && (
-            <div style={{ color: DIM, fontSize: "12px" }}>Scanning positions…</div>
-          )}
-          {!loading && signals.length === 0 && (
-            <div style={{ color: DIM, fontSize: "12px" }}>
-              No extreme signals detected.<br />
-              Market positioning is balanced.
-            </div>
-          )}
-
-          {signals.map(s => {
-            const sc = signalColor(s.signal);
-            const filled = Math.round((s.confidence / 100) * 16);
-            return (
-              <div
-                key={s.name}
-                style={{
-                  marginBottom: "7px",
-                  padding: "7px 8px",
-                  background: "rgba(255,255,255,0.02)",
-                  border: "1px solid rgba(255,255,255,0.05)",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
-                  <span style={{ color: sc, fontSize: "10px", letterSpacing: "0.04em" }}>[{s.signal}]</span>
-                  <span style={{ color: BRIGHT, fontWeight: 700, fontSize: "12px" }}>{s.name}</span>
-                </div>
-                <div style={{ marginBottom: "2px" }}>
-                  <span style={{ color: sc }}>{"▓".repeat(filled)}</span>
-                  <span style={{ color: "rgba(255,255,255,0.12)" }}>{"░".repeat(16 - filled)}</span>
-                  <span style={{ color: DIM, fontSize: "10px", marginLeft: "5px" }}>{s.confidence}%</span>
-                </div>
-                <div style={{ color: MUTED, fontSize: "11px" }}>{assetSignalLabel(s)}</div>
-              </div>
-            );
-          })}
-
-          <div style={{ color: DIM, fontSize: "10px", marginTop: "8px", letterSpacing: "0.05em" }}>
-            // VIA ORDERLY NETWORK
-          </div>
-        </Card>
+        {/* Live Signals were promoted to the full-width ◆ ALERTS cards above. */}
 
       </div>
 
