@@ -89,11 +89,15 @@ function PositionBar({ m, maxEdge, big }: { m: Market; maxEdge: number; big?: bo
 // the brain has actually recorded enough hourly funding history for the market.
 function FundingStory({ points, direction }: { points: { t: number; f: number }[]; direction: string }) {
   const W = 300, H = 140, cy = H / 2;
-  const maxAbs = Math.max(1e-9, ...points.map((p) => Math.abs(p.f)));
+  // FIXED reference so height is HONEST + comparable across markets: ~0.04%/8h
+  // (≈44%/yr) reaches a pole. A mild-but-stable market sits gently off-center instead
+  // of being pinned to the top just because it never varies (window-max scaling did that).
+  const REF = 0.0004;
+  const clamp = (v: number) => Math.max(-1, Math.min(1, v));
   const n = points.length;
   const coords = points.map((p, i) => {
     const x = n === 1 ? W : (i / (n - 1)) * W;
-    const y = cy - (p.f / maxAbs) * (cy * 0.86);
+    const y = cy - clamp(p.f / REF) * (cy * 0.86);
     return [x, y] as const;
   });
   const [ex, ey] = coords[coords.length - 1];
@@ -225,7 +229,7 @@ export function MispricedBoard() {
             <div style={{ fontFamily: UI, fontSize: 14, color: C.text.fog, marginTop: 18 }}>{m.coin} perpetual</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 1 }}>
               <span style={{ fontFamily: MONO, fontSize: 40, fontWeight: 600, color: C.text.bright, letterSpacing: "-0.02em", lineHeight: 1 }}>${fmtPrice(m.markPrice)}</span>
-              {change != null && <span style={{ fontFamily: MONO, fontSize: 14, color: change >= 0 ? C.pos : C.neg }}>{change >= 0 ? "+" : ""}{change}% today</span>}
+              {change != null && <span style={{ fontFamily: MONO, fontSize: 14, color: change > 0 ? C.pos : change < 0 ? C.neg : C.text.muted }}>{change > 0 ? "+" : ""}{change}% today</span>}
             </div>
 
             <div style={{ height: 1, background: C.border, margin: "16px 0" }} />
@@ -365,7 +369,7 @@ export function MispricedBoard() {
                       </p>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, fontFamily: MONO, fontSize: 11, color: C.text.fog }}>
                         <span>${fmtPrice(m.markPrice)}</span>
-                        {m.change24hPct != null && <span style={{ color: m.change24hPct >= 0 ? C.pos : C.neg }}>{m.change24hPct >= 0 ? "+" : ""}{m.change24hPct}% today</span>}
+                        {m.change24hPct != null && <span style={{ color: m.change24hPct > 0 ? C.pos : m.change24hPct < 0 ? C.neg : C.text.muted }}>{m.change24hPct > 0 ? "+" : ""}{m.change24hPct}% today</span>}
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`, fontFamily: MONO, fontSize: 10 }}>
                         <span style={{ color: C.text.faint, textTransform: "uppercase", letterSpacing: "0.12em", fontSize: 8.5 }}>Top callers</span>
@@ -411,7 +415,7 @@ export function MispricedBoard() {
       )}
 
       <p style={{ fontFamily: MONO, fontSize: 9.5, color: C.text.faint, lineHeight: 1.6, marginTop: 18, letterSpacing: "0.02em" }}>
-        Funding annualized (per-8h × 1095). |edge| ≥ 8%/yr on a market with ≥ $50k open interest ⇒ Mispriced · Watching; else priced fair.
+        Funding annualized (per-8h × 1095). |edge| ≥ 12%/yr on a market with ≥ $50k open interest ⇒ Mispriced · Watching; else priced fair.
         Caller lean is merit-weighted from open positions + active public calls. A read on positioning, not advice — a stretched market can stay stretched.
       </p>
     </div>

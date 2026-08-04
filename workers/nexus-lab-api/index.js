@@ -1958,7 +1958,7 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         const board = mispricedBoard(j?.data?.rows || []);
         const payload = {
           asOf: new Date().toISOString(), asOfMs: Date.now(), ...board,
-          criteria: { note: "Funding rate annualized (per-8h × 1095) = the crowd's mispricing pressure. Positive funding ⇒ book is lopsided LONG ⇒ fade edge is SHORT (and vice-versa). |edge| ≥ 8%/yr on a market with ≥ $50k open interest ⇒ MISPRICED · WATCHING; else PRICED FAIR. Ranked by |edge|. Not advice — a mean-reversion lens on positioning." },
+          criteria: { note: "Funding rate annualized (per-8h × 1095) = the crowd's mispricing pressure. Positive funding ⇒ book is lopsided LONG ⇒ fade edge is SHORT (and vice-versa). |edge| ≥ 12%/yr on a market with ≥ $50k open interest ⇒ MISPRICED · WATCHING; else PRICED FAIR. Ranked by |edge|. Not advice — a mean-reversion lens on positioning." },
         };
         try { await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 600 }); } catch { /* cache write best-effort */ }
         return respond(payload);

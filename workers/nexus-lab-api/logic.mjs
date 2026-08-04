@@ -555,7 +555,9 @@ export function contestedBoard(entries, cfg = CONTESTED) {
 //       open_interest, 24h_open). Pure + tested — the route just feeds it live rows.
 export const MISPRICED = {
   fundingPeriodsPerYear: 3 * 365, // Orderly funds every 8h → 1095 periods/yr
-  minEdgePct: 8,     // |annualized funding| ≥ this ⇒ flagged MISPRICED · WATCHING
+  minEdgePct: 12,    // |annualized funding| ≥ this ⇒ flagged MISPRICED · WATCHING. 12%/yr
+                     // (~0.011%/8h) is the noise floor on this venue — below it "mispriced"
+                     // means nothing; scarcity is the point (few, genuine, over many, mild).
   minOiUsd: 50_000,  // liquidity floor — a wide funding print on a dust market is noise, not edge
   maxMarkets: 40,    // board cap (returned already ranked by edge)
 };
