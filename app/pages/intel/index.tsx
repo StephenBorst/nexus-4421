@@ -473,9 +473,19 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
         </div>
       </div>
 
-      {/* ── Market Regime ───────────────────────────────────── */}
+      {/* ── How to read this — plain-language, once, for everyone ──────────── */}
+      <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", marginBottom: "10px", padding: "10px 12px", border: "1px solid rgba(255,255,255,0.06)", borderLeft: `2px solid ${MUTED}`, borderRadius: "6px", background: "rgba(255,255,255,0.02)" }}>
+        <span style={{ color: MUTED, fontSize: "12px", flexShrink: 0 }}>?</span>
+        <span style={{ color: DIM, fontSize: "12px", lineHeight: 1.5, fontFamily: "var(--nx-font-ui, sans-serif)" }}>
+          <b style={{ color: BRIGHT }}>How to read this:</b> the read up top says whether the whole market is leaning risk-on or
+          risk-off, and why. Below it, the alerts worth acting on — where the crowd is stretched or positions are concentrated.
+          Green/red is direction, not a buy/sell.
+        </span>
+      </div>
+
+      {/* ── The Market Read (regime) ─────────────────────────── */}
       <Card style={{ marginBottom: "10px" }}>
-        <SectionTitle>// MARKET TAPE — TERMINAL</SectionTitle>
+        <SectionTitle>// THE MARKET READ</SectionTitle>
 
         <div style={{ marginBottom: "6px" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: "10px", marginBottom: "4px", flexWrap: "wrap" }}>
@@ -486,10 +496,14 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
             <span style={{ color: DIM, fontSize: "11px" }}>[{regime.score}]</span>
             <span style={{ color: DIM, fontSize: "12px" }}>BULLISH →</span>
           </div>
-          <div style={{ marginBottom: "4px" }}>
+          <div style={{ marginBottom: "6px" }}>
             <BarBlock value={regime.score} total={100} color={regime.color} len={28} />
           </div>
-          <div style={{ color: DIM, fontSize: "12px" }}>{regime.description}</div>
+          {/* Plain translation — what the tape means for the trade you're about to take. */}
+          <div style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: "13px", lineHeight: 1.55, color: DIM, padding: "9px 11px", background: "rgba(237,237,240,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "6px" }}>
+            <b style={{ color: BRIGHT }}>{regime.score >= 54 ? "Risk-on tape — the wind is behind longs." : regime.score <= 46 ? "Risk-off tape — longs are swimming upstream." : "Mixed tape — no clear edge either way."}</b>{" "}
+            {regime.description}
+          </div>
         </div>
 
         <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "10px" }}>
