@@ -716,6 +716,11 @@ export function AgentView() {
               {directiveDraft.leverage ? <span style={{ fontSize: 12, color: "#a1a1aa" }}>{directiveDraft.leverage}x</span> : null}
               <span style={{ fontSize: 12, color: rr >= 2 ? "#ededf0" : "#fbbf24" }}>R:R 1:{rr.toFixed(2)}</span>
             </div>
+            {/^0x[a-f0-9]{40}$/i.test(directiveDraft.source || "") && (
+              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", marginBottom: 10 }}>
+                ◆ copied from {directiveDraft.source!.slice(0, 6)}…{directiveDraft.source!.slice(-4)} — this close grades back to their public copy record.
+              </div>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(88px, 1fr))", gap: 8, marginBottom: 12 }}>
               {[
                 { label: "ENTRY", val: num(directiveDraft.entryPrice), color: "#a1a1aa" },
