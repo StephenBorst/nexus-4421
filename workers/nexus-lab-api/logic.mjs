@@ -703,6 +703,26 @@ export function fundingReversion(points, cfg = REVERSION) {
   };
 }
 
+// ── Edge quality — the board's SELF-AWARENESS about its own signal ────────────
+// Funding tells you the crowd is stretched; it does NOT tell you the fade actually
+// pays. This grades a flagged market by whether fading it has HISTORICALLY reverted
+// (from fundingReversion). PROVEN = fades here have paid; TRAP = funding is stretched
+// but fading it has LOST (price kept going the crowd's way); MIXED = coin-flip;
+// UNPROVEN = not enough recorded history to say. Keeps "mispriced by funding" honest
+// about whether the mean-revert actually shows up — most funding tools stop at the
+// number; this pairs the number with its track record.
+export const EDGE_QUALITY = { proven: 55, trap: 42 };
+
+export function edgeQuality(reversion, cfg = EDGE_QUALITY) {
+  if (!reversion || !reversion.samples) return { tier: "UNPROVEN", revertedPct: null, samples: 0 };
+  const r = reversion.revertedPct;
+  const tier = r >= cfg.proven ? "PROVEN" : r <= cfg.trap ? "TRAP" : "MIXED";
+  return { tier, revertedPct: r, samples: reversion.samples };
+}
+
+// Rank order for the board: proven edge first, traps last (avoid fading them).
+export const EDGE_QUALITY_RANK = { PROVEN: 0, MIXED: 1, UNPROVEN: 2, TRAP: 3 };
+
 // ═══════════════════════════════════════════════════════════════════════════
 // LOSS POSTMORTEMS  (why did it lose — from a FIXED taxonomy, so it aggregates)
 // ═══════════════════════════════════════════════════════════════════════════

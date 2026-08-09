@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -1956,9 +1956,28 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         });
         const j = await res.json();
         const board = mispricedBoard(j?.data?.rows || []);
+
+        // Self-awareness: enrich each FLAGGED market with whether fading it has
+        // HISTORICALLY paid (fundingReversion over the brain's oi:hist), then rank
+        // proven-edge first and traps last. Only core+watchlisted symbols have history,
+        // so most stay UNPROVEN — honest, not hidden. Bounded: only the flagged few get
+        // a KV read; the whole payload is cached 180s.
+        const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+        const flagged = board.markets.filter((m) => m.status === "MISPRICED");
+        await Promise.all(flagged.map(async (m) => {
+          try {
+            const raw = await AGENT_KV.get(`oi:hist:${m.symbol}`);
+            const rev = fundingReversion(raw ? JSON.parse(raw) : []);
+            m.reversion = rev ? { revertedPct: rev.revertedPct, avgReversionPct: rev.avgReversionPct, samples: rev.samples, horizonDays: rev.horizonDays } : null;
+          } catch { m.reversion = null; }
+          m.edgeQuality = edgeQuality(m.reversion);
+        }));
+        flagged.sort((a, b) => (EDGE_QUALITY_RANK[a.edgeQuality.tier] - EDGE_QUALITY_RANK[b.edgeQuality.tier]) || (b.edge - a.edge));
+        board.markets = [...flagged, ...board.markets.filter((m) => m.status !== "MISPRICED")];
+
         const payload = {
           asOf: new Date().toISOString(), asOfMs: Date.now(), ...board,
-          criteria: { note: "Funding rate annualized (per-8h × 1095) = the crowd's mispricing pressure. Positive funding ⇒ book is lopsided LONG ⇒ fade edge is SHORT (and vice-versa). |edge| ≥ 12%/yr on a market with ≥ $50k open interest ⇒ MISPRICED · WATCHING; else PRICED FAIR. Ranked by |edge|. Not advice — a mean-reversion lens on positioning." },
+          criteria: { note: "Funding annualized (per-8h × 1095) = the crowd's mispricing. Positive funding ⇒ book lopsided LONG ⇒ fade edge is SHORT (and vice-versa). |edge| ≥ 12%/yr on ≥ $50k OI ⇒ MISPRICED · WATCHING. Flagged markets carry an edgeQuality from whether fading them has HISTORICALLY reverted (PROVEN ≥55% / TRAP ≤42% / MIXED / UNPROVEN=no recorded history); ranked proven-first, traps last. Not advice — a mean-reversion lens that says when the fade has paid and when it hasn't." },
         };
         try { await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 600 }); } catch { /* cache write best-effort */ }
         return respond(payload);

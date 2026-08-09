@@ -339,7 +339,7 @@ export const TOOLS: ToolDef[] = [
         fetch(`${AGENT_API}/intel/mispriced`).then((r) => r.json()).catch(() => null),
         fetch(`${AGENT_API}/theses/consensus`).then((r) => r.json()).catch(() => null),
       ]);
-      type M = { coin: string; direction: string; fundingAnnualPct: number; funding8hPct: number; change24hPct: number | null; status: string };
+      type M = { coin: string; direction: string; fundingAnnualPct: number; funding8hPct: number; change24hPct: number | null; status: string; edgeQuality?: { tier: string; revertedPct: number | null; samples: number } };
       const markets: M[] = board?.markets ?? [];
       if (!markets.length) return JSON.stringify({ error: "mispriced board unavailable" });
       const lean: Record<string, { side: string; participants: number }> = cons?.consensus ?? {};
@@ -348,9 +348,12 @@ export const TOOLS: ToolDef[] = [
       const rows = picked.slice(0, 12).map((m) => {
         const l = lean[m.coin];
         const diverges = !!l && l.side !== "SPLIT" && m.direction !== "NONE" && l.side !== m.direction;
+        const q = m.edgeQuality;
         return {
           coin: m.coin, fade: m.direction, edge_annual_pct: m.fundingAnnualPct,
           funding_8h_pct: m.funding8hPct, change_24h_pct: m.change24hPct, status: m.status,
+          // Has fading this HISTORICALLY paid? PROVEN/TRAP/MIXED/UNPROVEN — the honest half.
+          edge_quality: q ? { tier: q.tier, reverted_pct: q.revertedPct, samples: q.samples } : undefined,
           sharp_callers: l ? { lean: l.side, n: l.participants } : null,
           divergence: diverges || undefined,
         };
@@ -359,7 +362,7 @@ export const TOOLS: ToolDef[] = [
         scanned: board?.scanned ?? null,
         mispriced_count: board?.mispricedCount ?? null,
         markets: rows,
-        note: "Funding annualized = the crowd's mispricing; fade = the mean-revert edge. Positioning lens, not advice — a market can stay stretched. 'divergence' = the sharp callers lean the OTHER way (worth flagging, not resolving).",
+        note: "Funding annualized = the crowd's mispricing; fade = the mean-revert edge. edge_quality is the honest half — whether fading THIS market has historically reverted: TRAP means funding is stretched but the fade has LOST (do NOT blindly fade it), PROVEN means it's paid, UNPROVEN means not enough recorded history. Always surface a TRAP. Positioning lens, not advice. 'divergence' = the sharp callers lean the other way.",
       });
     },
   },

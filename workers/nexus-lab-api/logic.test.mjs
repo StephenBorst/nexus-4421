@@ -8,7 +8,7 @@ import {
   classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge,
   planQuality, planSummary,
   expectancyStats, callerScore, convictionCalibration, contestedBoard,
-  mispricedBoard, consensusBySymbol, MISPRICED, fundingReversion,
+  mispricedBoard, consensusBySymbol, MISPRICED, fundingReversion, edgeQuality,
   LOSS_REASONS, isLossReason, postmortemSummary,
   validateArenaRegistration, arenaAgentConfig,
 } from "./logic.mjs";
@@ -1353,4 +1353,19 @@ test("fundingReversion: flat/zero current funding → null", () => {
 
 test("fundingReversion: short history → null", () => {
   assert.equal(fundingReversion(revSeries(6, 0.001, 100, 1)), null);
+});
+
+// ── Edge quality (the board's self-awareness) ────────────────────────────────
+test("edgeQuality: high revert rate → PROVEN", () => {
+  assert.equal(edgeQuality({ revertedPct: 65, samples: 10 }).tier, "PROVEN");
+});
+test("edgeQuality: low revert rate → TRAP (fading has failed)", () => {
+  assert.equal(edgeQuality({ revertedPct: 20, samples: 10 }).tier, "TRAP");
+});
+test("edgeQuality: middling → MIXED", () => {
+  assert.equal(edgeQuality({ revertedPct: 50, samples: 10 }).tier, "MIXED");
+});
+test("edgeQuality: no reversion data → UNPROVEN", () => {
+  assert.equal(edgeQuality(null).tier, "UNPROVEN");
+  assert.equal(edgeQuality({ samples: 0 }).tier, "UNPROVEN");
 });

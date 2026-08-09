@@ -23,11 +23,14 @@ import { AGENT_API } from "./agentTypes";
 import { useIsMobile } from "./useIsMobile";
 import { SectionHeader } from "./components";
 
+type EdgeQuality = { tier: "PROVEN" | "TRAP" | "MIXED" | "UNPROVEN"; revertedPct: number | null; samples: number };
 type Market = {
   symbol: string; coin: string; markPrice: number;
   funding8hPct: number; fundingAnnualPct: number; oiUsd: number;
   change24hPct: number | null; direction: "LONG" | "SHORT" | "NONE";
   edge: number; status: "MISPRICED" | "PRICED_FAIR";
+  reversion?: { revertedPct: number; avgReversionPct: number; samples: number; horizonDays: number } | null;
+  edgeQuality?: EdgeQuality; // flagged markets: has fading this HISTORICALLY paid?
 };
 type BoardResp = { asOf?: string; scanned?: number; mispricedCount?: number; markets?: Market[] };
 type Lean = { side: "LONG" | "SHORT" | "SPLIT"; lean: number; longCount: number; shortCount: number; participants: number };
@@ -126,6 +129,27 @@ function reversionSentence(coin: string, r: Reversion): string {
   if (r.avgReversionPct > 0)
     return `The last ${r.samples} times ${coin} funding ran this hot, price gave back an average of ${mag}% over ${d} — it reverted ${r.revertedPct}% of the time.`;
   return `Careful: the last ${r.samples} times ${coin} funding ran this hot, price kept going the crowd's way by ${mag}% on average over ${d} — the fade only worked ${r.revertedPct}% of the time.`;
+}
+
+// Edge quality — pairs the raw funding signal with its TRACK RECORD (has fading this
+// historically paid?). The honest intelligence: most tools stop at the number; this
+// says when the fade has edge (PROVEN) and — crucially — when it's a TRAP (funding
+// stretched but fading it has LOST). Monochrome/amber per the design law.
+function EdgeQualityChip({ q }: { q?: EdgeQuality }) {
+  if (!q) return null;
+  const map: Record<string, { color: string; text: string }> = {
+    PROVEN:   { color: C.accent,     text: `◆ Fade has paid here — reverted ${q.revertedPct}%` },
+    TRAP:     { color: C.warn,       text: `⚠ Trap — fading this has FAILED (reverted only ${q.revertedPct}%)` },
+    MIXED:    { color: C.text.fog,   text: `Coin-flip so far — reverted ${q.revertedPct}%` },
+    UNPROVEN: { color: C.text.faint, text: `Unproven — not enough funding history yet` },
+  };
+  const s = map[q.tier];
+  if (!s) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 9, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.03em", color: s.color, lineHeight: 1.35 }}>
+      {s.text}{q.samples > 0 && q.tier !== "UNPROVEN" ? <span style={{ color: C.text.faint, fontWeight: 400 }}>· {q.samples}×</span> : null}
+    </div>
+  );
 }
 
 // The sharp callers' second opinion (merit-weighted lean), phrased plainly.
@@ -349,7 +373,7 @@ export function MispricedBoard() {
                   return (
                     <div key={m.symbol} onClick={() => setOpenCoin(m.coin)} title="Open this market"
                       className="nx-card-interactive"
-                      style={{ position: "relative", border: `1px solid ${C.borderStrong}`, borderLeft: `2px solid ${C.accent}`, borderRadius: RADIUS.lg, padding: "13px 15px 12px", background: "linear-gradient(180deg,#161619 0%,#101012 100%)", cursor: "pointer", overflow: "hidden" }}>
+                      style={{ position: "relative", border: `1px solid ${C.borderStrong}`, borderLeft: `2px solid ${m.edgeQuality?.tier === "TRAP" ? C.warn : C.accent}`, borderRadius: RADIUS.lg, padding: "13px 15px 12px", background: "linear-gradient(180deg,#161619 0%,#101012 100%)", cursor: "pointer", overflow: "hidden" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 11 }}>
                         <span style={{ fontFamily: MONO, fontSize: 15, fontWeight: 700, color: C.text.bright }}>{m.coin}</span>
                         <span style={{ fontFamily: MONO, fontSize: 8.5, color: C.text.faint }}>{fmtUsd(m.oiUsd)} open interest</span>
@@ -363,6 +387,7 @@ export function MispricedBoard() {
                           </div>
                         </div>
                       </div>
+                      <EdgeQualityChip q={m.edgeQuality} />
                       <div style={{ margin: "11px 0 2px" }}><PositionBar m={m} maxEdge={maxEdge} /></div>
                       <p style={{ fontFamily: UI, fontSize: 12.5, lineHeight: 1.5, color: C.text.fog, marginTop: 10, marginBottom: 0, padding: "8px 10px", background: "rgba(237,237,240,0.03)", border: `1px solid ${C.border}`, borderRadius: RADIUS.md }}>
                         {plainRead(m)}
