@@ -627,6 +627,46 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
         </div>
       )}
 
+      {/* ── Funding vs its own history — percentile gauges for the majors ──── */}
+      {(() => {
+        const majors = (["BTC", "ETH", "SOL"] as const)
+          .map((sym) => ({ sym, f: contexts[sym]?.funding, data: getDerivData(sym) }))
+          .filter((m) => m.f && m.f.pct != null);
+        if (!majors.length) return null;
+        return (
+          <div style={{ marginBottom: "10px" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "10px", margin: "2px 0 10px" }}>
+              <span style={{ color: DIM, fontFamily: "var(--nx-font-mono)", fontSize: "11px", fontWeight: 700, letterSpacing: "0.12em" }}>FUNDING vs ITS OWN HISTORY</span>
+              <span style={{ color: C.text.faint, fontFamily: "var(--nx-font-mono)", fontSize: "10px" }}>the majors</span>
+              <span style={{ flex: 1, height: 1, background: C.border }} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "12px" }}>
+              {majors.map(({ sym, f, data }) => {
+                const pct = Math.max(0, Math.min(100, f.pct));
+                const stretched = f.pct >= 85 || f.pct <= 15;
+                const cap = f.pct >= 85 ? "unusually high — the crowd is stretched long"
+                  : f.pct <= 15 ? "unusually low — stretched short"
+                  : "normal — nothing stretched here";
+                return (
+                  <div key={sym} style={{ border: `1px solid ${C.border}`, borderRadius: "10px", padding: "14px", background: C.surfaceAlt }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                      <span style={{ color: BRIGHT, fontFamily: "var(--nx-font-mono)", fontSize: "13px", fontWeight: 700 }}>{sym}</span>
+                      <span style={{ color: MUTED, fontFamily: "var(--nx-font-mono)", fontSize: "10px" }}>{data ? `${fmtFunding(data.funding)}/8h` : "—"}</span>
+                    </div>
+                    <div style={{ position: "relative", height: "6px", borderRadius: "4px", background: C.inset, border: `1px solid ${C.border}`, margin: "11px 0 8px" }}>
+                      <div style={{ position: "absolute", top: "-1px", bottom: "-1px", width: "2px", background: stretched ? YELLOW : C.accent, left: `${pct}%` }} />
+                    </div>
+                    <div style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: "11.5px", lineHeight: 1.45, color: MUTED }}>
+                      <b style={{ color: stretched ? YELLOW : BRIGHT }}>{f.pct}th percentile</b> — {cap}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Portfolio Context ──────────────────────────────────── */}
       {portfolioLongPct !== null && accountState?.status === "SignedIn" && (() => {
         const netLong   = portfolioLongPct;

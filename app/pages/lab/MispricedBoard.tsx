@@ -349,35 +349,35 @@ export function MispricedBoard() {
                   return (
                     <div key={m.symbol} onClick={() => setOpenCoin(m.coin)} title="Open this market"
                       className="nx-card-interactive"
-                      style={{ position: "relative", border: `1px solid ${C.borderStrong}`, borderLeft: `2px solid ${C.accent}`, borderRadius: RADIUS.lg, padding: "16px 16px 14px", background: "linear-gradient(180deg,#161619 0%,#101012 100%)", cursor: "pointer", overflow: "hidden" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                      style={{ position: "relative", border: `1px solid ${C.borderStrong}`, borderLeft: `2px solid ${C.accent}`, borderRadius: RADIUS.lg, padding: "13px 15px 12px", background: "linear-gradient(180deg,#161619 0%,#101012 100%)", cursor: "pointer", overflow: "hidden" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 11 }}>
                         <span style={{ fontFamily: MONO, fontSize: 15, fontWeight: 700, color: C.text.bright }}>{m.coin}</span>
                         <span style={{ fontFamily: MONO, fontSize: 8.5, color: C.text.faint }}>{fmtUsd(m.oiUsd)} open interest</span>
                         <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: C.accent }}>WATCHING</span>
                       </div>
                       <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
                         <div>
-                          <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: C.text.muted, marginBottom: 4 }}>Funding edge</div>
-                          <div style={{ fontFamily: MONO, fontSize: 34, fontWeight: 600, color: C.text.bright, lineHeight: 0.9, letterSpacing: "-0.02em" }}>
+                          <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: C.text.muted, marginBottom: 3 }}>Funding edge</div>
+                          <div style={{ fontFamily: MONO, fontSize: 31, fontWeight: 600, color: C.text.bright, lineHeight: 0.9, letterSpacing: "-0.02em" }}>
                             {m.fundingAnnualPct >= 0 ? "+" : ""}{m.fundingAnnualPct}<span style={{ fontSize: 13, color: C.text.faint }}>%/yr</span>
                           </div>
                         </div>
                       </div>
-                      <div style={{ margin: "14px 0 2px" }}><PositionBar m={m} maxEdge={maxEdge} /></div>
-                      <p style={{ fontFamily: UI, fontSize: 12.5, lineHeight: 1.5, color: C.text.fog, marginTop: 12, padding: "9px 11px", background: "rgba(237,237,240,0.03)", border: `1px solid ${C.border}`, borderRadius: RADIUS.md }}>
+                      <div style={{ margin: "11px 0 2px" }}><PositionBar m={m} maxEdge={maxEdge} /></div>
+                      <p style={{ fontFamily: UI, fontSize: 12.5, lineHeight: 1.5, color: C.text.fog, marginTop: 10, marginBottom: 0, padding: "8px 10px", background: "rgba(237,237,240,0.03)", border: `1px solid ${C.border}`, borderRadius: RADIUS.md }}>
                         {plainRead(m)}
                       </p>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, fontFamily: MONO, fontSize: 11, color: C.text.fog }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, fontFamily: MONO, fontSize: 11, color: C.text.fog }}>
                         <span>${fmtPrice(m.markPrice)}</span>
                         {m.change24hPct != null && <span style={{ color: m.change24hPct > 0 ? C.pos : m.change24hPct < 0 ? C.neg : C.text.muted }}>{m.change24hPct > 0 ? "+" : ""}{m.change24hPct}% today</span>}
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`, fontFamily: MONO, fontSize: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, fontFamily: MONO, fontSize: 10 }}>
                         <span style={{ color: C.text.faint, textTransform: "uppercase", letterSpacing: "0.12em", fontSize: 8.5 }}>Top callers</span>
                         <Callers m={m} lean={l} />
                       </div>
                       <button onClick={(e) => { e.stopPropagation(); draftFade(m); }} style={{
-                        marginTop: 13, width: "100%", fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
-                        color: C.accent, border: `1px solid ${C.borderStrong}`, borderRadius: RADIUS.md, padding: 9, background: "transparent", cursor: "pointer",
+                        marginTop: 11, width: "100%", fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+                        color: C.accent, border: `1px solid ${C.borderStrong}`, borderRadius: RADIUS.md, padding: 8, background: "transparent", cursor: "pointer",
                       }}>→ Draft this fade as a trade</button>
                     </div>
                   );
