@@ -1,6 +1,8 @@
 # Historical Stance Snapshots — build spec
 
-**Status:** scoped, not built (2026-08-09). ~1 day. Pure-logic-first with `node:test`.
+**Status:** ✅ BUILT + shipped 2026-08-09 (commit f405803). This spec is the as-built
+design; the deviation from the original scope is noted at the bottom. Pure-logic-first
+with `node:test` (9 new tests).
 
 ## The gap this closes
 The caller graph is **live-only**. `gatherStanceEntries(env)` computes the current
@@ -84,6 +86,18 @@ Derive `contrarianEdge = avgR(contrarian) − avgR(withCrowd)` and a shrunk
 Nothing is contrarian-classified until `stance:hist` accrues (hours→days) AND a caller
 has a minimum contrarian sample. Boards render the contrarian column blank until then —
 same fail-soft as every other graded surface. Not a bug; the grade earns itself.
+
+## As-built notes (deviations from the scope above)
+- `contrarianEdgeScore(contrarian, withCrowd)` (logic.mjs) is the shrink helper, ranking by
+  contrarian avg-R × `calls/(calls+4)`, ≥3-call gate; `edge` = contrarian avg-R − with-crowd
+  avg-R. Board `/theses/contrarians` gates on `score > 0` (net-positive).
+- The contrarian join in `computeCallerStats` is **opt-in** (`opts.contrarian`) — off by
+  default so `gatherStanceEntries` (consensus poll path) pays nothing; the leaderboard and the
+  contrarians board pass it, and `gatherStanceEntries(env,{contrarian:true})` threads it for the
+  contested board only. Stance history keyed by BARE coin (`bareCoin`), joined per-call.
+- Surfaces shipped: `/theses/contrarians` board + `Contrarians.tsx` (Feed, under CONTESTED);
+  `contrarian` field on `/theses/leaderboard` rows and `/theses/contested` participants; copilot
+  `get_verified_callers` description. A per-row leaderboard badge was left to a later polish pass.
 
 ## Why this is the right next TIER (not a polish tack-on)
 It's the caller-graph's network-effect moat made measurable: the more callers post, the
