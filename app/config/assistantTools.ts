@@ -410,7 +410,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "xray_wallet",
     description:
-      "X-ray ANY wallet's perp record from public data — no login, works on wallets that have never touched Nexus. Reads BOTH Hyperliquid (trade-by-trade history) and the Orderly network incl. Nexus (per-market settled PnL + live open positions), PLUS the wallet's Tracked Record — a graded consistency read (Operator Score / trend / green-day rate) that separates a lucky single print from a wallet that's consistently profitable over time. Use when the user pastes a wallet address, asks 'is this trader any good', or wants to vet someone before copying them.",
+      "X-ray ANY wallet's perp record from public data — no login, works on wallets that have never touched Nexus. Reads BOTH Hyperliquid (trade-by-trade history) and the Orderly network incl. Nexus (per-market settled PnL + live open positions), PLUS the wallet's Tracked Record — a graded consistency read (Consistency Score / trend / green-day rate) that separates a lucky single print from a wallet that's consistently profitable over time. Use when the user pastes a wallet address, asks 'is this trader any good', or wants to vet someone before copying them.",
     input_schema: {
       type: "object",
       properties: { wallet: { type: "string", description: "0x… wallet address." } },
@@ -478,7 +478,7 @@ export const TOOLS: ToolDef[] = [
                 days_tracked: trk.daysTracked,
                 net_realized_while_tracked: trk.netRealized,
                 green_day_rate_pct: trk.winWindowRate,   // null until daily-cadence data accrues
-                operator_score: trk.operatorScore,       // 0-100, null until ~4 daily windows
+                consistency_score: trk.operatorScore,    // 0-100, null until ~4 daily windows
                 tier: (trk.tier as { title?: string } | null)?.title ?? null,
                 trend: trk.trend,
                 graded_windows: trk.gradedWindows,
@@ -488,7 +488,7 @@ export const TOOLS: ToolDef[] = [
       return JSON.stringify({
         wallet: w, hyperliquid, orderly, tracked_record,
         note: orderly
-          ? "Orderly figures are per-MARKET settled totals (no public per-trade tape), so hold-time/timing stats are Hyperliquid-only. tracked_record grades the CHANGE in realized PnL between daily snapshots — operator_score/tier are EARNED from consistency over time and stay null until enough daily windows accrue; long gaps in watching are excluded so a month can't pose as a green day."
+          ? "Orderly figures are per-MARKET settled totals (no public per-trade tape), so hold-time/timing stats are Hyperliquid-only. tracked_record grades the CHANGE in realized PnL between daily snapshots — consistency_score/tier are EARNED from consistency over time and stay null until enough daily windows accrue; long gaps in watching are excluded so a month can't pose as a green day."
           : "No Orderly-network history found for this wallet (sub-accounts aren't resolvable from an address).",
         full_report: `/analyze?address=${w}`,
       });

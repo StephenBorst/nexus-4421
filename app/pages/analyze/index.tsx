@@ -290,7 +290,7 @@ export default function AnalyzePage() {
             hold-time and timing analytics above stay Hyperliquid-only.
           </p>
 
-          {/* The accruing, self-grading record over time (Operator Score + copy record) */}
+          {/* The accruing, self-grading record over time (Consistency Score + copy record) */}
           {address && <TrackedRecordCard address={address} />}
 
           {orderly.venues.map((v) => (

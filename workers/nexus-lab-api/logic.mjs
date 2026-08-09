@@ -954,7 +954,8 @@ export function standoffVerdict(longAgg, shortAgg, { minCalls = 3, minGapR = 0.3
 // and grade the SERIES: the delta in cumulative realized PnL between two snapshots
 // is the realized PnL the wallet actually earned in that window. From those windows
 // we get an honest realized-PnL equity curve, a consistency rate, drawdown control,
-// and a transparent Operator Score — the same "earned, not claimed" discipline the
+// and a transparent score (the `operatorScore` field, shown as "Consistency Score" in
+// the UI) — the same "earned, not claimed" discipline the
 // caller merit ranks use, applied to any wallet on the network.
 //
 // ⚠️ Honesty guards baked in: (1) we grade only realized-PnL DELTAS (never the

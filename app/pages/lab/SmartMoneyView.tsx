@@ -461,11 +461,11 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
                     const tk = trackMap[t.address.toLowerCase()];
                     if (!tk) return null;
                     if (tk.tier) return (
-                      <span onClick={() => openDetail(t.address, t.source, t.accountId)} title={`Operator Score ${tk.operatorScore} — graded from ${tk.daysTracked}d of realized-PnL consistency. Click for the full Tracked Record.`}
+                      <span onClick={() => openDetail(t.address, t.source, t.accountId)} title={`Consistency Score ${tk.operatorScore} — graded from ${tk.daysTracked}d of realized-PnL consistency. Click for the full Tracked Record.`}
                         style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3ecf8e", border: "1px solid #33333a", borderRadius: 3, padding: "1px 5px", flexShrink: 0, cursor: "pointer" }}>{tk.tier.glyph} {tk.operatorScore}</span>
                     );
                     return (
-                      <span title={`Tracking — ${tk.points} snapshots. A graded Operator Score unlocks after ~4 daily windows.`}
+                      <span title={`Tracking — ${tk.points} snapshots. A graded Consistency Score unlocks after ~4 daily windows.`}
                         style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", flexShrink: 0 }}>▪ tracking</span>
                     );
                   })()}

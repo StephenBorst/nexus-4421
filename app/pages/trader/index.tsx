@@ -735,7 +735,7 @@ export default function TraderPage() {
                 <InFlightCalls calls={openCalls} prices={livePrices} />
                 <VenueEvidence wallet={wallet ?? null} openCalls={openCalls} />
 
-                {/* The accruing, self-grading on-chain record (Operator Score, trend,
+                {/* The accruing, self-grading on-chain record (Consistency Score, trend,
                     copy record) — same surface as the Smart Money x-ray, so a trader's
                     public page and their x-ray can never tell a different story. */}
                 {wallet && <TrackedRecordCard address={wallet} />}

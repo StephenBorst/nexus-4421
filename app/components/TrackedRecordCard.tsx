@@ -1,7 +1,8 @@
 // The graded, accruing wallet record — ONE reusable surface so every place a wallet
 // appears (Smart Money detail, the /analyze full x-ray, a public trader profile)
 // shows the SAME thing and can never drift. Renders three self-contained cards:
-//   • Tracked Record — realized-PnL consistency over time (Operator Score + tier)
+//   • Tracked Record — realized-PnL consistency over time (Consistency Score + tier;
+//     the `operatorScore` field renders as "Consistency Score" in the UI)
 //   • You vs this wallet — same methodology, side by side (only if myAddress given)
 //   • Copied on Nexus — did copying this wallet actually make money (graded closes)
 // All read-only public reads; the history read self-seeds the record server-side.
@@ -110,7 +111,7 @@ export function TrackedRecordCard({ address, myAddress }: { address: string; myA
             <span title={`${track.tier.title} — earned from ${track.gradedWindows} graded daily windows`} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3ecf8e", border: "1px solid #33333a", borderRadius: 3, padding: "1px 5px" }}>{track.tier.glyph} {track.tier.title.toUpperCase()}</span>
           )}
           {typeof track.operatorScore === "number" && (
-            <span style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a" }}>OPERATOR SCORE <span style={{ color: "#ededf0", fontWeight: 700, fontSize: 12 }}>{track.operatorScore}</span></span>
+            <span style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a" }}>CONSISTENCY SCORE <span style={{ color: "#ededf0", fontWeight: 700, fontSize: 12 }}>{track.operatorScore}</span></span>
           )}
         </div>
 
@@ -146,7 +147,7 @@ export function TrackedRecordCard({ address, myAddress }: { address: string; myA
         const rows = [
           { k: "Net (tracked)", me: fmtSigned(myTrack.netRealized), them: fmtSigned(track.netRealized), meWin: cmp(myTrack.netRealized, track.netRealized) },
           { k: "Green Days", me: pct(myTrack.winWindowRate), them: pct(track.winWindowRate), meWin: cmp(myTrack.winWindowRate, track.winWindowRate) },
-          { k: "Operator Score", me: numOrDash(myTrack.operatorScore), them: numOrDash(track.operatorScore), meWin: cmp(myTrack.operatorScore, track.operatorScore) },
+          { k: "Consistency Score", me: numOrDash(myTrack.operatorScore), them: numOrDash(track.operatorScore), meWin: cmp(myTrack.operatorScore, track.operatorScore) },
         ];
         return (
           <div style={card}>

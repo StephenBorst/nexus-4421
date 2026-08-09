@@ -26,7 +26,7 @@
   trade records + SHA-256 ledger hash anyone can recompute; anchored on Arbitrum.
 - [Wallet Tracked Record (JSON)](https://og.nexustradinglabs.com/smart/xray/history?address=0x0000000000000000000000000000000000000000):
   any wallet's accruing, self-grading record — realized-PnL equity curve, green-day rate,
-  drawdown and an Operator Score, graded from daily snapshots of public settlement.
+  drawdown and a Consistency Score, graded from daily snapshots of public settlement.
 - [Copy record (JSON)](https://og.nexustradinglabs.com/agents/copy-record/0x0000000000000000000000000000000000000000):
   realized PnL of Nexus agent trades that copied a given leader — did copying them work,
   graded from on-chain-auditable closes rather than the leader's self-report.
