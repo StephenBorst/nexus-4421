@@ -723,6 +723,15 @@ async function enterPosition(address, state, config, signal, env, cache) {
     strategy: directive
       ? `DIRECTIVE · ${signal.direction}`
       : `${(config.maxHoldHours ?? 0) <= 8 ? "DAY" : (config.maxHoldHours ?? 0) <= 120 ? "SWING" : "POSITION"} · ${config.signalMode || "CONFLUENCE"}${config.dcaEnabled ? " · DCA" : ""}`,
+    // Copy-loop provenance: which leader this trade mirrors, if any. An autocopy
+    // COPY signal carries signal.leader; a smart-money ⚡ copy arrives as a directive
+    // whose `source` is the leader's 0x address (THESIS / non-address sources → none).
+    // Stamped so the closed trade can prove "copies of leader X actually returned Y".
+    ...(() => {
+      const lead = signal.leader
+        || (directive && /^0x[a-fA-F0-9]{40}$/.test(String(directive.source || "")) ? String(directive.source) : null);
+      return lead ? { source_leader: lead.toLowerCase() } : {};
+    })(),
     // Back-link to the source directive so the one-shot close can retire it.
     ...(directive ? { directive_id: directive.id } : {}),
     // Multi-TP + trailing exit state (evaluateExit). remaining_qty shrinks as
@@ -979,7 +988,7 @@ async function logAgentTrade(address, env, auditable) {
     body: JSON.stringify(payload),
   });
   // Core row = drop optional columns that may not be migrated yet.
-  const { entry_order_id, close_order_id, parent_id, exit_seq, strategy, ...core } = auditable;
+  const { entry_order_id, close_order_id, parent_id, exit_seq, strategy, source_leader, ...core } = auditable;
   try {
     let res = await insert({ wallet_address: address, ...auditable });
     if (!res.ok) {
@@ -1113,6 +1122,7 @@ async function partialClose(address, state, config, env, action, cache) {
     await logAgentTrade(address, env, {
       ...sliceTrade,
       entry_order_id: pos.order_id ?? null, close_order_id: sliceOrderId,
+      ...(pos.source_leader ? { source_leader: pos.source_leader } : {}),
       parent_id: `agent_${address.slice(2, 8)}_${pos.opened_at}`, exit_seq: pos.tp_hits.length,
     });
   }
@@ -1219,6 +1229,7 @@ async function closePosition(address, state, env, reason, cache) {
   const laddered = (pos.tp_hits || []).length > 0;
   const auditable = {
     ...trade, entry_order_id: pos.order_id ?? null, close_order_id: closeOrderId,
+    ...(pos.source_leader ? { source_leader: pos.source_leader } : {}),
     ...(laddered ? { parent_id: `agent_${address.slice(2, 8)}_${pos.opened_at}`, exit_seq: pos.tp_hits.length + 1 } : {}),
   };
 

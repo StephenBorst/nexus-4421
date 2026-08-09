@@ -23,6 +23,9 @@ interface SmTrader { source: "orderly" | "hl"; address: string; accountId?: stri
 // Compact graded Tracked Record per wallet (from /smart/xray/tracked) — turns the
 // board from a raw-single-number leaderboard into a graded-consistency one.
 interface TrackChip { operatorScore: number | null; tier: { tier: string; title: string; glyph: string } | null; scored: boolean; netRealized: number; daysTracked: number; trend: "UP" | "DOWN" | "FLAT"; points: number; }
+// Graded "tracked signal" — a wallet crossing an Operator-tier boundary.
+interface XrayEvent { wallet: string; kind: "TIER_UP" | "TIER_DOWN"; fromTier: string | null; toTier: string | null; operatorScore: number | null; netRealized: number; ts: number; }
+const TIER_GLYPH: Record<string, string> = { TRACKED: "▪", POSITIVE: "◆", CONSISTENT: "✦" };
 
 const WATCH_KEY = "nexus_sm_watchlist";
 const loadWatch = (): string[] => { try { return JSON.parse(localStorage.getItem(WATCH_KEY) || "[]"); } catch { return []; } };
@@ -52,6 +55,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
   const [watch, setWatch] = useState<string[]>(loadWatch);
   const [watchOnly, setWatchOnly] = useState(false);
   const [trackMap, setTrackMap] = useState<Record<string, TrackChip>>({});
+  const [trackedSignals, setTrackedSignals] = useState<XrayEvent[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const { state: acct } = useAccount();
   const wallet = (acct as { address?: string })?.address?.toLowerCase() ?? null;
@@ -94,6 +98,16 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
       .catch(() => {});
     return () => { cancel = true; };
   }, [board, watch]);
+
+  // Graded "tracked signals" — wallets that just earned/lost an Operator tier.
+  useEffect(() => {
+    let cancel = false;
+    fetch(`${AGENT_API}/smart/xray/events`)
+      .then((r) => r.json())
+      .then((x) => { if (!cancel && x && Array.isArray(x.events)) setTrackedSignals(x.events.slice(0, 6)); })
+      .catch(() => {});
+    return () => { cancel = true; };
+  }, []);
 
   // Smart-money CONSENSUS — coins where ≥2 tracked traders hold the same side.
   // The highest-conviction signal: not one whale, but agreement. Derived free
@@ -214,7 +228,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
   // ⚡ Copy a move → directive draft (agent manages exit + grades on-chain). `sym`
   // is the Orderly-copyable coin (already gated tradeable). Default stop 3% /
   // target 6% off the observed price; user reviews + edits in the arm panel.
-  const copy = (sym: string, side: "LONG" | "SHORT", refPrice: number, lev?: number | null) => {
+  const copy = (sym: string, side: "LONG" | "SHORT", refPrice: number, lev?: number | null, leader?: string) => {
     const p = refPrice > 0 ? refPrice : 0;
     const isLong = side === "LONG";
     deployDirectiveFromThesis({
@@ -222,6 +236,9 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
       stopLoss: p > 0 ? (isLong ? p * 0.97 : p * 1.03) : 0,
       takeProfit1: p > 0 ? (isLong ? p * 1.06 : p * 0.94) : 0,
       leverage: lev && lev > 0 ? Math.min(20, Math.round(lev)) : undefined,
+      // Provenance → the closed trade is graded back to this leader ("copies of
+      // 0x… returned Y"). Only when there's a single leader (not consensus).
+      source: leader && /^0x[a-f0-9]{40}$/i.test(leader) ? leader : undefined,
     }, navigate);
   };
 
@@ -251,7 +268,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
   return (
     <div style={{ maxWidth: 1180, margin: "0 auto" }}>
       {poster && <SharePoster data={poster} onClose={() => setPoster(null)} />}
-      {detail && <TraderDetail source={detail.source} address={detail.address} accountId={detail.accountId} onClose={() => setDetail(null)} />}
+      {detail && <TraderDetail source={detail.source} address={detail.address} accountId={detail.accountId} myAddress={wallet ?? undefined} onClose={() => setDetail(null)} />}
       {toast && (
         <div className="nx-fade-in" style={{ position: "fixed", bottom: 20, left: 20, zIndex: 8000, background: "#0f0f11", border: "1px solid #33333a", borderLeft: `3px solid ${TRACKED}`, borderRadius: 6, padding: "10px 14px", fontFamily: "var(--nx-font-mono)", fontSize: 11, color: TRACKED, boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>
           {toast}
@@ -375,9 +392,33 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
                 <span style={{ marginLeft: 10, display: "flex", gap: 6, flexShrink: 0 }}>
                   {e.type === "OPEN" && shareBtn({ kind: "smart", symbol: e.sym, direction: e.side, szUsd: e.szUsd, trader: short(e.addr) })}
                   {e.type === "OPEN" && thesisBtn(() => openThesis(e.sym, e.side, e.price, `${short(e.addr)} (smart money) opened ${e.side} ${e.sym}.`))}
-                  {e.type === "OPEN" && tradeBtn(() => copy(e.sym, e.side, e.price))}
+                  {e.type === "OPEN" && tradeBtn(() => copy(e.sym, e.side, e.price, null, e.addr))}
                 </span>
               </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── TRACKED SIGNALS — graded tier crossings (low-noise, ~daily) ── */}
+      {trackedSignals.length > 0 && (
+        <div style={{ ...agentCardStyle, marginBottom: 12 }}>
+          <div style={agentLabelStyle}>// TRACKED SIGNALS <span style={{ color: "#52525b" }}>— Operator-tier changes, graded from realized-PnL consistency</span></div>
+          <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+            {trackedSignals.map((s, i) => {
+              const up = s.kind === "TIER_UP";
+              return (
+                <div key={i} onClick={() => openDetail(s.wallet, "orderly")} title="Open the wallet's Tracked Record"
+                  style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", cursor: "pointer", padding: "5px 0", borderTop: i ? "1px solid #1a1a1e" : "none" }}>
+                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: up ? "#3ecf8e" : "#71717a", width: 16, flexShrink: 0 }}>{up ? "▲" : "▽"}</span>
+                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ededf0", flexShrink: 0, textDecoration: "underline", textDecorationColor: "#33333a" }}>{short(s.wallet)}</span>
+                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#a1a1aa" }}>
+                    {up ? "earned" : "dropped to"} {s.toTier ? `${TIER_GLYPH[s.toTier] ?? ""} ${s.toTier}` : "no tier"}
+                    {s.operatorScore != null && up ? <span style={{ color: "#52525b" }}> · score {s.operatorScore}</span> : null}
+                  </span>
+                  <span style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#52525b", flexShrink: 0 }}>{ago(s.ts)}</span>
+                </div>
               );
             })}
           </div>
@@ -444,7 +485,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
                         <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, color: p.uPnl >= 0 ? "#3ecf8e" : "#f7525f", flex: "1 1 88px", minWidth: 88, textAlign: "right" }}>{p.uPnl >= 0 ? "+" : ""}{usd(p.uPnl)}</span>
                         <span style={{ marginLeft: 10, flexShrink: 0 }}>
                           {p.tradeable && p.sym
-                            ? tradeBtn(() => copy(p.sym as string, p.side, p.entry, p.lev))
+                            ? tradeBtn(() => copy(p.sym as string, p.side, p.entry, p.lev, t.address))
                             : <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#52525b", whiteSpace: "nowrap" }}>HL-only</span>}
                         </span>
                       </div>

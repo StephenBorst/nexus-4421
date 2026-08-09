@@ -172,15 +172,40 @@ export async function sweepTrackedXray(env) {
     if (braw) for (const t of (JSON.parse(braw).traders || [])) if (/^0x[a-f0-9]{40}$/i.test(t.address || "")) addrs.add(t.address.toLowerCase());
   } catch { /* non-fatal */ }
   const targets = [...addrs].slice(0, 200);
-  let snapped = 0;
+  let snapped = 0, events = 0;
   for (let i = 0; i < targets.length; i += 6) {
     await Promise.all(targets.slice(i, i + 6).map(async (a) => {
       const before = (await readXrayHist(env, a)).length;
-      const after = (await snapshotXray(env, a)).length;
-      if (after > before) snapped++;
+      const series = await snapshotXray(env, a);
+      if (series.length > before) { snapped++; if (await emitTierEvent(env, a, series)) events++; }
     }));
   }
-  return { watched: targets.length, snapped };
+  return { watched: targets.length, snapped, events };
+}
+
+// Graded, low-noise "tracked signals": when a fresh snapshot moves a wallet ACROSS
+// a tier boundary (earned ▲ or lost ▽ its Operator tier), record one event. Diffed
+// against the last-seen tier per wallet so we never spam — only real crossings, and
+// only ~once/day (the snapshot cadence). Returns true if an event was emitted.
+const XRAY_TIER_RANK = { "": 0, TRACKED: 1, POSITIVE: 2, CONSISTENT: 3 };
+async function emitTierEvent(env, address, series) {
+  try {
+    const tk = xrayTrack(series);
+    const toKey = tk.tier ? tk.tier.tier : "";
+    const prevKey = (await env.LAB_STORE.get(`xray:tier:${address}`)) || "";
+    if (toKey === prevKey) return false;
+    await env.LAB_STORE.put(`xray:tier:${address}`, toKey, { expirationTtl: 400 * 86400 });
+    const up = (XRAY_TIER_RANK[toKey] ?? 0) > (XRAY_TIER_RANK[prevKey] ?? 0);
+    const ev = {
+      wallet: address, kind: up ? "TIER_UP" : "TIER_DOWN",
+      fromTier: prevKey || null, toTier: toKey || null,
+      operatorScore: tk.operatorScore, netRealized: tk.netRealized, ts: Date.now(),
+    };
+    const exRaw = await env.LAB_STORE.get("xray:events");
+    const merged = [ev, ...(exRaw ? JSON.parse(exRaw) : [])].slice(0, 40);
+    await env.LAB_STORE.put("xray:events", JSON.stringify(merged), { expirationTtl: 14 * 86400 });
+    return true;
+  } catch { return false; }
 }
 
 // Build the Orderly-native smart-money board from the public realized-PnL ranking.
@@ -465,6 +490,14 @@ export async function handleSmart(parts, request, env, ctx) {
     const stale = !last || !Number.isFinite(last.t) || Date.now() - last.t >= XRAY_SNAP_MIN_MS;
     if (stale) { try { hist = await snapshotXray(env, address); } catch { /* keep stored */ } }
     return json({ address, snapshots: hist.length, track: xrayTrack(hist), updatedAt: Date.now() }, request);
+  }
+
+  if (parts[0] === "smart" && parts[1] === "xray" && parts[2] === "events" && request.method === "GET") {
+    // ── GET /smart/xray/events — graded "tracked signals" (tier crossings) ─────
+    // A wallet earning ▲ or losing ▽ its Operator tier. Emitted by the daily cron
+    // sweep, so it's a real crossing, not noise. Public read.
+    const raw = await env.LAB_STORE.get("xray:events");
+    return json({ events: raw ? JSON.parse(raw) : [], updatedAt: Date.now() }, request);
   }
 
   if (parts[0] === "smart" && parts[1] === "xray" && parts[2] === "tracked" && request.method === "GET") {

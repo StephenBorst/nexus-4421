@@ -223,6 +223,43 @@ export async function handleAgents(parts, request, env, ctx) {
     return json({ ...agentStanding(aggregateAgentTrades(rows)), criteriaConfig: AGENT_BOARD }, request);
   }
 
+  // ── /agents/copy-record/:leader — did copying THIS wallet actually work? ────
+  // Closes the copy loop: aggregate the realized PnL of Nexus AGENT trades that
+  // mirrored this leader (source_leader tagged at entry from a smart-money ⚡ copy
+  // or autocopy). So a trader-detail can answer "copies of this whale returned Y",
+  // graded on-chain-auditable closes — not the leader's self-reported number.
+  // Degrades gracefully: if the source_leader column isn't migrated the query 400s,
+  // res.ok is false, and we return an honest {available:false} instead of throwing.
+  if (parts[0] === "agents" && parts[1] === "copy-record" && parts[2]) {
+    if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+    const leader = String(parts[2]).toLowerCase();
+    if (!/^0x[a-f0-9]{40}$/.test(leader)) return json({ error: "valid 0x leader required" }, request, 400);
+    if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return json({ leader, trades: 0, available: false }, request);
+    const CACHE = `copyrec:${leader}`;
+    const cached = await env.LAB_STORE.get(CACHE);
+    if (cached) return json(JSON.parse(cached), request);
+    let rows = [], available = true;
+    try {
+      const res = await fetch(
+        `${env.SUPABASE_URL}/rest/v1/agent_trades?select=pnl,wallet_address&source_leader=ilike.${leader}&limit=10000`,
+        { headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` } }
+      );
+      if (res.ok) rows = await res.json();
+      else available = false; // column not migrated yet, or query rejected
+    } catch (e) { console.error("[copy-record] supabase error:", e); available = false; }
+    let net = 0, wins = 0; const copiers = new Set();
+    for (const r of rows) { const p = parseFloat(r.pnl || 0); net += p; if (p > 0) wins++; if (r.wallet_address) copiers.add(String(r.wallet_address).toLowerCase()); }
+    const trades = rows.length;
+    const payload = {
+      leader, available, trades, copiers: copiers.size,
+      net: Math.round(net * 100) / 100, wins, losses: trades - wins,
+      winRatePct: trades ? Math.round((wins / trades) * 1000) / 10 : null,
+      note: "Realized PnL of Nexus agent trades that copied this leader (on-chain-auditable closes; scale-out slices count as separate closes).",
+    };
+    await env.LAB_STORE.put(CACHE, JSON.stringify(payload), { expirationTtl: 300 });
+    return json(payload, request);
+  }
+
   // ── /agents/ledger — verifiable, canonical hash of the agent trade ledger ──
   // Anyone can fetch the raw records, recompute the SHA-256 over the canonical
   // serialization, and confirm it matches `ledgerHash`. This makes every number
