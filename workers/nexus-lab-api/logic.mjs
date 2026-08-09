@@ -703,6 +703,31 @@ export function fundingReversion(points, cfg = REVERSION) {
   };
 }
 
+// Merge Orderly's PUBLIC funding-rate history (rows: {funding_rate, funding_rate_
+// timestamp ms}) with 1h price candles (priceData: {t:[sec], c:[close]}) into the
+// {t,price,funding} series fundingReversion expects — so edge quality works for ANY
+// market from public data, not just the core symbols we record oi:hist for. For each
+// funding stamp, take the close of the most recent candle at/before it (two-pointer;
+// both inputs sorted ascending here). Pure + tested.
+export function mergeFundingPrice(fundingRows, priceData) {
+  if (!Array.isArray(fundingRows) || !priceData || !Array.isArray(priceData.t) || !Array.isArray(priceData.c)) return [];
+  const t = priceData.t, c = priceData.c;
+  if (!t.length) return [];
+  const fr = fundingRows
+    .map((r) => ({ ts: Number(r.funding_rate_timestamp), f: Number(r.funding_rate) }))
+    .filter((r) => Number.isFinite(r.ts) && Number.isFinite(r.f))
+    .sort((a, b) => a.ts - b.ts);
+  const out = [];
+  let pi = 0;
+  for (const { ts, f } of fr) {
+    const tsSec = ts / 1000;
+    while (pi + 1 < t.length && t[pi + 1] <= tsSec) pi++;
+    const price = Number(c[pi]);
+    if (Number.isFinite(price) && price > 0) out.push({ t: ts, price, funding: f });
+  }
+  return out;
+}
+
 // ── Edge quality — the board's SELF-AWARENESS about its own signal ────────────
 // Funding tells you the crowd is stretched; it does NOT tell you the fade actually
 // pays. This grades a flagged market by whether fading it has HISTORICALLY reverted

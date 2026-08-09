@@ -8,7 +8,7 @@ import {
   classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets, regimeEdge,
   planQuality, planSummary,
   expectancyStats, callerScore, convictionCalibration, contestedBoard,
-  mispricedBoard, consensusBySymbol, MISPRICED, fundingReversion, edgeQuality,
+  mispricedBoard, consensusBySymbol, MISPRICED, fundingReversion, edgeQuality, mergeFundingPrice,
   LOSS_REASONS, isLossReason, postmortemSummary,
   validateArenaRegistration, arenaAgentConfig,
 } from "./logic.mjs";
@@ -1368,4 +1368,30 @@ test("edgeQuality: middling → MIXED", () => {
 test("edgeQuality: no reversion data → UNPROVEN", () => {
   assert.equal(edgeQuality(null).tier, "UNPROVEN");
   assert.equal(edgeQuality({ samples: 0 }).tier, "UNPROVEN");
+});
+
+// ── mergeFundingPrice (universal reversion input from public Orderly history) ──
+test("mergeFundingPrice: pairs each funding stamp with the candle at/before it", () => {
+  const price = { t: [1000, 2000, 3000, 4000], c: [10, 20, 30, 40] }; // t in sec
+  // rows come newest-first from the API (descending) — must be sorted ascending.
+  const funding = [
+    { funding_rate: 0.002, funding_rate_timestamp: 3500 * 1000 }, // → candle t≤3500 = 3000 → 30
+    { funding_rate: 0.001, funding_rate_timestamp: 2500 * 1000 }, // → candle t≤2500 = 2000 → 20
+  ];
+  const out = mergeFundingPrice(funding, price);
+  assert.deepEqual(out, [
+    { t: 2500000, price: 20, funding: 0.001 },
+    { t: 3500000, price: 30, funding: 0.002 },
+  ]);
+});
+
+test("mergeFundingPrice: funding before first candle uses the first close", () => {
+  const out = mergeFundingPrice([{ funding_rate: 0.001, funding_rate_timestamp: 500 * 1000 }], { t: [1000, 2000], c: [10, 20] });
+  assert.equal(out[0].price, 10);
+});
+
+test("mergeFundingPrice: junk inputs → []", () => {
+  assert.deepEqual(mergeFundingPrice(null, { t: [1], c: [1] }), []);
+  assert.deepEqual(mergeFundingPrice([{ funding_rate: 1, funding_rate_timestamp: 1 }], null), []);
+  assert.deepEqual(mergeFundingPrice([{}], { t: [], c: [] }), []);
 });

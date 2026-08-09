@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -1958,16 +1958,21 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         const board = mispricedBoard(j?.data?.rows || []);
 
         // Self-awareness: enrich each FLAGGED market with whether fading it has
-        // HISTORICALLY paid (fundingReversion over the brain's oi:hist), then rank
-        // proven-edge first and traps last. Only core+watchlisted symbols have history,
-        // so most stay UNPROVEN — honest, not hidden. Bounded: only the flagged few get
-        // a KV read; the whole payload is cached 180s.
-        const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+        // HISTORICALLY paid, then rank proven-edge first and traps last. Reversion is
+        // built from Orderly's PUBLIC funding-rate history + 1h price candles (available
+        // for EVERY market), so this works on long-tail markets too — not just the core
+        // symbols we record oi:hist for. Bounded: only the flagged few fetch; cached 180s.
+        const nowS = Math.floor(Date.now() / 1000);
+        const fromS = nowS - 45 * 86400;
         const flagged = board.markets.filter((m) => m.status === "MISPRICED");
         await Promise.all(flagged.map(async (m) => {
           try {
-            const raw = await AGENT_KV.get(`oi:hist:${m.symbol}`);
-            const rev = fundingReversion(raw ? JSON.parse(raw) : []);
+            const [fh, ph] = await Promise.all([
+              fetch(`https://api-evm.orderly.org/v1/public/funding_rate_history?symbol=${m.symbol}&page=1&size=100`, { headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" } }).then((r) => r.json()),
+              fetch(`https://api-evm.orderly.org/tv/history?symbol=${m.symbol}&resolution=60&from=${fromS}&to=${nowS}`).then((r) => r.json()),
+            ]);
+            const series = mergeFundingPrice(fh?.data?.rows || [], (ph && ph.s === "ok" && Array.isArray(ph.t)) ? { t: ph.t, c: ph.c } : null);
+            const rev = fundingReversion(series);
             m.reversion = rev ? { revertedPct: rev.revertedPct, avgReversionPct: rev.avgReversionPct, samples: rev.samples, horizonDays: rev.horizonDays } : null;
           } catch { m.reversion = null; }
           m.edgeQuality = edgeQuality(m.reversion);
