@@ -452,17 +452,8 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", rowGap: "2px", columnGap: "8px", fontSize: "12px" }}>
           <div>
             <span style={{ color: DIM }}>FUNDING 8H  </span><span style={{ color: fc }}>{data ? fmtFunding(data.funding) : "—"}</span>
-            {(() => {
-              const f = contexts[sym]?.funding;
-              if (!f || f.pct == null) return null;
-              const extreme = f.pct >= 85 || f.pct <= 15;
-              return (
-                <span title={`Funding is in the ${f.pct}th percentile of the last ${f.days} days${extreme ? " — crowd is stretched" : ""}`}
-                  style={{ marginLeft: 6, color: extreme ? (f.pct >= 85 ? GREEN : RED) : MUTED, fontSize: "10px" }}>
-                  {f.pct}th pct{extreme ? " ⚠" : ""}
-                </span>
-              );
-            })()}
+            {/* Funding percentile-vs-history lives in the "FUNDING vs ITS OWN HISTORY"
+                gauges above — de-duped from this dense row. */}
           </div>
           <div><span style={{ color: DIM }}>OI  </span><span style={{ color: MUTED }}>{data ? fmtOI(data.oi) : "—"}</span></div>
           <div><span style={{ color: DIM }}>L/S  </span><span style={{ color: lsColor(ls) }}>{ls !== null ? ls.toFixed(2) : "—"}</span></div>
