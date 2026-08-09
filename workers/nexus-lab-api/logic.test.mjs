@@ -1395,3 +1395,74 @@ test("mergeFundingPrice: junk inputs → []", () => {
   assert.deepEqual(mergeFundingPrice([{ funding_rate: 1, funding_rate_timestamp: 1 }], null), []);
   assert.deepEqual(mergeFundingPrice([{}], { t: [], c: [] }), []);
 });
+
+// ── Tracked x-ray record (xrayTrack) ─────────────────────────────────────────
+import { xrayTrack } from "./logic.mjs";
+
+const DAY = 86400 * 1000;
+// Build snapshots from a list of cumulative realized-PnL readings, one per day.
+const snapsFrom = (realizeds, opts = {}) =>
+  realizeds.map((realized, i) => ({ t: (opts.t0 ?? 0) + i * DAY, realized, unrealized: 0, markets: 3, wins: 2, losses: 1, open: opts.open ?? 0 }));
+
+test("xrayTrack: <2 snapshots → building (nothing to grade yet)", () => {
+  assert.equal(xrayTrack([]).building, true);
+  assert.equal(xrayTrack([{ t: 0, realized: 100 }]).building, true);
+  assert.equal(xrayTrack([{ t: 0, realized: 100 }]).points, 1);
+});
+
+test("xrayTrack: grades REALIZED DELTAS, not the cumulative total", () => {
+  // Cumulative 1000→1100→1250 = +100 then +150 earned WHILE tracked (net +250),
+  // never the lifetime 1250 the wallet already had before we watched.
+  const r = xrayTrack(snapsFrom([1000, 1100, 1250]));
+  assert.equal(r.netRealized, 250);
+  assert.equal(r.windows, 2);
+  assert.deepEqual(r.curve, [0, 100, 250]);
+  assert.equal(r.winWindowRate, 100);
+  assert.equal(r.trend, "UP");
+});
+
+test("xrayTrack: mixed windows → honest win-window rate + drawdown", () => {
+  // deltas: +100, -60, +40  → net +80; one losing window of 3.
+  const r = xrayTrack(snapsFrom([0, 100, 40, 80]));
+  assert.equal(r.netRealized, 80);
+  assert.equal(r.winWindows, 2);
+  assert.equal(r.winWindowRate, round2(2 / 3 * 100));
+  assert.equal(r.worstWindow, -60);
+  assert.equal(r.bestWindow, 100);
+  assert.equal(r.maxDrawdown, 60); // peak 100 → trough 40
+});
+
+test("xrayTrack: net-negative record scores but earns NO tier", () => {
+  const r = xrayTrack(snapsFrom([0, -50, -30, -120, -90]));
+  assert.ok(r.netRealized < 0);
+  assert.equal(r.tier, null);
+  assert.equal(r.trend, "DOWN");
+  assert.ok(r.operatorScore >= 0); // still visible, just low
+});
+
+test("xrayTrack: score is sample-shrunk — one great window can't mint a high score", () => {
+  // Perfect-but-short (2 windows) must score well below a long consistent record.
+  const shortRec = xrayTrack(snapsFrom([0, 500, 1000]));      // 2 windows, flawless
+  const longRec = xrayTrack(snapsFrom(Array.from({ length: 21 }, (_, i) => i * 100))); // 20 windows, flawless
+  assert.ok(longRec.operatorScore > shortRec.operatorScore);
+  assert.equal(shortRec.operatorScore, null); // <4 windows → not scored at all
+});
+
+test("xrayTrack: consistent long positive record earns the top tier", () => {
+  const r = xrayTrack(snapsFrom(Array.from({ length: 16 }, (_, i) => i * 100)));
+  assert.equal(r.tier.tier, "CONSISTENT");
+  assert.ok(r.operatorScore >= 65);
+});
+
+test("xrayTrack: collapses same-day snapshots to the last (no zero-length windows)", () => {
+  const noisy = [
+    { t: 0, realized: 0 }, { t: 1000, realized: 10 },      // same UTC day → keep realized:10
+    { t: DAY, realized: 50 }, { t: DAY + 500, realized: 60 }, // same day → keep 60
+  ];
+  const r = xrayTrack(noisy);
+  assert.equal(r.points, 2);
+  assert.equal(r.netRealized, 50); // day0 keeps realized:10, day1 keeps realized:60 → 60-10
+  assert.equal(r.windows, 1);
+});
+
+function round2(n) { return Math.round(n * 10) / 10; }

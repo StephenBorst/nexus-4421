@@ -918,6 +918,96 @@ export function rankCaller(stats) {
   return { tier: "SIGNAL", title: "Signal", glyph: "▪" };
 }
 
+// ── Tracked x-ray record (persistent, self-grading wallet monitor) ────────────
+// The Smart-Money x-ray is a point-in-time read of the public Orderly settlement
+// indexer (cumulative realized PnL per market — NO per-trade tape). To turn a
+// lookup into an ACCRUING, comparable record we snapshot that aggregate over time
+// and grade the SERIES: the delta in cumulative realized PnL between two snapshots
+// is the realized PnL the wallet actually earned in that window. From those windows
+// we get an honest realized-PnL equity curve, a consistency rate, drawdown control,
+// and a transparent Operator Score — the same "earned, not claimed" discipline the
+// caller merit ranks use, applied to any wallet on the network.
+//
+// ⚠️ Honesty guards baked in: (1) we grade only realized-PnL DELTAS (never the
+// cumulative markets/wins/losses, which are lifetime and would double-count history
+// the wallet had before we started watching); (2) the score is sample-shrunk toward
+// zero so a wallet must earn a track LENGTH, not just one good window; (3) a
+// net-negative record earns no tier (mirrors rankCaller's avgR<=0 rule). Pure+tested.
+const DAY_MS = 86400 * 1000;
+
+// Collapse to at most one snapshot per UTC day (the last wins), sorted ascending.
+// The read-seeder + the cron can both write on the same day; without this a busy day
+// would manufacture zero-length windows and dilute every rate.
+function dedupeDaily(snaps) {
+  const byDay = new Map();
+  for (const s of (snaps || [])) {
+    if (!s || !Number.isFinite(s.t)) continue;
+    byDay.set(Math.floor(s.t / DAY_MS), s);
+  }
+  return [...byDay.values()].sort((a, b) => a.t - b.t);
+}
+
+export function xrayTrack(snapshots) {
+  const snaps = dedupeDaily(snapshots);
+  const points = snaps.length;
+  if (points < 2) {
+    return { points, building: true, latest: snaps[points - 1] || null };
+  }
+  const first = snaps[0], last = snaps[points - 1];
+  const daysTracked = round((last.t - first.t) / DAY_MS, 1);
+  const netRealized = Math.round((last.realized || 0) - (first.realized || 0));
+
+  // Per-window realized deltas → cumulative equity curve of the TRACKED window.
+  const deltas = [];
+  for (let i = 1; i < points; i++) deltas.push(Math.round((snaps[i].realized || 0) - (snaps[i - 1].realized || 0)));
+  const windows = deltas.length;
+  let run = 0; const curve = [0];
+  for (const d of deltas) { run += d; curve.push(run); }
+
+  const winWindows = deltas.filter((d) => d > 0).length;
+  const winWindowRate = round((winWindows / windows) * 100, 1);
+  const bestWindow = Math.max(...deltas);
+  const worstWindow = Math.min(...deltas);
+
+  // Max peak-to-trough drawdown on the cumulative realized curve (>=0).
+  let peak = curve[0], maxDrawdown = 0, peakPos = Math.max(0, ...curve);
+  for (const v of curve) { if (v > peak) peak = v; maxDrawdown = Math.max(maxDrawdown, peak - v); }
+  maxDrawdown = Math.round(maxDrawdown);
+
+  const grossFlow = deltas.reduce((s, d) => s + Math.abs(d), 0);
+  // "Retention": share of gross realized flow that stuck as NET profit (a
+  // profit-factor cousin honest to per-window data). Negative → clamped to 0.
+  const retention = grossFlow > 0 ? clamp01(netRealized / grossFlow) : 0;
+  const consistency = winWindows / windows; // 0..1 share of net-green windows
+  // Drawdown control: how shallow the worst dip is vs the gains achieved. No gains → 0.
+  const drawdownControl = peakPos > 0 ? clamp01(1 - maxDrawdown / peakPos) : 0;
+
+  // Transparent composite, then shrink toward 0 by track length so an unproven
+  // wallet can't score high off one lucky window (K=6 windows ≈ a week of daily snaps).
+  const raw = 0.5 * consistency + 0.3 * retention + 0.2 * drawdownControl;
+  const conf = windows / (windows + 6);
+  const scoreReady = windows >= 4;
+  const operatorScore = scoreReady ? Math.round(raw * conf * 100) : null;
+
+  // Tier only when scored AND net-positive (negative records stay unranked but visible).
+  let tier = null;
+  if (scoreReady && netRealized > 0) {
+    if (operatorScore >= 65 && windows >= 14) tier = { tier: "CONSISTENT", title: "Consistent", glyph: "✦" };
+    else if (operatorScore >= 40 && windows >= 7) tier = { tier: "POSITIVE", title: "Positive", glyph: "◆" };
+    else tier = { tier: "TRACKED", title: "Tracked", glyph: "▪" };
+  }
+  const trend = netRealized > grossFlow * 0.02 ? "UP" : netRealized < -grossFlow * 0.02 ? "DOWN" : "FLAT";
+
+  return {
+    points, building: false, daysTracked, netRealized, windows, winWindows,
+    winWindowRate, maxDrawdown, bestWindow, worstWindow, curve, trend,
+    operatorScore, tier, latest: last,
+    currentOpen: last.open || 0,
+  };
+}
+
+function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
+
 // ── Signal-webhook ingestion (TradingView / bring-your-own-signal) ───────────
 // External signals can't wallet-sign, so the per-user secret token in the URL is
 // the auth (it only authorizes order placement on the order-only key, and is

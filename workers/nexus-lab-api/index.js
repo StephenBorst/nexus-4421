@@ -52,7 +52,7 @@ async function prevCopyLeaders(env, address) {
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./backtest.mjs";
 // Route families lifted out of the 74-route fetch handler (see shared.mjs for the
 // migration rules — one family per commit, read-only families first).
-import { handleSmart, refreshSmartSeed } from "./routes-smart.mjs";
+import { handleSmart, refreshSmartSeed, sweepTrackedXray } from "./routes-smart.mjs";
 import { handleTheses } from "./routes-theses.mjs";
 import { handleAgents } from "./routes-agents.mjs";
 import { handleArena } from "./routes-arena.mjs";
@@ -590,11 +590,16 @@ export default {
       try { const n = await gradePublicTheses(env); console.log(`[grade] cron resolved ${n} calls`); }
       catch (e) { console.error("[grade] cron failed:", String(e)); }
     })());
-    // 12h: refresh the Smart Money tracked set.
+    // 12h: refresh the Smart Money tracked set + snapshot every watched wallet's
+    // Tracked Record (accrues even when nobody's viewing it).
     if (event.cron === "0 */12 * * *") {
       ctx.waitUntil((async () => {
         try { const n = await refreshSmartSeed(env); console.log(`[smart] refreshed tracked set: ${n}`); }
         catch (e) { console.error("[smart] refresh failed (using static seed):", String(e)); }
+      })());
+      ctx.waitUntil((async () => {
+        try { const r = await sweepTrackedXray(env); console.log(`[xray] snapshotted ${r.snapped}/${r.watched} watched wallets`); }
+        catch (e) { console.error("[xray] sweep failed:", String(e)); }
       })());
     }
   },

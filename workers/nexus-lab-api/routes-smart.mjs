@@ -14,7 +14,7 @@
 // Contract: handleSmart returns a Response when it owns the path, or null so the
 // remaining routes in index.js get their turn. Never throws for "not mine".
 import { json, normalizeAddress, recoverEthAddress } from "./shared.mjs";
-import { orderlyAccountId } from "./logic.mjs";
+import { orderlyAccountId, xrayTrack } from "./logic.mjs";
 
 // ── Smart Money (Phase 1) ─────────────────────────────────────────────────────
 // Curated seed of top Hyperliquid traders (snapshotted from the public HL
@@ -62,6 +62,119 @@ async function orderlyDashboard(path) {
 // One indexer call each (all parallel) — keep this list bounded.
 const NEXUS_BROKER_ID = "nexus_trading";
 const ORDERLY_BROKERS = [NEXUS_BROKER_ID, "orderly", "woofi_pro", "raydium", "btse_dex", "aden", "vooi", "logx"];
+
+// ── Public multi-venue wallet aggregate (the x-ray core) ─────────────────────
+// Probe every broker's ranking by the address's derived account_id and fold the
+// per-symbol realized/unrealized rows into one cross-venue record. Shared by the
+// live /smart/xray read AND the snapshotter that builds the accruing Tracked
+// Record, so the two can never grade different numbers. Returns null-safe zeros.
+async function xrayAggregate(address) {
+  const coin = (s) => String(s).replace("PERP_", "").replace("_USDC", "");
+  const probed = await Promise.all(ORDERLY_BROKERS.map(async (brokerId) => {
+    let accountId;
+    try { accountId = orderlyAccountId(address, brokerId); } catch { return null; }
+    try {
+      const d = await orderlyDashboard(`/ranking/realized_pnl?account_id=${accountId}&limit=100`);
+      const rows = d?.data?.rows || [];
+      if (!rows.length) return null;
+      let realized = 0, unrealized = 0, wins = 0, losses = 0;
+      const bySymbol = rows.map((r) => {
+        const rp = parseFloat(r.total_realized_pnl || "0");
+        const up = parseFloat(r.un_realized_pnl || "0");
+        const holding = parseFloat(r.holding || "0");
+        realized += rp; unrealized += up;
+        if (rp > 0) wins++; else if (rp < 0) losses++;
+        return {
+          sym: coin(r.symbol),
+          realized: Math.round(rp), unrealized: Math.round(up),
+          open: Math.abs(holding) > 1e-9,
+          side: holding > 0 ? "LONG" : holding < 0 ? "SHORT" : null,
+          szUsd: Math.round(Math.abs(parseFloat(r.holding_value || "0"))),
+          entry: parseFloat(r.average_entry_price || "0"),
+        };
+      }).sort((a, b) => Math.abs(b.realized) - Math.abs(a.realized));
+      const graded = wins + losses;
+      return {
+        brokerId, accountId, isNexus: brokerId === NEXUS_BROKER_ID,
+        realized: Math.round(realized), unrealized: Math.round(unrealized),
+        markets: rows.length, wins, losses,
+        profitableMarketsPct: graded ? Math.round((wins / graded) * 1000) / 10 : 0,
+        openPositions: bySymbol.filter((s) => s.open).length,
+        bySymbol,
+      };
+    } catch { return null; }
+  }));
+  const venues = probed.filter(Boolean)
+    .sort((a, b) => (b.isNexus ? 1 : 0) - (a.isNexus ? 1 : 0) || b.realized - a.realized);
+  return {
+    address, venues,
+    totalRealized: venues.reduce((s, v) => s + v.realized, 0),
+    totalUnrealized: venues.reduce((s, v) => s + v.unrealized, 0),
+    markets: venues.reduce((s, v) => s + v.markets, 0),
+    totalWins: venues.reduce((s, v) => s + v.wins, 0),
+    totalLosses: venues.reduce((s, v) => s + v.losses, 0),
+    totalOpen: venues.reduce((s, v) => s + v.openPositions, 0),
+    brokersChecked: ORDERLY_BROKERS.length,
+  };
+}
+
+// ── Tracked Record: persist the x-ray aggregate as a daily time-series ───────
+// Turns the point-in-time x-ray into an ACCRUING, self-grading record. Each
+// snapshot stores the cumulative aggregate; xrayTrack (logic.mjs) grades the
+// DELTAS between snapshots — the realized PnL the wallet actually earned while
+// tracked. Throttled to ~1/day so a busy read path can't manufacture noise.
+const XRAY_HIST_PREFIX = "xray:hist:";
+const XRAY_SNAP_MIN_MS = 20 * 3600 * 1000; // ≥20h between stored snapshots (≈1/day)
+const XRAY_HIST_CAP = 240;                  // ~8 months of daily points
+const XRAY_HIST_TTL = 400 * 86400;
+
+async function readXrayHist(env, address) {
+  const raw = await env.LAB_STORE.get(XRAY_HIST_PREFIX + address.toLowerCase());
+  if (!raw) return [];
+  try { const a = JSON.parse(raw); return Array.isArray(a) ? a : []; } catch { return []; }
+}
+
+// Append a snapshot if the last one is stale AND there's real indexed data to
+// record (markets>0). Returns the (possibly unchanged) series. Never throws.
+async function snapshotXray(env, address, agg) {
+  try {
+    const a = agg || await xrayAggregate(address);
+    if (!a || a.markets <= 0) return await readXrayHist(env, address); // nothing indexed → don't store noise
+    const hist = await readXrayHist(env, address);
+    const last = hist[hist.length - 1];
+    if (last && Number.isFinite(last.t) && Date.now() - last.t < XRAY_SNAP_MIN_MS) return hist; // fresh enough
+    hist.push({
+      t: Date.now(), realized: a.totalRealized, unrealized: a.totalUnrealized,
+      markets: a.markets, wins: a.totalWins, losses: a.totalLosses, open: a.totalOpen,
+    });
+    const trimmed = hist.slice(-XRAY_HIST_CAP);
+    await env.LAB_STORE.put(XRAY_HIST_PREFIX + address.toLowerCase(), JSON.stringify(trimmed), { expirationTtl: XRAY_HIST_TTL });
+    return trimmed;
+  } catch { return await readXrayHist(env, address); }
+}
+
+// Cron sweep: snapshot every wallet anyone has starred (union of all watchlists)
+// so a Tracked Record accrues even when nobody is viewing it. Bounded + best-effort.
+// Exported: the 12h cron in index.js drives it.
+export async function sweepTrackedXray(env) {
+  const listed = await env.LAB_STORE.list({ prefix: "sm:wl:" });
+  const addrs = new Set();
+  for (const k of listed.keys) {
+    const raw = await env.LAB_STORE.get(k.name);
+    if (!raw) continue;
+    try { for (const a of JSON.parse(raw)) if (/^0x[a-f0-9]{40}$/i.test(a)) addrs.add(a.toLowerCase()); } catch { /* skip */ }
+  }
+  const targets = [...addrs].slice(0, 200);
+  let snapped = 0;
+  for (let i = 0; i < targets.length; i += 6) {
+    await Promise.all(targets.slice(i, i + 6).map(async (a) => {
+      const before = (await readXrayHist(env, a)).length;
+      const after = (await snapshotXray(env, a)).length;
+      if (after > before) snapped++;
+    }));
+  }
+  return { watched: targets.length, snapped };
+}
 
 // Build the Orderly-native smart-money board from the public realized-PnL ranking.
 // One call returns the ecosystem's top traders + their live positions in Orderly
@@ -332,57 +445,35 @@ export async function handleSmart(parts, request, env, ctx) {
   // hash-encoded, /events_v2 empty). So this is a venue + market breakdown — it
   // CANNOT produce the hold-time/timing analytics the HL fill history supports.
   // Don't promise per-trade stats off this endpoint. KV-cached 5min.
+  if (parts[0] === "smart" && parts[1] === "xray" && parts[2] === "history" && request.method === "GET") {
+    // ── GET /smart/xray/history?address= — the accruing Tracked Record ─────────
+    // Grades the wallet's realized-PnL over time (xrayTrack). Self-seeding: if the
+    // stored series is empty or stale it snapshots a fresh aggregate first, so
+    // simply opening a wallet's detail begins its record. Cheap on repeat views —
+    // it only pays the multi-broker fetch when a new daily snapshot is due.
+    const address = (url.searchParams.get("address") || "").trim();
+    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) return json({ error: "valid 0x address required" }, request, 400);
+    let hist = await readXrayHist(env, address);
+    const last = hist[hist.length - 1];
+    const stale = !last || !Number.isFinite(last.t) || Date.now() - last.t >= XRAY_SNAP_MIN_MS;
+    if (stale) { try { hist = await snapshotXray(env, address); } catch { /* keep stored */ } }
+    return json({ address, snapshots: hist.length, track: xrayTrack(hist), updatedAt: Date.now() }, request);
+  }
+
   if (parts[0] === "smart" && parts[1] === "xray" && request.method === "GET") {
     const address = (url.searchParams.get("address") || "").trim();
     if (!/^0x[a-fA-F0-9]{40}$/.test(address)) return json({ error: "valid 0x address required" }, request, 400);
     const CACHE = `sm:xray:${address.toLowerCase()}`;
     const cached = await env.LAB_STORE.get(CACHE);
-    if (cached) return json(JSON.parse(cached), request);
-    const coin = (s) => String(s).replace("PERP_", "").replace("_USDC", "");
-    const probed = await Promise.all(ORDERLY_BROKERS.map(async (brokerId) => {
-      let accountId;
-      try { accountId = orderlyAccountId(address, brokerId); } catch { return null; }
-      try {
-        const d = await orderlyDashboard(`/ranking/realized_pnl?account_id=${accountId}&limit=100`);
-        const rows = d?.data?.rows || [];
-        if (!rows.length) return null;
-        let realized = 0, unrealized = 0, wins = 0, losses = 0;
-        const bySymbol = rows.map((r) => {
-          const rp = parseFloat(r.total_realized_pnl || "0");
-          const up = parseFloat(r.un_realized_pnl || "0");
-          const holding = parseFloat(r.holding || "0");
-          realized += rp; unrealized += up;
-          if (rp > 0) wins++; else if (rp < 0) losses++;
-          return {
-            sym: coin(r.symbol),
-            realized: Math.round(rp), unrealized: Math.round(up),
-            open: Math.abs(holding) > 1e-9,
-            side: holding > 0 ? "LONG" : holding < 0 ? "SHORT" : null,
-            szUsd: Math.round(Math.abs(parseFloat(r.holding_value || "0"))),
-            entry: parseFloat(r.average_entry_price || "0"),
-          };
-        }).sort((a, b) => Math.abs(b.realized) - Math.abs(a.realized));
-        const graded = wins + losses;
-        return {
-          brokerId, accountId, isNexus: brokerId === NEXUS_BROKER_ID,
-          realized: Math.round(realized), unrealized: Math.round(unrealized),
-          markets: rows.length, wins, losses,
-          profitableMarketsPct: graded ? Math.round((wins / graded) * 1000) / 10 : 0,
-          openPositions: bySymbol.filter((s) => s.open).length,
-          bySymbol,
-        };
-      } catch { return null; }
-    }));
-    const venues = probed.filter(Boolean)
-      .sort((a, b) => (b.isNexus ? 1 : 0) - (a.isNexus ? 1 : 0) || b.realized - a.realized);
-    const payload = {
-      address, venues,
-      totalRealized: venues.reduce((s, v) => s + v.realized, 0),
-      totalUnrealized: venues.reduce((s, v) => s + v.unrealized, 0),
-      markets: venues.reduce((s, v) => s + v.markets, 0),
-      brokersChecked: ORDERLY_BROKERS.length,
-    };
+    if (cached) {
+      // Even a cache hit should keep the Tracked Record accruing (throttled inside).
+      ctx.waitUntil(snapshotXray(env, address));
+      return json(JSON.parse(cached), request);
+    }
+    const payload = await xrayAggregate(address);
     await env.LAB_STORE.put(CACHE, JSON.stringify(payload), { expirationTtl: 300 });
+    // Seed/extend the accruing record off the aggregate we already fetched.
+    ctx.waitUntil(snapshotXray(env, address, payload));
     return json(payload, request);
   }
 
