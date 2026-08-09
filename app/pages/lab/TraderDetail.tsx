@@ -3,6 +3,7 @@
 // (realized+unrealized PnL by market + live positions, via account_id). HL
 // traders link to the full wallet x-ray (/analyze), which reads their fills.
 import { useEffect, useState } from "react";
+import { TrackedRecordCard } from "@/components/TrackedRecordCard";
 
 const AGENT_API = "https://og.nexustradinglabs.com";
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -12,59 +13,14 @@ const usd = (n: number) => {
   return `${n < 0 ? "-" : ""}$${s}`;
 };
 
-const fmtSigned = (n?: number) => `${(n || 0) >= 0 ? "+" : ""}${usd(n || 0)}`;
-const pct = (n?: number | null) => (n == null ? "—" : `${n}%`);
-const numOrDash = (n?: number | null) => (n == null ? "—" : String(n));
-// Which side "wins" a metric: higher is better; null-vs-number defers to the number;
-// null both / ties → no winner highlight.
-const cmp = (mine?: number | null, theirs?: number | null): boolean | null => {
-  const a = mine ?? null, b = theirs ?? null;
-  if (a == null && b == null) return null;
-  if (a == null) return false;
-  if (b == null) return true;
-  return a === b ? null : a > b;
-};
-
 interface SymRow { sym: string; realized: number; unrealized: number; open: boolean; side: "LONG" | "SHORT" | null; szUsd: number; entry: number; }
 interface Detail { address: string | null; totalRealized: number; totalUnrealized: number; profitableMarketsPct: number; markets: number; wins: number; losses: number; bySymbol: SymRow[]; }
-
-interface XrayTrack {
-  points: number; building: boolean; scored?: boolean;
-  daysTracked?: number; netRealized?: number; windows?: number;
-  gradedWindows?: number; gapWindows?: number;
-  winWindowRate?: number | null; maxDrawdown?: number; curve?: number[];
-  trend?: "UP" | "DOWN" | "FLAT"; operatorScore?: number | null;
-  tier?: { tier: string; title: string; glyph: string } | null;
-}
-
-// Dependency-free equity sparkline of the tracked realized-PnL window. Plots the
-// cumulative-delta curve with a dashed zero baseline; colour follows the net.
-function Sparkline({ data, positive }: { data: number[]; positive: boolean }) {
-  if (!data || data.length < 2) return null;
-  const w = 260, h = 44, pad = 3;
-  const min = Math.min(0, ...data), max = Math.max(0, ...data);
-  const range = max - min || 1;
-  const x = (i: number) => pad + (i / (data.length - 1)) * (w - 2 * pad);
-  const y = (v: number) => pad + (1 - (v - min) / range) * (h - 2 * pad);
-  const path = data.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
-  const zeroY = y(0);
-  const color = positive ? "#3ecf8e" : "#f7525f";
-  return (
-    <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ display: "block" }}>
-      <line x1={pad} x2={w - pad} y1={zeroY} y2={zeroY} stroke="#33333a" strokeWidth="1" strokeDasharray="2 3" />
-      <path d={path} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 export function TraderDetail({ source, address, accountId, myAddress, onClose }: {
   source: "orderly" | "hl"; address: string; accountId?: string; myAddress?: string; onClose: () => void;
 }) {
   const [d, setD] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(source === "orderly");
-  const [track, setTrack] = useState<XrayTrack | null>(null);
-  const [myTrack, setMyTrack] = useState<XrayTrack | null>(null);
-  const [copyRec, setCopyRec] = useState<{ available: boolean; trades: number; net: number; winRatePct: number | null; copiers: number } | null>(null);
 
   useEffect(() => {
     if (source !== "orderly" || !accountId) { setLoading(false); return; }
@@ -76,44 +32,6 @@ export function TraderDetail({ source, address, accountId, myAddress, onClose }:
       .finally(() => { if (!cancel) setLoading(false); });
     return () => { cancel = true; };
   }, [source, accountId]);
-
-  // The accruing Tracked Record — keyed by ADDRESS (the trader detail always has
-  // one). This read self-seeds the first snapshot server-side, so opening a
-  // wallet begins its graded record.
-  useEffect(() => {
-    if (source !== "orderly" || !address) return;
-    let cancel = false;
-    fetch(`${AGENT_API}/smart/xray/history?address=${address}`)
-      .then((r) => r.json())
-      .then((x) => { if (!cancel && x && x.track) setTrack(x.track); })
-      .catch(() => {});
-    return () => { cancel = true; };
-  }, [source, address]);
-
-  // Did copying THIS wallet on Nexus actually work? Graded from real agent closes.
-  useEffect(() => {
-    if (source !== "orderly" || !address) return;
-    let cancel = false;
-    fetch(`${AGENT_API}/agents/copy-record/${address}`)
-      .then((r) => r.json())
-      .then((x) => { if (!cancel && x && !x.error) setCopyRec(x); })
-      .catch(() => {});
-    return () => { cancel = true; };
-  }, [source, address]);
-
-  // My own Tracked Record — same methodology, so "you vs this wallet" is apples to
-  // apples (both graded from realized-PnL consistency). Only when I have a distinct
-  // connected wallet; hidden until I've actually accrued a record.
-  useEffect(() => {
-    const me = (myAddress || "").toLowerCase();
-    if (!me || me === address.toLowerCase()) { setMyTrack(null); return; }
-    let cancel = false;
-    fetch(`${AGENT_API}/smart/xray/history?address=${me}`)
-      .then((r) => r.json())
-      .then((x) => { if (!cancel && x && x.track) setMyTrack(x.track); })
-      .catch(() => {});
-    return () => { cancel = true; };
-  }, [myAddress, address]);
 
   const label = { fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase" as const, marginBottom: 3 };
   const statVal = (n: number) => ({ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: n >= 0 ? "#3ecf8e" : "#f7525f" });
@@ -156,102 +74,8 @@ export function TraderDetail({ source, address, accountId, myAddress, onClose }:
                 <div><div style={label}>Markets Traded</div><div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: "#ededf0" }}>{d.markets} <span style={{ fontSize: 10, color: "#52525b" }}>{d.wins}W/{d.losses}L</span></div></div>
               </div>
 
-              {/* Tracked Record — the accruing, self-grading monitor */}
-              {track && (
-                <div style={{ border: "1px solid #232327", borderRadius: 8, padding: 12, marginBottom: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase" }}>Tracked Record</span>
-                    {track.tier && (
-                      <span title={`${track.tier.title} — earned from ${track.gradedWindows} graded daily windows`} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3ecf8e", border: "1px solid #33333a", borderRadius: 3, padding: "1px 5px" }}>{track.tier.glyph} {track.tier.title.toUpperCase()}</span>
-                    )}
-                    {typeof track.operatorScore === "number" && (
-                      <span style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a" }}>OPERATOR SCORE <span style={{ color: "#ededf0", fontWeight: 700, fontSize: 12 }}>{track.operatorScore}</span></span>
-                    )}
-                  </div>
-
-                  {track.building ? (
-                    <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#71717a", lineHeight: 1.6, padding: "6px 0" }}>
-                      Tracking started. A graded record accrues each day this wallet is watched — realized-PnL trend, consistency and drawdown, computed from public settlement. Check back.
-                    </div>
-                  ) : (
-                    <>
-                      {track.curve && track.curve.length >= 2 && (
-                        <div style={{ marginBottom: 10 }}><Sparkline data={track.curve} positive={(track.netRealized || 0) >= 0} /></div>
-                      )}
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(88px, 1fr))", gap: 10 }}>
-                        <div>
-                          <div style={label}>Net (tracked)</div>
-                          <div style={statVal(track.netRealized || 0)}>{(track.netRealized || 0) >= 0 ? "+" : ""}{usd(track.netRealized || 0)}</div>
-                        </div>
-                        <div>
-                          <div style={label}>Days Tracked</div>
-                          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: "#ededf0" }}>{track.daysTracked}</div>
-                        </div>
-                        <div>
-                          <div style={label}>Green Days</div>
-                          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: "#ededf0" }}>{track.winWindowRate == null ? "—" : `${track.winWindowRate}%`}</div>
-                        </div>
-                        <div>
-                          <div style={label}>Max Drawdown</div>
-                          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: "#f7525f" }}>-{usd(track.maxDrawdown || 0)}</div>
-                        </div>
-                      </div>
-                      {!track.scored && (
-                        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", marginTop: 8, lineHeight: 1.5 }}>
-                          Consistency score unlocks after ~4 days of daily snapshots{track.gapWindows ? " — sparse gaps in watching don't count toward it" : ""}. The net total above is already real.
-                        </div>
-                      )}
-                      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 8, lineHeight: 1.5 }}>
-                        Graded from the change in realized PnL between daily snapshots — the P&amp;L earned while watched, not lifetime history.{track.gapWindows ? " Long gaps between snapshots are excluded from the consistency read so a month can't pose as a green day." : " Score is earned from a track length, so a short streak can't inflate it."}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* You vs this wallet — same graded methodology, side by side */}
-              {myTrack && !myTrack.building && track && !track.building && (() => {
-                const rows: { k: string; me: string; them: string; meWin: boolean | null }[] = [
-                  { k: "Net (tracked)", me: fmtSigned(myTrack.netRealized), them: fmtSigned(track.netRealized), meWin: cmp(myTrack.netRealized, track.netRealized) },
-                  { k: "Green Days", me: pct(myTrack.winWindowRate), them: pct(track.winWindowRate), meWin: cmp(myTrack.winWindowRate, track.winWindowRate) },
-                  { k: "Operator Score", me: numOrDash(myTrack.operatorScore), them: numOrDash(track.operatorScore), meWin: cmp(myTrack.operatorScore, track.operatorScore) },
-                ];
-                return (
-                  <div style={{ border: "1px solid #232327", borderRadius: 8, padding: 12, marginBottom: 16 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 72px 72px", gap: 6, alignItems: "center", marginBottom: 4 }}>
-                      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase" }}>You vs this wallet</span>
-                      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ededf0", textAlign: "right" }}>YOU</span>
-                      <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", textAlign: "right" }}>THEM</span>
-                    </div>
-                    {rows.map((r) => (
-                      <div key={r.k} style={{ display: "grid", gridTemplateColumns: "1fr 72px 72px", gap: 6, alignItems: "center", padding: "5px 0", borderTop: "1px solid #1a1a1e" }}>
-                        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#a1a1aa" }}>{r.k}</span>
-                        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 700, textAlign: "right", color: r.meWin === true ? "#3ecf8e" : "#d4d4d8" }}>{r.me}</span>
-                        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, textAlign: "right", color: r.meWin === false ? "#ededf0" : "#71717a" }}>{r.them}</span>
-                      </div>
-                    ))}
-                    <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 8, lineHeight: 1.5 }}>
-                      Both graded the same way — realized-PnL consistency over the days each was tracked. A dash means not enough daily data yet.
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Copy record — did copying this wallet on Nexus actually work? */}
-              {copyRec && copyRec.available && copyRec.trades > 0 && (
-                <div style={{ border: "1px solid #232327", borderRadius: 8, padding: 12, marginBottom: 16 }}>
-                  <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase", marginBottom: 8 }}>Copied on Nexus</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))", gap: 10 }}>
-                    <div><div style={label}>Net (copiers)</div><div style={statVal(copyRec.net)}>{copyRec.net >= 0 ? "+" : ""}{usd(copyRec.net)}</div></div>
-                    <div><div style={label}>Graded Closes</div><div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: "#ededf0" }}>{copyRec.trades}</div></div>
-                    <div><div style={label}>Win Rate</div><div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: "#ededf0" }}>{copyRec.winRatePct == null ? "—" : `${copyRec.winRatePct}%`}</div></div>
-                    <div><div style={label}>Copiers</div><div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: "#ededf0" }}>{copyRec.copiers}</div></div>
-                  </div>
-                  <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 8, lineHeight: 1.5 }}>
-                    Realized P&amp;L of Nexus agent trades that copied this wallet — graded from on-chain-auditable closes, not their self-reported number. The agent manages every exit.
-                  </div>
-                </div>
-              )}
+              {/* Tracked Record + You-vs-wallet + Copied-on-Nexus (shared surface) */}
+              <TrackedRecordCard address={address} myAddress={myAddress} />
 
               {/* By market */}
               <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase", marginBottom: 6 }}>Realized P&amp;L by market</div>

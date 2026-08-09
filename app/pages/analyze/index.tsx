@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { AnalyticsView } from "@/pages/lab/AnalyticsView";
+import { TrackedRecordCard } from "@/components/TrackedRecordCard";
 import { SectionHeader } from "@/pages/lab/components";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import type { ProcessedTrade } from "@/pages/lab/types";
@@ -288,6 +289,9 @@ export default function AnalyzePage() {
             These are per-market totals; Orderly doesn&apos;t publish a per-trade tape, so the
             hold-time and timing analytics above stay Hyperliquid-only.
           </p>
+
+          {/* The accruing, self-grading record over time (Operator Score + copy record) */}
+          {address && <TrackedRecordCard address={address} />}
 
           {orderly.venues.map((v) => (
             <div key={v.brokerId} style={{ border: `1px solid ${BORDER}`, borderLeft: v.isNexus ? `3px solid ${BONE}` : `1px solid ${BORDER}`, borderRadius: 6, background: SURFACE_ALT, padding: "14px 16px", marginBottom: 12 }}>

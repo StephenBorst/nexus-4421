@@ -17,6 +17,7 @@ import CommentsPanel from "@/components/CommentsPanel";
 import { deployToAgent } from "@/utils/agentPrefill";
 import { deriveStyle } from "@/config/agentStyles";
 import { PublicOperatorProfile, InFlightCalls, VenueEvidence } from "./ProfileSynthesis";
+import { TrackedRecordCard } from "@/components/TrackedRecordCard";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 
@@ -733,6 +734,11 @@ export default function TraderPage() {
                 <PublicOperatorProfile wallet={wallet ?? null} isOwn={isOwn} />
                 <InFlightCalls calls={openCalls} prices={livePrices} />
                 <VenueEvidence wallet={wallet ?? null} openCalls={openCalls} />
+
+                {/* The accruing, self-grading on-chain record (Operator Score, trend,
+                    copy record) — same surface as the Smart Money x-ray, so a trader's
+                    public page and their x-ray can never tell a different story. */}
+                {wallet && <TrackedRecordCard address={wallet} />}
 
                 {/* Stats grid */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 8, marginBottom: 24 }}>
