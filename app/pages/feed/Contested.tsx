@@ -9,31 +9,41 @@ import { useEffect, useState } from "react";
 const API_BASE = "https://og.nexustradinglabs.com";
 
 type MeritRank = { tier: string; title: string; glyph: string } | null;
-type Party = { wallet: string; displayName: string | null; pfp: string | null; meritRank: MeritRank; weight: number; sources: string[] };
+type PartyRecord = { calls: number; winRate: number; avgR: number } | null;
+type SideRecord = { calls: number; wins: number; rSum: number; winRate: number | null; avgR: number | null };
+type Edge = { side: "LONG" | "SHORT" | null; gapR: number; reason: string | null };
+type Party = { wallet: string; displayName: string | null; pfp: string | null; meritRank: MeritRank; weight: number; sources: string[]; record?: PartyRecord };
 type Row = {
   symbol: string;
   longs: Party[]; shorts: Party[];
   longCount: number; shortCount: number;
   longWeight: number; shortWeight: number;
+  longRecord?: SideRecord; shortRecord?: SideRecord; edge?: Edge;
   balance: number; tension: number;
 };
 
 const short = (w: string) => `${w.slice(0, 6)}…${w.slice(-4)}`;
 const name = (p: Party) => p.displayName || short(p.wallet);
+const rStr = (n: number) => `${n >= 0 ? "+" : ""}${n}R`;
 
-function Camp({ side, parties, weight, count }: { side: "LONG" | "SHORT"; parties: Party[]; weight: number; count: number }) {
+function Camp({ side, parties, weight, count, record }: { side: "LONG" | "SHORT"; parties: Party[]; weight: number; count: number; record?: SideRecord }) {
   const tone = side === "LONG" ? "#3ecf8e" : "#f7525f";
   return (
     <div style={{ flex: "1 1 0", minWidth: 0 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 6 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 2 }}>
         <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, fontWeight: 700, color: tone, letterSpacing: "0.08em" }}>{side}</span>
         <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b" }}>{count} · wt {weight}</span>
+      </div>
+      {/* This side's combined graded record — who's actually been right */}
+      <div title="combined graded call record of this side's callers" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: record && record.calls ? "#a1a1aa" : "#52525b", marginBottom: 6 }}>
+        {record && record.calls ? `${record.wins}-${record.calls - record.wins} · ${rStr(record.avgR ?? 0)}` : "no graded calls yet"}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
         {parties.slice(0, 4).map((p) => (
           <div key={p.wallet} style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
             {p.meritRank && <span title={p.meritRank.title} style={{ fontSize: 9, color: "#ededf0", flexShrink: 0 }}>{p.meritRank.glyph}</span>}
             <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#a1a1aa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(p)}</span>
+            {p.record && <span title={`${p.record.calls} graded calls`} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", flexShrink: 0 }}>{rStr(p.record.avgR)}</span>}
             {p.sources.includes("position") && <span title="holds an open position" style={{ fontSize: 8, color: "#3ecf8e", flexShrink: 0 }}>●</span>}
           </div>
         ))}
@@ -92,10 +102,17 @@ export default function Contested() {
               </div>
 
               <div style={{ display: "flex", gap: 12 }}>
-                <Camp side="LONG" parties={row.longs} weight={row.longWeight} count={row.longCount} />
+                <Camp side="LONG" parties={row.longs} weight={row.longWeight} count={row.longCount} record={row.longRecord} />
                 <div style={{ width: 1, background: "#232327", flexShrink: 0 }} />
-                <Camp side="SHORT" parties={row.shorts} weight={row.shortWeight} count={row.shortCount} />
+                <Camp side="SHORT" parties={row.shorts} weight={row.shortWeight} count={row.shortCount} record={row.shortRecord} />
               </div>
+
+              {/* Which side has the graded record — the actionable read */}
+              {row.edge && row.edge.side && (
+                <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid #1a1a1e", fontFamily: "var(--nx-font-mono)", fontSize: 10, color: row.edge.side === "LONG" ? "#3ecf8e" : "#f7525f" }}>
+                  ◆ {row.edge.side}S have the record here <span style={{ color: "#52525b" }}>· +{row.edge.gapR}R avg-R edge</span>
+                </div>
+              )}
             </div>
           );
         })}

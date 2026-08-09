@@ -19,7 +19,7 @@ import { json } from "./shared.mjs";
 import {
   rankCaller, callerScore, contestedBoard, consensusBySymbol, classifyRegime, callAlignment,
   planQuality, normalizeSymbol, REGIME, postmortemSummary, isLossReason, LOSS_REASONS,
-  estimateResolution,
+  estimateResolution, aggregateSideRecord, standoffVerdict,
 } from "./logic.mjs";
 import { computeCallerStats, gatherStanceEntries, REGIME_PAD_S, ADVICE_FLAG_TEXT } from "./grading.mjs";
 
@@ -174,22 +174,31 @@ export async function handleTheses(parts, request, env) {
       if (profileCache.has(k)) return profileCache.get(k);
       const raw = await env.LAB_STORE.get(`profile:${w}`);
       const p = raw ? (() => { try { return JSON.parse(raw); } catch { return {}; } })() : {};
-      const merit = rankCaller(byWallet[k] || byWallet[w] || null);
-      const out = { wallet: w, displayName: p.displayName || null, pfp: p.pfp || null, meritRank: merit };
+      const rec = byWallet[k] || byWallet[w] || null;
+      const merit = rankCaller(rec);
+      // Each participant's own graded record so a reader can weigh the two sides by
+      // who's actually been right — not just who's loud.
+      const record = rec && rec.calls ? { calls: rec.calls, winRate: Math.round((rec.wins / rec.calls) * 1000) / 10, avgR: Math.round((rec.rSum / rec.calls) * 100) / 100 } : null;
+      const out = { wallet: w, displayName: p.displayName || null, pfp: p.pfp || null, meritRank: merit, record };
       profileCache.set(k, out);
       return out;
     };
-    const enriched = await Promise.all(board.map(async (row) => ({
-      ...row,
-      longs: await Promise.all(row.longs.map(async (l) => ({ ...await profile(l.wallet), weight: l.weight, sources: l.sources }))),
-      shorts: await Promise.all(row.shorts.map(async (s) => ({ ...await profile(s.wallet), weight: s.weight, sources: s.sources }))),
-    })));
+    const recOf = (w) => byWallet[w.toLowerCase()] || byWallet[w] || { calls: 0, wins: 0, rSum: 0 };
+    const enriched = await Promise.all(board.map(async (row) => {
+      const longs = await Promise.all(row.longs.map(async (l) => ({ ...await profile(l.wallet), weight: l.weight, sources: l.sources })));
+      const shorts = await Promise.all(row.shorts.map(async (s) => ({ ...await profile(s.wallet), weight: s.weight, sources: s.sources })));
+      // Which SIDE has the better graded record — the actionable read on a standoff.
+      const longRecord = aggregateSideRecord(row.longs.map((l) => recOf(l.wallet)));
+      const shortRecord = aggregateSideRecord(row.shorts.map((s) => recOf(s.wallet)));
+      const edge = standoffVerdict(longRecord, shortRecord);
+      return { ...row, longs, shorts, longRecord, shortRecord, edge };
+    }));
 
     return json({
       count: enriched.length,
       contested: enriched,
       criteria: {
-        note: "Symbols where credible callers hold OPPOSING directions right now, from open positions + active (unresolved, <14d) public calls. Ranked by tension = weight balance × total weight; participants weighted by earned merit tier (Apex 3 / Sharp 2 / Signal 1). A wallet on both sides of a symbol is voided there.",
+        note: "Symbols where credible callers hold OPPOSING directions right now, from open positions + active (unresolved, <14d) public calls. Ranked by tension = weight balance × total weight; participants weighted by earned merit tier (Apex 3 / Sharp 2 / Signal 1). A wallet on both sides of a symbol is voided there. `edge` names the side with the better graded avg-R (withheld until BOTH sides have ≥3 graded calls and the gap ≥0.3R).",
       },
     }, request);
   }

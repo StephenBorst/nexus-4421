@@ -918,6 +918,35 @@ export function rankCaller(stats) {
   return { tier: "SIGNAL", title: "Signal", glyph: "▪" };
 }
 
+// ── Contested-standoff edge (which SIDE has the graded record) ───────────────
+// The disagreement board shows WHERE credible callers are opposed; this asks which
+// side is historically RIGHT. Aggregates each side's participants' graded call
+// records (from computeCallerStats' byWallet) into a combined win-rate + avg-R, then
+// declares an edge only when BOTH sides have a real sample and the gap is meaningful
+// — a verdict drawn from one call on a side is worse than silence (same discipline
+// as the regime verdict). Pure + tested; the standoff itself stays trustless.
+export function aggregateSideRecord(records) {
+  let calls = 0, wins = 0, rSum = 0;
+  for (const r of (records || [])) { calls += r?.calls || 0; wins += r?.wins || 0; rSum += r?.rSum || 0; }
+  return {
+    calls, wins, rSum,
+    winRate: calls ? Math.round((wins / calls) * 1000) / 10 : null,
+    avgR: calls ? Math.round((rSum / calls) * 100) / 100 : null,
+  };
+}
+
+// Compare two side aggregates. Returns the side with the better avg-R, but only when
+// EACH side has ≥ minCalls graded calls AND the gap clears minGapR — otherwise null
+// (withheld), never a coin-flip verdict.
+export function standoffVerdict(longAgg, shortAgg, { minCalls = 3, minGapR = 0.3 } = {}) {
+  const lC = longAgg?.calls || 0, sC = shortAgg?.calls || 0;
+  if (lC < minCalls || sC < minCalls) return { side: null, gapR: 0, reason: "not enough graded calls on both sides yet" };
+  const lR = longAgg.avgR ?? 0, sR = shortAgg.avgR ?? 0;
+  const gap = Math.round((lR - sR) * 100) / 100;
+  if (Math.abs(gap) < minGapR) return { side: null, gapR: gap, reason: "the two sides' records are too close to call" };
+  return { side: gap > 0 ? "LONG" : "SHORT", gapR: Math.round(Math.abs(gap) * 100) / 100, reason: null };
+}
+
 // ── Tracked x-ray record (persistent, self-grading wallet monitor) ────────────
 // The Smart-Money x-ray is a point-in-time read of the public Orderly settlement
 // indexer (cumulative realized PnL per market — NO per-trade tape). To turn a

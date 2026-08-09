@@ -1509,3 +1509,48 @@ test("xrayTrack: gap windows can't inflate the score above a clean daily record"
 });
 
 function round2(n) { return Math.round(n * 10) / 10; }
+
+// ── Contested standoff edge (aggregateSideRecord + standoffVerdict) ───────────
+import { aggregateSideRecord, standoffVerdict } from "./logic.mjs";
+
+test("aggregateSideRecord: sums calls/wins/rSum and derives rate + avgR", () => {
+  const a = aggregateSideRecord([{ calls: 10, wins: 6, rSum: 8 }, { calls: 5, wins: 2, rSum: 1 }]);
+  assert.equal(a.calls, 15);
+  assert.equal(a.wins, 8);
+  assert.equal(a.rSum, 9);
+  assert.equal(a.winRate, round1(8 / 15 * 100));
+  assert.equal(a.avgR, round2(9 / 15));
+});
+
+test("aggregateSideRecord: empty side → null rates, not zero (nothing to claim)", () => {
+  const a = aggregateSideRecord([]);
+  assert.equal(a.calls, 0);
+  assert.equal(a.winRate, null);
+  assert.equal(a.avgR, null);
+});
+
+test("standoffVerdict: picks the side with the better avg-R when both have a sample", () => {
+  const v = standoffVerdict({ calls: 6, avgR: 0.9 }, { calls: 5, avgR: 0.1 });
+  assert.equal(v.side, "LONG");
+  assert.equal(v.gapR, 0.8);
+});
+
+test("standoffVerdict: withheld when a side lacks graded calls", () => {
+  const v = standoffVerdict({ calls: 8, avgR: 1.2 }, { calls: 1, avgR: -0.5 });
+  assert.equal(v.side, null);
+  assert.match(v.reason, /not enough graded calls/);
+});
+
+test("standoffVerdict: withheld when records are too close to call", () => {
+  const v = standoffVerdict({ calls: 10, avgR: 0.5 }, { calls: 10, avgR: 0.4 });
+  assert.equal(v.side, null);
+  assert.match(v.reason, /too close/);
+});
+
+test("standoffVerdict: a stronger SHORT side wins", () => {
+  const v = standoffVerdict({ calls: 5, avgR: -0.2 }, { calls: 7, avgR: 0.9 });
+  assert.equal(v.side, "SHORT");
+  assert.equal(v.gapR, 1.1);
+});
+
+function round1(n) { return Math.round(n * 10) / 10; }
