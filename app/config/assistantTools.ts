@@ -398,7 +398,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "get_verified_callers",
     description:
-      "Get the TRUSTLESS human-caller leaderboard: traders ranked by objectively-graded public thesis calls (first-touch TP-vs-SL vs public price), needing >=5 resolved calls. Use for 'best callers' or social-proof questions.",
+      "Get the TRUSTLESS human-caller leaderboard: traders ranked by objectively-graded public thesis calls (first-touch TP-vs-SL vs public price), needing >=5 resolved calls. Each entry also carries a `contrarian` record ({calls, avgR, edge, score} or null) — how they do on calls made AGAINST the crowd's consensus lean, so you can name who's right when they fade the crowd. Use for 'best callers', 'who's a good contrarian', or social-proof questions.",
     input_schema: { type: "object", properties: {} },
     run: async () => {
       const res = await fetch(`${AGENT_API}/theses/leaderboard`);

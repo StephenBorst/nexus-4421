@@ -14,7 +14,46 @@ import { notifyResolution } from "./resolutions.mjs";
 import {
   gradeCall, REGIME, classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets,
   regimeEdge, planQuality, planSummary, expectancyStats, convictionCalibration, rankCaller,
+  consensusBySymbol, stanceAtPost, classifyContrarian, aggregateSideRecord, contrarianEdgeScore,
 } from "./logic.mjs";
+
+// ── Historical stance snapshots (contrarian grading) ─────────────────────────
+// Persist the merit-weighted consensus lean per symbol over time so a call can later
+// be graded CONTRARIAN vs with-crowd against the lean that PRECEDED it. Mirrors the
+// Tracked Record x-ray snapshot pattern. Keyed by BARE coin (BTC), matching the
+// consensus board + the join in computeCallerStats. Spec: docs/historical-stance-snapshots-spec.md.
+const STANCE_HIST_PREFIX = "stance:hist:";
+const STANCE_SNAP_MIN_MS = 50 * 60 * 1000;  // ≥50min between stored snapshots (~hourly cron)
+const STANCE_HIST_CAP = 240;
+const STANCE_HIST_TTL = 400 * 86400;
+
+async function readStanceHist(env, coin) {
+  const raw = await env.LAB_STORE.get(STANCE_HIST_PREFIX + coin);
+  if (!raw) return [];
+  try { const a = JSON.parse(raw); return Array.isArray(a) ? a : []; } catch { return []; }
+}
+
+// Cron pass: snapshot the CURRENT merit-weighted lean per symbol. Only symbols with a
+// real lean (a dominant side + ≥2 participants) are stored — SPLIT/thin ticks would make
+// everything read "contrarian" against noise. Throttled per symbol. Best-effort.
+export async function snapshotStances(env) {
+  let stored = 0;
+  try {
+    const { entries } = await gatherStanceEntries(env);
+    const consensus = consensusBySymbol(entries);
+    const now = Date.now();
+    for (const [coin, c] of Object.entries(consensus)) {
+      if ((c.side !== "LONG" && c.side !== "SHORT") || (c.participants || 0) < 2) continue;
+      const hist = await readStanceHist(env, coin);
+      const last = hist[hist.length - 1];
+      if (last && Number.isFinite(last.t) && now - last.t < STANCE_SNAP_MIN_MS) continue;
+      hist.push({ t: now, side: c.side, lean: c.lean, longWeight: c.longWeight, shortWeight: c.shortWeight, participants: c.participants });
+      await env.LAB_STORE.put(STANCE_HIST_PREFIX + coin, JSON.stringify(hist.slice(-STANCE_HIST_CAP)), { expirationTtl: STANCE_HIST_TTL });
+      stored++;
+    }
+  } catch (e) { console.error("[stances] snapshot", e.message); }
+  return stored;
+}
 
 // Grade every PUBLIC thesis call against public price (first-touch TP-vs-SL via
 // gradeCall in logic.mjs) and aggregate per wallet → { wallet: {calls,wins,rSum} }.
@@ -160,12 +199,21 @@ export async function computeCallerStats(env, maxHorizonS = 30 * 86400, opts = {
       if (d && d.s === "ok" && Array.isArray(d.t)) history[sym] = { t: d.t, h: d.h, l: d.l, c: d.c };
     } catch (e) { console.error("[caller-stats] history fetch", sym, e.message); }
   }));
+  // Contrarian grading is OPT-IN (opts.contrarian) so the hot stance path — gatherStanceEntries
+  // → computeCallerStats for merit weights — doesn't pay for the extra KV reads. Only the
+  // leaderboard + the contrarians board ask for it. Stance history is keyed by BARE coin.
+  const wantContrarian = !!opts.contrarian;
+  const stanceHist = {};
+  if (wantContrarian) {
+    const coins = [...new Set(calls.map(({ t }) => bareCoin(t.symbol)))];
+    await Promise.all(coins.map(async (coin) => { stanceHist[coin] = await readStanceHist(env, coin); }));
+  }
   const byWallet = {};
   for (const { wallet, t } of calls) {
     const cd = history[t.symbol];
     const g = gradeCall(t, cd);
     if (g.outcome === "PENDING" || g.outcome === "INVALID") continue;
-    const a = byWallet[wallet] || (byWallet[wallet] = { calls: 0, wins: 0, rSum: 0, resolved: [], regimeRows: [], planScored: [], expRows: [] });
+    const a = byWallet[wallet] || (byWallet[wallet] = { calls: 0, wins: 0, rSum: 0, resolved: [], regimeRows: [], planScored: [], expRows: [], _contra: { calls: 0, wins: 0, rSum: 0 }, _crowd: { calls: 0, wins: 0, rSum: 0 } });
     a.calls += 1; if (g.outcome === "WIN") a.wins += 1; a.rSum += g.r;
     // Track (time, R) so the leaderboard can emit a cumulative-R equity curve —
     // the same trustless grade, just as a series instead of an aggregate.
@@ -184,6 +232,16 @@ export async function computeCallerStats(env, maxHorizonS = 30 * 86400, opts = {
     // Process grade: was the call well-formed at post time (public-verifiable half).
     const pq = planQuality(t, cd);
     if (pq) a.planScored.push(pq);
+
+    // Contrarian attribution: was this call made AGAINST the crowd lean that PRECEDED
+    // it, and did it pay? Same graded R, joined to the stance snapshot nearest-before
+    // the post. Withheld (neither bucket) when there's no qualifying lean.
+    if (wantContrarian) {
+      const lean = stanceAtPost(stanceHist[bareCoin(t.symbol)], t.createdAt);
+      const cls = classifyContrarian(t.direction, lean?.side);
+      const bucket = cls === "CONTRARIAN" ? a._contra : cls === "WITH_CROWD" ? a._crowd : null;
+      if (bucket) { bucket.calls += 1; if (g.outcome === "WIN") bucket.wins += 1; bucket.rSum += g.r; }
+    }
   }
   for (const a of Object.values(byWallet)) {
     // Build the chronological cumulative-R series per wallet (a.rSeries).
@@ -201,10 +259,18 @@ export async function computeCallerStats(env, maxHorizonS = 30 * 86400, opts = {
     // Expectancy-forward ranking + the conviction-calibration read.
     a.expectancy = expectancyStats(a.expRows);
     a.calibration = convictionCalibration(a.expRows);
-    delete a.resolved; delete a.regimeRows; delete a.planScored; delete a.expRows; // internal only — keep the shape lean
+    if (wantContrarian) {
+      a.contrarianRecord = aggregateSideRecord([a._contra]);
+      a.withCrowdRecord = aggregateSideRecord([a._crowd]);
+      a.contrarian = contrarianEdgeScore(a.contrarianRecord, a.withCrowdRecord); // ranked score or null
+    }
+    delete a.resolved; delete a.regimeRows; delete a.planScored; delete a.expRows; delete a._contra; delete a._crowd; // internal only
   }
   return byWallet;
 }
+
+// Bare coin (BTC) from any thesis symbol shape — the join key for stance history.
+const bareCoin = (s) => String(s || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
 
 // Merit weight per earned tier — a standoff between two Apex callers should outrank
 // two anonymous wallets. Shared by every surface that weights live stances.
@@ -218,10 +284,12 @@ const MERIT_WEIGHT = { APEX: 3, SHARP: 2, SIGNAL: 1 };
 // (BTC, not PERP_BTC_USDC) so they join the mispriced board's coin key.
 // Returns { entries, byWallet } — byWallet is the graded record (reused for merit
 // enrichment by the caller).
-export async function gatherStanceEntries(env, { freshMs = 14 * 86400 * 1000 } = {}) {
+export async function gatherStanceEntries(env, { freshMs = 14 * 86400 * 1000, contrarian = false } = {}) {
   const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
   const bare = (s) => String(s || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
-  const byWallet = await computeCallerStats(env, 30 * 86400);
+  // contrarian is opt-in (only the contested board wants it) so the consensus poll path
+  // doesn't pay the extra stance-history reads.
+  const byWallet = await computeCallerStats(env, 30 * 86400, { contrarian });
   const weightOf = (w) => {
     const r = rankCaller(byWallet[w?.toLowerCase?.()] || byWallet[w] || null);
     return r ? (MERIT_WEIGHT[r.tier] || 1) : 1;

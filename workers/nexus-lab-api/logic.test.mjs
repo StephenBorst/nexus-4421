@@ -1554,3 +1554,61 @@ test("standoffVerdict: a stronger SHORT side wins", () => {
 });
 
 function round1(n) { return Math.round(n * 10) / 10; }
+
+// ── Contrarian grading (stanceAtPost / classifyContrarian / contrarianEdgeScore) ──
+import { stanceAtPost, classifyContrarian, contrarianEdgeScore } from "./logic.mjs";
+
+const stanceHist = [
+  { t: 1000, side: "LONG", participants: 3 },
+  { t: 2000, side: "SHORT", participants: 4 },
+  { t: 3000, side: "SPLIT", participants: 5 },   // not a lean → skipped
+  { t: 4000, side: "LONG", participants: 1 },     // thin → skipped
+];
+
+test("stanceAtPost: picks the latest qualifying snapshot at/before the call", () => {
+  assert.deepEqual(stanceAtPost(stanceHist, 2500), { side: "SHORT", participants: 4 });
+  assert.deepEqual(stanceAtPost(stanceHist, 1500), { side: "LONG", participants: 3 });
+});
+
+test("stanceAtPost: skips SPLIT + thin snapshots, so a later thin/split doesn't win", () => {
+  // At t=5000 the newest snapshots are SPLIT(3000) and thin LONG(4000) → fall back to SHORT(2000).
+  assert.deepEqual(stanceAtPost(stanceHist, 5000), { side: "SHORT", participants: 4 });
+});
+
+test("stanceAtPost: null when every snapshot post-dates the call (cold-start)", () => {
+  assert.equal(stanceAtPost(stanceHist, 500), null);
+  assert.equal(stanceAtPost([], 9999), null);
+  assert.equal(stanceAtPost(stanceHist, "nope"), null);
+});
+
+test("stanceAtPost: honors a custom minParticipants gate", () => {
+  assert.equal(stanceAtPost([{ t: 1, side: "LONG", participants: 2 }], 10, { minParticipants: 3 }), null);
+});
+
+test("classifyContrarian: opposing the lean = CONTRARIAN, matching = WITH_CROWD", () => {
+  assert.equal(classifyContrarian("SHORT", "LONG"), "CONTRARIAN");
+  assert.equal(classifyContrarian("LONG", "LONG"), "WITH_CROWD");
+  assert.equal(classifyContrarian("long", "LONG"), "WITH_CROWD"); // case-insensitive
+});
+
+test("classifyContrarian: null when either side is missing/invalid", () => {
+  assert.equal(classifyContrarian("LONG", "SPLIT"), null);
+  assert.equal(classifyContrarian("LONG", null), null);
+  assert.equal(classifyContrarian("", "LONG"), null);
+});
+
+test("contrarianEdgeScore: withheld below the contrarian sample gate", () => {
+  assert.equal(contrarianEdgeScore({ calls: 2, avgR: 3 }, { calls: 10, avgR: 0 }), null);
+});
+
+test("contrarianEdgeScore: shrinks contrarian avg-R and computes edge vs with-crowd", () => {
+  const r = contrarianEdgeScore({ calls: 6, wins: 4, winRate: 66.7, avgR: 1.0 }, { calls: 10, avgR: 0.2 });
+  assert.equal(r.edge, 0.8);                     // 1.0 − 0.2
+  assert.equal(r.score, Math.round(1.0 * (6 / 10) * 1000) / 1000); // shrunk by 6/(6+4)
+  assert.equal(r.avgR, 1.0);
+});
+
+test("contrarianEdgeScore: with no with-crowd sample, edge is vs zero", () => {
+  const r = contrarianEdgeScore({ calls: 5, avgR: 0.5 }, { calls: 0 });
+  assert.equal(r.edge, 0.5);
+});

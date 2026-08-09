@@ -649,6 +649,53 @@ export function consensusBySymbol(entries, cfg = { minLean: 0.15 }) {
   return out;
 }
 
+// ── Contrarian grading (historical stance snapshots) ─────────────────────────
+// The caller-graph's sharpest signal: was a call made AGAINST the crowd's lean at the
+// moment it was posted — and did fading the crowd pay? Requires a persisted history of
+// the merit-weighted consensus lean per symbol (`stance:hist:{symbol}`); this pure layer
+// just reads that history and classifies. ⚠️ gradeCall is NEVER touched — contrarian-ness
+// is an ATTRIBUTE of the call's context, exactly like regime attribution. Pure + tested.
+
+// The nearest consensus snapshot at/before a call's post time that carries a real lean.
+// Returns { side, participants } or null (cold-start / thin / all snapshots post-date it).
+export function stanceAtPost(history, createdAtMs, cfg = {}) {
+  const minParticipants = cfg.minParticipants ?? 2;
+  const t0 = Number(createdAtMs);
+  if (!Array.isArray(history) || !Number.isFinite(t0)) return null;
+  let best = null;
+  for (const s of history) {
+    if (!s || !Number.isFinite(Number(s.t)) || Number(s.t) > t0) continue;
+    const side = s.side === "LONG" || s.side === "SHORT" ? s.side : null;
+    if (!side) continue;                                   // SPLIT/ambiguous ticks aren't a lean
+    if ((Number(s.participants) || 0) < minParticipants) continue;
+    if (!best || Number(s.t) > Number(best.t)) best = s;   // latest qualifying snapshot ≤ post time
+  }
+  return best ? { side: best.side, participants: Number(best.participants) || 0 } : null;
+}
+
+// A call vs the crowd lean it was posted into. null when there's no qualifying lean.
+export function classifyContrarian(direction, leanSide) {
+  const d = String(direction || "").toUpperCase();
+  if ((d !== "LONG" && d !== "SHORT") || (leanSide !== "LONG" && leanSide !== "SHORT")) return null;
+  return d === leanSide ? "WITH_CROWD" : "CONTRARIAN";
+}
+
+// Rank a caller's contrarian record. Only when the contrarian sample clears minCalls; the
+// score is the contrarian avg-R SHRUNK by sample so a couple of lucky fades can't top a
+// long record, and `edge` is how much better (or worse) they do fading vs following the
+// crowd. Returns null (unranked) below the sample gate. contrarian/withCrowd are the
+// aggregateSideRecord shape ({ calls, winRate, avgR }).
+export function contrarianEdgeScore(contrarian, withCrowd, cfg = {}) {
+  const minCalls = cfg.minCalls ?? 3, K = cfg.K ?? 4;
+  const cCalls = contrarian?.calls || 0;
+  if (cCalls < minCalls) return null;
+  const cAvg = contrarian.avgR ?? 0;
+  const wAvg = (withCrowd?.calls || 0) ? (withCrowd.avgR ?? 0) : 0;
+  const edge = Math.round((cAvg - wAvg) * 100) / 100;
+  const score = Math.round(cAvg * (cCalls / (cCalls + K)) * 1000) / 1000; // shrunk contrarian avg-R
+  return { calls: cCalls, wins: contrarian.wins ?? null, winRate: contrarian.winRate ?? null, avgR: cAvg, edge, score };
+}
+
 // ── Funding reversion — the learnable "proof" stat ────────────────────────────
 // "The last N times funding ran THIS hot, what did price do?" From the brain's
 // oi:hist series ({t,price,funding}), find PAST moments where funding was in the same

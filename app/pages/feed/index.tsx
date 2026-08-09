@@ -24,6 +24,7 @@ import { getAgentSig } from "@/pages/lab/agentKeys";
 import { chartImageList, effectiveStatus } from "@/pages/lab/helpers";
 import LiveNow from "./LiveNow";
 import Contested from "./Contested";
+import Contrarians from "./Contrarians";
 import Resolved, { type ResolutionEvent } from "./Resolved";
 import LeakReport from "./LeakReport";
 import { lifecycleState, describeUpdate, updateKind } from "@/lib/lifecycle.mjs";
@@ -1692,6 +1693,7 @@ export default function FeedPage() {
               </div>
             )}
             {!loading && !error && <Contested />}
+            {!loading && !error && <Contrarians />}
             {!loading && !error && (
               <LeaderboardView feed={feed} walletAddress={walletAddress} onCopy={setCopyTarget} />
             )}

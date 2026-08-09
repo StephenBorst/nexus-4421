@@ -37,7 +37,8 @@ export async function handleTheses(parts, request, env) {
     const MIN_CALLS = 5, TOP_N = 25, MAX_HORIZON_S = 30 * 86400;
 
     // First-touch grade per wallet (shared helper — same source as Desk scoring).
-    const byWallet = await computeCallerStats(env, MAX_HORIZON_S);
+    // contrarian:true also joins each call to the consensus lean that preceded it.
+    const byWallet = await computeCallerStats(env, MAX_HORIZON_S, { contrarian: true });
 
     const eligible = [];
     for (const [wallet, a] of Object.entries(byWallet)) {
@@ -68,6 +69,8 @@ export async function handleTheses(parts, request, env) {
         discipline: a.plan ? { score: a.plan.score, scored: a.plan.scored, topFlag: a.plan.topFlag } : null,
         // "Where does this trader's edge live" — the single strongest cut.
         regimeEdge: a.regimeEdges?.trend || a.regimeEdges?.align || null,
+        // Are they right FADING the crowd? { calls, avgR, edge, score } or null.
+        contrarian: a.contrarian || null,
       });
     }
     // Tie-break on profit factor then sample — reward the sturdier record, not the
@@ -153,6 +156,40 @@ export async function handleTheses(parts, request, env) {
     }, request);
   }
 
+  // ── /theses/contrarians — who's right when they FADE the crowd ──
+  // The caller-graph's sharpest signal: callers whose calls AGAINST the merit-weighted
+  // consensus lean (at post time) actually paid. Ranked by shrunk contrarian avg-R,
+  // net-positive gate. Populates only as stance:hist accrues (docs spec). Pure public read.
+  if (parts[0] === "theses" && parts[1] === "contrarians") {
+    if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+    const byWallet = await computeCallerStats(env, 30 * 86400, { contrarian: true });
+    const rows = [];
+    for (const [wallet, a] of Object.entries(byWallet)) {
+      const c = a.contrarian;
+      if (!c || c.score <= 0) continue; // gated on sample (in contrarianEdgeScore) + net-positive
+      rows.push({
+        wallet, meritRank: rankCaller(a),
+        contrarianCalls: c.calls, contrarianAvgR: c.avgR, contrarianWinRate: c.winRate,
+        edge: c.edge, score: c.score,
+        withCrowdAvgR: a.withCrowdRecord?.avgR ?? null, withCrowdCalls: a.withCrowdRecord?.calls ?? 0,
+      });
+    }
+    rows.sort((x, y) => y.score - x.score || y.edge - x.edge || y.contrarianCalls - x.contrarianCalls);
+    const top = rows.slice(0, 20);
+    const enriched = await Promise.all(top.map(async (e, i) => {
+      const raw = await env.LAB_STORE.get(`profile:${e.wallet}`);
+      const p = raw ? (() => { try { return JSON.parse(raw); } catch { return {}; } })() : {};
+      return { rank: i + 1, displayName: p.displayName || null, pfp: p.pfp || null, ...e };
+    }));
+    return json({
+      count: enriched.length,
+      contrarians: enriched,
+      criteria: {
+        note: "Callers ranked by their record on CONTRARIAN calls — those made against the merit-weighted consensus lean that preceded them (from persisted stance snapshots). Score = contrarian avg-R shrunk by sample (≥3 contrarian calls, net-positive). `edge` = contrarian avg-R minus their with-crowd avg-R. gradeCall is untouched — this is attribution, not a re-grade. Sparse until stance history accrues.",
+      },
+    }, request);
+  }
+
   // ── /theses/contested — the DISAGREEMENT board ──
   // Consensus is worthless; the signal is where credible callers are OPPOSED right
   // now. Combines two things we already publish — currently-open positions and
@@ -163,7 +200,8 @@ export async function handleTheses(parts, request, env) {
     if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
     // Shared stance universe (open positions + active calls, merit-weighted) — the
     // SAME source the consensus lean reads, so the two boards can never disagree.
-    const { entries, byWallet } = await gatherStanceEntries(env);
+    // contrarian:true so each participant can show whether they're a proven fader.
+    const { entries, byWallet } = await gatherStanceEntries(env, { contrarian: true });
 
     const board = contestedBoard(entries).slice(0, 12);
 
@@ -179,7 +217,9 @@ export async function handleTheses(parts, request, env) {
       // Each participant's own graded record so a reader can weigh the two sides by
       // who's actually been right — not just who's loud.
       const record = rec && rec.calls ? { calls: rec.calls, winRate: Math.round((rec.wins / rec.calls) * 1000) / 10, avgR: Math.round((rec.rSum / rec.calls) * 100) / 100 } : null;
-      const out = { wallet: w, displayName: p.displayName || null, pfp: p.pfp || null, meritRank: merit, record };
+      // Proven fader? { calls, avgR, edge, score } when they clear the contrarian sample.
+      const contrarian = rec?.contrarian || null;
+      const out = { wallet: w, displayName: p.displayName || null, pfp: p.pfp || null, meritRank: merit, record, contrarian };
       profileCache.set(k, out);
       return out;
     };

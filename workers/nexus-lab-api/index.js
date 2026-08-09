@@ -59,7 +59,7 @@ import { handleArena } from "./routes-arena.mjs";
 import { handleFeed } from "./routes-feed.mjs";
 import { loadOiHistForBacktest, revalidateStrategy, OI_BACKTEST_MIN_DAYS, OI_BACKTEST_MIN_SAMPLES } from "./strategies.mjs";
 import { json, cors, normalizeAddress, recoverEthAddress, ALLOWED_ORIGINS, holdersRoomMessage, appendNotification } from "./shared.mjs";
-import { gradedStatusOf, fetchGradeHistory, gradePublicTheses, computeCallerStats, REGIME_PAD_S, ADVICE_FLAG_TEXT } from "./grading.mjs";
+import { gradedStatusOf, fetchGradeHistory, gradePublicTheses, computeCallerStats, snapshotStances, REGIME_PAD_S, ADVICE_FLAG_TEXT } from "./grading.mjs";
 // The SAME synthesis the Lab + trader page render (pure, dependency-free), so the
 // shareable card can never disagree with the profile it depicts. Bundled cross-dir by
 // wrangler like the other ../ imports.
@@ -589,6 +589,12 @@ export default {
     ctx.waitUntil((async () => {
       try { const n = await gradePublicTheses(env); console.log(`[grade] cron resolved ${n} calls`); }
       catch (e) { console.error("[grade] cron failed:", String(e)); }
+    })());
+    // Hourly: snapshot the merit-weighted consensus lean per symbol so calls can be
+    // graded contrarian-vs-crowd over time (docs/historical-stance-snapshots-spec.md).
+    ctx.waitUntil((async () => {
+      try { const n = await snapshotStances(env); console.log(`[stances] snapshotted ${n} symbol leans`); }
+      catch (e) { console.error("[stances] snapshot failed:", String(e)); }
     })());
     // 12h: refresh the Smart Money tracked set + snapshot every watched wallet's
     // Tracked Record (accrues even when nobody's viewing it).
