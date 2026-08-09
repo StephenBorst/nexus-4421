@@ -871,7 +871,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
   }, [board.length]);
 
   // Trustless call grades (public-price graded, on-chain anchored) keyed by wallet.
-  const [graded, setGraded] = useState<Map<string, { hitRate: number; avgR: number; calls: number; score: number; meritRank: { tier: string; title: string; glyph: string } | null; rSeries: number[]; discipline: { score: number; scored: number } | null; regimeEdge: { best: { bucket: string; avgR: number } } | null; calibration: { calibrated: boolean; inverted: boolean; gap: number } | null }>>(new Map());
+  const [graded, setGraded] = useState<Map<string, { hitRate: number; avgR: number; calls: number; score: number; meritRank: { tier: string; title: string; glyph: string } | null; rSeries: number[]; discipline: { score: number; scored: number } | null; regimeEdge: { best: { bucket: string; avgR: number } } | null; calibration: { calibrated: boolean; inverted: boolean; gap: number } | null; contrarian: { calls: number; avgR: number; edge: number; score: number } | null }>>(new Map());
   const [emerging, setEmerging] = useState<Map<string, { calls: number; toQualify: number }>>(new Map());
   const [callLedger, setCallLedger] = useState<{ ledgerHash?: string; onChain?: { verified?: boolean; explorer?: string } | null } | null>(null);
   useEffect(() => {
@@ -881,9 +881,9 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
       fetch(`${API_BASE}/theses/ledger`).then((r) => r.json()).catch(() => null),
     ]).then(([lb, led]) => {
       if (cancel) return;
-      const m = new Map<string, { hitRate: number; avgR: number; calls: number; score: number; meritRank: { tier: string; title: string; glyph: string } | null; rSeries: number[]; discipline: { score: number; scored: number } | null; regimeEdge: { best: { bucket: string; avgR: number } } | null; calibration: { calibrated: boolean; inverted: boolean; gap: number } | null }>();
+      const m = new Map<string, { hitRate: number; avgR: number; calls: number; score: number; meritRank: { tier: string; title: string; glyph: string } | null; rSeries: number[]; discipline: { score: number; scored: number } | null; regimeEdge: { best: { bucket: string; avgR: number } } | null; calibration: { calibrated: boolean; inverted: boolean; gap: number } | null; contrarian: { calls: number; avgR: number; edge: number; score: number } | null }>();
       for (const e of (lb?.leaderboard || [])) {
-        if (e.wallet) m.set(e.wallet.toLowerCase(), { hitRate: e.hitRate, avgR: e.avgR, calls: e.calls, score: e.score, meritRank: e.meritRank ?? null, rSeries: Array.isArray(e.rSeries) ? e.rSeries : [], discipline: e.discipline ?? null, regimeEdge: e.regimeEdge ?? null, calibration: e.calibration ?? null });
+        if (e.wallet) m.set(e.wallet.toLowerCase(), { hitRate: e.hitRate, avgR: e.avgR, calls: e.calls, score: e.score, meritRank: e.meritRank ?? null, rSeries: Array.isArray(e.rSeries) ? e.rSeries : [], discipline: e.discipline ?? null, regimeEdge: e.regimeEdge ?? null, calibration: e.calibration ?? null, contrarian: e.contrarian ?? null });
       }
       setGraded(m);
       const em = new Map<string, { calls: number; toQualify: number }>();
@@ -1014,6 +1014,17 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                       style={{ fontSize: 8, color: trader.graded.discipline.score >= 70 ? "#a1a1aa" : "#fbbf24", border: `1px solid ${trader.graded.discipline.score >= 70 ? "#33333a" : "#4a3a00"}`, borderRadius: 2, padding: "1px 4px", background: trader.graded.discipline.score >= 70 ? "#1a1a1e" : "#2a1a00" }}
                     >
                       PLAN {trader.graded.discipline.score}
+                    </span>
+                  )}
+                  {/* ⚡ FADER — proven right against the crowd. Shown only when their
+                      contrarian avg-R is net-positive (the meaningful signal); the
+                      record is graded from stance snapshots joined at post time. */}
+                  {trader.graded?.contrarian && trader.graded.contrarian.avgR > 0 && (
+                    <span
+                      title={`Right when fading the crowd: +${trader.graded.contrarian.avgR}R avg over ${trader.graded.contrarian.calls} contrarian calls (made against the consensus lean that preceded them), ${trader.graded.contrarian.edge >= 0 ? "+" : ""}${trader.graded.contrarian.edge}R better than their with-crowd calls.`}
+                      style={{ fontSize: 8, color: "#3ecf8e", border: "1px solid #33333a", borderRadius: 2, padding: "1px 4px", background: "#1a1a1e", letterSpacing: "0.04em" }}
+                    >
+                      &#9889; FADER +{trader.graded.contrarian.avgR}R
                     </span>
                   )}
                   <NexusTierBadge address={trader.wallet} />
