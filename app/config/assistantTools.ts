@@ -410,7 +410,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "xray_wallet",
     description:
-      "X-ray ANY wallet's perp record from public data — no login, works on wallets that have never touched Nexus. Reads BOTH Hyperliquid (trade-by-trade history) and the Orderly network incl. Nexus (per-market settled PnL + live open positions). Use when the user pastes a wallet address, asks 'is this trader any good', or wants to vet someone before copying them.",
+      "X-ray ANY wallet's perp record from public data — no login, works on wallets that have never touched Nexus. Reads BOTH Hyperliquid (trade-by-trade history) and the Orderly network incl. Nexus (per-market settled PnL + live open positions), PLUS the wallet's Tracked Record — a graded consistency read (Operator Score / trend / green-day rate) that separates a lucky single print from a wallet that's consistently profitable over time. Use when the user pastes a wallet address, asks 'is this trader any good', or wants to vet someone before copying them.",
     input_schema: {
       type: "object",
       properties: { wallet: { type: "string", description: "0x… wallet address." } },
@@ -420,13 +420,16 @@ export const TOOLS: ToolDef[] = [
       const w = String(args.wallet ?? "").trim();
       if (!/^0x[0-9a-fA-F]{40}$/.test(w)) return JSON.stringify({ error: "invalid wallet address" });
 
-      const [hlRes, ordRes] = await Promise.allSettled([
+      const [hlRes, ordRes, trkRes] = await Promise.allSettled([
         fetch("https://api.hyperliquid.xyz/info", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "userFills", user: w.toLowerCase() }),
         }).then((r) => r.json()),
         fetch(`${AGENT_API}/smart/xray?address=${encodeURIComponent(w)}`).then((r) => r.json()),
+        // Self-seeding: reading the history also begins/extends this wallet's Tracked
+        // Record, so vetting a wallet starts grading its consistency over time.
+        fetch(`${AGENT_API}/smart/xray/history?address=${encodeURIComponent(w)}`).then((r) => r.json()),
       ]);
 
       // Hyperliquid: closed fills only → count / net pnl / win rate.
@@ -464,10 +467,28 @@ export const TOOLS: ToolDef[] = [
           }
         : null;
 
+      // Tracked Record: the accruing, self-grading consistency read (realized-PnL
+      // DELTAS between daily snapshots, not lifetime). Lets the AI separate a lucky
+      // single print from a wallet that is consistently profitable over time.
+      const trk = trkRes.status === "fulfilled" ? (trkRes.value?.track as Record<string, unknown> | undefined) : undefined;
+      const tracked_record = trk
+        ? (trk.building
+            ? { status: "tracking_started", snapshots: trk.points }
+            : {
+                days_tracked: trk.daysTracked,
+                net_realized_while_tracked: trk.netRealized,
+                green_day_rate_pct: trk.winWindowRate,   // null until daily-cadence data accrues
+                operator_score: trk.operatorScore,       // 0-100, null until ~4 daily windows
+                tier: (trk.tier as { title?: string } | null)?.title ?? null,
+                trend: trk.trend,
+                graded_windows: trk.gradedWindows,
+              })
+        : null;
+
       return JSON.stringify({
-        wallet: w, hyperliquid, orderly,
+        wallet: w, hyperliquid, orderly, tracked_record,
         note: orderly
-          ? "Orderly figures are per-MARKET settled totals (no public per-trade tape), so hold-time/timing stats are Hyperliquid-only."
+          ? "Orderly figures are per-MARKET settled totals (no public per-trade tape), so hold-time/timing stats are Hyperliquid-only. tracked_record grades the CHANGE in realized PnL between daily snapshots — operator_score/tier are EARNED from consistency over time and stay null until enough daily windows accrue; long gaps in watching are excluded so a month can't pose as a green day."
           : "No Orderly-network history found for this wallet (sub-accounts aren't resolvable from an address).",
         full_report: `/analyze?address=${w}`,
       });
