@@ -62,6 +62,9 @@ async function orderlyDashboard(path) {
 // One indexer call each (all parallel) — keep this list bounded.
 const NEXUS_BROKER_ID = "nexus_trading";
 const ORDERLY_BROKERS = [NEXUS_BROKER_ID, "orderly", "woofi_pro", "raydium", "btse_dex", "aden", "vooi", "logx"];
+// Single source of truth for the board cache key — the board route WRITES it and the
+// Tracked-Record sweep READS it, so a version bump must not silently desync the two.
+const SM_BOARD_CACHE = "sm:board:v5";
 
 // ── Public multi-venue wallet aggregate (the x-ray core) ─────────────────────
 // Probe every broker's ranking by the address's derived account_id and fold the
@@ -168,7 +171,7 @@ export async function sweepTrackedXray(env) {
   // GRADED-consistency board over time, not a raw single-number one (the moat move:
   // one big realized print can be luck; an accruing record can't).
   try {
-    const braw = await env.LAB_STORE.get("sm:board:v5");
+    const braw = await env.LAB_STORE.get(SM_BOARD_CACHE);
     if (braw) for (const t of (JSON.parse(braw).traders || [])) if (/^0x[a-f0-9]{40}$/i.test(t.address || "")) addrs.add(t.address.toLowerCase());
   } catch { /* non-fatal */ }
   const targets = [...addrs].slice(0, 200);
@@ -403,7 +406,7 @@ export async function handleSmart(parts, request, env, ctx) {
   const url = new URL(request.url);
 
   if (parts[0] === "smart" && parts[1] === "board" && request.method === "GET") {
-    const CACHE_KEY = "sm:board:v5";
+    const CACHE_KEY = SM_BOARD_CACHE;
     const cached = await env.LAB_STORE.get(CACHE_KEY);
     if (cached) return json(JSON.parse(cached), request);
     const [orderly, seed, coinSet] = await Promise.all([buildOrderlyBoard(), smartSeed(env), orderlyPerpCoins(env)]);
