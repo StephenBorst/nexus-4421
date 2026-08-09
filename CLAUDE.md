@@ -95,7 +95,11 @@ is everything built on top:
   the live Supabase `agent_trades` table). KV namespace `NEXUS_AGENT` = c3c0582ec71c4d049d0795872f39f033.
 - **nexus-agent-brain** → cron, generates funding/OI signals into `agent:signal:<addr>`.
 - **nexus-lab-alerts** → alerts worker.
-- **nexus-landing** (Pages) → `landing.nexustradinglabs.com`, separate repo `StephenBorst/nexus-landing`.
+- **nexus-landing** → `landing.nexustradinglabs.com`, separate repo `StephenBorst/nexus-landing`.
+  ⚠️ NOT a Pages project (the only Pages project is `nexus-trading-lab`) — it's a **Workers
+  static-assets deploy**: `wrangler.jsonc` (`name: nexus-landing`, `assets.directory: "."`),
+  deploy with **`npx wrangler deploy`** from the repo root (NOT `wrangler pages deploy`). No CI —
+  pushing to GitHub does not deploy; run wrangler manually. CF auth via `CLOUDFLARE_API_TOKEN` env.
 
 ## Agent paper mode details
 - Frontend default mode = PAPER (new users start risk-free). PAPER needs no trading key.
