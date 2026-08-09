@@ -283,6 +283,10 @@ The public agents leaderboard ranks on a risk-adjusted score from live `agent_tr
   `close_order_id` so records are independently verifiable against the exchange. Insert is resilient
   (retries core row if order_id columns aren't migrated). ⚠️ TODO (dashboard): `ALTER TABLE agent_trades
   ADD COLUMN entry_order_id text, ADD COLUMN close_order_id text;` (else those fields just get dropped via fallback).
+  ⚠️ ALSO NEEDED (copy-loop grading, 2026-08-09): `ALTER TABLE agent_trades ADD COLUMN source_leader text;`
+  — exec stamps the copied leader's 0x addr; `GET /agents/copy-record/:leader` aggregates it into the
+  TraderDetail "COPIED ON NEXUS" block. Until run, logTrade drops it via the core fallback + the endpoint
+  returns `{available:false}` (UI hides) — graceful, but the feature stays dormant.
 - **Tier 3 — verifiable ledger (DONE, live):** `GET /agents/ledger` → canonical records + SHA-256
   `ledgerHash` anyone can recompute (verified: Python recompute == server hash). Each read checkpoints
   an append-only prev-linked hash chain (`GET /agents/ledger/chain`). Frontend TOP AGENTS shows the hash
