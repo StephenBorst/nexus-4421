@@ -16,8 +16,9 @@ interface SymRow { sym: string; realized: number; unrealized: number; open: bool
 interface Detail { address: string | null; totalRealized: number; totalUnrealized: number; profitableMarketsPct: number; markets: number; wins: number; losses: number; bySymbol: SymRow[]; }
 
 interface XrayTrack {
-  points: number; building: boolean;
+  points: number; building: boolean; scored?: boolean;
   daysTracked?: number; netRealized?: number; windows?: number;
+  gradedWindows?: number; gapWindows?: number;
   winWindowRate?: number | null; maxDrawdown?: number; curve?: number[];
   trend?: "UP" | "DOWN" | "FLAT"; operatorScore?: number | null;
   tier?: { tier: string; title: string; glyph: string } | null;
@@ -121,7 +122,7 @@ export function TraderDetail({ source, address, accountId, onClose }: {
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                     <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase" }}>Tracked Record</span>
                     {track.tier && (
-                      <span title={`${track.tier.title} — earned from ${track.windows} graded daily windows`} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3ecf8e", border: "1px solid #33333a", borderRadius: 3, padding: "1px 5px" }}>{track.tier.glyph} {track.tier.title.toUpperCase()}</span>
+                      <span title={`${track.tier.title} — earned from ${track.gradedWindows} graded daily windows`} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3ecf8e", border: "1px solid #33333a", borderRadius: 3, padding: "1px 5px" }}>{track.tier.glyph} {track.tier.title.toUpperCase()}</span>
                     )}
                     {typeof track.operatorScore === "number" && (
                       <span style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a" }}>OPERATOR SCORE <span style={{ color: "#ededf0", fontWeight: 700, fontSize: 12 }}>{track.operatorScore}</span></span>
@@ -148,15 +149,20 @@ export function TraderDetail({ source, address, accountId, onClose }: {
                         </div>
                         <div>
                           <div style={label}>Green Days</div>
-                          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: "#ededf0" }}>{track.winWindowRate ?? 0}%</div>
+                          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: "#ededf0" }}>{track.winWindowRate == null ? "—" : `${track.winWindowRate}%`}</div>
                         </div>
                         <div>
                           <div style={label}>Max Drawdown</div>
                           <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: "#f7525f" }}>-{usd(track.maxDrawdown || 0)}</div>
                         </div>
                       </div>
+                      {!track.scored && (
+                        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", marginTop: 8, lineHeight: 1.5 }}>
+                          Consistency score unlocks after ~4 days of daily snapshots{track.gapWindows ? " — sparse gaps in watching don't count toward it" : ""}. The net total above is already real.
+                        </div>
+                      )}
                       <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 8, lineHeight: 1.5 }}>
-                        Graded from the change in realized PnL between daily snapshots — the P&amp;L earned while watched, not lifetime history. Score is earned from a track length, so a short streak can&apos;t inflate it.
+                        Graded from the change in realized PnL between daily snapshots — the P&amp;L earned while watched, not lifetime history.{track.gapWindows ? " Long gaps between snapshots are excluded from the consistency read so a month can't pose as a green day." : " Score is earned from a track length, so a short streak can't inflate it."}
                       </div>
                     </>
                   )}

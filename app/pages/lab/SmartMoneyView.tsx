@@ -20,6 +20,9 @@ const AGENT_API = "https://og.nexustradinglabs.com";
 
 interface SmPosition { coin: string; sym: string | null; tradeable: boolean; side: "LONG" | "SHORT"; szUsd: number; entry: number; lev: number | null; uPnl: number; }
 interface SmTrader { source: "orderly" | "hl"; address: string; accountId?: string; pnl: number; pnlLabel: string; roi?: number | null; accountValue?: number; positions: SmPosition[]; }
+// Compact graded Tracked Record per wallet (from /smart/xray/tracked) — turns the
+// board from a raw-single-number leaderboard into a graded-consistency one.
+interface TrackChip { operatorScore: number | null; tier: { tier: string; title: string; glyph: string } | null; scored: boolean; netRealized: number; daysTracked: number; trend: "UP" | "DOWN" | "FLAT"; points: number; }
 
 const WATCH_KEY = "nexus_sm_watchlist";
 const loadWatch = (): string[] => { try { return JSON.parse(localStorage.getItem(WATCH_KEY) || "[]"); } catch { return []; } };
@@ -48,6 +51,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
   const [detail, setDetail] = useState<{ source: "orderly" | "hl"; address: string; accountId?: string } | null>(null);
   const [watch, setWatch] = useState<string[]>(loadWatch);
   const [watchOnly, setWatchOnly] = useState(false);
+  const [trackMap, setTrackMap] = useState<Record<string, TrackChip>>({});
   const [toast, setToast] = useState<string | null>(null);
   const { state: acct } = useAccount();
   const wallet = (acct as { address?: string })?.address?.toLowerCase() ?? null;
@@ -77,6 +81,19 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
       setWatch((local) => { const merged = [...new Set([...local, ...d.watch])]; try { localStorage.setItem(WATCH_KEY, JSON.stringify(merged)); } catch { /* ignore */ } return merged; });
     }).catch(() => {});
   }, [wallet]);
+
+  // Batch-load the graded Tracked Record for every wallet on the board + watchlist
+  // (KV-only server read; only wallets with ≥2 accrued snapshots come back).
+  useEffect(() => {
+    const addrs = [...new Set([...(board || []).map((t) => t.address.toLowerCase()), ...watch.map((w) => w.toLowerCase())])].slice(0, 60);
+    if (!addrs.length) return;
+    let cancel = false;
+    fetch(`${AGENT_API}/smart/xray/tracked?addresses=${addrs.join(",")}`)
+      .then((r) => r.json())
+      .then((x) => { if (!cancel && x && x.tracked) setTrackMap(x.tracked); })
+      .catch(() => {});
+    return () => { cancel = true; };
+  }, [board, watch]);
 
   // Smart-money CONSENSUS — coins where ≥2 tracked traders hold the same side.
   // The highest-conviction signal: not one whale, but agreement. Derived free
@@ -399,6 +416,18 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
                   <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: t.pnl >= 0 ? "#3ecf8e" : "#f7525f", flexShrink: 0 }}>{usd(t.pnl)} <span style={{ color: "#52525b" }}>{t.pnlLabel}</span></span>
                   {t.roi != null && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#a1a1aa", flexShrink: 0 }}>{(t.roi * 100).toFixed(0)}% ROI</span>}
                   {t.accountValue != null && t.accountValue > 0 && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", flexShrink: 0 }}>{usd(t.accountValue)} acct</span>}
+                  {(() => {
+                    const tk = trackMap[t.address.toLowerCase()];
+                    if (!tk) return null;
+                    if (tk.tier) return (
+                      <span onClick={() => openDetail(t.address, t.source, t.accountId)} title={`Operator Score ${tk.operatorScore} — graded from ${tk.daysTracked}d of realized-PnL consistency. Click for the full Tracked Record.`}
+                        style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#3ecf8e", border: "1px solid #33333a", borderRadius: 3, padding: "1px 5px", flexShrink: 0, cursor: "pointer" }}>{tk.tier.glyph} {tk.operatorScore}</span>
+                    );
+                    return (
+                      <span title={`Tracking — ${tk.points} snapshots. A graded Operator Score unlocks after ~4 daily windows.`}
+                        style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", flexShrink: 0 }}>▪ tracking</span>
+                    );
+                  })()}
                   <a href={t.source === "hl" ? `/analyze?address=${t.address}` : `https://orderly-dashboard.orderly.network/address/${t.address}`} target="_blank" rel="noopener noreferrer"
                     style={{ marginLeft: isMobile ? 0 : "auto", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", textDecoration: "none", border: "1px solid #232327", borderRadius: 3, padding: "3px 8px", flexShrink: 0 }}>
                     {t.source === "hl" ? "x-ray ↗" : "explorer ↗"}

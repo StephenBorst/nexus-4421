@@ -934,6 +934,10 @@ export function rankCaller(stats) {
 // zero so a wallet must earn a track LENGTH, not just one good window; (3) a
 // net-negative record earns no tier (mirrors rankCaller's avgR<=0 rule). Pure+tested.
 const DAY_MS = 86400 * 1000;
+// A window counts toward the consistency score only if its two daily snapshots are
+// within this span — 2.5 days absorbs the ~1/day cadence plus a missed cron tick,
+// while excluding true gaps (a wallet un-watched then re-watched weeks later).
+const MAX_WINDOW_DAYS = 2.5;
 
 // Collapse to at most one snapshot per UTC day (the last wins), sorted ascending.
 // The read-seeder + the cron can both write on the same day; without this a busy day
@@ -957,49 +961,65 @@ export function xrayTrack(snapshots) {
   const daysTracked = round((last.t - first.t) / DAY_MS, 1);
   const netRealized = Math.round((last.realized || 0) - (first.realized || 0));
 
-  // Per-window realized deltas → cumulative equity curve of the TRACKED window.
-  const deltas = [];
-  for (let i = 1; i < points; i++) deltas.push(Math.round((snaps[i].realized || 0) - (snaps[i - 1].realized || 0)));
+  // Per-window realized deltas → cumulative equity curve (continuous; gap-robust).
+  // ⚠️ Each window is GRADED only if its two snapshots are ≤ MAX_WINDOW_DAYS apart.
+  // A wallet that was watched, dropped for weeks, then watched again would otherwise
+  // lump that whole span into ONE window — a month of P&L masquerading as a single
+  // "green day", inflating consistency and hiding the real path. Gap windows still
+  // count toward the real total (netRealized) and the equity curve, but never toward
+  // the consistency read or the score. The whole point is a record you can trust.
+  const deltas = [], graded = [];
+  for (let i = 1; i < points; i++) {
+    const d = Math.round((snaps[i].realized || 0) - (snaps[i - 1].realized || 0));
+    deltas.push(d);
+    if ((snaps[i].t - snaps[i - 1].t) / DAY_MS <= MAX_WINDOW_DAYS) graded.push(d);
+  }
   const windows = deltas.length;
+  const gradedWindows = graded.length;
+  const gapWindows = windows - gradedWindows;
   let run = 0; const curve = [0];
   for (const d of deltas) { run += d; curve.push(run); }
 
-  const winWindows = deltas.filter((d) => d > 0).length;
-  const winWindowRate = round((winWindows / windows) * 100, 1);
-  const bestWindow = Math.max(...deltas);
-  const worstWindow = Math.min(...deltas);
+  // Consistency reads ONLY the daily-cadence (graded) windows.
+  const winWindows = graded.filter((d) => d > 0).length;
+  const winWindowRate = gradedWindows ? round((winWindows / gradedWindows) * 100, 1) : null;
+  const bestWindow = gradedWindows ? Math.max(...graded) : 0;
+  const worstWindow = gradedWindows ? Math.min(...graded) : 0;
 
-  // Max peak-to-trough drawdown on the cumulative realized curve (>=0).
-  let peak = curve[0], maxDrawdown = 0, peakPos = Math.max(0, ...curve);
+  // Max peak-to-trough drawdown on the FULL cumulative realized curve (real money).
+  let peak = curve[0], maxDrawdown = 0; const peakPos = Math.max(0, ...curve);
   for (const v of curve) { if (v > peak) peak = v; maxDrawdown = Math.max(maxDrawdown, peak - v); }
   maxDrawdown = Math.round(maxDrawdown);
 
-  const grossFlow = deltas.reduce((s, d) => s + Math.abs(d), 0);
+  // Score inputs are graded-window-only so gaps can't move them.
+  const netGraded = graded.reduce((s, d) => s + d, 0);
+  const gradedFlow = graded.reduce((s, d) => s + Math.abs(d), 0);
   // "Retention": share of gross realized flow that stuck as NET profit (a
   // profit-factor cousin honest to per-window data). Negative → clamped to 0.
-  const retention = grossFlow > 0 ? clamp01(netRealized / grossFlow) : 0;
-  const consistency = winWindows / windows; // 0..1 share of net-green windows
+  const retention = gradedFlow > 0 ? clamp01(netGraded / gradedFlow) : 0;
+  const consistency = gradedWindows ? winWindows / gradedWindows : 0; // 0..1 net-green share
   // Drawdown control: how shallow the worst dip is vs the gains achieved. No gains → 0.
   const drawdownControl = peakPos > 0 ? clamp01(1 - maxDrawdown / peakPos) : 0;
 
   // Transparent composite, then shrink toward 0 by track length so an unproven
   // wallet can't score high off one lucky window (K=6 windows ≈ a week of daily snaps).
   const raw = 0.5 * consistency + 0.3 * retention + 0.2 * drawdownControl;
-  const conf = windows / (windows + 6);
-  const scoreReady = windows >= 4;
-  const operatorScore = scoreReady ? Math.round(raw * conf * 100) : null;
+  const conf = gradedWindows / (gradedWindows + 6);
+  const scored = gradedWindows >= 4;
+  const operatorScore = scored ? Math.round(raw * conf * 100) : null;
 
   // Tier only when scored AND net-positive (negative records stay unranked but visible).
   let tier = null;
-  if (scoreReady && netRealized > 0) {
-    if (operatorScore >= 65 && windows >= 14) tier = { tier: "CONSISTENT", title: "Consistent", glyph: "✦" };
-    else if (operatorScore >= 40 && windows >= 7) tier = { tier: "POSITIVE", title: "Positive", glyph: "◆" };
+  if (scored && netRealized > 0) {
+    if (operatorScore >= 65 && gradedWindows >= 14) tier = { tier: "CONSISTENT", title: "Consistent", glyph: "✦" };
+    else if (operatorScore >= 40 && gradedWindows >= 7) tier = { tier: "POSITIVE", title: "Positive", glyph: "◆" };
     else tier = { tier: "TRACKED", title: "Tracked", glyph: "▪" };
   }
-  const trend = netRealized > grossFlow * 0.02 ? "UP" : netRealized < -grossFlow * 0.02 ? "DOWN" : "FLAT";
+  const trend = netRealized > 0 ? "UP" : netRealized < 0 ? "DOWN" : "FLAT";
 
   return {
-    points, building: false, daysTracked, netRealized, windows, winWindows,
+    points, building: false, scored, daysTracked, netRealized,
+    windows, gradedWindows, gapWindows, winWindows,
     winWindowRate, maxDrawdown, bestWindow, worstWindow, curve, trend,
     operatorScore, tier, latest: last,
     currentOpen: last.open || 0,

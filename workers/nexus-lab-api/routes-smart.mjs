@@ -164,6 +164,13 @@ export async function sweepTrackedXray(env) {
     if (!raw) continue;
     try { for (const a of JSON.parse(raw)) if (/^0x[a-f0-9]{40}$/i.test(a)) addrs.add(a.toLowerCase()); } catch { /* skip */ }
   }
+  // Also snapshot the current board's traders so the leaderboard itself becomes a
+  // GRADED-consistency board over time, not a raw single-number one (the moat move:
+  // one big realized print can be luck; an accruing record can't).
+  try {
+    const braw = await env.LAB_STORE.get("sm:board:v5");
+    if (braw) for (const t of (JSON.parse(braw).traders || [])) if (/^0x[a-f0-9]{40}$/i.test(t.address || "")) addrs.add(t.address.toLowerCase());
+  } catch { /* non-fatal */ }
   const targets = [...addrs].slice(0, 200);
   let snapped = 0;
   for (let i = 0; i < targets.length; i += 6) {
@@ -458,6 +465,27 @@ export async function handleSmart(parts, request, env, ctx) {
     const stale = !last || !Number.isFinite(last.t) || Date.now() - last.t >= XRAY_SNAP_MIN_MS;
     if (stale) { try { hist = await snapshotXray(env, address); } catch { /* keep stored */ } }
     return json({ address, snapshots: hist.length, track: xrayTrack(hist), updatedAt: Date.now() }, request);
+  }
+
+  if (parts[0] === "smart" && parts[1] === "xray" && parts[2] === "tracked" && request.method === "GET") {
+    // ── GET /smart/xray/tracked?addresses=a,b,c — batch graded records ─────────
+    // KV-only (no external fetch): reads each wallet's stored snapshot series and
+    // grades it. Powers the compact Operator Score / tier chip on the Smart Money
+    // board + watchlist rows without an aggregate fetch per row. Only wallets that
+    // have accrued ≥2 snapshots appear — the rest simply aren't tracked yet.
+    const addrs = [...new Set((url.searchParams.get("addresses") || "").split(",")
+      .map((s) => s.trim().toLowerCase()).filter((a) => /^0x[a-f0-9]{40}$/.test(a)))].slice(0, 60);
+    const out = {};
+    await Promise.all(addrs.map(async (a) => {
+      const hist = await readXrayHist(env, a);
+      if (hist.length < 2) return;
+      const tk = xrayTrack(hist);
+      out[a] = {
+        operatorScore: tk.operatorScore, tier: tk.tier, scored: tk.scored,
+        netRealized: tk.netRealized, daysTracked: tk.daysTracked, trend: tk.trend, points: tk.points,
+      };
+    }));
+    return json({ tracked: out }, request);
   }
 
   if (parts[0] === "smart" && parts[1] === "xray" && request.method === "GET") {

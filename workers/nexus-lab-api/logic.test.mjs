@@ -1465,4 +1465,47 @@ test("xrayTrack: collapses same-day snapshots to the last (no zero-length window
   assert.equal(r.windows, 1);
 });
 
+test("xrayTrack: a long snapshot GAP is not counted as a green day", () => {
+  // day0 → day30 (a 30-day gap, +5000) must NOT read as one flawless green window.
+  // Then two genuine daily windows: flat, then red.
+  const r = xrayTrack([
+    { t: 0, realized: 0 },
+    { t: 30 * DAY, realized: 5000 }, // gap window — excluded from consistency
+    { t: 31 * DAY, realized: 5000 }, // flat day (delta 0, not green)
+    { t: 32 * DAY, realized: 4900 }, // red day
+  ]);
+  assert.equal(r.windows, 3);
+  assert.equal(r.gradedWindows, 2);      // only the two 1-day windows count
+  assert.equal(r.gapWindows, 1);
+  assert.equal(r.netRealized, 4900);     // headline total is still the real money
+  assert.equal(r.winWindows, 0);         // neither graded window was green
+  assert.equal(r.winWindowRate, 0);
+  assert.equal(r.bestWindow, 0);         // best/worst read graded windows, not the +5000 gap
+});
+
+test("xrayTrack: an all-gap series withholds the consistency read (null), total stays real", () => {
+  const r = xrayTrack([
+    { t: 0, realized: 0 },
+    { t: 10 * DAY, realized: 300 },
+    { t: 25 * DAY, realized: 500 },
+  ]);
+  assert.equal(r.gradedWindows, 0);
+  assert.equal(r.winWindowRate, null);   // no daily-cadence data → no fake rate
+  assert.equal(r.operatorScore, null);   // can't score consistency we don't have
+  assert.equal(r.scored, false);
+  assert.equal(r.netRealized, 500);      // but the earned total is honest
+});
+
+test("xrayTrack: gap windows can't inflate the score above a clean daily record", () => {
+  // A wallet with one giant lucky gap + few daily windows must not outscore a
+  // long, clean daily record — the gap simply doesn't enter the score.
+  const gappy = xrayTrack([
+    { t: 0, realized: 0 }, { t: 40 * DAY, realized: 100000 }, // huge gap, excluded
+    { t: 41 * DAY, realized: 100050 }, { t: 42 * DAY, realized: 100100 },
+    { t: 43 * DAY, realized: 100160 }, { t: 44 * DAY, realized: 100230 },
+  ]);
+  assert.ok(gappy.gapWindows >= 1);
+  assert.equal(gappy.scored, gappy.gradedWindows >= 4);
+});
+
 function round2(n) { return Math.round(n * 10) / 10; }
