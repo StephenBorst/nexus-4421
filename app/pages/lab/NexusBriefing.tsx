@@ -68,6 +68,7 @@ export function NexusBriefing({
   const [agentActive, setAgentActive] = useState<boolean | null>(null);
   const [consensus, setConsensus] = useState<Consensus | null>(null);
   const [myContrarian, setMyContrarian] = useState<{ calls: number; avgR: number } | null>(null);
+  const [myAlignEdge, setMyAlignEdge] = useState<{ best: { bucket: string; avgR: number } } | null>(null);
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(COLLAPSE_KEY) === "1"; } catch { return false; }
   });
@@ -87,14 +88,18 @@ export function NexusBriefing({
 
   // Agent status — powers the "proven record, no agent running" personal nudge.
   useEffect(() => {
-    if (!wallet) { setAgentActive(null); setMyContrarian(null); return; }
+    if (!wallet) { setAgentActive(null); setMyContrarian(null); setMyAlignEdge(null); return; }
     let alive = true;
     fetch(`${AGENT_API}/agent/${wallet}`).then((r) => r.json())
       .then((d) => { if (alive) setAgentActive(!!d?.state?.active); })
       .catch(() => { /* nudge just won't fire */ });
-    // My own crowd-fading record — strengthens the fusion ("you're +NR fading").
+    // My own crowd-fading record + align (with/counter-trend) edge — both feed the fusion.
     fetch(`${AGENT_API}/theses/process/${wallet}`).then((r) => r.json())
-      .then((d) => { if (alive) setMyContrarian(d?.contrarian ? { calls: d.contrarian.calls, avgR: d.contrarian.avgR } : null); })
+      .then((d) => {
+        if (!alive) return;
+        setMyContrarian(d?.contrarian ? { calls: d.contrarian.calls, avgR: d.contrarian.avgR } : null);
+        setMyAlignEdge(d?.regimeEdges?.align?.best ? { best: { bucket: d.regimeEdges.align.best.bucket, avgR: d.regimeEdges.align.best.avgR } } : null);
+      })
       .catch(() => { /* fusion still fires without it */ });
     return () => { alive = false; };
   }, [wallet]);
@@ -114,8 +119,8 @@ export function NexusBriefing({
   // the graded caller lean, and my own edge. Leads the briefing when it fires.
   const fusion = useMemo(() => {
     const bt: BriefingTrade[] = trades.map((t) => ({ symbol: t.symbol, direction: t.direction, pnl: t.pnl, timestamp: t.timestamp }));
-    return buildFusion({ trades: bt, signals, consensus, tape, contrarian: myContrarian }).slice(0, 2);
-  }, [trades, signals, consensus, tape, myContrarian]);
+    return buildFusion({ trades: bt, signals, consensus, tape, contrarian: myContrarian, alignEdge: myAlignEdge }).slice(0, 2);
+  }, [trades, signals, consensus, tape, myContrarian, myAlignEdge]);
 
   // Coaching loop — remember every "your setup" the fusion flags, so follow-through
   // can be measured against your actual trades. Continuity, not a goldfish.

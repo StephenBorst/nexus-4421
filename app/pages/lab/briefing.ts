@@ -223,6 +223,10 @@ export interface FusionInput {
   consensus: Record<string, { side: "LONG" | "SHORT" | "SPLIT"; lean: number; participants: number }> | null;
   tape: { label: string; score: number } | null;
   contrarian?: { calls: number; avgR: number } | null; // the user's OWN fade record
+  // The user's ALIGN edge (with-trend vs counter-trend), from the graded regime
+  // attribution — the honest per-CLASS edge. A funding fade is a counter-trend play,
+  // so a strong AGAINST_TREND edge means the setup is the user's kind of trade.
+  alignEdge?: { best: { bucket: string; avgR: number } } | null;
 }
 
 export function buildFusion(input: FusionInput): Insight[] {
@@ -267,13 +271,35 @@ export function buildFusion(input: FusionInput): Insight[] {
   const faderNote = provenFader ? `, and your record fading the crowd is +${contrarian!.avgR}R over ${contrarian!.calls} calls` : "";
   const sideWord = (d: "LONG" | "SHORT") => (d === "LONG" ? "long" : "short");
 
+  // Per-CLASS edge: a funding fade is a COUNTER-TREND / mean-reversion play, so match it
+  // to the user's align edge. Strong AGAINST_TREND = their kind of trade; strong
+  // WITH_TREND = off-style (a momentum trader taking a counter-trend fade → respect it).
+  const alignBest = input.alignEdge?.best?.bucket || null;
+  const alignAvgR = input.alignEdge?.best?.avgR ?? 0;
+  const classStrong = alignBest === "align:AGAINST_TREND";
+  const classWeak = alignBest === "align:WITH_TREND";
+  const classNote = classStrong ? ` Counter-trend fades are your class — your align edge is +${alignAvgR}R against the trend.`
+    : classWeak ? " ⚠ Your record leans WITH-trend, so this counter-trend fade is off your usual style — respect the risk."
+    : "";
+
   if (userSide && userSide === fadeDir) {
     out.push({
       id: "fusion-your-setup",
       priority: 92,
       tone: "positive",
       title: `Your setup: fade the crowd ${sideWord(fadeDir)} on ${sym}`,
-      detail: `${sym}: ${setupPhrase} — the crowd is heavily ${heavy}, so the clean fade is ${sideWord(fadeDir)}, and that's your stronger side (${userWr}% win rate)${faderNote}.${callerNote}`,
+      detail: `${sym}: ${setupPhrase} — the crowd is heavily ${heavy}, so the clean fade is ${sideWord(fadeDir)}, and that's your stronger side (${userWr}% win rate)${faderNote}.${classNote}${callerNote}`,
+      action: { label: "Structure it", tab: "thesis" },
+      meta: { symbol: sym, direction: fadeDir },
+    });
+  } else if (!userSide && classStrong) {
+    // No directional edge, but the SETUP CLASS is where their edge lives.
+    out.push({
+      id: "fusion-your-class",
+      priority: 88,
+      tone: "positive",
+      title: `Your kind of setup: counter-trend fade ${sideWord(fadeDir)} on ${sym}`,
+      detail: `${sym}: ${setupPhrase} — the clean fade is ${sideWord(fadeDir)}, and counter-trend fades are where your edge lives (align +${alignAvgR}R against the trend)${faderNote}.${callerNote}`,
       action: { label: "Structure it", tab: "thesis" },
       meta: { symbol: sym, direction: fadeDir },
     });
