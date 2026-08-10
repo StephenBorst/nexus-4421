@@ -19,6 +19,7 @@ export interface Insight {
   title: string;                    // short headline
   detail: string;                   // one supporting line
   action?: { label: string; tab?: string }; // jump target inside the Lab
+  meta?: { symbol: string; direction: "LONG" | "SHORT" }; // structured setup (for the coaching loop)
 }
 
 export interface BriefingTrade {
@@ -228,14 +229,23 @@ export function buildFusion(input: FusionInput): Insight[] {
   const { trades, signals, consensus, contrarian } = input;
   const out: Insight[] = [];
 
-  // The market's cleanest fade: the most-stretched funding market. Fade the crowd.
+  // Setup selection, by CONVICTION CLASS. A confluence read (funding AND open interest
+  // agree — the agent's highest-conviction fade) wins; otherwise the most-stretched
+  // funding market. The direction is the fade in both cases. This is the generalization:
+  // the fusion reasons over setup CLASS, not just raw funding.
+  const confl = (signals || []).find((s) => s.confluence === "LONG" || s.confluence === "SHORT");
   const byFund = [...(signals || [])].sort((a, b) => Math.abs(b.funding_rate_8h) - Math.abs(a.funding_rate_8h));
   const hot = byFund.find((s) => Math.abs(s.funding_rate_8h) >= 0.0004);
-  if (!hot) return out;
-  const fadeDir: "LONG" | "SHORT" = hot.funding_rate_8h > 0 ? "SHORT" : "LONG";
-  const heavy = hot.funding_rate_8h > 0 ? "long" : "short";
-  const sym = hot.symbol;                                  // signals use bare tickers
-  const fundPct = (hot.funding_rate_8h * 100).toFixed(3);
+  const pick = confl || hot;
+  if (!pick) return out;
+  const klass: "confluence" | "funding" = confl ? "confluence" : "funding";
+  const fadeDir: "LONG" | "SHORT" = klass === "confluence" ? (pick.confluence as "LONG" | "SHORT") : (pick.funding_rate_8h > 0 ? "SHORT" : "LONG");
+  const heavy = fadeDir === "SHORT" ? "long" : "short";   // crowd is on the opposite side of the fade
+  const sym = pick.symbol;                                // signals use bare tickers
+  const fundPct = (pick.funding_rate_8h * 100).toFixed(3);
+  const setupPhrase = klass === "confluence"
+    ? "funding and open interest agree (the highest-conviction fade)"
+    : `funding is stretched (${fundPct}%/8h)`;
 
   // The graded crowd's lean on this symbol (merit-weighted callers), if any.
   const lean = consensus?.[sym] || null;
@@ -263,8 +273,9 @@ export function buildFusion(input: FusionInput): Insight[] {
       priority: 92,
       tone: "positive",
       title: `Your setup: fade the crowd ${sideWord(fadeDir)} on ${sym}`,
-      detail: `${sym} funding is stretched (${fundPct}%/8h) — the crowd is heavily ${heavy}, so the clean fade is ${sideWord(fadeDir)}, and that's your stronger side (${userWr}% win rate)${faderNote}.${callerNote}`,
+      detail: `${sym}: ${setupPhrase} — the crowd is heavily ${heavy}, so the clean fade is ${sideWord(fadeDir)}, and that's your stronger side (${userWr}% win rate)${faderNote}.${callerNote}`,
       action: { label: "Structure it", tab: "thesis" },
+      meta: { symbol: sym, direction: fadeDir },
     });
   } else if (userSide && userSide !== fadeDir) {
     out.push({
@@ -280,8 +291,8 @@ export function buildFusion(input: FusionInput): Insight[] {
       id: "fusion-signal-crowd",
       priority: 74,
       tone: "info",
-      title: `${sym}: funding and the graded callers both say fade ${sideWord(fadeDir)}`,
-      detail: `The crowd is heavily ${heavy} (funding ${fundPct}%/8h) and the merit-weighted callers lean ${sideWord(fadeDir)} too — the mechanical setup and the people with a track record agree.`,
+      title: `${sym}: the signal and the graded callers both say fade ${sideWord(fadeDir)}`,
+      detail: `${setupPhrase} — the crowd is heavily ${heavy} — and the merit-weighted callers lean ${sideWord(fadeDir)} too, so the mechanical setup and the people with a track record agree.`,
       action: { label: "See the read", tab: "intel" },
     });
   } else if (callersFight) {

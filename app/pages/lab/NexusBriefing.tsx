@@ -10,6 +10,10 @@
 import { useEffect, useMemo, useState } from "react";
 import type { TabId, ProcessedTrade } from "./types";
 import { buildBriefing, buildMarketRead, buildFusion, computeTape, type BriefingTrade, type Insight, type MarketSignal } from "./briefing";
+import { recordFlag, coachingInsight } from "@/lib/coaching.mjs";
+
+const FLAGS_KEY = "nexus_flagged_setups";
+const money = (n: number) => `${n < 0 ? "-" : "+"}$${Math.abs(n) >= 1000 ? `${(Math.abs(n) / 1000).toFixed(1)}K` : Math.abs(n).toFixed(2)}`;
 
 type Consensus = Record<string, { side: "LONG" | "SHORT" | "SPLIT"; lean: number; participants: number }>;
 
@@ -113,6 +117,36 @@ export function NexusBriefing({
     return buildFusion({ trades: bt, signals, consensus, tape, contrarian: myContrarian }).slice(0, 2);
   }, [trades, signals, consensus, tape, myContrarian]);
 
+  // Coaching loop — remember every "your setup" the fusion flags, so follow-through
+  // can be measured against your actual trades. Continuity, not a goldfish.
+  useEffect(() => {
+    const yourSetup = fusion.find((f) => f.id === "fusion-your-setup" && f.meta);
+    if (!yourSetup?.meta) return;
+    try {
+      const cur = JSON.parse(localStorage.getItem(FLAGS_KEY) || "[]");
+      localStorage.setItem(FLAGS_KEY, JSON.stringify(recordFlag(cur, yourSetup.meta, Date.now())));
+    } catch { /* private mode */ }
+  }, [fusion]);
+
+  const coaching = useMemo<Insight | null>(() => {
+    if (!wallet || !trades.length) return null;
+    let flags: { symbol: string; direction: "LONG" | "SHORT"; ts: number }[] = [];
+    try { flags = JSON.parse(localStorage.getItem(FLAGS_KEY) || "[]"); } catch { /* ignore */ }
+    const bt = trades.map((t) => ({ symbol: t.symbol, direction: t.direction, pnl: t.pnl, timestamp: t.timestamp }));
+    const c = coachingInsight(flags, bt, Date.now());
+    if (!c) return null;
+    return {
+      id: "coaching-followthrough",
+      priority: 58,
+      tone: c.taken === 0 ? "caution" : "info",
+      title: `You acted on ${c.taken} of your last ${c.flags} flagged setups`,
+      detail: c.taken === 0
+        ? `The Briefing flagged ${c.flags} setups on your side and you took none — the edge only pays if you pull the trigger on it.`
+        : `${c.rate}% follow-through${c.takenPnl !== 0 ? `, netting ${money(c.takenPnl)} on the ones you took` : ""}.${c.skipped > 0 ? ` ${c.skipped} you let go by.` : " Discipline on your own signal."}`,
+      action: { label: "Your log", tab: "tradelog" },
+    };
+  }, [wallet, trades, fusion]); // fusion dep → recompute after a fresh flag records
+
   const market = useMemo(
     () => buildMarketRead({ rows, signals, liveAgents, tape })
       .filter((m) => !fusion.some((f) => f.detail.startsWith(m.title.split(" ")[0]))) // avoid echoing the fusion's symbol read
@@ -124,7 +158,7 @@ export function NexusBriefing({
 
   const toggle = () => setCollapsed((c) => { const n = !c; try { localStorage.setItem(COLLAPSE_KEY, n ? "1" : "0"); } catch { /* ignore */ } return n; });
 
-  const total = fusion.length + personal.length + market.length;
+  const total = fusion.length + personal.length + market.length + (coaching ? 1 : 0);
   const askAi = () => window.dispatchEvent(new CustomEvent("nexus:assistant-ask", {
     detail: {
       prompt: personal.length
@@ -161,9 +195,10 @@ export function NexusBriefing({
             </>
           )}
           {/* Personal lens next when present, labeled only when other lenses show. */}
-          {personal.length > 0 && (
+          {(personal.length > 0 || coaching) && (
             <>
               {(fusion.length > 0 || market.length > 0) && <GroupLabel text="Your terminal" />}
+              {coaching && <InsightRow key={coaching.id} ins={coaching} onSelectTab={onSelectTab} />}
               {personal.map((ins) => <InsightRow key={ins.id} ins={ins} onSelectTab={onSelectTab} />)}
             </>
           )}
