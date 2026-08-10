@@ -8,12 +8,12 @@ export function LabWelcome() {
   // looks like an afterthought. Ordered by the trader's lifecycle: scout → plan →
   // automate → validate → grade → record.
   const features = [
-    { icon: "◎", title: "Smart Money", desc: "See what proven on-chain traders are holding right now across Orderly and Hyperliquid — then copy any move into a risk-managed trade." },
+    { icon: "◆", title: "The Briefing · Live Signals", desc: "The terminal reads the market, the graded caller crowd, and your own record — then tells you which setups are actually yours. A live signals bell (and Telegram) so you never miss one." },
+    { icon: "◎", title: "Smart Money", desc: "See what proven on-chain traders are holding right now across Orderly and Hyperliquid — with a graded Consistency Score on any wallet — then copy any move into a risk-managed trade." },
     { icon: "◈", title: "The Nexus Thesis Engine", desc: "Plan every trade — position sizing, R:R, funding cost, live P&L tracking, on-chain proof." },
     { icon: "⬢", title: "Autonomous Trading Agent", desc: "Runs your strategy hands-free and grades every close on-chain. Scale-out & trailing exits, DCA, TradingView signals. Hard risk caps, kill switch, order-only keys." },
-    { icon: "◆", title: "Strategy Workbench", desc: "Build a strategy by trading style, backtest it on real history, then publish it — every result graded on-chain. Verify, don't trust." },
-    { icon: "▣", title: "Analytics", desc: "Trading score, win-rate breakdowns, hold-time & leverage analysis — grade yourself like a desk." },
-    { icon: "▤", title: "Trade Log", desc: "Full journal of every closed day with notes, filters, and a calendar heatmap." },
+    { icon: "◇", title: "Strategy Workbench", desc: "Build a strategy by trading style, backtest it on real history, then publish it — every result graded on-chain. Verify, don't trust." },
+    { icon: "▣", title: "Analytics & Journal", desc: "Trading score, win-rate & hold-time breakdowns, leverage analysis, and a full journal with a calendar heatmap — grade yourself like a desk." },
   ];
   return (
     <div style={{ padding: "32px 8px" }}>

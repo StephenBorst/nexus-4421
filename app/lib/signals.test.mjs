@@ -44,3 +44,17 @@ test("countUnseen: counts only ids not in the seen set", () => {
   assert.equal(countUnseen(list, { a: 1, b: 1, c: 1 }), 0);
   assert.equal(countUnseen(list, {}), 3);
 });
+
+test("buildSignals: a strong trend surfaces a MOMENTUM signal (ride it)", () => {
+  const out = buildSignals({ signals: [{ symbol: "BTC", funding_rate_8h: 0.0001, trend: "TREND_UP", trend_move_pct: 6.2 }] });
+  const mom = out.find((s) => s.kind === "MOMENTUM");
+  assert.ok(mom, "expected a MOMENTUM signal");
+  assert.equal(mom.id, "mom-BTC-LONG");
+  assert.match(mom.title, /long momentum/);
+  assert.match(mom.detail, /uptrend/);
+});
+
+test("buildSignals: CHOP / no trend → no momentum signal", () => {
+  const out = buildSignals({ signals: [{ symbol: "BTC", funding_rate_8h: 0.0001, trend: "CHOP", trend_move_pct: 0.2 }] });
+  assert.equal(out.find((s) => s.kind === "MOMENTUM"), undefined);
+});

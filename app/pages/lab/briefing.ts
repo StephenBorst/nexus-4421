@@ -94,6 +94,8 @@ export interface MarketSignal {
   funding_signal: "LONG" | "SHORT" | "NONE";
   oi_signal: "LONG" | "SHORT" | "NONE";
   confluence: "LONG" | "SHORT" | "NONE";
+  trend?: "TREND_UP" | "TREND_DOWN" | "CHOP" | null;  // 1h regime (momentum source)
+  trend_move_pct?: number | null;                     // net % move over the trend window
 }
 
 export interface MarketReadInput {
@@ -271,18 +273,37 @@ export function buildFusion(input: FusionInput): Insight[] {
   const faderNote = provenFader ? `, and your record fading the crowd is +${contrarian!.avgR}R over ${contrarian!.calls} calls` : "";
   const sideWord = (d: "LONG" | "SHORT") => (d === "LONG" ? "long" : "short");
 
-  // Per-CLASS edge: a funding fade is a COUNTER-TREND / mean-reversion play, so match it
-  // to the user's align edge. Strong AGAINST_TREND = their kind of trade; strong
-  // WITH_TREND = off-style (a momentum trader taking a counter-trend fade → respect it).
+  // Per-CLASS edge (the matrix). A funding fade is a COUNTER-TREND / mean-reversion play;
+  // riding a trend is a WITH-trend / momentum play. Match the setup to the user's ALIGN
+  // edge: AGAINST_TREND traders get fades, WITH_TREND traders get the trend to ride.
   const alignBest = input.alignEdge?.best?.bucket || null;
   const alignAvgR = input.alignEdge?.best?.avgR ?? 0;
-  const classStrong = alignBest === "align:AGAINST_TREND";
-  const classWeak = alignBest === "align:WITH_TREND";
-  const classNote = classStrong ? ` Counter-trend fades are your class — your align edge is +${alignAvgR}R against the trend.`
-    : classWeak ? " ⚠ Your record leans WITH-trend, so this counter-trend fade is off your usual style — respect the risk."
+  const classAgainst = alignBest === "align:AGAINST_TREND"; // mean-reversion / fader
+  const classWith = alignBest === "align:WITH_TREND";       // momentum / trend-rider
+  const classNote = classAgainst ? ` Counter-trend fades are your class — your align edge is +${alignAvgR}R against the trend.`
+    : classWith ? " ⚠ Your record leans WITH-trend, so this counter-trend fade is off your usual style — respect the risk."
     : "";
 
-  if (userSide && userSide === fadeDir) {
+  // The MOMENTUM setup: the strongest-trending core symbol (ride it, don't fade it).
+  const trending = (signals || [])
+    .filter((s) => s.trend === "TREND_UP" || s.trend === "TREND_DOWN")
+    .sort((a, b) => Math.abs(b.trend_move_pct ?? 0) - Math.abs(a.trend_move_pct ?? 0));
+  const mom = trending[0] || null;
+  const momDir: "LONG" | "SHORT" | null = mom ? (mom.trend === "TREND_UP" ? "LONG" : "SHORT") : null;
+  const momMove = mom?.trend_move_pct ?? 0;
+
+  if (mom && momDir && classWith) {
+    // A momentum trader + a live trend = ride it. Leads for this user (their class).
+    out.push({
+      id: "fusion-momentum",
+      priority: 92,
+      tone: "positive",
+      title: `Your setup: ride the ${mom.symbol} trend (${sideWord(momDir)})`,
+      detail: `${mom.symbol} is in a strong ${momDir === "LONG" ? "uptrend" : "downtrend"} (${momMove >= 0 ? "+" : ""}${momMove}% over the window), and momentum is your class — your align edge is +${alignAvgR}R WITH the trend. Ride it, don't fade it.`,
+      action: { label: "Structure it", tab: "thesis" },
+      meta: { symbol: mom.symbol, direction: momDir },
+    });
+  } else if (userSide && userSide === fadeDir) {
     out.push({
       id: "fusion-your-setup",
       priority: 92,
@@ -292,7 +313,7 @@ export function buildFusion(input: FusionInput): Insight[] {
       action: { label: "Structure it", tab: "thesis" },
       meta: { symbol: sym, direction: fadeDir },
     });
-  } else if (!userSide && classStrong) {
+  } else if (!userSide && classAgainst) {
     // No directional edge, but the SETUP CLASS is where their edge lives.
     out.push({
       id: "fusion-your-class",

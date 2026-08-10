@@ -16,7 +16,7 @@ interface Signal { id: string; kind: string; priority: number; ts: number; tab: 
 const loadSeen = (): Record<string, number> => { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || "{}"); } catch { return {}; } };
 const saveSeen = (m: Record<string, number>) => { try { localStorage.setItem(SEEN_KEY, JSON.stringify(m)); } catch { /* private mode */ } };
 
-const KIND_GLYPH: Record<string, string> = { FADE_ALIGN: "◆", DIVERGENCE: "⚔", FUNDING: "≈", TIER: "✦" };
+const KIND_GLYPH: Record<string, string> = { FADE_ALIGN: "◆", DIVERGENCE: "⚔", MOMENTUM: "↗", FUNDING: "≈", TIER: "✦" };
 
 export default function SignalsNavButton() {
   const [list, setList] = useState<Signal[]>([]);

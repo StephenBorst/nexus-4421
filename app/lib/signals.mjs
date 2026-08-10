@@ -40,7 +40,21 @@ export function buildSignals({ signals, consensus, xrayEvents } = {}) {
     }
   }
 
-  // 2 — Tracked-wallet tier crossings (a watched wallet earned/lost a consistency tier).
+  // 2 — Momentum: the strongest-trending core symbol (ride it, don't fade it). Public
+  // trend read (classifyRegime), so it's a with-trend signal for momentum traders.
+  const trending = (signals || [])
+    .filter((s) => s && (s.trend === "TREND_UP" || s.trend === "TREND_DOWN"))
+    .sort((a, b) => Math.abs(Number(b.trend_move_pct) || 0) - Math.abs(Number(a.trend_move_pct) || 0));
+  const mom = trending[0];
+  if (mom) {
+    const dir = mom.trend === "TREND_UP" ? "LONG" : "SHORT";
+    const move = Number(mom.trend_move_pct) || 0;
+    out.push({ id: `mom-${mom.symbol}-${dir}`, kind: "MOMENTUM", priority: 70, ts: now, tab: "intel",
+      title: `${mom.symbol} is trending — ${sideWord(dir)} momentum`,
+      detail: `${mom.symbol} is in a strong ${dir === "LONG" ? "uptrend" : "downtrend"} (${move >= 0 ? "+" : ""}${move}% over the window) — a with-trend read for momentum traders, not a fade.` });
+  }
+
+  // 3 — Tracked-wallet tier crossings (a watched wallet earned/lost a consistency tier).
   for (const e of (xrayEvents || []).slice(0, 6)) {
     if (!e || !e.wallet) continue;
     const up = e.kind === "TIER_UP";

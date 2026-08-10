@@ -3,11 +3,36 @@
 // ◆ SIGNALS bell shows (shared `buildSignals` from app/lib — one engine, zero drift) and
 // DMs the single highest-conviction one to opted-in Telegram subscribers, throttled and
 // deduped so it never spams. Opt-in via the bot `/signals on`. Requires TELEGRAM_TOKEN.
-import { confluenceSignal, consensusBySymbol } from "./logic.mjs";
+import { confluenceSignal, consensusBySymbol, classifyRegime } from "./logic.mjs";
 import { gatherStanceEntries } from "./grading.mjs";
 import { buildSignals } from "../../app/lib/signals.mjs";
 
 const SIGNAL_SYMS = ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC", "PERP_ARB_USDC", "PERP_HYPE_USDC", "PERP_XRP_USDC", "PERP_DOGE_USDC"];
+
+// The MOMENTUM signal source. A trend read per core symbol, classified from 1h OHLC by
+// the SAME classifyRegime that grades a caller's align edge — so "ride the trend" (a
+// momentum setup) and "your align edge is WITH the trend" (the user's class) speak one
+// language. Cached in KV so the /signals hot path only does a cheap read, not an OHLC
+// fetch. Run on the hourly cron. Returns how many symbols were classified.
+export async function snapshotTrendRegimes(env) {
+  const KV = env.NEXUS_AGENT || env.LAB_STORE;
+  const now = Math.floor(Date.now() / 1000);
+  const from = now - 80 * 3600; // ~80 candles ≥ the 48-candle lookback
+  let stored = 0;
+  await Promise.all(SIGNAL_SYMS.map(async (sym) => {
+    try {
+      const d = await (await fetch(`https://api-evm.orderly.org/tv/history?symbol=${sym}&resolution=60&from=${from}&to=${now}`)).json();
+      if (!d || d.s !== "ok" || !Array.isArray(d.t) || !d.t.length) return;
+      const cd = { t: d.t, h: d.h, l: d.l, c: d.c };
+      const reg = classifyRegime(cd, cd.t[cd.t.length - 1]);
+      if (!reg) return;
+      const bare = sym.replace("PERP_", "").replace("_USDC", "");
+      await KV.put(`regime:${bare}`, JSON.stringify({ trend: reg.trend, vol: reg.vol, movePct: reg.movePct, t: Date.now() }), { expirationTtl: 6 * 3600 });
+      stored++;
+    } catch { /* skip this symbol */ }
+  }));
+  return stored;
+}
 const BROADCAST_KEY = "signals:broadcast";     // { id, ts } of the last DM'd signal
 const MIN_BROADCAST_MS = 3 * 3600 * 1000;      // at most one push / 3h, however hot the tape
 
@@ -25,12 +50,15 @@ export async function computeSignalRows(env) {
       const priceChange = prev?.price ? (mark - prev.price) / prev.price : 0;
       const oiChange = prev?.oi ? (oi - prev.oi) / prev.oi : 0;
       const sig = confluenceSignal({ fundingRate: funding, priceChange, oiChange, hasPrev: !!prev });
+      const bare = sym.replace("PERP_", "").replace("_USDC", "");
+      const reg = JSON.parse((await KV.get(`regime:${bare}`)) || "null"); // cached trend read
       return {
-        symbol: sym.replace("PERP_", "").replace("_USDC", ""),
+        symbol: bare,
         mark_price: mark, funding_rate_8h: funding, open_interest: oi,
         price_change_pct: Number((priceChange * 100).toFixed(3)),
         oi_change_pct: Number((oiChange * 100).toFixed(3)),
         funding_signal: sig.fundingSignal, oi_signal: sig.oiSignal, confluence: sig.confluence,
+        trend: reg?.trend ?? null, trend_move_pct: reg?.movePct ?? null,
       };
     } catch { return null; }
   }));
@@ -53,7 +81,7 @@ export async function deliverSignals(env) {
     KV.get("xray:events"),
   ]);
   const built = buildSignals({ signals, consensus, xrayEvents: evRaw ? JSON.parse(evRaw) : [] });
-  const top = built.find((s) => s.kind === "FADE_ALIGN" || s.kind === "DIVERGENCE");
+  const top = built.find((s) => s.kind === "FADE_ALIGN" || s.kind === "DIVERGENCE" || s.kind === "MOMENTUM");
   if (!top) return { sent: 0, reason: "no_high_conviction_signal" };
   if (top.id === last.id) return { sent: 0, reason: "unchanged" };
   if (Date.now() - (last.ts || 0) < MIN_BROADCAST_MS) return { sent: 0, reason: "throttled" };

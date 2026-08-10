@@ -60,7 +60,7 @@ import { handleFeed } from "./routes-feed.mjs";
 import { loadOiHistForBacktest, revalidateStrategy, OI_BACKTEST_MIN_DAYS, OI_BACKTEST_MIN_SAMPLES } from "./strategies.mjs";
 import { json, cors, normalizeAddress, recoverEthAddress, ALLOWED_ORIGINS, holdersRoomMessage, appendNotification } from "./shared.mjs";
 import { gradedStatusOf, fetchGradeHistory, gradePublicTheses, computeCallerStats, snapshotStances, REGIME_PAD_S, ADVICE_FLAG_TEXT } from "./grading.mjs";
-import { computeSignalRows, deliverSignals } from "./signal-delivery.mjs";
+import { computeSignalRows, deliverSignals, snapshotTrendRegimes } from "./signal-delivery.mjs";
 // The SAME synthesis the Lab + trader page render (pure, dependency-free), so the
 // shareable card can never disagree with the profile it depicts. Bundled cross-dir by
 // wrangler like the other ../ imports.
@@ -596,6 +596,13 @@ export default {
     ctx.waitUntil((async () => {
       try { const n = await snapshotStances(env); console.log(`[stances] snapshotted ${n} symbol leans`); }
       catch (e) { console.error("[stances] snapshot failed:", String(e)); }
+    })());
+    // Hourly: classify each core symbol's trend regime (the momentum signal source),
+    // cached for the /signals hot path + the fusion. Runs BEFORE delivery so the push
+    // reads fresh trend data.
+    ctx.waitUntil((async () => {
+      try { const n = await snapshotTrendRegimes(env); console.log(`[regime] classified ${n} symbol trends`); }
+      catch (e) { console.error("[regime] snapshot failed:", String(e)); }
     })());
     // Hourly: push the single highest-conviction signal to opted-in Telegram subscribers
     // (throttled + deduped inside). Signals reach traders when the app is closed.
