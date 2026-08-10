@@ -9,7 +9,9 @@
 // go deeper. Renders nothing when there's genuinely nothing to say (cold-start safe).
 import { useEffect, useMemo, useState } from "react";
 import type { TabId, ProcessedTrade } from "./types";
-import { buildBriefing, buildMarketRead, computeTape, type BriefingTrade, type Insight, type MarketSignal } from "./briefing";
+import { buildBriefing, buildMarketRead, buildFusion, computeTape, type BriefingTrade, type Insight, type MarketSignal } from "./briefing";
+
+type Consensus = Record<string, { side: "LONG" | "SHORT" | "SPLIT"; lean: number; participants: number }>;
 
 const PROXY = "https://orderly-proxy.stephenpatrick24.workers.dev";
 const AGENT_API = "https://og.nexustradinglabs.com";
@@ -60,6 +62,8 @@ export function NexusBriefing({
   const [signals, setSignals] = useState<MarketSignal[] | null>(null);
   const [liveAgents, setLiveAgents] = useState<number | null>(null);
   const [agentActive, setAgentActive] = useState<boolean | null>(null);
+  const [consensus, setConsensus] = useState<Consensus | null>(null);
+  const [myContrarian, setMyContrarian] = useState<{ calls: number; avgR: number } | null>(null);
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(COLLAPSE_KEY) === "1"; } catch { return false; }
   });
@@ -72,16 +76,22 @@ export function NexusBriefing({
     fetch(`${AGENT_API}/signals`).then((r) => r.json()).then((j) => { if (alive) setSignals(Array.isArray(j?.signals) ? j.signals : []); }).catch(() => { /* no setups */ });
     // /agents/live returns { count, positions:[...] } — count is authoritative.
     fetch(`${AGENT_API}/agents/live`).then((r) => r.json()).then((j) => { if (alive) setLiveAgents(typeof j?.count === "number" ? j.count : (Array.isArray(j?.positions) ? j.positions.length : 0)); }).catch(() => { /* no live count */ });
+    // The merit-weighted caller lean per symbol — the graded crowd, for the fusion.
+    fetch(`${AGENT_API}/theses/consensus`).then((r) => r.json()).then((j) => { if (alive) setConsensus(j?.consensus ?? null); }).catch(() => { /* no crowd lean */ });
     return () => { alive = false; };
   }, []);
 
   // Agent status — powers the "proven record, no agent running" personal nudge.
   useEffect(() => {
-    if (!wallet) { setAgentActive(null); return; }
+    if (!wallet) { setAgentActive(null); setMyContrarian(null); return; }
     let alive = true;
     fetch(`${AGENT_API}/agent/${wallet}`).then((r) => r.json())
       .then((d) => { if (alive) setAgentActive(!!d?.state?.active); })
       .catch(() => { /* nudge just won't fire */ });
+    // My own crowd-fading record — strengthens the fusion ("you're +NR fading").
+    fetch(`${AGENT_API}/theses/process/${wallet}`).then((r) => r.json())
+      .then((d) => { if (alive) setMyContrarian(d?.contrarian ? { calls: d.contrarian.calls, avgR: d.contrarian.avgR } : null); })
+      .catch(() => { /* fusion still fires without it */ });
     return () => { alive = false; };
   }, [wallet]);
 
@@ -96,16 +106,25 @@ export function NexusBriefing({
     }).slice(0, 3);
   }, [wallet, trades, winRate, totalPnl, openPositions, tape, agentActive]);
 
+  // ⭐ THE FUSION — is the market's setup MINE? Intersects the crowded-fade signal,
+  // the graded caller lean, and my own edge. Leads the briefing when it fires.
+  const fusion = useMemo(() => {
+    const bt: BriefingTrade[] = trades.map((t) => ({ symbol: t.symbol, direction: t.direction, pnl: t.pnl, timestamp: t.timestamp }));
+    return buildFusion({ trades: bt, signals, consensus, tape, contrarian: myContrarian }).slice(0, 2);
+  }, [trades, signals, consensus, tape, myContrarian]);
+
   const market = useMemo(
-    () => buildMarketRead({ rows, signals, liveAgents, tape }).slice(0, personal.length ? 3 : 4),
-    [rows, signals, liveAgents, tape, personal.length]
+    () => buildMarketRead({ rows, signals, liveAgents, tape })
+      .filter((m) => !fusion.some((f) => f.detail.startsWith(m.title.split(" ")[0]))) // avoid echoing the fusion's symbol read
+      .slice(0, (personal.length ? 3 : 4) - Math.min(fusion.length, 1)),
+    [rows, signals, liveAgents, tape, personal.length, fusion]
   );
 
-  if (!personal.length && !market.length) return null;
+  if (!fusion.length && !personal.length && !market.length) return null;
 
   const toggle = () => setCollapsed((c) => { const n = !c; try { localStorage.setItem(COLLAPSE_KEY, n ? "1" : "0"); } catch { /* ignore */ } return n; });
 
-  const total = personal.length + market.length;
+  const total = fusion.length + personal.length + market.length;
   const askAi = () => window.dispatchEvent(new CustomEvent("nexus:assistant-ask", {
     detail: {
       prompt: personal.length
@@ -134,16 +153,23 @@ export function NexusBriefing({
 
       {!collapsed && (
         <div>
-          {/* Personal lens first when present, labeled only when both lenses show. */}
+          {/* ⭐ The fusion leads — "is this setup mine". Labeled only when other lenses show. */}
+          {fusion.length > 0 && (
+            <>
+              {(personal.length > 0 || market.length > 0) && <GroupLabel text="The read · your edge × the market" />}
+              {fusion.map((ins) => <InsightRow key={ins.id} ins={ins} onSelectTab={onSelectTab} />)}
+            </>
+          )}
+          {/* Personal lens next when present, labeled only when other lenses show. */}
           {personal.length > 0 && (
             <>
-              {market.length > 0 && <GroupLabel text="Your terminal" />}
+              {(fusion.length > 0 || market.length > 0) && <GroupLabel text="Your terminal" />}
               {personal.map((ins) => <InsightRow key={ins.id} ins={ins} onSelectTab={onSelectTab} />)}
             </>
           )}
           {market.length > 0 && (
             <>
-              {personal.length > 0 && <GroupLabel text="The market" />}
+              {(fusion.length > 0 || personal.length > 0) && <GroupLabel text="The market" />}
               {market.map((ins) => <InsightRow key={ins.id} ins={ins} onSelectTab={onSelectTab} />)}
             </>
           )}

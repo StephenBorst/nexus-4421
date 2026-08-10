@@ -125,7 +125,7 @@ export async function handleTheses(parts, request, env) {
   if (parts[0] === "theses" && parts[1] === "process" && parts[2]) {
     if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
     const wallet = parts[2].toLowerCase();
-    const byWallet = await computeCallerStats(env, 30 * 86400, { onlyWallet: wallet });
+    const byWallet = await computeCallerStats(env, 30 * 86400, { onlyWallet: wallet, contrarian: true });
     const a = Object.values(byWallet)[0];
     if (!a || !a.calls) {
       return json({ wallet, calls: 0, regime: {}, regimeEdges: {}, discipline: null, note: "no resolved public calls yet" }, request);
@@ -142,6 +142,8 @@ export async function handleTheses(parts, request, env) {
       expectancy: a.expectancy,
       // Conviction calibration: when they bet bigger, were they more right?
       calibration: a.calibration,
+      // Their own record fading the crowd (contrarian vs with-crowd), or null.
+      contrarian: a.contrarian || null,
       // How many calls had enough prior history to classify (< calls near the
       // horizon edge). Stated so a thin breakdown reads as thin, not as fact.
       attributed: a.regimeAttributed,

@@ -207,6 +207,97 @@ export function buildMarketRead(input: MarketReadInput): Insight[] {
   return out.sort((a, b) => b.priority - a.priority);
 }
 
+// ── THE FUSION — the synthesis of syntheses ──────────────────────────────────
+// Every other read is EITHER about the market (tape, funding, movers) OR about you
+// (your record, your leaks). This is the intersection nobody else can compute: it
+// takes the market's cleanest fade setup (crowded funding), the merit-weighted CALLER
+// consensus on that symbol, and YOUR edge (which side you're actually good at + whether
+// you're a proven crowd-fader) and asks the only question that matters — "is this setup
+// MINE?". Aligned → your highest-conviction, personalized play. Off your edge → the
+// blunt "sit it out". This is the moat: it requires the graded market, the graded crowd,
+// and your graded record all at once. Pure + fail-soft on any missing input.
+export interface FusionInput {
+  trades: BriefingTrade[];
+  signals: MarketSignal[] | null;
+  consensus: Record<string, { side: "LONG" | "SHORT" | "SPLIT"; lean: number; participants: number }> | null;
+  tape: { label: string; score: number } | null;
+  contrarian?: { calls: number; avgR: number } | null; // the user's OWN fade record
+}
+
+export function buildFusion(input: FusionInput): Insight[] {
+  const { trades, signals, consensus, contrarian } = input;
+  const out: Insight[] = [];
+
+  // The market's cleanest fade: the most-stretched funding market. Fade the crowd.
+  const byFund = [...(signals || [])].sort((a, b) => Math.abs(b.funding_rate_8h) - Math.abs(a.funding_rate_8h));
+  const hot = byFund.find((s) => Math.abs(s.funding_rate_8h) >= 0.0004);
+  if (!hot) return out;
+  const fadeDir: "LONG" | "SHORT" = hot.funding_rate_8h > 0 ? "SHORT" : "LONG";
+  const heavy = hot.funding_rate_8h > 0 ? "long" : "short";
+  const sym = hot.symbol;                                  // signals use bare tickers
+  const fundPct = (hot.funding_rate_8h * 100).toFixed(3);
+
+  // The graded crowd's lean on this symbol (merit-weighted callers), if any.
+  const lean = consensus?.[sym] || null;
+  const callersAgree = !!(lean && lean.side === fadeDir);
+  const callersFight = !!(lean && lean.side !== fadeDir && lean.side !== "SPLIT");
+  const callerNote = callersAgree ? " The merit-weighted callers lean the same way — the setup and the people with a track record agree."
+    : callersFight ? ` But the credible callers actually lean ${lean!.side} — a real disagreement, so treat it as lower-conviction.`
+    : "";
+
+  // Your edge: which side you're measurably better on (needs a real sample both sides).
+  const longs = trades.filter((t) => t.direction === "LONG");
+  const shorts = trades.filter((t) => t.direction === "SHORT");
+  let userSide: "LONG" | "SHORT" | null = null, userWr = 0;
+  if (longs.length >= 4 && shorts.length >= 4) {
+    const lw = wrOf(longs), sw = wrOf(shorts);
+    if (Math.abs(lw - sw) >= 12) { userSide = lw > sw ? "LONG" : "SHORT"; userWr = Math.max(lw, sw); }
+  }
+  const provenFader = !!(contrarian && contrarian.calls >= 3 && contrarian.avgR > 0);
+  const faderNote = provenFader ? `, and your record fading the crowd is +${contrarian!.avgR}R over ${contrarian!.calls} calls` : "";
+  const sideWord = (d: "LONG" | "SHORT") => (d === "LONG" ? "long" : "short");
+
+  if (userSide && userSide === fadeDir) {
+    out.push({
+      id: "fusion-your-setup",
+      priority: 92,
+      tone: "positive",
+      title: `Your setup: fade the crowd ${sideWord(fadeDir)} on ${sym}`,
+      detail: `${sym} funding is stretched (${fundPct}%/8h) — the crowd is heavily ${heavy}, so the clean fade is ${sideWord(fadeDir)}, and that's your stronger side (${userWr}% win rate)${faderNote}.${callerNote}`,
+      action: { label: "Structure it", tab: "thesis" },
+    });
+  } else if (userSide && userSide !== fadeDir) {
+    out.push({
+      id: "fusion-not-your-side",
+      priority: 84,
+      tone: "caution",
+      title: `${sym}'s setup is a ${sideWord(fadeDir)} fade — not your side`,
+      detail: `The crowd is heavily ${heavy}, so the clean fade is ${sideWord(fadeDir)}. But your edge is ${sideWord(userSide)}-side (${userWr}%). Sit it out or size down — chasing setups off your edge is where records leak.${callerNote}`,
+      action: { label: "Why", tab: "analytics" },
+    });
+  } else if (callersAgree) {
+    out.push({
+      id: "fusion-signal-crowd",
+      priority: 74,
+      tone: "info",
+      title: `${sym}: funding and the graded callers both say fade ${sideWord(fadeDir)}`,
+      detail: `The crowd is heavily ${heavy} (funding ${fundPct}%/8h) and the merit-weighted callers lean ${sideWord(fadeDir)} too — the mechanical setup and the people with a track record agree.`,
+      action: { label: "See the read", tab: "intel" },
+    });
+  } else if (callersFight) {
+    out.push({
+      id: "fusion-divergence",
+      priority: 70,
+      tone: "info",
+      title: `${sym}: the signal and the sharp callers disagree`,
+      detail: `Funding says fade ${sideWord(fadeDir)}, but the credible callers lean ${sideWord(lean!.side as "LONG" | "SHORT")}. Disagreement is where the information is — look before you commit.`,
+      action: { label: "Smart money", tab: "smart" },
+    });
+  }
+
+  return out.sort((a, b) => b.priority - a.priority);
+}
+
 /**
  * Build the ranked briefing. Returns [] when there's nothing honest to say
  * (e.g. no trades yet) — the caller renders nothing rather than filler.
