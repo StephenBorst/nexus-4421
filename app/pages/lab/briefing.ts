@@ -96,7 +96,12 @@ export interface MarketSignal {
   confluence: "LONG" | "SHORT" | "NONE";
   trend?: "TREND_UP" | "TREND_DOWN" | "CHOP" | null;  // 1h regime (momentum source)
   trend_move_pct?: number | null;                     // net % move over the trend window
+  trend_oi_pct?: number | null;                       // ~hourly OI change (momentum confirmation)
 }
+
+// A trend needs rising open interest (new money committing) to be a real momentum setup —
+// otherwise it's a squeeze/exhaustion (fakeout). >= this %/hr OI growth = confirmed.
+const MOMENTUM_OI_MIN = 1;
 
 export interface MarketReadInput {
   rows: { symbol: string; "24h_open"?: string | number; "24h_close"?: string | number }[] | null;
@@ -284,22 +289,25 @@ export function buildFusion(input: FusionInput): Insight[] {
     : classWith ? " ⚠ Your record leans WITH-trend, so this counter-trend fade is off your usual style — respect the risk."
     : "";
 
-  // The MOMENTUM setup: the strongest-trending core symbol (ride it, don't fade it).
+  // The MOMENTUM setup: the strongest-trending core symbol, CONFIRMED by rising OI (new
+  // money committing). A trend on thinning OI is a squeeze/exhaustion, not a setup — it
+  // doesn't qualify, which is the sharpening.
   const trending = (signals || [])
-    .filter((s) => s.trend === "TREND_UP" || s.trend === "TREND_DOWN")
+    .filter((s) => (s.trend === "TREND_UP" || s.trend === "TREND_DOWN") && (s.trend_oi_pct ?? 0) >= MOMENTUM_OI_MIN)
     .sort((a, b) => Math.abs(b.trend_move_pct ?? 0) - Math.abs(a.trend_move_pct ?? 0));
   const mom = trending[0] || null;
   const momDir: "LONG" | "SHORT" | null = mom ? (mom.trend === "TREND_UP" ? "LONG" : "SHORT") : null;
   const momMove = mom?.trend_move_pct ?? 0;
+  const momOi = mom?.trend_oi_pct ?? 0;
 
   if (mom && momDir && classWith) {
-    // A momentum trader + a live trend = ride it. Leads for this user (their class).
+    // A momentum trader + a live, OI-confirmed trend = ride it. Leads for this user.
     out.push({
       id: "fusion-momentum",
       priority: 92,
       tone: "positive",
       title: `Your setup: ride the ${mom.symbol} trend (${sideWord(momDir)})`,
-      detail: `${mom.symbol} is in a strong ${momDir === "LONG" ? "uptrend" : "downtrend"} (${momMove >= 0 ? "+" : ""}${momMove}% over the window), and momentum is your class — your align edge is +${alignAvgR}R WITH the trend. Ride it, don't fade it.`,
+      detail: `${mom.symbol} is in a strong ${momDir === "LONG" ? "uptrend" : "downtrend"} (${momMove >= 0 ? "+" : ""}${momMove}%) and open interest is rising (+${momOi}%/hr) — new money committing, not a squeeze. Momentum is your class: your align edge is +${alignAvgR}R WITH the trend. Ride it, don't fade it.`,
       action: { label: "Structure it", tab: "thesis" },
       meta: { symbol: mom.symbol, direction: momDir },
     });

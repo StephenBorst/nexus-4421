@@ -45,16 +45,21 @@ test("countUnseen: counts only ids not in the seen set", () => {
   assert.equal(countUnseen(list, {}), 3);
 });
 
-test("buildSignals: a strong trend surfaces a MOMENTUM signal (ride it)", () => {
-  const out = buildSignals({ signals: [{ symbol: "BTC", funding_rate_8h: 0.0001, trend: "TREND_UP", trend_move_pct: 6.2 }] });
+test("buildSignals: a strong OI-confirmed trend surfaces a MOMENTUM signal (ride it)", () => {
+  const out = buildSignals({ signals: [{ symbol: "BTC", funding_rate_8h: 0.0001, trend: "TREND_UP", trend_move_pct: 6.2, trend_oi_pct: 3.4 }] });
   const mom = out.find((s) => s.kind === "MOMENTUM");
   assert.ok(mom, "expected a MOMENTUM signal");
   assert.equal(mom.id, "mom-BTC-LONG");
   assert.match(mom.title, /long momentum/);
-  assert.match(mom.detail, /uptrend/);
+  assert.match(mom.detail, /open interest rising/);
+});
+
+test("buildSignals: a trend on FLAT/falling OI is NOT momentum (squeeze, not conviction)", () => {
+  const out = buildSignals({ signals: [{ symbol: "BTC", funding_rate_8h: 0.0001, trend: "TREND_UP", trend_move_pct: 6.2, trend_oi_pct: 0.2 }] });
+  assert.equal(out.find((s) => s.kind === "MOMENTUM"), undefined);
 });
 
 test("buildSignals: CHOP / no trend → no momentum signal", () => {
-  const out = buildSignals({ signals: [{ symbol: "BTC", funding_rate_8h: 0.0001, trend: "CHOP", trend_move_pct: 0.2 }] });
+  const out = buildSignals({ signals: [{ symbol: "BTC", funding_rate_8h: 0.0001, trend: "CHOP", trend_move_pct: 0.2, trend_oi_pct: 5 }] });
   assert.equal(out.find((s) => s.kind === "MOMENTUM"), undefined);
 });

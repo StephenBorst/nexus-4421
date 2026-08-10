@@ -7,6 +7,8 @@
 
 const sideWord = (d) => (d === "LONG" ? "long" : "short");
 const shortAddr = (w) => `${String(w).slice(0, 6)}…${String(w).slice(-4)}`;
+// A momentum setup needs rising OI (>= this %/hr) — new money, not a squeeze.
+const MOMENTUM_OI_MIN = 1;
 
 export function buildSignals({ signals, consensus, xrayEvents } = {}) {
   const out = [];
@@ -40,18 +42,19 @@ export function buildSignals({ signals, consensus, xrayEvents } = {}) {
     }
   }
 
-  // 2 — Momentum: the strongest-trending core symbol (ride it, don't fade it). Public
-  // trend read (classifyRegime), so it's a with-trend signal for momentum traders.
+  // 2 — Momentum: the strongest-trending core symbol, CONFIRMED by rising OI (new money
+  // committing — not a squeeze). classifyRegime trend + a real OI rise; a with-trend read.
   const trending = (signals || [])
-    .filter((s) => s && (s.trend === "TREND_UP" || s.trend === "TREND_DOWN"))
+    .filter((s) => s && (s.trend === "TREND_UP" || s.trend === "TREND_DOWN") && (Number(s.trend_oi_pct) || 0) >= MOMENTUM_OI_MIN)
     .sort((a, b) => Math.abs(Number(b.trend_move_pct) || 0) - Math.abs(Number(a.trend_move_pct) || 0));
   const mom = trending[0];
   if (mom) {
     const dir = mom.trend === "TREND_UP" ? "LONG" : "SHORT";
     const move = Number(mom.trend_move_pct) || 0;
-    out.push({ id: `mom-${mom.symbol}-${dir}`, kind: "MOMENTUM", priority: 70, ts: now, tab: "intel",
+    const oi = Number(mom.trend_oi_pct) || 0;
+    out.push({ id: `mom-${mom.symbol}-${dir}`, kind: "MOMENTUM", priority: 72, ts: now, tab: "intel",
       title: `${mom.symbol} is trending — ${sideWord(dir)} momentum`,
-      detail: `${mom.symbol} is in a strong ${dir === "LONG" ? "uptrend" : "downtrend"} (${move >= 0 ? "+" : ""}${move}% over the window) — a with-trend read for momentum traders, not a fade.` });
+      detail: `${mom.symbol} is in a strong ${dir === "LONG" ? "uptrend" : "downtrend"} (${move >= 0 ? "+" : ""}${move}%) with open interest rising (+${oi}%/hr) — new money committing, a with-trend read, not a fade.` });
   }
 
   // 3 — Tracked-wallet tier crossings (a watched wallet earned/lost a consistency tier).

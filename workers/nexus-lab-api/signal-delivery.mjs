@@ -27,7 +27,15 @@ export async function snapshotTrendRegimes(env) {
       const reg = classifyRegime(cd, cd.t[cd.t.length - 1]);
       if (!reg) return;
       const bare = sym.replace("PERP_", "").replace("_USDC", "");
-      await KV.put(`regime:${bare}`, JSON.stringify({ trend: reg.trend, vol: reg.vol, movePct: reg.movePct, t: Date.now() }), { expirationTtl: 6 * 3600 });
+      // OI-confirmation: rising open interest in a trend = new money committing (real
+      // conviction) vs flat/bleeding OI = a squeeze or exhaustion (fakeout risk). Compute
+      // the ~hourly OI delta vs the PRIOR regime snapshot, using the brain's market:prev
+      // OI reading (no extra fetch). Null on the first run until two snapshots accrue.
+      const prevMkt = JSON.parse((await KV.get(`market:prev:${sym}`)) || "null");
+      const curOi = Number(prevMkt?.oi) || null;
+      const priorReg = JSON.parse((await KV.get(`regime:${bare}`)) || "null");
+      const oiChangePct = (priorReg?.oi && curOi) ? Number((((curOi - priorReg.oi) / priorReg.oi) * 100).toFixed(2)) : null;
+      await KV.put(`regime:${bare}`, JSON.stringify({ trend: reg.trend, vol: reg.vol, movePct: reg.movePct, oi: curOi, oiChangePct, t: Date.now() }), { expirationTtl: 6 * 3600 });
       stored++;
     } catch { /* skip this symbol */ }
   }));
@@ -58,7 +66,7 @@ export async function computeSignalRows(env) {
         price_change_pct: Number((priceChange * 100).toFixed(3)),
         oi_change_pct: Number((oiChange * 100).toFixed(3)),
         funding_signal: sig.fundingSignal, oi_signal: sig.oiSignal, confluence: sig.confluence,
-        trend: reg?.trend ?? null, trend_move_pct: reg?.movePct ?? null,
+        trend: reg?.trend ?? null, trend_move_pct: reg?.movePct ?? null, trend_oi_pct: reg?.oiChangePct ?? null,
       };
     } catch { return null; }
   }));
