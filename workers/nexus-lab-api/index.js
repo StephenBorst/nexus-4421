@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, confluenceSignal, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -60,6 +60,7 @@ import { handleFeed } from "./routes-feed.mjs";
 import { loadOiHistForBacktest, revalidateStrategy, OI_BACKTEST_MIN_DAYS, OI_BACKTEST_MIN_SAMPLES } from "./strategies.mjs";
 import { json, cors, normalizeAddress, recoverEthAddress, ALLOWED_ORIGINS, holdersRoomMessage, appendNotification } from "./shared.mjs";
 import { gradedStatusOf, fetchGradeHistory, gradePublicTheses, computeCallerStats, snapshotStances, REGIME_PAD_S, ADVICE_FLAG_TEXT } from "./grading.mjs";
+import { computeSignalRows, deliverSignals } from "./signal-delivery.mjs";
 // The SAME synthesis the Lab + trader page render (pure, dependency-free), so the
 // shareable card can never disagree with the profile it depicts. Bundled cross-dir by
 // wrangler like the other ../ imports.
@@ -596,6 +597,12 @@ export default {
       try { const n = await snapshotStances(env); console.log(`[stances] snapshotted ${n} symbol leans`); }
       catch (e) { console.error("[stances] snapshot failed:", String(e)); }
     })());
+    // Hourly: push the single highest-conviction signal to opted-in Telegram subscribers
+    // (throttled + deduped inside). Signals reach traders when the app is closed.
+    ctx.waitUntil((async () => {
+      try { const r = await deliverSignals(env); if (r.sent) console.log(`[signals] pushed ${r.id} to ${r.sent} chats`); }
+      catch (e) { console.error("[signals] delivery failed:", String(e)); }
+    })());
     // 12h: refresh the Smart Money tracked set + snapshot every watched wallet's
     // Tracked Record (accrues even when nobody's viewing it).
     if (event.cron === "0 */12 * * *") {
@@ -645,15 +652,26 @@ export default {
           });
         } catch { /* fail-soft */ }
       };
-      if (chatId && text.startsWith("/start")) {
+      if (chatId && text.startsWith("/signals")) {
+        // Opt in/out of the highest-conviction market signal push (separate from agent
+        // trade alerts). Keyed by chatId so delivery can list subscribers directly.
+        const onoff = (text.split(/\s+/)[1] || "on").toLowerCase();
+        if (onoff === "off" || onoff === "stop") {
+          await AGENT_KV.delete(`signals:sub:${chatId}`);
+          await reply("🔕 Signals off. Send /signals on to get the top Nexus market signal again.");
+        } else {
+          await AGENT_KV.put(`signals:sub:${chatId}`, "1");
+          await reply("◆ Signals on. You'll get the single highest-conviction Nexus signal when it fires — funding + the graded caller crowd aligned, or a sharp disagreement. At most once every few hours. Send /signals off to stop.");
+        }
+      } else if (chatId && text.startsWith("/start")) {
         const arg = text.split(/\s+/)[1] || "";
         const addr = /^0x[a-fA-F0-9]{40}$/.test(arg) ? arg.toLowerCase() : null;
         if (addr) {
           await AGENT_KV.put(`tg:chat:${addr}`, String(chatId));
           await AGENT_KV.put(`tg:wallet:${chatId}`, addr);
-          await reply(`✅ Linked to <code>${addr.slice(0, 6)}…${addr.slice(-4)}</code>. You'll get a message whenever your Nexus agent opens or closes a trade. Send /stop to unlink.`);
+          await reply(`✅ Linked to <code>${addr.slice(0, 6)}…${addr.slice(-4)}</code>. You'll get a message whenever your Nexus agent opens or closes a trade. Send /stop to unlink. Want market signals too? Send /signals on.`);
         } else {
-          await reply("👋 To get Nexus agent trade alerts, open the Agent tab on Nexus Trading Labs and tap “Link Telegram”.");
+          await reply("👋 To get Nexus agent trade alerts, open the Agent tab on Nexus Trading Labs and tap “Link Telegram”. For market signals, send /signals on.");
         }
       } else if (chatId && text.startsWith("/stop")) {
         const stopArg = text.split(/\s+/)[1] || "";
@@ -4167,29 +4185,8 @@ document.getElementById("btn").addEventListener("click",go);
     }
     if (parts[0] === "signals") {
       if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
-      const KV = env.NEXUS_AGENT || env.LAB_STORE;
-      const SYMS = ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC", "PERP_ARB_USDC", "PERP_HYPE_USDC", "PERP_XRP_USDC", "PERP_DOGE_USDC"];
-      const rows = await Promise.all(SYMS.map(async (sym) => {
-        try {
-          const d = (await (await fetch(`https://api-evm.orderly.org/v1/public/futures/${sym}`)).json())?.data;
-          if (!d || !d.mark_price) return null;
-          const mark = Number(d.mark_price), funding = Number(d.last_funding_rate) || 0, oi = Number(d.open_interest) || 0;
-          const prev = JSON.parse((await KV.get(`market:prev:${sym}`)) || "null");
-          const priceChange = prev?.price ? (mark - prev.price) / prev.price : 0;
-          const oiChange = prev?.oi ? (oi - prev.oi) / prev.oi : 0;
-          const sig = confluenceSignal({ fundingRate: funding, priceChange, oiChange, hasPrev: !!prev });
-          return {
-            symbol: sym.replace("PERP_", "").replace("_USDC", ""),
-            mark_price: mark, funding_rate_8h: funding, open_interest: oi,
-            price_change_pct: Number((priceChange * 100).toFixed(3)),
-            oi_change_pct: Number((oiChange * 100).toFixed(3)),
-            funding_signal: sig.fundingSignal, oi_signal: sig.oiSignal, confluence: sig.confluence,
-          };
-        } catch { return null; }
-      }));
-      const signals = rows.filter(Boolean).sort(
-        (a, b) => (b.confluence !== "NONE") - (a.confluence !== "NONE") || Math.abs(b.funding_rate_8h) - Math.abs(a.funding_rate_8h)
-      );
+      // Shared builder (signal-delivery.mjs) so the public API + the Telegram push agree.
+      const signals = await computeSignalRows(env);
       return json({
         generated_at: new Date().toISOString(),
         note: "Funding-extreme (fade the crowd) + OI-divergence reads, same rules as the Nexus autonomous agent. confluence = both rules agree (strongest). Deltas vs ~5-min prior snapshot.",
