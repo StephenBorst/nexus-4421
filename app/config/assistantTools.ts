@@ -408,6 +408,41 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "get_contested",
+    description:
+      "Get the DISAGREEMENT board: symbols where credible, merit-weighted callers currently hold OPPOSING directions right now — and which SIDE has the better graded record (win rate + avg-R). Consensus is cheap; disagreement between people with track records is the signal. Use for 'where do the smart callers disagree', 'what's contested', or to find high-information standoffs before taking a side.",
+    input_schema: { type: "object", properties: {} },
+    run: async () => {
+      const res = await fetch(`${AGENT_API}/theses/contested`);
+      if (!res.ok) return JSON.stringify({ error: `contested failed (${res.status})` });
+      const d = await res.json();
+      const party = (p: Record<string, any>) => ({ name: p.displayName || p.wallet, rank: p.meritRank?.title ?? null, record: p.record ?? null, contrarian: p.contrarian ?? null });
+      const rows = (d?.contested ?? []).slice(0, 8).map((r: Record<string, any>) => ({
+        symbol: r.symbol, split: r.balance, edge: r.edge ?? null,
+        longs: (r.longs ?? []).map(party),
+        shorts: (r.shorts ?? []).map(party),
+      }));
+      return JSON.stringify({ count: rows.length, contested: rows, note: "`edge` names the side with the better graded avg-R (withheld until both sides have >=3 graded calls). `contrarian` on a participant = their fade-the-crowd record." });
+    },
+  },
+  {
+    name: "get_contrarians",
+    description:
+      "Get the CONTRARIANS board: callers who are provably RIGHT when they FADE the crowd — ranked by their record on calls made AGAINST the merit-weighted consensus lean that preceded them (graded from persisted stance snapshots, first-touch vs public price). The purest 'right when everyone's wrong' signal. Use for 'who's the best contrarian', 'who's right fading the crowd', or to find non-consensus edge. Sparse until stance history accrues.",
+    input_schema: { type: "object", properties: {} },
+    run: async () => {
+      const res = await fetch(`${AGENT_API}/theses/contrarians`);
+      if (!res.ok) return JSON.stringify({ error: `contrarians failed (${res.status})` });
+      const d = await res.json();
+      const rows = (d?.contrarians ?? []).slice(0, 10).map((r: Record<string, any>) => ({
+        name: r.displayName || r.wallet, rank: r.meritRank?.title ?? null,
+        contrarianCalls: r.contrarianCalls, contrarianAvgR: r.contrarianAvgR, contrarianWinRate: r.contrarianWinRate,
+        edgeVsCrowd: r.edge,
+      }));
+      return JSON.stringify({ count: rows.length, contrarians: rows, note: "contrarianAvgR = avg R on calls made against the crowd; edgeVsCrowd = how much better they do fading vs following consensus." });
+    },
+  },
+  {
     name: "xray_wallet",
     description:
       "X-ray ANY wallet's perp record from public data — no login, works on wallets that have never touched Nexus. Reads BOTH Hyperliquid (trade-by-trade history) and the Orderly network incl. Nexus (per-market settled PnL + live open positions), PLUS the wallet's Tracked Record — a graded consistency read (Consistency Score / trend / green-day rate) that separates a lucky single print from a wallet that's consistently profitable over time. Use when the user pastes a wallet address, asks 'is this trader any good', or wants to vet someone before copying them.",
