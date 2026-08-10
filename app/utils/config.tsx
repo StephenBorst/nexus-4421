@@ -31,6 +31,7 @@ import { Link } from "react-router-dom";
 import CustomLeftNav from "@/components/CustomLeftNav";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import MessagesNavButton from "@/components/MessagesNavButton";
+import SignalsNavButton from "@/components/SignalsNavButton";
 import { buildCampaignsUrl } from "@/components/CampaignsNavTitle";
 interface MainNavItem {
   name: string;
@@ -359,6 +360,7 @@ const allMenuItems = [
 
           <Flex itemAlign={"center"} className="oui-gap-2">
             {components.accountSummary}
+            <SignalsNavButton />
             <MessagesNavButton />
             {components.linkDevice}
             {components.scanQRCode}
