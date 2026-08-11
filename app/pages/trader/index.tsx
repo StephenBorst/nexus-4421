@@ -271,7 +271,7 @@ function ThesisRow({
             const toSL = distancePct(markPrice, thesis.stopLoss);
             const toTP = distancePct(markPrice, thesis.takeProfit1);
             return (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 12px", marginBottom: 12, padding: 10, background: "#0f0f11", borderRadius: 4, border: "1px solid #232327" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(70px, 1fr))", gap: "8px 12px", marginBottom: 12, padding: 10, background: "#0f0f11", borderRadius: 4, border: "1px solid #232327" }}>
                 {[
                   { label: "MARK", val: `$${markPrice.toFixed(markPrice < 10 ? 4 : 2)}`, color: "#fff" },
                   { label: "UNREALIZED", val: `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)`, color: pnl >= 0 ? "#3ecf8e" : "#f7525f" },
@@ -437,7 +437,7 @@ function CopyModal({ thesis, walletAddress, onClose }: { thesis: FeedThesis; wal
         {/* Calc output */}
         <div style={{ marginTop: 10, marginBottom: 12 }}>
           {calc ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px 10px", padding: 10, background: "#1a1a1e", borderRadius: 4, border: "1px solid #232327" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(70px, 1fr))", gap: "8px 10px", padding: 10, background: "#1a1a1e", borderRadius: 4, border: "1px solid #232327" }}>
               <div>
                 <div style={{ fontSize: 7, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>YOUR SIZE</div>
                 <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#ededf0", fontWeight: "bold" }}>${calc.positionSize.toFixed(0)}</div>

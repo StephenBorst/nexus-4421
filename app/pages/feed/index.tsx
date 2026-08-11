@@ -283,7 +283,7 @@ function CopyModal({
         </div>
 
         {/* Original levels (read-only) */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 12px", marginBottom: 16, padding: 10, background: "#0f0f11", borderRadius: 4, border: "1px solid #232327" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(70px, 1fr))", gap: "8px 12px", marginBottom: 16, padding: 10, background: "#0f0f11", borderRadius: 4, border: "1px solid #232327" }}>
           {[
             { label: "ENTRY", val: `$${thesis.entryPrice.toFixed(2)}`, color: "#a1a1aa" },
             { label: "STOP",  val: `$${thesis.stopLoss.toFixed(2)}`,   color: "#f7525f" },
@@ -338,7 +338,7 @@ function CopyModal({
         {/* Live calc output */}
         <div style={{ marginBottom: 12, marginTop: 10 }}>
           {calc ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px 10px", padding: 10, background: "#1a1a1e", borderRadius: 4, border: "1px solid #232327" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(70px, 1fr))", gap: "8px 10px", padding: 10, background: "#1a1a1e", borderRadius: 4, border: "1px solid #232327" }}>
               <div>
                 <div style={labelStyle}>YOUR SIZE</div>
                 <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#ededf0", fontWeight: "bold" }}>${calc.positionSize.toFixed(0)}</div>
@@ -597,8 +597,9 @@ function FeedCard({
         )}
       </div>
 
-      {/* Key levels grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px 12px", marginBottom: 10 }}>
+      {/* Key levels grid — auto-fit so the 5 $-value columns reflow (don't clip the
+          last column off-card) on narrow phones; unchanged at desktop width. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(70px, 1fr))", gap: "8px 12px", marginBottom: 10 }}>
         {[
           { label: "ENTRY", val: `$${thesis.entryPrice.toFixed(2)}`, color: undefined },
           { label: "STOP",  val: `$${thesis.stopLoss.toFixed(2)}`,   color: "#f7525f" },
@@ -620,7 +621,7 @@ function FeedCard({
         const toTP = distancePct(markPrice, thesis.takeProfit1);
         const isWinning = pnl >= 0;
         return (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px 12px", marginBottom: 10, paddingTop: 10, borderTop: "1px solid #232327" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(70px, 1fr))", gap: "8px 12px", marginBottom: 10, paddingTop: 10, borderTop: "1px solid #232327" }}>
             <div>
               <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>MARK</div>
               <div style={{ fontSize: 12, color: "#fff", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>
