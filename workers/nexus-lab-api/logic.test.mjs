@@ -11,6 +11,7 @@ import {
   mispricedBoard, consensusBySymbol, MISPRICED, fundingReversion, edgeQuality, mergeFundingPrice,
   LOSS_REASONS, isLossReason, postmortemSummary,
   validateArenaRegistration, arenaAgentConfig,
+  parsePriceTarget, forecastDivergence, FORECAST,
 } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
@@ -1611,4 +1612,105 @@ test("contrarianEdgeScore: shrinks contrarian avg-R and computes edge vs with-cr
 test("contrarianEdgeScore: with no with-crowd sample, edge is vs zero", () => {
   const r = contrarianEdgeScore({ calls: 5, avgR: 0.5 }, { calls: 0 });
   assert.equal(r.edge, 0.5);
+});
+
+// ── Forecast Divergence (prediction-market lens) ─────────────────────────────
+test("parsePriceTarget: extracts $-anchored strikes with k/m suffixes + direction", () => {
+  assert.deepEqual(parsePriceTarget("Will Bitcoin reach $150,000 by Dec 2026?"), { target: 150000, direction: "UP" });
+  assert.deepEqual(parsePriceTarget("Will BTC hit $130k in 2026?"), { target: 130000, direction: "UP" });
+  assert.deepEqual(parsePriceTarget("Will ETH fall below $2k this year?"), { target: 2000, direction: "DOWN" });
+  assert.deepEqual(parsePriceTarget("Will SOL top $1.5M market... $300 reach?"), { target: 1500000, direction: "UP" });
+});
+
+test("parsePriceTarget: null without a $ anchor (never mistakes a year for a strike)", () => {
+  assert.equal(parsePriceTarget("Will Bitcoin flip gold by 2026?"), null);
+  assert.equal(parsePriceTarget("Will there be a spot XRP ETF?"), null);
+  assert.equal(parsePriceTarget(""), null);
+});
+
+const futures = [
+  { symbol: "PERP_BTC_USDC", mark_price: 118000, last_funding_rate: 0.0001 },   // funding + ⇒ tape leans UP
+  { symbol: "PERP_ETH_USDC", mark_price: 3000, last_funding_rate: -0.0002 },    // funding − ⇒ tape leans DOWN
+];
+
+test("forecastDivergence: flags a near-money conviction divergence (forecast UP vs tape DOWN)", () => {
+  const poly = [
+    // ETH: near-money $3,300 (+10%) at 72% YES ⇒ crowd leans UP; funding negative ⇒ tape DOWN ⇒ DIVERGENT
+    { id: "1", question: "Will Ethereum reach $3,300 by Sept?", outcomes: '["Yes","No"]', outcomePrices: '["0.72","0.28"]', volumeNum: 250000, liquidity: "40000", endDate: "2026-09-30" },
+  ];
+  const r = forecastDivergence(poly, futures);
+  assert.equal(r.markets.length, 1);
+  const m = r.markets[0];
+  assert.equal(m.coin, "ETH");
+  assert.equal(m.symbol, "PERP_ETH_USDC");
+  assert.equal(m.forecastProbPct, 72);
+  assert.equal(m.target, 3300);
+  assert.equal(m.targetDirection, "UP");
+  assert.equal(m.forecastLean, "UP");     // 72% YES on an up-bet ⇒ crowd leans UP
+  assert.equal(m.nearMoney, true);
+  assert.equal(m.fundingLean, "DOWN");
+  assert.equal(m.alignment, "DIVERGENT");
+  assert.equal(m.divergence, true);
+  assert.equal(r.divergentCount, 1);
+});
+
+test("forecastDivergence: probability fold — low YES on a far DOWN tail = UP lean, never flagged", () => {
+  const poly = [
+    // "dip to $15k" at 2.6% YES: crowd 97% says it WON'T dip ⇒ effectively bullish (UP), matching funding.
+    { id: "2", question: "Will Bitcoin dip to $15,000 by 2026?", outcomes: '["Yes","No"]', outcomePrices: '["0.026","0.974"]', volumeNum: 900000 },
+  ];
+  const r = forecastDivergence(poly, futures);
+  const m = r.markets[0];
+  assert.equal(m.targetDirection, "DOWN");
+  assert.equal(m.forecastLean, "UP");     // folded: low YES on a DOWN bet ⇒ UP lean (not DOWN)
+  assert.equal(m.nearMoney, false);       // −87% away ⇒ tail strike, no directional read
+  assert.equal(m.alignment, null);        // far strike ⇒ not scored for divergence
+  assert.equal(m.divergence, false);
+});
+
+test("forecastDivergence: aligned when folded forecast lean matches funding lean", () => {
+  const poly = [
+    // Near-money $125k (+6%) at 65% YES ⇒ UP lean; BTC funding + ⇒ UP ⇒ ALIGNED
+    { id: "3", question: "Will Bitcoin reach $125,000 by Sept?", outcomes: '["Yes","No"]', outcomePrices: '["0.65","0.35"]', volumeNum: 500000, endDate: "2026-09-30" },
+  ];
+  const r = forecastDivergence(poly, futures);
+  assert.equal(r.markets[0].nearMoney, true);
+  assert.equal(r.markets[0].forecastLean, "UP");
+  assert.equal(r.markets[0].fundingLean, "UP");
+  assert.equal(r.markets[0].alignment, "ALIGNED");
+  assert.equal(r.markets[0].divergence, false);
+});
+
+test("forecastDivergence: a coin-flip forecast is not a divergence (conviction gate)", () => {
+  const poly = [
+    // Near-money but 52% ⇒ folded lean UP, funding DOWN ⇒ DIVERGENT direction, but conviction 2 < 15
+    { id: "4", question: "Will Ethereum reach $3,200 by Sept?", outcomes: '["Yes","No"]', outcomePrices: '["0.52","0.48"]', volumeNum: 80000 },
+  ];
+  const r = forecastDivergence(poly, futures);
+  assert.equal(r.markets[0].nearMoney, true);
+  assert.equal(r.markets[0].alignment, "DIVERGENT"); // direction disagrees…
+  assert.equal(r.markets[0].divergence, false);       // …but 52% is a coin-flip ⇒ not flagged
+});
+
+test("forecastDivergence: filters dust volume, closed markets, and unlisted assets", () => {
+  const poly = [
+    { id: "5", question: "Will Bitcoin reach $150k?", outcomes: '["Yes","No"]', outcomePrices: '["0.6","0.4"]', volumeNum: 100 },       // dust
+    { id: "6", question: "Will Bitcoin reach $200k?", outcomes: '["Yes","No"]', outcomePrices: '["0.3","0.7"]', volumeNum: 999999, closed: true }, // closed
+    { id: "7", question: "Will PEPE reach $0.01?", outcomes: '["Yes","No"]', outcomePrices: '["0.4","0.6"]', volumeNum: 999999 },        // unlisted asset
+  ];
+  const r = forecastDivergence(poly, futures);
+  assert.equal(r.markets.length, 0);
+});
+
+test("forecastDivergence: coin filter + non-target market surfaces forecast with no divergence", () => {
+  const poly = [
+    { id: "7", question: "Will there be a spot Solana ETF approved in 2026?", outcomes: '["Yes","No"]', outcomePrices: '["0.8","0.2"]', volume: "300000" },
+    { id: "8", question: "Will Bitcoin reach $150k?", outcomes: '["Yes","No"]', outcomePrices: '["0.6","0.4"]', volume: "300000" },
+  ];
+  const r = forecastDivergence(poly, [...futures, { symbol: "PERP_SOL_USDC", mark_price: 180, last_funding_rate: 0.0001 }], FORECAST, { coin: "SOL" });
+  assert.equal(r.markets.length, 1);
+  assert.equal(r.markets[0].coin, "SOL");
+  assert.equal(r.markets[0].target, null);          // not a price-target market
+  assert.equal(r.markets[0].divergence, false);
+  assert.equal(r.markets[0].forecastProbPct, 80);
 });

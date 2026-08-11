@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -2052,6 +2052,58 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       }), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300", ...cors(request) } });
     }
 
+    // ── /intel/forecasts[/:coin] — the prediction-market lens (Forecast Divergence) ──
+    // Quotient-informed sibling of /intel/mispriced: reads the FORECASTING crowd, not
+    // the funding crowd. Pulls Polymarket's liquid crypto markets, joins each to our
+    // tape (mark + funding from ONE Orderly public-futures snapshot), and on price-target
+    // markets flags where the forecast DIRECTION disagrees with positioning — a divergence
+    // worth a GRADED thesis. We never invent a fair probability (Q's model is their moat).
+    // Public, fail-soft, KV-cached 5 min. Polymarket's gamma API is public + serves
+    // datacenter IPs (verified), so the Worker fetch works where CoinGecko/rss2json don't.
+    if (parts[0] === "intel" && parts[1] === "forecasts" && request.method === "GET") {
+      const coin = parts[2] ? String(parts[2]).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "") : null;
+      const CACHE_KEY = "intel:forecasts:v1", TTL_MS = 300 * 1000;
+      const respond = (payload) => new Response(JSON.stringify(payload), {
+        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=180", ...cors(request) },
+      });
+      // Board is computed for ALL assets once, cached, then optionally coin-filtered on read.
+      const filterCoin = (board) => coin
+        ? { ...board, markets: board.markets.filter((m) => m.coin === coin), divergentCount: board.markets.filter((m) => m.coin === coin && m.divergence).length }
+        : board;
+      try {
+        const cached = await env.LAB_STORE.get(CACHE_KEY);
+        if (cached) {
+          const c = JSON.parse(cached);
+          if (c && (Date.now() - (c.asOfMs || 0)) < TTL_MS) return respond(filterCoin(c));
+        }
+      } catch { /* cache miss → recompute */ }
+      try {
+        const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+        const [pm, fut] = await Promise.all([
+          // Active crypto markets, deepest first. tag_id=21 = Polymarket's Crypto tag
+          // (verified); order=volumeNum surfaces the liquid price-target markets. Our own
+          // asset regex is the real filter, so a tag drift still yields correct input.
+          fetch("https://gamma-api.polymarket.com/markets?closed=false&active=true&limit=200&order=volumeNum&ascending=false&tag_id=21", {
+            headers: { "User-Agent": UA, "Accept": "application/json" },
+          }).then((r) => r.json()).catch(() => []),
+          fetch("https://api-evm.orderly.org/v1/public/futures", {
+            headers: { "User-Agent": UA, "Accept": "application/json, text/plain, */*" },
+          }).then((r) => r.json()).catch(() => ({})),
+        ]);
+        const rows = Array.isArray(pm) ? pm : (pm?.data || []);
+        const board = forecastDivergence(rows, fut?.data?.rows || []);
+        const payload = {
+          asOf: new Date().toISOString(), asOfMs: Date.now(), ...board,
+          criteria: { note: "Polymarket forecast probability joined to Orderly funding. On price-target markets, a DIVERGENCE = the forecasting crowd leans one way (conviction ≥15pts off a coin-flip) while leveraged positioning (funding) leans the other. Not a fair-value oracle and not advice — a prompt to investigate, and to stake a graded thesis on the gap." },
+        };
+        try { await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 900 }); } catch { /* best-effort */ }
+        return respond(filterCoin(payload));
+      } catch (e) {
+        // Fail-soft: 200 empty board so the Lab renders "no linked forecasts", not an error.
+        return json({ asOf: new Date().toISOString(), scanned: 0, divergentCount: 0, markets: [], error: String(e) }, request);
+      }
+    }
+
     // NB: news aggregation is CLIENT-side (app/pages/lab/MarketIntel.tsx) on purpose —
     // rss2json blocks Cloudflare Worker IPs, so a server-side /intel/news returns 0.
     // (Same reason /intel/catalysts comes back empty in prod — a known limitation.)
@@ -3532,6 +3584,66 @@ document.getElementById("btn").addEventListener("click",go);
         } catch { /* leave null */ }
       }));
       return json({ ls: out, source: "okx", ts: Date.now() }, request);
+    }
+
+    // ── /proxy/twelvedata?symbols=SPX,DXY,GOLD — TradFi macro quotes ──────────
+    // Server-held key (secret TWELVEDATA_KEY) so the copilot's get_macro tool never
+    // ships a key to the browser. Fail-soft: returns {error} (not a throw) when the
+    // key is unset, so the tool degrades to "not configured" rather than breaking.
+    // KV-cached 60s (free-tier request budgets are small).
+    if (parts[0] === "proxy" && parts[1] === "twelvedata" && request.method === "GET") {
+      const key = env.TWELVEDATA_KEY;
+      if (!key) return json({ error: "macro data not configured (TWELVEDATA_KEY unset)" }, request);
+      const syms = (url.searchParams.get("symbols") || "SPX,DXY,GOLD")
+        .split(",").map((s) => s.trim().toUpperCase()).filter(Boolean).slice(0, 8);
+      const CACHE_KEY = `proxy:twelvedata:${syms.join(",")}`;
+      try {
+        const c = await env.LAB_STORE.get(CACHE_KEY);
+        if (c) { const p = JSON.parse(c); if (Date.now() - (p.ts || 0) < 60_000) return json(p, request); }
+      } catch { /* recompute */ }
+      try {
+        const r = await fetch(`https://api.twelvedata.com/quote?symbol=${encodeURIComponent(syms.join(","))}&apikey=${key}`);
+        const d = await r.json();
+        // One symbol → flat object; many → keyed by symbol. Normalize to {sym:{price,change_pct}}.
+        const one = (o) => o && o.symbol ? { price: Number(o.close), change_pct: Number(o.percent_change) } : null;
+        const quotes = {};
+        if (d && d.symbol) quotes[d.symbol] = one(d);
+        else for (const k of Object.keys(d || {})) if (d[k] && d[k].symbol) quotes[k] = one(d[k]);
+        const payload = { quotes, source: "twelvedata", ts: Date.now() };
+        try { await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 120 }); } catch { /* best-effort */ }
+        return json(payload, request);
+      } catch (e) { return json({ error: String(e) }, request); }
+    }
+
+    // ── /proxy/taapi?symbol=BTC&interval=1h&indicators=rsi,macd — TA indicators ──
+    // Server-held key (secret TAAPI_KEY). Free tier is one indicator per request +
+    // rate-limited, so we fetch a small bounded set sequentially and KV-cache 120s.
+    if (parts[0] === "proxy" && parts[1] === "taapi" && request.method === "GET") {
+      const key = env.TAAPI_KEY;
+      if (!key) return json({ error: "indicator data not configured (TAAPI_KEY unset)" }, request);
+      const sym = String(url.searchParams.get("symbol") || "BTC").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "").replace(/[^A-Z0-9]/g, "");
+      const interval = String(url.searchParams.get("interval") || "1h").toLowerCase();
+      const ALLOWED = new Set(["rsi", "macd", "ema", "bbands"]);
+      const inds = (url.searchParams.get("indicators") || "rsi,macd")
+        .split(",").map((s) => s.trim().toLowerCase()).filter((s) => ALLOWED.has(s)).slice(0, 3);
+      if (!sym || !inds.length) return json({ error: "symbol + at least one of rsi,macd,ema,bbands required" }, request);
+      const CACHE_KEY = `proxy:taapi:${sym}:${interval}:${inds.join(",")}`;
+      try {
+        const c = await env.LAB_STORE.get(CACHE_KEY);
+        if (c) { const p = JSON.parse(c); if (Date.now() - (p.ts || 0) < 120_000) return json(p, request); }
+      } catch { /* recompute */ }
+      const pair = `${sym}/USDT`;
+      const indicators = {};
+      for (const ind of inds) {
+        try {
+          const r = await fetch(`https://api.taapi.io/${ind}?secret=${key}&exchange=binance&symbol=${encodeURIComponent(pair)}&interval=${encodeURIComponent(interval)}`);
+          const d = await r.json();
+          indicators[ind] = (d && d.error) ? null : d;
+        } catch { indicators[ind] = null; }
+      }
+      const payload = { symbol: sym, interval, indicators, source: "taapi", ts: Date.now() };
+      try { await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 180 }); } catch { /* best-effort */ }
+      return json(payload, request);
     }
 
     if (parts[0] === "signals" && parts[1] === "context" && parts[2] && request.method === "GET") {

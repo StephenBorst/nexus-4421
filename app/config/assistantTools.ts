@@ -529,6 +529,98 @@ export const TOOLS: ToolDef[] = [
       });
     },
   },
+  {
+    name: "get_forecasts",
+    description:
+      "Get the FORECAST DIVERGENCE board — Polymarket prediction-market forecasts on assets we trade, joined to our funding/positioning. On price-target markets it flags where the FORECASTING crowd (folded probability → directional lean) disagrees with the LEVERAGED tape (funding lean), but ONLY for near-money strikes where that read is meaningful (a far tail strike carries no directional signal and is surfaced, not flagged). Use for 'what do prediction markets say about BTC', 'where do forecasters and the tape disagree', 'is the crowd's forecast offside vs positioning'. Pass a symbol to focus one asset. This is NOT a fair-value oracle and NOT advice — we do not compute a fair probability (that's not ours to claim); it's a divergence worth INVESTIGATING and staking a graded thesis on. Offer to draft_thesis on a standout divergence.",
+    input_schema: {
+      type: "object",
+      properties: { symbol: { type: "string", description: "Optional ticker (BTC, ETH, SOL…) to focus one asset." } },
+    },
+    run: async (args) => {
+      const focus = shortTicker(String(args.symbol ?? ""));
+      const url = focus ? `${AGENT_API}/intel/forecasts/${focus}` : `${AGENT_API}/intel/forecasts`;
+      const board = await fetch(url).then((r) => r.json()).catch(() => null);
+      type F = { coin: string; question: string; forecastProbPct: number; target: number | null; targetDirection: string | null; distancePct: number | null; forecastLean: string | null; fundingLean: string | null; nearMoney: boolean | null; alignment: string | null; divergence: boolean; volumeUsd: number; endDate: string | null };
+      const markets: F[] = board?.markets ?? [];
+      if (!markets.length) return JSON.stringify({ error: "no linked prediction markets right now (sparse by design — mostly BTC/ETH/SOL + major narratives)" });
+      // Lead with flagged divergences, then near-money reads, then context.
+      const rows = markets.slice(0, 12).map((m) => ({
+        coin: m.coin, question: m.question, forecast_yes_pct: m.forecastProbPct,
+        target: m.target, target_dir: m.targetDirection, distance_pct: m.distancePct,
+        forecast_lean: m.forecastLean, funding_lean: m.fundingLean,
+        near_money: m.nearMoney, alignment: m.alignment,
+        divergence: m.divergence || undefined, volume_usd: m.volumeUsd, ends: m.endDate,
+      }));
+      return JSON.stringify({
+        divergent_count: board?.divergentCount ?? null,
+        markets: rows,
+        note: "forecast_yes_pct is Polymarket's crowd probability; forecast_lean folds it (low YES on an 'up' bet = a DOWN lean). A DIVERGENCE = near-money forecast lean vs funding lean disagree with conviction — a prompt to investigate, not a signal to trade. Far strikes are context only. Offer to draft a graded thesis on a standout.",
+      });
+    },
+  },
+  {
+    name: "get_defi",
+    description:
+      "Get DeFi macro context from DeFiLlama: total DeFi TVL, the top chains by TVL, and (if a chain is named) that chain's TVL + rank. Use for 'how's DeFi TVL', 'which chains are growing', 'where's the liquidity', or to frame an asset's chain in macro terms. Read-only, free public data.",
+    input_schema: {
+      type: "object",
+      properties: { chain: { type: "string", description: "Optional chain name (Ethereum, Base, Solana, Arbitrum…)." } },
+    },
+    run: async (args) => {
+      // DeFiLlama is free + CORS-friendly → direct client fetch (no key, no proxy).
+      const chains = await fetch("https://api.llama.fi/v2/chains").then((r) => r.json()).catch(() => null);
+      if (!Array.isArray(chains) || !chains.length) return JSON.stringify({ error: "DeFiLlama unavailable" });
+      const sorted = [...chains].sort((a, b) => (b.tvl || 0) - (a.tvl || 0));
+      const total = sorted.reduce((s, c) => s + (Number(c.tvl) || 0), 0);
+      const top = sorted.slice(0, 8).map((c, i) => ({ rank: i + 1, chain: c.name, tvl_usd: Math.round(c.tvl || 0) }));
+      const want = String(args.chain ?? "").trim().toLowerCase();
+      let focus: Record<string, unknown> | undefined;
+      if (want) {
+        const idx = sorted.findIndex((c) => String(c.name || "").toLowerCase() === want || String(c.tokenSymbol || "").toLowerCase() === want);
+        if (idx >= 0) focus = { chain: sorted[idx].name, tvl_usd: Math.round(sorted[idx].tvl || 0), rank: idx + 1 };
+      }
+      return JSON.stringify({ total_defi_tvl_usd: Math.round(total), top_chains: top, focus, note: "Snapshot TVL from DeFiLlama. Macro liquidity context, not a trade signal." });
+    },
+  },
+  {
+    name: "get_macro",
+    description:
+      "Get TradFi macro quotes (via TwelveData): price + daily change for indices/FX/commodities like SPX, NDX, DXY, GOLD, US10Y. Use to frame crypto against risk-on/risk-off (e.g. 'how's the dollar', 'is risk bid today', 'what's SPX doing'). Read-only. Returns 'not configured' if the data key isn't set on the worker.",
+    input_schema: {
+      type: "object",
+      properties: { symbols: { type: "string", description: "Comma-separated, e.g. 'SPX,DXY,GOLD'. Defaults to SPX,DXY,GOLD." } },
+    },
+    run: async (args) => {
+      const symbols = String(args.symbols ?? "SPX,DXY,GOLD").replace(/\s+/g, "");
+      const r = await fetch(`${AGENT_API}/proxy/twelvedata?symbols=${encodeURIComponent(symbols)}`).then((x) => x.json()).catch(() => null);
+      if (!r || r.error) return JSON.stringify({ error: r?.error ?? "macro data unavailable" });
+      return JSON.stringify({ quotes: r.quotes ?? r, note: "TradFi context to frame crypto risk appetite — not a trade signal." });
+    },
+  },
+  {
+    name: "get_indicators",
+    description:
+      "Get technical indicators for a crypto pair (via TAAPI): RSI, MACD, and other common reads on a chosen interval. Use when the user asks 'is BTC overbought', 'what's the RSI', 'MACD on ETH 4h'. Read-only, and TA is a lagging lens — frame it as context, never as advice. Returns 'not configured' if the data key isn't set on the worker.",
+    input_schema: {
+      type: "object",
+      properties: {
+        symbol: { type: "string", description: "Ticker like BTC, ETH, SOL." },
+        interval: { type: "string", description: "Candle interval: 1h, 4h, 1d (default 1h)." },
+        indicators: { type: "string", description: "Comma-separated subset of rsi,macd,ema,bbands (default rsi,macd)." },
+      },
+      required: ["symbol"],
+    },
+    run: async (args) => {
+      const sym = shortTicker(String(args.symbol ?? ""));
+      if (!sym) return JSON.stringify({ error: "symbol required" });
+      const interval = String(args.interval ?? "1h");
+      const indicators = String(args.indicators ?? "rsi,macd").replace(/\s+/g, "");
+      const r = await fetch(`${AGENT_API}/proxy/taapi?symbol=${sym}&interval=${encodeURIComponent(interval)}&indicators=${encodeURIComponent(indicators)}`).then((x) => x.json()).catch(() => null);
+      if (!r || r.error) return JSON.stringify({ error: r?.error ?? "indicator data unavailable" });
+      return JSON.stringify({ symbol: sym, interval, indicators: r.indicators ?? r, note: "TA is a lagging context lens, not advice. An overbought reading can stay overbought." });
+    },
+  },
 ];
 
 // ── ACTION tools (client-side navigation + thesis drafting) ──

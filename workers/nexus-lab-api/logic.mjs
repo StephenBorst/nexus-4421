@@ -1474,3 +1474,159 @@ export function diffCopyLeaders(oldLeaders, newLeaders, self) {
     removed: [...o].filter((x) => !n.has(x)),
   };
 }
+
+// ── Forecast Divergence (the prediction-market lens) ─────────────────────────
+// Quotient-informed, same spirit as the mispriced board: don't only read the
+// FUNDING crowd — read the FORECASTING crowd. Polymarket prices a probability on
+// asset-linked questions ("Will BTC reach $X by DATE"). We surface that forecast
+// beside the tape and, on price-target markets, flag when the forecasting crowd's
+// DIRECTION disagrees with current funding/positioning — the on-brand analog to
+// Quotient's fair-price "edge", using OUR funding data as the counter-model.
+//
+// Deliberate honesty: we do NOT invent a fair probability (Q's 6,000-source model
+// is their moat, not ours). We surface the crowd forecast + a funding-alignment
+// read + a target window, and the product's job is to turn a divergence into a
+// GRADED thesis — the thing Quotient's "do not recommend a trade" stops short of.
+export const FORECAST = {
+  minVolumeUsd: 5_000,   // a thin prediction market isn't a crowd — ignore dust
+  minConvictionPct: 15,  // |prob − 50| gate: a coin-flip forecast isn't a divergence
+  nearBandPct: 20,       // only a strike within ±this% of mark carries a DIRECTIONAL read;
+                         // a far tail strike ("dip to $5k") is priced as tail risk, not a lean
+  maxMarkets: 30,
+};
+
+// Asset name/ticker → bare coin. Matched case-insensitively against the question
+// with word boundaries (so "eth" won't hit "together"). Extend as deeper
+// prediction markets appear for more of our listings; this base set covers the
+// liquid ones. Order matters only for display, not correctness (first match wins).
+export const FORECAST_ASSETS = [
+  { coin: "BTC", rx: /\b(bitcoin|btc)\b/i },
+  { coin: "ETH", rx: /\b(ethereum|ether|eth)\b/i },
+  { coin: "SOL", rx: /\b(solana|sol)\b/i },
+  { coin: "XRP", rx: /\b(xrp|ripple)\b/i },
+  { coin: "DOGE", rx: /\b(dogecoin|doge)\b/i },
+  { coin: "BNB", rx: /\b(bnb|binance\s*coin)\b/i },
+  { coin: "ADA", rx: /\b(cardano|ada)\b/i },
+  { coin: "AVAX", rx: /\b(avalanche|avax)\b/i },
+  { coin: "LINK", rx: /\b(chainlink|link)\b/i },
+  { coin: "SUI", rx: /\bsui\b/i },
+];
+
+// Polymarket gamma returns `outcomes` / `outcomePrices` as JSON-encoded STRINGS
+// (occasionally already arrays). Parse defensively either way.
+function parseJsonArray(v) {
+  if (Array.isArray(v)) return v;
+  if (typeof v === "string") { try { const a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch { return []; } }
+  return [];
+}
+
+// Extract a directional price target from a question. Requires an explicit `$`
+// anchor so we never mistake a year ("by 2026") for a strike. k/K → ×1e3,
+// m/M → ×1e6. direction: UP = the YES bet is that price reaches a HIGHER strike;
+// DOWN = YES bet is price falls below it. null when it isn't a price-target market.
+export function parsePriceTarget(question) {
+  const q = String(question || "");
+  const m = q.match(/\$\s*([0-9][0-9,]*\.?[0-9]*)\s*([kKmM])?/);
+  if (!m) return null;
+  let val = parseFloat(m[1].replace(/,/g, ""));
+  const suffix = (m[2] || "").toLowerCase();
+  if (suffix === "k") val *= 1e3;
+  else if (suffix === "m") val *= 1e6;
+  if (!Number.isFinite(val) || val <= 0) return null;
+  const up = /\b(reach|reaches|hit|hits|above|exceed|exceeds|surpass|surpasses|over|cross|crosses|top|tops|higher|≥|>=)\b/i.test(q);
+  const down = /\b(below|under|dip|dips|drop|drops|fall|falls|lower|beneath|≤|<=)\b/i.test(q);
+  const direction = (up && !down) ? "UP" : (down && !up) ? "DOWN" : (up ? "UP" : null);
+  if (!direction) return null;
+  return { target: val, direction };
+}
+
+// polyMarkets: raw gamma /markets rows. futuresRows: Orderly /v1/public/futures
+// rows (same shape mispricedBoard reads). opts.coin filters to one asset.
+export function forecastDivergence(polyMarkets, futuresRows, cfg = FORECAST, opts = {}) {
+  const wantCoin = opts.coin ? String(opts.coin).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "") : null;
+  // Build coin → tape snapshot (mark + funding) from Orderly's public futures.
+  const tape = {};
+  for (const r of futuresRows || []) {
+    const sym = r && r.symbol;
+    if (!sym || !String(sym).startsWith("PERP_")) continue;
+    const coin = String(sym).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+    const mark = Number(r.mark_price);
+    if (!Number.isFinite(mark) || mark <= 0) continue;
+    const funding = Number(r.last_funding_rate);
+    tape[coin] = { symbol: sym, mark, funding: Number.isFinite(funding) ? funding : null };
+  }
+  const out = [];
+  for (const pm of polyMarkets || []) {
+    if (pm && (pm.closed === true || pm.active === false)) continue;
+    const q = pm && pm.question;
+    if (!q) continue;
+    const asset = FORECAST_ASSETS.find((a) => a.rx.test(q));
+    if (!asset) continue;
+    if (wantCoin && asset.coin !== wantCoin) continue;
+    const volume = Number(pm.volumeNum ?? pm.volume ?? 0) || 0;
+    if (volume < cfg.minVolumeUsd) continue;
+
+    // YES probability from the outcome book.
+    const outcomes = parseJsonArray(pm.outcomes).map((x) => String(x).toLowerCase());
+    const prices = parseJsonArray(pm.outcomePrices).map(Number);
+    let yesProb = null;
+    const yi = outcomes.indexOf("yes");
+    if (yi >= 0 && Number.isFinite(prices[yi])) yesProb = prices[yi];
+    else if (prices.length && Number.isFinite(prices[0])) yesProb = prices[0];
+    if (yesProb == null || !Number.isFinite(yesProb)) continue;
+    yesProb = round(yesProb * 100, 1);
+
+    const t = tape[asset.coin] || null;
+    const entry = {
+      id: pm.id ?? pm.conditionId ?? null,
+      coin: asset.coin,
+      symbol: t ? t.symbol : null,
+      question: q,
+      slug: pm.slug ?? null,
+      forecastProbPct: yesProb,               // the crowd's probability of YES
+      volumeUsd: Math.round(volume),
+      liquidityUsd: Math.round(Number(pm.liquidity ?? 0) || 0),
+      endDate: pm.endDate ?? null,
+      markPrice: t ? t.mark : null,
+      funding8hPct: (t && t.funding != null) ? round(t.funding * 100, 5) : null,
+      target: null, targetDirection: null, distancePct: null,
+      forecastLean: null, nearMoney: null,
+      fundingLean: null, alignment: null, divergence: false,
+    };
+
+    const pt = parsePriceTarget(q);
+    if (pt && t) {
+      entry.target = pt.target;
+      entry.targetDirection = pt.direction;   // the direction the YES outcome bets on
+      entry.distancePct = round(((pt.target - t.mark) / t.mark) * 100, 2);
+      // Effective forecast lean FOLDS the probability: a LOW YES on an "up" bet means the
+      // crowd is betting price WON'T get there (a down/flat lean), and vice-versa. Without
+      // this fold, "2% chance BTC dips to $15k" (a bullish crowd) would read as bearish.
+      entry.forecastLean = yesProb >= 50 ? pt.direction : (pt.direction === "UP" ? "DOWN" : "UP");
+      // Only a NEAR-money strike carries a directional read vs positioning; a far tail
+      // strike ("dip to $5k", 90% away) is priced as tail risk, so we surface the forecast
+      // but never flag it as a divergence.
+      entry.nearMoney = Math.abs(entry.distancePct) <= cfg.nearBandPct;
+      if (t.funding != null && t.funding !== 0) {
+        // Funding lean: positive funding ⇒ book net LONG ⇒ leveraged tape leans UP;
+        // negative ⇒ leans DOWN. (The mispriced board FADES this; here we only read its
+        // direction to compare against the forecast.)
+        entry.fundingLean = t.funding > 0 ? "UP" : "DOWN";
+        if (entry.nearMoney) {
+          entry.alignment = entry.forecastLean === entry.fundingLean ? "ALIGNED" : "DIVERGENT";
+          // Flag only a CONVICTION divergence: forecasters lean one way, the tape the
+          // other, and the forecast isn't a coin-flip. That gap = worth investigating.
+          entry.divergence = entry.alignment === "DIVERGENT" && Math.abs(yesProb - 50) >= cfg.minConvictionPct;
+        }
+      }
+    }
+    out.push(entry);
+  }
+  // Flagged divergences first, then by crowd depth (volume = forecast quality).
+  out.sort((a, b) => (Number(b.divergence) - Number(a.divergence)) || (b.volumeUsd - a.volumeUsd));
+  return {
+    scanned: out.length,
+    divergentCount: out.filter((m) => m.divergence).length,
+    markets: out.slice(0, cfg.maxMarkets),
+  };
+}

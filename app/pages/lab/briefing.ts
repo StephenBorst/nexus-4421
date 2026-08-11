@@ -218,6 +218,36 @@ export function buildMarketRead(input: MarketReadInput): Insight[] {
   return out.sort((a, b) => b.priority - a.priority);
 }
 
+// ── FORECAST READ — the prediction-market lens as a briefing input ───────────
+// Turns a flagged near-money Forecast Divergence (forecastDivergence, worker-side)
+// into a briefing insight: the forecasting crowd and the leveraged tape disagree,
+// which is a prompt to investigate + stake a graded thesis. Caution tone, ranked
+// below the fusion/personal lenses but among the market reads. Pure + fail-soft.
+export interface ForecastRead {
+  coin: string;
+  question: string;
+  forecastProbPct: number;
+  forecastLean: "UP" | "DOWN" | null;
+  fundingLean: "UP" | "DOWN" | null;
+  divergence: boolean;
+}
+export function buildForecastRead(markets: ForecastRead[] | null): Insight[] {
+  if (!Array.isArray(markets)) return [];
+  const flagged = markets.filter((m) => m.divergence && m.forecastLean && m.fundingLean);
+  return flagged.slice(0, 1).map((m) => {
+    const q = m.question.length > 52 ? `${m.question.slice(0, 52)}…` : m.question;
+    return {
+      id: `forecast-${m.coin}`,
+      priority: 66,
+      tone: "caution" as const,
+      title: `${m.coin} — forecasters ${m.forecastLean === "UP" ? "bullish" : "bearish"}, tape offside`,
+      detail: `Polymarket leans ${m.forecastLean} (${m.forecastProbPct}%) on "${q}" while funding leans ${m.fundingLean}. A near-money divergence worth a graded thesis.`,
+      action: { label: "Forecasts", tab: "intel" },
+      meta: { symbol: m.coin, direction: (m.forecastLean === "UP" ? "LONG" : "SHORT") as "LONG" | "SHORT" },
+    };
+  });
+}
+
 // ── THE FUSION — the synthesis of syntheses ──────────────────────────────────
 // Every other read is EITHER about the market (tape, funding, movers) OR about you
 // (your record, your leaks). This is the intersection nobody else can compute: it

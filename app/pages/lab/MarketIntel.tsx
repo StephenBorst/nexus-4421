@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { navBtnStyle } from "./styles";
 import { useIsMobile } from "./useIsMobile";
 import IntelPage from "@/pages/intel";
+import { ForecastDivergence } from "./ForecastDivergence";
 // Pure + pinned by tests (app/lib/rssDate.test.mjs) — see that file for the "-333m" bug.
 import { parseRssDate, timeAgo } from "@/lib/rssDate.mjs";
 
@@ -202,7 +203,7 @@ export function MarketIntelView() {
           }}>{label}</button>
         ))}
       </div>
-      {sub === "intel" ? <IntelPage embedded /> : <NewsTab />}
+      {sub === "intel" ? <><IntelPage embedded /><ForecastDivergence /></> : <NewsTab />}
     </div>
   );
 }
