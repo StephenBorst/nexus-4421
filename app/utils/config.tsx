@@ -358,14 +358,18 @@ const allMenuItems = [
             {components.mainNav}
           </Flex>
 
+          {/* Mobile declutter: the nav can't fit 10 items on a phone. Collapse the
+              desktop-oriented ones (balance summary, device-linking QR flows, the
+              sub-account switcher) and keep the essentials — signals, messages,
+              language (no hamburger alternative), network, wallet, identity. */}
           <Flex itemAlign={"center"} className="oui-gap-2">
-            {components.accountSummary}
+            {!isMobile && components.accountSummary}
             <SignalsNavButton />
             <MessagesNavButton />
-            {components.linkDevice}
-            {components.scanQRCode}
+            {!isMobile && components.linkDevice}
+            {!isMobile && components.scanQRCode}
             {components.languageSwitcher}
-            {components.subAccount}
+            {!isMobile && components.subAccount}
             {components.chainMenu}
             {components.walletConnect}
             <ProfileAvatar />
