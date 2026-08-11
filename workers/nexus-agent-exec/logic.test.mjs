@@ -505,3 +505,55 @@ test("twapSchedule: respects the max-slice cap and bad inputs", () => {
   assert.equal(twapSchedule({ totalNotional: 1000, durationMin: 30, slices: 5, side: "BUY", markPrice: 0 }).ok, false);
   assert.equal(twapSchedule({ totalNotional: 0, durationMin: 30, slices: 5, side: "BUY", markPrice: 100 }).ok, false);
 });
+
+// ─── twapDueSlices / twapProgress (execution state machine) ───────────────────
+import { twapDueSlices, twapProgress } from "./logic.mjs";
+
+const twapState = (startedAt, overrides = {}) => ({
+  status: "ACTIVE", startedAt, symbol: "PERP_BTC_USDC", side: "BUY",
+  slices: [
+    { seq: 0, qty: 0.01, notionalEst: 100, offsetMs: 0, done: false },
+    { seq: 1, qty: 0.01, notionalEst: 100, offsetMs: 60000, done: false },
+    { seq: 2, qty: 0.01, notionalEst: 100, offsetMs: 120000, done: false },
+  ],
+  ...overrides,
+});
+
+test("twapDueSlices: fires only slices whose offset has elapsed", () => {
+  const start = 1_000_000;
+  const r0 = twapDueSlices(twapState(start), start + 500);          // only seq 0 (offset 0)
+  assert.deepEqual(r0.due.map((s) => s.seq), [0]);
+  assert.equal(r0.complete, false);
+  assert.equal(r0.remaining, 3);
+  const r1 = twapDueSlices(twapState(start), start + 61_000);       // seq 0 + 1
+  assert.deepEqual(r1.due.map((s) => s.seq), [0, 1]);
+});
+
+test("twapDueSlices: never re-fires a slice already marked done (idempotent)", () => {
+  const start = 1_000_000;
+  const s = twapState(start);
+  s.slices[0].done = true; s.slices[1].done = true;
+  const r = twapDueSlices(s, start + 200_000); // all offsets elapsed, but 0/1 done
+  assert.deepEqual(r.due.map((x) => x.seq), [2]);
+  assert.equal(r.remaining, 1);
+});
+
+test("twapDueSlices: complete when all children filled; inactive states fire nothing", () => {
+  const start = 1_000_000;
+  const done = twapState(start); done.slices.forEach((s) => (s.done = true));
+  const r = twapDueSlices(done, start + 999_999);
+  assert.equal(r.complete, true);
+  assert.equal(r.due.length, 0);
+  assert.equal(twapDueSlices({ ...twapState(start), status: "CANCELLED" }, start + 999_999).due.length, 0);
+  assert.equal(twapDueSlices(null, 1).due.length, 0);
+});
+
+test("twapProgress: filled/total/notional summary", () => {
+  const s = twapState(1_000_000);
+  s.slices[0].done = true; s.slices[0].filledNotional = 101;
+  const p = twapProgress(s);
+  assert.equal(p.total, 3);
+  assert.equal(p.filled, 1);
+  assert.equal(p.remaining, 2);
+  assert.equal(p.filledNotional, 101);
+});

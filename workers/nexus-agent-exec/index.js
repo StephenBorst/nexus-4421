@@ -13,7 +13,7 @@
 
 import * as ed from "@noble/ed25519";
 import bs58 from "bs58";
-import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice, breakevenArmed, directiveExpired, directiveShouldFill, directiveLevels, volScaledCapital, realizedVolPct, selectCopySignal, AUTOCOPY_MAX_LEADERS } from "./logic.mjs";
+import { snapQty, shouldResetDaily, dailyCapBlocked, computePnl, agentThesisLevels, agentCloseStatus, volScaledLevels, evaluateExit, normTakeProfits, dcaUnitMargin, nextSafetyOrder, blendAvg, dcaTakeProfitPrice, breakevenArmed, directiveExpired, directiveShouldFill, directiveLevels, volScaledCapital, realizedVolPct, selectCopySignal, AUTOCOPY_MAX_LEADERS, twapDueSlices, twapProgress } from "./logic.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const COOLDOWN_MS = 15 * 60 * 1000; // 15 min between trades
@@ -279,11 +279,130 @@ export default {
           )
         );
       }
+
+      // ── TWAP pass — fire any due order slices ─────────────────────────────
+      // Independent of the agent user set (a wallet can run a TWAP without the
+      // agent). Shares the price cache. Each processTwap is fail-isolated.
+      try {
+        const twapRaw = await env.NEXUS_AGENT.get("twap:users");
+        const twapUsers = twapRaw ? JSON.parse(twapRaw) : [];
+        for (let i = 0; i < twapUsers.length; i += BATCH_SIZE) {
+          const batch = twapUsers.slice(i, i + BATCH_SIZE);
+          await Promise.all(
+            batch.map((address) =>
+              processTwap(address, env, priceCache).catch((e) =>
+                console.error(`[twap] ${address.slice(0, 10)} error:`, e.message)
+              )
+            )
+          );
+        }
+      } catch (e) { console.error("[twap] pass error:", e.message); }
     } catch (e) {
       console.error("[exec] fatal:", e.message);
     }
   },
 };
+
+// Remove a wallet from the twap:users index (called when a TWAP reaches a terminal
+// state). Best-effort; the per-address state carries the authoritative status.
+async function twapRemoveUser(address, env) {
+  try {
+    const raw = await env.NEXUS_AGENT.get("twap:users");
+    const users = raw ? JSON.parse(raw) : [];
+    const next = users.filter((a) => String(a).toLowerCase() !== String(address).toLowerCase());
+    if (next.length !== users.length) await env.NEXUS_AGENT.put("twap:users", JSON.stringify(next));
+  } catch { /* index cleanup is best-effort */ }
+}
+
+// Process one wallet's active TWAP: fire every child slice whose offset has elapsed,
+// via the SAME order-only signing path the agent uses. SINGLE-WRITER: exec owns
+// twap:{addr} once lab-api has created it. Idempotency: each slice is marked done +
+// persisted the instant it fires, so a mid-tick failure never double-places it. A
+// cancel is a dedicated twap:cancel:{addr} flag (consumed here) so it can't be lost
+// to a state-write race — the agent:kill pattern.
+async function processTwap(address, env, cache) {
+  const raw = await env.NEXUS_AGENT.get(`twap:${address}`);
+  if (!raw) { await twapRemoveUser(address, env); return; }
+  const state = JSON.parse(raw);
+
+  // Honor a cancel flag (dedicated key so it can't race the state write).
+  const cancelled = await env.NEXUS_AGENT.get(`twap:cancel:${address}`);
+  if (cancelled) {
+    state.status = "CANCELLED";
+    state.endedAt = Date.now();
+    await env.NEXUS_AGENT.put(`twap:${address}`, JSON.stringify(state));
+    await env.NEXUS_AGENT.delete(`twap:cancel:${address}`);
+    await twapRemoveUser(address, env);
+    console.log(`[twap] ${address.slice(0, 10)} cancelled at ${twapProgress(state).filled}/${state.slices.length}`);
+    return;
+  }
+
+  const now = Date.now();
+  const { due, complete } = twapDueSlices(state, now);
+  if (complete) {
+    if (state.status !== "COMPLETE") {
+      state.status = "COMPLETE";
+      state.endedAt = now;
+      await env.NEXUS_AGENT.put(`twap:${address}`, JSON.stringify(state));
+    }
+    await twapRemoveUser(address, env);
+    return;
+  }
+  if (!due.length) return;
+
+  // Decrypt the order-only key once for this tick's fires.
+  const keyRaw = await env.NEXUS_AGENT.get(`twap:key:${address}`);
+  if (!keyRaw) { console.error(`[twap] no key for ${address.slice(0, 10)}`); return; }
+  const keyData = JSON.parse(keyRaw);
+  keyData.tradingKey = await decryptTradingKey(keyData.tradingKey, env);
+
+  // Set leverage once, before the first fill of the whole schedule.
+  if (twapProgress(state).filled === 0 && state.leverage) {
+    try { await orderlyRequest(keyData, "POST", "/v1/client/leverage", { symbol: state.symbol, leverage: state.leverage }); }
+    catch (e) { console.error(`[twap] ${address.slice(0, 10)} leverage set failed:`, e.message); }
+  }
+
+  const mark = await getMarkPrice(state.symbol, env, cache);
+  for (const slice of due) {
+    const target = state.slices.find((s) => s.seq === slice.seq);
+    if (!target || target.done) continue;
+    try {
+      const order = await orderlyRequest(keyData, "POST", "/v1/order", {
+        symbol: state.symbol,
+        order_type: "MARKET",
+        side: state.side,
+        order_quantity: target.qty,
+        broker_id: "nexus_trading",
+      });
+      if (order && order.success === false) {
+        target.error = String(order.message || order.code || "rejected");
+        console.error(`[twap] ${address.slice(0, 10)} slice ${target.seq} rejected:`, target.error);
+        // Leave it un-done so the next tick retries; a persistent reject stalls the
+        // schedule rather than silently dropping size (visible in the status endpoint).
+      } else {
+        target.done = true;
+        target.firedAt = Date.now();
+        target.orderId = order?.data?.order_id ?? null;
+        target.filledNotional = mark ? parseFloat((target.qty * mark).toFixed(2)) : target.notionalEst;
+        target.error = null;
+      }
+    } catch (e) {
+      target.error = e.message;
+      console.error(`[twap] ${address.slice(0, 10)} slice ${target.seq} error:`, e.message);
+    }
+    // Persist after EACH slice → a crash can't double-fire an already-placed slice.
+    await env.NEXUS_AGENT.put(`twap:${address}`, JSON.stringify(state));
+  }
+
+  // Terminal check after this tick's fires.
+  if (twapDueSlices(state, Date.now()).complete) {
+    state.status = "COMPLETE";
+    state.endedAt = Date.now();
+    await env.NEXUS_AGENT.put(`twap:${address}`, JSON.stringify(state));
+    await twapRemoveUser(address, env);
+    console.log(`[twap] ${address.slice(0, 10)} complete — ${state.slices.length} slices`);
+  }
+}
 
 // Recover an untracked live position (a "ghost"): the agent is flat in KV but a real
 // position exists on the exchange — e.g. a reconcile misfire or a rare KV-write miss

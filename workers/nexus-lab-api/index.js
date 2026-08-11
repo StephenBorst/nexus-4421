@@ -50,6 +50,10 @@ async function prevCopyLeaders(env, address) {
 }
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./backtest.mjs";
+// TWAP planner/status — reuse the exec worker's tested logic (wrangler bundles the
+// cross-dir import, same as backtest.mjs). ONE planner, so start-validation and the
+// cron fire from identical rules.
+import { twapSchedule, twapProgress } from "../nexus-agent-exec/logic.mjs";
 // Route families lifted out of the 74-route fetch handler (see shared.mjs for the
 // migration rules — one family per commit, read-only families first).
 import { handleSmart, refreshSmartSeed, sweepTrackedXray } from "./routes-smart.mjs";
@@ -3744,6 +3748,83 @@ document.getElementById("btn").addEventListener("click",go);
 
     // ── /feed ──────────────────────────────────────────────
     // ── /agent/:address — agent config, state, trade history ──
+    // ── TWAP — native time-sliced execution (our own, on the order-only key) ──
+    // Build-vs-buy: we run TWAP on our infra instead of the marketplace plugin's
+    // third-party hosted backend. `start` validates + plans the schedule (the SAME
+    // twapSchedule the cron fires from), provisions the order-only key from walletSig
+    // (identical derivation to the agent — cannot withdraw), and hands the schedule to
+    // the exec cron. Owner-authed on mutations; GET status is public. Fail-soft.
+    if (parts[0] === "twap" && parts[1]) {
+      const address = parts[1].toLowerCase();
+      const TWAP_KV = env.NEXUS_AGENT || env.LAB_STORE;
+      const TWAP_ORDERLY = "https://api-evm.orderly.org";
+      const twapOwns = (walletSig) => typeof walletSig === "string" && recoverEthAddress("nexus-trading-key-v1", walletSig) === address;
+
+      // GET /twap/:address — public status (progress from the same pure summary).
+      if (request.method === "GET" && !parts[2]) {
+        const raw = await TWAP_KV.get(`twap:${address}`);
+        if (!raw) return json({ active: false, twap: null }, request);
+        const state = JSON.parse(raw);
+        return json({ active: state.status === "ACTIVE", twap: { ...state, progress: twapProgress(state) } }, request);
+      }
+
+      // POST /twap/:address/start
+      if (request.method === "POST" && parts[2] === "start") {
+        let body; try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        if (!twapOwns(body?.walletSig)) return json({ error: "walletSig_required", hint: "start requires walletSig = sign_message('nexus-trading-key-v1') from the wallet's own signer." }, request, 401);
+        // One active TWAP per wallet (child orders net per symbol/account anyway).
+        const existing = await TWAP_KV.get(`twap:${address}`);
+        if (existing) { const s = JSON.parse(existing); if (s.status === "ACTIVE") return json({ error: "twap_active", hint: "A TWAP is already running for this wallet — cancel it first." }, request, 409); }
+        const symbol = normalizeSymbol(body?.symbol);
+        const side = String(body?.side || "").toUpperCase();
+        if (!symbol) return json({ error: "symbol required (e.g. BTC or PERP_BTC_USDC)" }, request, 400);
+        if (!["BUY", "SELL"].includes(side)) return json({ error: "side must be BUY or SELL" }, request, 400);
+        const totalNotional = Number(body?.totalNotional);
+        const durationMin = Number(body?.durationMin);
+        const slices = Number(body?.slices);
+        const leverage = Math.max(1, Math.min(50, Number(body?.leverage) || 1));
+        if (!(totalNotional > 0) || !(durationMin > 0) || !(slices >= 2)) return json({ error: "totalNotional (>0), durationMin (>0), slices (>=2) required" }, request, 400);
+        // Step size + min_notional live on /v1/public/info; mark on /v1/public/futures.
+        const info = (await (await fetch(`${TWAP_ORDERLY}/v1/public/info/${symbol}`)).json())?.data || {};
+        const fut = (await (await fetch(`${TWAP_ORDERLY}/v1/public/futures/${symbol}`)).json())?.data || {};
+        const markPrice = Number(fut.mark_price);
+        if (!(markPrice > 0)) return json({ error: `no mark price for ${symbol}` }, request, 400);
+        const plan = twapSchedule({ totalNotional, durationMin, slices, side, markPrice, baseTick: info.base_tick, baseMin: info.base_min, minNotional: info.min_notional ?? 10 });
+        if (!plan.ok) return json({ error: "unschedulable", reason: plan.reason, hint: "Increase total size, reduce slices, or check the market." }, request, 400);
+        // Provision the order-only key from walletSig (same derivation as the agent;
+        // Orderly order-scope only — can trade, never withdraw).
+        const recRaw = await env.LAB_STORE.get("user:" + address);
+        if (!recRaw) return json({ error: "wallet_not_registered", hint: "Enable trading first (place one manual trade to generate the Orderly key)." }, request, 401);
+        const rec = JSON.parse(recRaw);
+        if (!rec.accountId) return json({ error: "wallet_not_registered", hint: "No Orderly account on file." }, request, 401);
+        const secret = await agentSecretFromWalletSig(body.walletSig);
+        const encryptedKey = await encryptSecret(secret, env);
+        await TWAP_KV.put(`twap:key:${address}`, JSON.stringify({ tradingKey: encryptedKey, accountId: rec.accountId, registeredAt: Date.now(), enc: "v1" }));
+        await TWAP_KV.delete(`twap:cancel:${address}`);
+        const state = {
+          status: "ACTIVE", startedAt: Date.now(), createdAt: Date.now(),
+          symbol, side, leverage, markAtStart: markPrice,
+          intervalMs: plan.intervalMs, totalNotional,
+          slices: plan.slices.map((s) => ({ ...s, done: false, orderId: null, error: null })),
+        };
+        await TWAP_KV.put(`twap:${address}`, JSON.stringify(state));
+        const usersRaw = await TWAP_KV.get("twap:users");
+        const users = usersRaw ? JSON.parse(usersRaw) : [];
+        if (!users.includes(address)) { users.push(address); await TWAP_KV.put("twap:users", JSON.stringify(users)); }
+        return json({ ok: true, twap: { ...state, progress: twapProgress(state) }, note: "TWAP scheduled — the exec cron fires each slice via your order-only key. Cancel anytime; already-filled slices remain your position." }, request);
+      }
+
+      // POST /twap/:address/cancel — dedicated flag key (can't race the state write).
+      if (request.method === "POST" && parts[2] === "cancel") {
+        let body; try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+        if (!twapOwns(body?.walletSig)) return json({ error: "walletSig_required" }, request, 401);
+        await TWAP_KV.put(`twap:cancel:${address}`, "1", { expirationTtl: 3600 });
+        return json({ ok: true, note: "Cancel requested — the next exec tick stops new slices. Already-filled slices remain your position." }, request);
+      }
+
+      return json({ error: "not found" }, request, 404);
+    }
+
     if (parts[0] === "agent" && parts[1]) {
       const address = parts[1].toLowerCase();
       // Agent data MUST live in the same KV namespace the brain/exec Workers read

@@ -484,3 +484,32 @@ export function twapSchedule({ totalNotional, durationMin, slices, side, markPri
   if (!out.length) return { ok: false, reason: firstErr || "no valid slices", slices: [] };
   return { ok: true, reason: null, count: out.length, intervalMs, totalQtyEst: parseFloat(placedQty.toFixed(decimals)), slices: out };
 }
+
+// ── TWAP execution state machine (pure firing decision) ──────────────────────
+// The exec cron loads a stored TWAP and asks this which child slices are DUE to
+// fire now (their offset has elapsed and they aren't already filled) and whether
+// the whole schedule is done. Pure so the money decision is testable without
+// touching Orderly. Idempotent by design: the cron marks a slice done the instant
+// it fires, so a slice is never double-placed across ticks.
+export function twapDueSlices(state, now) {
+  if (!state || state.status !== "ACTIVE" || !Array.isArray(state.slices)) {
+    return { due: [], complete: false, remaining: 0 };
+  }
+  const start = Number(state.startedAt) || 0;
+  const pending = state.slices.filter((s) => !s.done);
+  const due = pending.filter((s) => (start + (Number(s.offsetMs) || 0)) <= now);
+  return { due, complete: pending.length === 0, remaining: pending.length };
+}
+
+// Progress summary for the status endpoint / UI: filled vs total children and the
+// notional actually placed so far. Pure; tolerates a partially-filled schedule.
+export function twapProgress(state) {
+  const slices = Array.isArray(state?.slices) ? state.slices : [];
+  const filled = slices.filter((s) => s.done);
+  return {
+    total: slices.length,
+    filled: filled.length,
+    filledNotional: parseFloat(filled.reduce((a, s) => a + (Number(s.filledNotional) || Number(s.notionalEst) || 0), 0).toFixed(2)),
+    remaining: slices.length - filled.length,
+  };
+}
