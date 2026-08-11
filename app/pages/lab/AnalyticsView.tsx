@@ -453,7 +453,7 @@ function PerformanceAnalysis({ orders }: { orders: ProcessedTrade[] }) {
   const worstSym = data.worst.symbol.replace("PERP_", "").replace("_USDC", "");
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 8, marginTop: 8 }}>
       <div style={cardStyle}>
         <div style={{ fontSize: 10, color: "#71717a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; PERFORMANCE ANALYSIS</div>
         <div style={{ marginBottom: 8 }}>

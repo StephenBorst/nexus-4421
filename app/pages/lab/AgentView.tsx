@@ -1584,7 +1584,7 @@ export function AgentView() {
             return (
               <div style={{ ...agentCardStyle, borderColor: lossPct >= 90 ? "#f7525f60" : "#232327" }}>
                 <div style={agentLabelStyle}>🛡 ACTIVE GUARDRAILS</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, marginTop: 10 }}>
                   {/* Daily loss limit */}
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
