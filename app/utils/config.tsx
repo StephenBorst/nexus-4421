@@ -349,7 +349,7 @@ const allMenuItems = [
                 <img
                   src={withBasePath("/logo-secondary.webp")}
                   alt="logo"
-                  style={{ height: "32px" }}
+                  style={{ height: "30px", width: "auto", flexShrink: 0, objectFit: "contain" }}
                 />
               ) : (
                 components.title

@@ -1460,9 +1460,9 @@ export function ThesisView() {
             {/* Signal framing — a thesis becomes a "Signal" when it names the near-term
                 CATALYST (why now) and a defined EXIT WINDOW (when you'll know). Both
                 optional; they sharpen the call and surface on Proof of Edge. */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 8, marginTop: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: 8, marginTop: 10, alignItems: "end" }}>
               <div>
-                <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 5 }}>⚡ CATALYST <span style={{ color: "#33333a" }}>(why now · optional)</span></div>
+                <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>⚡ CATALYST <span style={{ color: "#33333a" }}>(why now · optional)</span></div>
                 <input
                   style={inputStyle} type="text"
                   placeholder="the near-term trigger — e.g. CPI Thu, funding reset, range breakout"
@@ -1470,7 +1470,7 @@ export function ThesisView() {
                 />
               </div>
               <div>
-                <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 5 }}>⌛ EXIT BY <span style={{ color: "#33333a" }}>(optional)</span></div>
+                <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>⌛ EXIT BY <span style={{ color: "#33333a" }}>(optional)</span></div>
                 <input
                   style={inputStyle} type="text"
                   placeholder="7D · 48h · FOMC"

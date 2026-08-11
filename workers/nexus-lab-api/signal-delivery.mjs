@@ -78,10 +78,11 @@ export async function computeSignalRows(env) {
 // Cron: build signals, pick the single highest-conviction push-worthy one (a fade where
 // signal+crowd agree, or a real signal-vs-callers divergence), and DM opted-in chats —
 // only when it's genuinely NEW and outside the throttle. Best-effort + fail-soft.
-export async function deliverSignals(env) {
-  if (!env.TELEGRAM_TOKEN) return { skipped: "no_token" };
+export async function deliverSignals(env, opts = {}) {
+  const dryRun = !!opts.dryRun;
   const KV = env.NEXUS_AGENT || env.LAB_STORE;
   const last = JSON.parse((await KV.get(BROADCAST_KEY)) || "null") || { id: null, ts: 0 };
+  const hasToken = !!env.TELEGRAM_TOKEN;
 
   const [signals, consensus, evRaw] = await Promise.all([
     computeSignalRows(env),
@@ -90,25 +91,30 @@ export async function deliverSignals(env) {
   ]);
   const built = buildSignals({ signals, consensus, xrayEvents: evRaw ? JSON.parse(evRaw) : [] });
   const top = built.find((s) => s.kind === "FADE_ALIGN" || s.kind === "DIVERGENCE" || s.kind === "MOMENTUM");
-  if (!top) return { sent: 0, reason: "no_high_conviction_signal" };
-  if (top.id === last.id) return { sent: 0, reason: "unchanged" };
-  if (Date.now() - (last.ts || 0) < MIN_BROADCAST_MS) return { sent: 0, reason: "throttled" };
-
   const subs = await KV.list({ prefix: "signals:sub:" });
-  if (!subs.keys.length) { await KV.put(BROADCAST_KEY, JSON.stringify({ id: top.id, ts: Date.now() })); return { sent: 0, reason: "no_subscribers" }; }
+  // Ops-visible diagnostic so `/signals/deliver-now` shows WHY it did or didn't fire.
+  const diag = { hasToken, built: built.length, top: top ? { id: top.id, kind: top.kind, title: top.title } : null, subscribers: subs.keys.length, last, throttleMs: MIN_BROADCAST_MS };
+
+  if (!hasToken) return { sent: 0, reason: "no_token", ...diag };
+  if (!top) return { sent: 0, reason: "no_high_conviction_signal", ...diag };
+  if (top.id === last.id) return { sent: 0, reason: "unchanged", ...diag };
+  if (Date.now() - (last.ts || 0) < MIN_BROADCAST_MS) return { sent: 0, reason: "throttled", wouldSend: top.id, ...diag };
+  if (!subs.keys.length) { if (!dryRun) await KV.put(BROADCAST_KEY, JSON.stringify({ id: top.id, ts: Date.now() })); return { sent: 0, reason: "no_subscribers", wouldSend: top.id, ...diag }; }
+  if (dryRun) return { sent: 0, reason: "dry_run", wouldSend: top.id, ...diag };
 
   const text = `◆ <b>Nexus signal</b>\n${top.title}\n${top.detail}\n\n<a href="https://trade.nexustradinglabs.com/lab?tab=${top.tab}">Open the Lab →</a>\n<i>Send /signals off to stop.</i>`;
   let sent = 0;
   for (const k of subs.keys) {
     const chatId = k.name.slice("signals:sub:".length);
     try {
-      await fetch(`https://api.telegram.org/bot${env.TELEGRAM_TOKEN}/sendMessage`, {
+      const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_TOKEN}/sendMessage`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true }),
       });
-      sent++;
-    } catch { /* skip this chat */ }
+      if (r.ok) sent++;
+      else console.error(`[signals] send failed chat=${chatId} status=${r.status}`);
+    } catch (e) { console.error(`[signals] send error chat=${chatId}: ${e.message}`); }
   }
   await KV.put(BROADCAST_KEY, JSON.stringify({ id: top.id, ts: Date.now() }));
-  return { sent, id: top.id };
+  return { sent, id: top.id, ...diag };
 }

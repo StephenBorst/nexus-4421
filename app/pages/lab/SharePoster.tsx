@@ -6,7 +6,8 @@
 // monospace, rationed green, "verify — don't trust".
 import { useRef, useState } from "react";
 
-const GREEN = "#3ecf8e";
+const GREEN = "#3ecf8e";   // profit ONLY (realized) — never decoration or a planned metric
+const ACCENT = "#ededf0";  // bone/white — the brand accent (labels, brand column, plan metrics)
 const RED = "#f7525f";
 const BRIGHT = "#f4f4f5";
 const MUTED = "#71717a";
@@ -65,16 +66,16 @@ function PosterSVG({ data, svgRef }: { data: PosterData; svgRef: React.Ref<SVGSV
       ? `${data.consensus} smart-money traders agree`
       : "smart money · Hyperliquid";
     if (data.szUsd != null && data.szUsd > 0) rows.push({ label: "SIZE", value: money(data.szUsd) });
-    if (data.consensus && data.consensus > 1) rows.push({ label: "CONSENSUS", value: `${data.consensus} traders`, color: GREEN });
+    if (data.consensus && data.consensus > 1) rows.push({ label: "CONSENSUS", value: `${data.consensus} traders`, color: ACCENT });
     if (data.trader) rows.push({ label: "TRADER", value: data.trader });
     if (data.roi != null) rows.push({ label: "30D ROI", value: `${(data.roi * 100).toFixed(0)}%`, color: GREEN });
   } else {
     headline = data.rr != null ? `${data.rr.toFixed(2)}R` : "THESIS";
-    headlineColor = data.rr != null ? GREEN : BRIGHT;
+    headlineColor = ACCENT; // R:R is PLANNED, not realized profit → bone, not green
     subline = data.rr != null ? "R:R planned · trustless grade" : "trade thesis";
     if (data.entry != null) rows.push({ label: "ENTRY", value: `$${data.entry.toLocaleString()}` });
     if (data.stop != null) rows.push({ label: "STOP", value: `$${data.stop.toLocaleString()}`, color: RED });
-    if (data.target != null) rows.push({ label: "TARGET", value: `$${data.target.toLocaleString()}`, color: GREEN });
+    if (data.target != null) rows.push({ label: "TARGET", value: `$${data.target.toLocaleString()}`, color: ACCENT });
     if (data.author) rows.push({ label: "CALLER", value: `${data.meritGlyph ? data.meritGlyph + " " : ""}${data.author}` });
   }
 
@@ -91,7 +92,7 @@ function PosterSVG({ data, svgRef }: { data: PosterData; svgRef: React.Ref<SVGSV
       <rect x="1" y="1" width={W - 2} height={H - 2} fill="none" stroke="#232327" strokeWidth="2" rx="14" />
 
       {/* ── LEFT: content zone ─────────────────────────────── */}
-      <text x="60" y="80" fill={GREEN} fontFamily={MONO} fontSize="17" letterSpacing="5" fillOpacity="0.9">{kindLabel}</text>
+      <text x="60" y="80" fill={ACCENT} fontFamily={MONO} fontSize="17" letterSpacing="5" fillOpacity="0.9">{kindLabel}</text>
 
       {/* Symbol + direction chip */}
       <text x="60" y="164" fill={BRIGHT} fontFamily={MONO} fontSize="72" fontWeight="700">{asset(data.symbol)}</text>
@@ -126,8 +127,8 @@ function PosterSVG({ data, svgRef }: { data: PosterData; svgRef: React.Ref<SVGSV
       })}
 
       {/* ── RIGHT: brand column (mirrors the SDK PnL poster) ── */}
-      <line x1="830" y1="150" x2="830" y2="470" stroke={GREEN} strokeOpacity="0.3" strokeWidth="2" />
-      <text x={RX} y="228" textAnchor="end" fontFamily={MONO} fontSize="15" letterSpacing="5" fill={GREEN} fillOpacity="0.85">// OMNICHAIN TRADING</text>
+      <line x1="830" y1="150" x2="830" y2="470" stroke={ACCENT} strokeOpacity="0.25" strokeWidth="2" />
+      <text x={RX} y="228" textAnchor="end" fontFamily={MONO} fontSize="15" letterSpacing="5" fill={ACCENT} fillOpacity="0.85">// OMNICHAIN TRADING</text>
       <text x={RX} y="300" textAnchor="end" fontFamily={SANS} fontSize="56" fontWeight="700" fill={BRIGHT}>Nexus</text>
       <text x={RX} y="358" textAnchor="end" fontFamily={SANS} fontSize="56" fontWeight="700" fill="#71717a">Trading</text>
       <text x={RX} y="416" textAnchor="end" fontFamily={SANS} fontSize="56" fontWeight="700" fill={BRIGHT}>Labs</text>
@@ -135,7 +136,7 @@ function PosterSVG({ data, svgRef }: { data: PosterData; svgRef: React.Ref<SVGSV
 
       {/* Footer */}
       <line x1="60" y1="560" x2={W - 60} y2="560" stroke="#1a1a1e" strokeWidth="1" />
-      <text x="60" y="596" fill={GREEN} fontFamily={MONO} fontSize="15" letterSpacing="1" fillOpacity="0.7">◆ VERIFY, DON'T TRUST</text>
+      <text x="60" y="596" fill={ACCENT} fontFamily={MONO} fontSize="15" letterSpacing="1" fillOpacity="0.7">◆ VERIFY, DON'T TRUST</text>
       <text x={RX} y="596" fill={FAINT} fontFamily={MONO} fontSize="15" letterSpacing="1" textAnchor="end">nexustradinglabs.com</text>
     </svg>
   );

@@ -4190,6 +4190,13 @@ document.getElementById("btn").addEventListener("click",go);
       const thesesRes = await handleTheses(parts, request, env);
       if (thesesRes) return thesesRes;
     }
+    // Ops/verify: what WOULD the Telegram push send right now, and why did/didn't it fire?
+    // Dry-run by default (no send, no throttle write); `?send=1` actually delivers.
+    if (parts[0] === "signals" && parts[1] === "deliver-now" && request.method === "GET") {
+      const send = url.searchParams.get("send") === "1";
+      const result = await deliverSignals(env, { dryRun: !send });
+      return json({ mode: send ? "live" : "dry-run", ...result }, request);
+    }
     if (parts[0] === "signals") {
       if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
       // Shared builder (signal-delivery.mjs) so the public API + the Telegram push agree.

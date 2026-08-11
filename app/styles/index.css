@@ -212,49 +212,10 @@ html, body {
 .nx-fade-in { animation: nx-fade-in 320ms var(--nx-ease) both; }
 @keyframes nx-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-/* ── Signature ambient terminal texture ──────────────────────────────────────
-   A hairline grid + a slow radial scan of light, fixed behind everything. This
-   is the ownable atmosphere — kept faint enough to feel, not read. It sits at
-   z-index 0; page content paints above wherever it sets its own surface. */
-.nx-ambient {
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  /* ── Texture intensity — tune here, one place. ──────────────────────────────
-     --nx-grid-op : hairline grid strength (0 = off; 0.025 whisper · 0.055 present)
-                    ⚠️ The line is WHITE, not --nx-border. A dark line on a near-black
-                    ground is mathematically invisible (#232327 @0.09 over #0a0a0b is a
-                    ~2/255 delta — verified imperceptible on prod). Light line + low
-                    alpha is the only way a grid reads here.
-     --nx-grid-size: grid pitch (smaller = denser, more "engineered")
-     --nx-scan-op : moving light strength · --nx-vignette: edge falloff depth */
-  --nx-grid-op: 0.035;
-  --nx-grid-size: 44px;
-  --nx-scan-op: 0.045;
-  --nx-vignette: 0.22;
-  /* Edge vignette — only shows on exposed canvas (behind content), adds depth to
-     the margins without touching readability. */
-  background: radial-gradient(135% 105% at 50% -5%, transparent 58%, rgba(0,0,0,var(--nx-vignette)));
-}
-.nx-ambient::before {
-  content: ""; position: absolute; inset: 0;
-  background-image:
-    linear-gradient(rgba(255,255,255,1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px);
-  background-size: var(--nx-grid-size) var(--nx-grid-size); opacity: var(--nx-grid-op);
-  /* Concentrated at the top and dissolving into the content — reads as header
-     atmosphere, not a flat wallpaper. Opacity glides so a regime shift is felt,
-     not seen (data-reactivity from useMarketPulse). */
-  transition: opacity 2.5s var(--nx-ease);
-  -webkit-mask-image: radial-gradient(125% 82% at 50% -8%, #000 0%, #000 32%, transparent 72%);
-          mask-image: radial-gradient(125% 82% at 50% -8%, #000 0%, #000 32%, transparent 72%);
-}
-.nx-ambient::after {
-  content: ""; position: absolute; inset: -35% -12% auto -12%; height: 72%;
-  background: radial-gradient(ellipse at 50% 0%, rgba(237,237,240,var(--nx-scan-op)), transparent 62%);
-  animation: nx-scan var(--nx-scan-dur, 22s) var(--nx-ease) infinite alternate;
-}
-@keyframes nx-scan { from { transform: translateX(-4%); } to { transform: translateX(4%); } }
-/* App shell renders inside #root; keep it above the ambient layer. */
-#root { position: relative; z-index: 1; }
+/* ── Background: clean terminal-black ─────────────────────────────────────────
+   The signature grid + scan-glow texture was removed — the app background is flat
+   terminal-black, congruent with the landing hero. (AmbientTexture now only hosts
+   the cursor spotlight.) */
 
 /* Card materiality — a hover lift for interactive cards (depth via motion +
    hairline, never shadow). Opt in with .nx-card-lift on inline-styled cards. */
@@ -314,7 +275,7 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
   .nx-card, .nx-btn, .nx-input, .nx-trade-row, .nx-expand, .nx-chevron { transition: none; }
-  .nx-skeleton::after, .nx-fade-in, .nx-draw, .nx-grow, .nx-area-in, .nx-ambient::after,
+  .nx-skeleton::after, .nx-fade-in, .nx-draw, .nx-grow, .nx-area-in,
   .nx-live-dot, .nx-pulse, .nx-stagger > * { animation: none; }
   .nx-card-lift { transition: none; }
 }

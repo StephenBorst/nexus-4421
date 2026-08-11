@@ -97,7 +97,9 @@ export default function SignalsNavButton() {
       </button>
 
       {open && (
-        <div className="nx-fade-in" style={{ position: "absolute", top: 34, right: 0, zIndex: 9500, width: "min(360px, 92vw)", maxHeight: "70vh", overflowY: "auto", background: "#0f0f11", border: "1px solid #33333a", borderRadius: 10, boxShadow: "0 16px 50px rgba(0,0,0,0.6)" }}>
+        // Anchored to the VIEWPORT (fixed), not the button — so the panel can never
+        // overflow off-screen on mobile where the bell sits mid-nav.
+        <div className="nx-fade-in" style={{ position: "fixed", top: 54, right: 8, zIndex: 9500, width: "min(360px, calc(100vw - 16px))", maxHeight: "72vh", overflowY: "auto", background: "#0f0f11", border: "1px solid #33333a", borderRadius: 10, boxShadow: "0 16px 50px rgba(0,0,0,0.6)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 14px", borderBottom: "1px solid #232327", position: "sticky", top: 0, background: "#0f0f11" }}>
             <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", color: "#ededf0" }}>◆ SIGNALS</span>
             <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", letterSpacing: "0.05em" }}>live · public · graded</span>
