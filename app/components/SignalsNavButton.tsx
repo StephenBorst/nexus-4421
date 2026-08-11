@@ -78,7 +78,7 @@ export default function SignalsNavButton() {
   };
 
   return (
-    <div ref={rootRef} style={{ position: "relative", display: "inline-flex" }}>
+    <div ref={rootRef} style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}>
       <button
         onClick={toggle}
         title={unseen > 0 ? `Signals, ${unseen} new` : "Signals"}

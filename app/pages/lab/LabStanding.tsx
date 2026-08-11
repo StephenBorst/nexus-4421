@@ -15,17 +15,20 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 const AGENT_API = "https://og.nexustradinglabs.com";
+const MIN_CALLS = 5; // Verified Caller threshold (mirrors lab-api MIN_CALLS)
 
-type Ranked = {
-  wallet: string; calls: number; hitRate: number; avgR: number;
+// The connected wallet's OWN graded CALLER record (published theses, first-touch graded
+// vs public price) — distinct from the trade record in Analytics. Read from the per-wallet
+// /theses/process endpoint so EVERY state is handled directly from the true count + avg-R,
+// not inferred from which board list a wallet happens to land in (the old two-list lookup
+// silently dropped net-negative callers with 5+ calls into a wrong "no record" state).
+type Process = {
+  calls: number; hitRate: number; avgR: number;
   meritRank?: { glyph: string; title: string } | null;
 };
-type Emerging = { wallet: string; calls: number; hitRate: number; avgR: number; callsToQualify: number };
 
 export function LabStanding({ address }: { address?: string | null }) {
-  const [ranked, setRanked] = useState<Ranked | null>(null);
-  const [emerging, setEmerging] = useState<Emerging | null>(null);
-  const [minCalls, setMinCalls] = useState(5);
+  const [rec, setRec] = useState<Process | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -33,13 +36,9 @@ export function LabStanding({ address }: { address?: string | null }) {
     let alive = true;
     (async () => {
       try {
-        const d = await (await fetch(`${AGENT_API}/theses/leaderboard`)).json();
+        const d = await (await fetch(`${AGENT_API}/theses/process/${String(address).toLowerCase()}`)).json();
         if (!alive) return;
-        const me = String(address).toLowerCase();
-        const eq = (w: unknown) => String(w ?? "").toLowerCase() === me;
-        setRanked((d?.leaderboard ?? []).find((r: Ranked) => eq(r.wallet)) ?? null);
-        setEmerging((d?.emerging ?? []).find((r: Emerging) => eq(r.wallet)) ?? null);
-        if (d?.criteria?.minCalls) setMinCalls(d.criteria.minCalls);
+        setRec(d && typeof d.calls === "number" ? { calls: d.calls, hitRate: d.hitRate ?? 0, avgR: d.avgR ?? 0, meritRank: d.meritRank ?? null } : null);
         setLoaded(true);
       } catch { /* fail soft — strip just doesn't render */ }
     })();
@@ -47,11 +46,18 @@ export function LabStanding({ address }: { address?: string | null }) {
   }, [address]);
 
   if (!address || !loaded) return null;
+  const minCalls = MIN_CALLS;
+  // Derive the state directly from the record: ranked (earned merit) → emerging (<5) →
+  // qualified-by-count-but-net-negative (5+, unranked) → nothing yet.
+  const ranked = rec && rec.meritRank ? rec : null;
+  const emerging = rec && !rec.meritRank && rec.calls > 0 && rec.calls < minCalls
+    ? { calls: rec.calls, callsToQualify: minCalls - rec.calls } : null;
+  const unranked = rec && !rec.meritRank && rec.calls >= minCalls ? rec : null;
 
   const label = { fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", letterSpacing: "0.12em" };
   const val = { fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ededf0", fontWeight: 600 } as const;
 
-  // Three states, one line: ranked → emerging → no record yet.
+  // States, one line: ranked → emerging (<5) → net-negative-but-5+ → no record yet.
   let body: React.ReactNode;
   if (ranked) {
     const r = ranked;
@@ -67,6 +73,18 @@ export function LabStanding({ address }: { address?: string | null }) {
         <span style={{ ...val, color: r.avgR >= 0 ? "#3ecf8e" : "#f7525f" }}>
           {r.avgR >= 0 ? "+" : ""}{r.avgR.toFixed(2)}R avg
         </span>
+      </>
+    );
+  } else if (unranked) {
+    // 5+ resolved calls but net-negative by R — met the count, not the bar. Shown
+    // honestly rather than dropped into a wrong "no record yet" state.
+    const u = unranked;
+    body = (
+      <>
+        <span style={val}>{u.calls} graded</span>
+        <span style={val}>{u.hitRate.toFixed(0)}% hit</span>
+        <span style={{ ...val, color: "#f7525f" }}>{u.avgR.toFixed(2)}R avg</span>
+        <span style={{ ...label, letterSpacing: 0, fontSize: 11 }}>net-negative — not yet ranked</span>
       </>
     );
   } else if (emerging) {
@@ -100,7 +118,7 @@ export function LabStanding({ address }: { address?: string | null }) {
       padding: "10px 16px", background: "#0f0f11", border: "1px solid #232327",
       borderRadius: 4, marginBottom: 12,
     }}>
-      <span style={label}>YOUR GRADED RECORD</span>
+      <span style={label} title="Your published-thesis (CALL) record, graded first-touch vs public price — separate from your trade record in Analytics.">YOUR CALLER RECORD</span>
       {body}
       <Link
         to="/feed?view=ranks"
