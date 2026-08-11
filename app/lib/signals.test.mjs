@@ -63,3 +63,12 @@ test("buildSignals: CHOP / no trend → no momentum signal", () => {
   const out = buildSignals({ signals: [{ symbol: "BTC", funding_rate_8h: 0.0001, trend: "CHOP", trend_move_pct: 0.2, trend_oi_pct: 5 }] });
   assert.equal(out.find((s) => s.kind === "MOMENTUM"), undefined);
 });
+
+test("buildSignals: momentum funding cross-check — crowded funding flags a LATE ride", () => {
+  const clean = buildSignals({ signals: [{ symbol: "BTC", funding_rate_8h: 0.0001, trend: "TREND_UP", trend_move_pct: 6, trend_oi_pct: 3 }] }).find((s) => s.kind === "MOMENTUM");
+  assert.match(clean.detail, /room to run/);
+  assert.ok(!/late/i.test(clean.title));
+  const late = buildSignals({ signals: [{ symbol: "BTC", funding_rate_8h: 0.0009, trend: "TREND_UP", trend_move_pct: 6, trend_oi_pct: 3 }] }).find((s) => s.kind === "MOMENTUM");
+  assert.match(late.title, /\(late\)/);
+  assert.match(late.detail, /crowded long/);
+});

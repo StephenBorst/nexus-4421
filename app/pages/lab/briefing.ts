@@ -102,6 +102,9 @@ export interface MarketSignal {
 // A trend needs rising open interest (new money committing) to be a real momentum setup —
 // otherwise it's a squeeze/exhaustion (fakeout). >= this %/hr OI growth = confirmed.
 const MOMENTUM_OI_MIN = 1;
+// Funding at/above this (per 8h) means the crowd is already max-positioned on the trend's
+// side — the ride is late (and it's the fade class's setup). Same band as the fade trigger.
+const CROWDED_FUNDING = 0.0004;
 
 export interface MarketReadInput {
   rows: { symbol: string; "24h_open"?: string | number; "24h_close"?: string | number }[] | null;
@@ -240,10 +243,65 @@ export function buildFusion(input: FusionInput): Insight[] {
   const { trades, signals, consensus, contrarian } = input;
   const out: Insight[] = [];
 
-  // Setup selection, by CONVICTION CLASS. A confluence read (funding AND open interest
-  // agree — the agent's highest-conviction fade) wins; otherwise the most-stretched
-  // funding market. The direction is the fade in both cases. This is the generalization:
-  // the fusion reasons over setup CLASS, not just raw funding.
+  const sideWord = (d: "LONG" | "SHORT") => (d === "LONG" ? "long" : "short");
+
+  // Your edge: which side you're measurably better on (needs a real sample both sides).
+  const longs = trades.filter((t) => t.direction === "LONG");
+  const shorts = trades.filter((t) => t.direction === "SHORT");
+  let userSide: "LONG" | "SHORT" | null = null, userWr = 0;
+  if (longs.length >= 4 && shorts.length >= 4) {
+    const lw = wrOf(longs), sw = wrOf(shorts);
+    if (Math.abs(lw - sw) >= 12) { userSide = lw > sw ? "LONG" : "SHORT"; userWr = Math.max(lw, sw); }
+  }
+  const provenFader = !!(contrarian && contrarian.calls >= 3 && contrarian.avgR > 0);
+  const faderNote = provenFader ? `, and your record fading the crowd is +${contrarian!.avgR}R over ${contrarian!.calls} calls` : "";
+
+  // Per-CLASS edge (the matrix). A funding fade is a COUNTER-TREND / mean-reversion play;
+  // riding a trend is a WITH-trend / momentum play. Match the setup to the user's ALIGN
+  // edge: AGAINST_TREND traders get fades, WITH_TREND traders get the trend to ride.
+  const alignBest = input.alignEdge?.best?.bucket || null;
+  const alignAvgR = input.alignEdge?.best?.avgR ?? 0;
+  const classAgainst = alignBest === "align:AGAINST_TREND"; // mean-reversion / fader
+  const classWith = alignBest === "align:WITH_TREND";       // momentum / trend-rider
+  const classNote = classAgainst ? ` Counter-trend fades are your class — your align edge is +${alignAvgR}R against the trend.`
+    : classWith ? " ⚠ Your record leans WITH-trend, so this counter-trend fade is off your usual style — respect the risk."
+    : "";
+
+  // ── MOMENTUM setup (evaluated FIRST, independent of any fade setup) ──
+  // The strongest-trending core symbol, CONFIRMED by rising OI (new money committing —
+  // a trend on thinning OI is a squeeze/exhaustion, not a setup). Cross-checked against
+  // funding: crowd already max-positioned on the trend's side = a LATE ride, graded not hidden.
+  const trending = (signals || [])
+    .filter((s) => (s.trend === "TREND_UP" || s.trend === "TREND_DOWN") && (s.trend_oi_pct ?? 0) >= MOMENTUM_OI_MIN)
+    .sort((a, b) => Math.abs(b.trend_move_pct ?? 0) - Math.abs(a.trend_move_pct ?? 0));
+  const mom = trending[0] || null;
+  const momDir: "LONG" | "SHORT" | null = mom ? (mom.trend === "TREND_UP" ? "LONG" : "SHORT") : null;
+  const momMove = mom?.trend_move_pct ?? 0;
+  const momOi = mom?.trend_oi_pct ?? 0;
+  const momFunding = mom?.funding_rate_8h ?? 0;
+  const momExtended = !!mom && ((momDir === "LONG" && momFunding >= CROWDED_FUNDING) || (momDir === "SHORT" && momFunding <= -CROWDED_FUNDING));
+  const fundingNote = momExtended
+    ? ` But funding is already crowded ${momDir === "LONG" ? "long" : "short"} (${(momFunding * 100).toFixed(3)}%/8h) — the trend is LATE, so tighten the stop; this is where trends snap.`
+    : ` Funding isn't crowded yet (${(momFunding * 100).toFixed(3)}%/8h), so the crowd isn't all-in — room to run.`;
+
+  // A momentum trader + a live, OI-confirmed trend = ride it. This IS their read, so it
+  // returns early — no need to also throw a fade at a trend-rider.
+  if (mom && momDir && classWith) {
+    out.push({
+      id: "fusion-momentum",
+      priority: momExtended ? 90 : 92,
+      tone: momExtended ? "caution" : "positive",
+      title: `Your setup: ride the ${mom.symbol} trend (${sideWord(momDir)})`,
+      detail: `${mom.symbol} is in a strong ${momDir === "LONG" ? "uptrend" : "downtrend"} (${momMove >= 0 ? "+" : ""}${momMove}%) and open interest is rising (+${momOi}%/hr) — new money committing, not a squeeze. Momentum is your class: your align edge is +${alignAvgR}R WITH the trend.${fundingNote}`,
+      action: { label: "Structure it", tab: "thesis" },
+      meta: { symbol: mom.symbol, direction: momDir },
+    });
+    return out;
+  }
+
+  // ── FADE setup (may not exist) ──
+  // A confluence read (funding AND OI agree) wins; otherwise the most-stretched funding
+  // market. The direction is the fade. No fade setup + no momentum above → nothing to say.
   const confl = (signals || []).find((s) => s.confluence === "LONG" || s.confluence === "SHORT");
   const byFund = [...(signals || [])].sort((a, b) => Math.abs(b.funding_rate_8h) - Math.abs(a.funding_rate_8h));
   const hot = byFund.find((s) => Math.abs(s.funding_rate_8h) >= 0.0004);
@@ -266,52 +324,7 @@ export function buildFusion(input: FusionInput): Insight[] {
     : callersFight ? ` But the credible callers actually lean ${lean!.side} — a real disagreement, so treat it as lower-conviction.`
     : "";
 
-  // Your edge: which side you're measurably better on (needs a real sample both sides).
-  const longs = trades.filter((t) => t.direction === "LONG");
-  const shorts = trades.filter((t) => t.direction === "SHORT");
-  let userSide: "LONG" | "SHORT" | null = null, userWr = 0;
-  if (longs.length >= 4 && shorts.length >= 4) {
-    const lw = wrOf(longs), sw = wrOf(shorts);
-    if (Math.abs(lw - sw) >= 12) { userSide = lw > sw ? "LONG" : "SHORT"; userWr = Math.max(lw, sw); }
-  }
-  const provenFader = !!(contrarian && contrarian.calls >= 3 && contrarian.avgR > 0);
-  const faderNote = provenFader ? `, and your record fading the crowd is +${contrarian!.avgR}R over ${contrarian!.calls} calls` : "";
-  const sideWord = (d: "LONG" | "SHORT") => (d === "LONG" ? "long" : "short");
-
-  // Per-CLASS edge (the matrix). A funding fade is a COUNTER-TREND / mean-reversion play;
-  // riding a trend is a WITH-trend / momentum play. Match the setup to the user's ALIGN
-  // edge: AGAINST_TREND traders get fades, WITH_TREND traders get the trend to ride.
-  const alignBest = input.alignEdge?.best?.bucket || null;
-  const alignAvgR = input.alignEdge?.best?.avgR ?? 0;
-  const classAgainst = alignBest === "align:AGAINST_TREND"; // mean-reversion / fader
-  const classWith = alignBest === "align:WITH_TREND";       // momentum / trend-rider
-  const classNote = classAgainst ? ` Counter-trend fades are your class — your align edge is +${alignAvgR}R against the trend.`
-    : classWith ? " ⚠ Your record leans WITH-trend, so this counter-trend fade is off your usual style — respect the risk."
-    : "";
-
-  // The MOMENTUM setup: the strongest-trending core symbol, CONFIRMED by rising OI (new
-  // money committing). A trend on thinning OI is a squeeze/exhaustion, not a setup — it
-  // doesn't qualify, which is the sharpening.
-  const trending = (signals || [])
-    .filter((s) => (s.trend === "TREND_UP" || s.trend === "TREND_DOWN") && (s.trend_oi_pct ?? 0) >= MOMENTUM_OI_MIN)
-    .sort((a, b) => Math.abs(b.trend_move_pct ?? 0) - Math.abs(a.trend_move_pct ?? 0));
-  const mom = trending[0] || null;
-  const momDir: "LONG" | "SHORT" | null = mom ? (mom.trend === "TREND_UP" ? "LONG" : "SHORT") : null;
-  const momMove = mom?.trend_move_pct ?? 0;
-  const momOi = mom?.trend_oi_pct ?? 0;
-
-  if (mom && momDir && classWith) {
-    // A momentum trader + a live, OI-confirmed trend = ride it. Leads for this user.
-    out.push({
-      id: "fusion-momentum",
-      priority: 92,
-      tone: "positive",
-      title: `Your setup: ride the ${mom.symbol} trend (${sideWord(momDir)})`,
-      detail: `${mom.symbol} is in a strong ${momDir === "LONG" ? "uptrend" : "downtrend"} (${momMove >= 0 ? "+" : ""}${momMove}%) and open interest is rising (+${momOi}%/hr) — new money committing, not a squeeze. Momentum is your class: your align edge is +${alignAvgR}R WITH the trend. Ride it, don't fade it.`,
-      action: { label: "Structure it", tab: "thesis" },
-      meta: { symbol: mom.symbol, direction: momDir },
-    });
-  } else if (userSide && userSide === fadeDir) {
+  if (userSide && userSide === fadeDir) {
     out.push({
       id: "fusion-your-setup",
       priority: 92,

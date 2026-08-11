@@ -9,6 +9,8 @@ const sideWord = (d) => (d === "LONG" ? "long" : "short");
 const shortAddr = (w) => `${String(w).slice(0, 6)}…${String(w).slice(-4)}`;
 // A momentum setup needs rising OI (>= this %/hr) — new money, not a squeeze.
 const MOMENTUM_OI_MIN = 1;
+// Funding at/above this (per 8h) on the trend's side = crowd already max-positioned → late ride.
+const CROWDED_FUNDING = 0.0004;
 
 export function buildSignals({ signals, consensus, xrayEvents } = {}) {
   const out = [];
@@ -52,9 +54,14 @@ export function buildSignals({ signals, consensus, xrayEvents } = {}) {
     const dir = mom.trend === "TREND_UP" ? "LONG" : "SHORT";
     const move = Number(mom.trend_move_pct) || 0;
     const oi = Number(mom.trend_oi_pct) || 0;
-    out.push({ id: `mom-${mom.symbol}-${dir}`, kind: "MOMENTUM", priority: 72, ts: now, tab: "intel",
-      title: `${mom.symbol} is trending — ${sideWord(dir)} momentum`,
-      detail: `${mom.symbol} is in a strong ${dir === "LONG" ? "uptrend" : "downtrend"} (${move >= 0 ? "+" : ""}${move}%) with open interest rising (+${oi}%/hr) — new money committing, a with-trend read, not a fade.` });
+    const fund = Number(mom.funding_rate_8h) || 0;
+    const extended = (dir === "LONG" && fund >= CROWDED_FUNDING) || (dir === "SHORT" && fund <= -CROWDED_FUNDING);
+    const fundNote = extended
+      ? ` Funding is already crowded ${sideWord(dir)} (${(fund * 100).toFixed(3)}%/8h) — a LATE ride, tighten the stop.`
+      : " Funding isn't crowded yet — room to run.";
+    out.push({ id: `mom-${mom.symbol}-${dir}`, kind: "MOMENTUM", priority: extended ? 66 : 72, ts: now, tab: "intel",
+      title: `${mom.symbol} is trending — ${sideWord(dir)} momentum${extended ? " (late)" : ""}`,
+      detail: `${mom.symbol} is in a strong ${dir === "LONG" ? "uptrend" : "downtrend"} (${move >= 0 ? "+" : ""}${move}%) with open interest rising (+${oi}%/hr) — new money committing, a with-trend read.${fundNote}` });
   }
 
   // 3 — Tracked-wallet tier crossings (a watched wallet earned/lost a consistency tier).
