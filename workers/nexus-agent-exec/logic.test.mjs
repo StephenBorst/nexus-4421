@@ -461,3 +461,47 @@ test("selectCopySignal: an agent's open position wins over a caller's call on th
   assert.equal(s.kind, "agent");
   assert.equal(s.symbol, "PERP_BTC_USDC");
 });
+
+// ─── twapSchedule (our native TWAP planner) ───────────────────────────────────
+import { twapSchedule, TWAP } from "./logic.mjs";
+
+test("twapSchedule: splits a total into N valid time-sliced children", () => {
+  const r = twapSchedule({ totalNotional: 1000, durationMin: 30, slices: 5, side: "BUY", markPrice: 100, baseTick: 0.001, baseMin: 0.001, minNotional: 10 });
+  assert.equal(r.ok, true);
+  assert.equal(r.count, 5);
+  assert.equal(r.intervalMs, 6 * 60 * 1000); // 30min / 5
+  assert.equal(r.slices[0].offsetMs, 0);
+  assert.equal(r.slices[4].offsetMs, 4 * 6 * 60 * 1000);
+  // every slice clears min_notional and side carries through
+  for (const s of r.slices) { assert.ok(s.notionalEst >= 10); assert.equal(s.side, "BUY"); }
+  // sum of child qty ≈ total notional / mark (within a tick)
+  const sumQty = r.slices.reduce((a, s) => a + s.qty, 0);
+  assert.ok(Math.abs(sumQty - 1000 / 100) < 0.01);
+});
+
+test("twapSchedule: clamps slice count so no child falls below min_notional", () => {
+  // $45 total, $10 min slice ⇒ at most 4 valid slices even if 10 requested
+  const r = twapSchedule({ totalNotional: 45, durationMin: 20, slices: 10, side: "SELL", markPrice: 100, baseTick: 0.001, baseMin: 0.001, minNotional: 10 });
+  assert.equal(r.ok, true);
+  assert.equal(r.count, 4);
+  for (const s of r.slices) assert.ok(s.notionalEst >= 10);
+});
+
+test("twapSchedule: not executable when total is below one min slice", () => {
+  const r = twapSchedule({ totalNotional: 8, durationMin: 10, slices: 3, side: "BUY", markPrice: 100, baseTick: 0.001, baseMin: 0.001, minNotional: 10 });
+  assert.equal(r.ok, false);
+  assert.equal(r.slices.length, 0);
+});
+
+test("twapSchedule: snaps each child cleanly to base_tick (no -1104 float artifacts)", () => {
+  const r = twapSchedule({ totalNotional: 300, durationMin: 15, slices: 3, side: "BUY", markPrice: 71520, baseTick: 0.00001, baseMin: 0.00001, minNotional: 10 });
+  assert.equal(r.ok, true);
+  for (const s of r.slices) assert.equal(s.qty, parseFloat(s.qty.toFixed(5)));
+});
+
+test("twapSchedule: respects the max-slice cap and bad inputs", () => {
+  const many = twapSchedule({ totalNotional: 1e7, durationMin: 600, slices: 999, side: "BUY", markPrice: 100, baseTick: 0.001, baseMin: 0.001, minNotional: 10 });
+  assert.equal(many.count, TWAP.maxSlices);
+  assert.equal(twapSchedule({ totalNotional: 1000, durationMin: 30, slices: 5, side: "BUY", markPrice: 0 }).ok, false);
+  assert.equal(twapSchedule({ totalNotional: 0, durationMin: 30, slices: 5, side: "BUY", markPrice: 100 }).ok, false);
+});

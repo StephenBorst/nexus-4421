@@ -434,3 +434,53 @@ export function selectCopySignal(config, leaders, alreadyCopiedKey, now = Date.n
   }
   return null;
 }
+
+// ── TWAP slicing (our own, on-infra) ─────────────────────────────────────────
+// Build vs. buy: the marketplace twap-plugin routes order flow through a THIRD-PARTY
+// hosted backend holding a 30-day delegated key. We already own scheduled Orderly
+// order placement + snapQty + signing, so we build TWAP natively — same order-only
+// key, our infra, "verify don't trust". This is the PURE planner: it splits a total
+// order into N time-sliced child orders, each snapped to base_tick and each
+// individually clearing base_min / min_notional (an undersized slice is exactly what
+// Orderly rejects with -1104 / "order value should be ≥ min"). The exec worker fires
+// each slice at its offset via the same signing path as a normal market order.
+export const TWAP = {
+  minSlices: 2,
+  maxSlices: 50,
+  minSliceNotionalFloor: 10, // absolute floor; effective floor = max(this, minNotional)
+};
+
+export function twapSchedule({ totalNotional, durationMin, slices, side, markPrice, baseTick, baseMin, minNotional }, cfg = TWAP) {
+  if (!(markPrice > 0)) return { ok: false, reason: "bad mark price", slices: [] };
+  if (!(totalNotional > 0)) return { ok: false, reason: "totalNotional must be > 0", slices: [] };
+  const dur = Math.max(1, Number(durationMin) || 0);
+  const wantSlices = Math.min(cfg.maxSlices, Math.max(cfg.minSlices, Math.round(Number(slices) || cfg.minSlices)));
+  const minSliceNotional = Math.max(cfg.minSliceNotionalFloor, minNotional || 0);
+  // Each slice must clear the min slice notional, else Orderly rejects it. Cap the
+  // slice count so we never emit an undersized child; below one valid slice = not doable.
+  const maxByNotional = Math.floor(totalNotional / minSliceNotional);
+  if (maxByNotional < 1) return { ok: false, reason: `total ${totalNotional} below one min slice (${minSliceNotional})`, slices: [] };
+  const n = Math.max(1, Math.min(wantSlices, maxByNotional));
+  const sliceNotional = totalNotional / n;
+  const tick = baseTick || 0.001;
+  const min = baseMin || tick;
+  const decimals = Math.max(0, Math.round(-Math.log10(tick)));
+  const intervalMs = Math.round((dur * 60 * 1000) / n);
+  const totalQtyTarget = totalNotional / markPrice;
+  const out = [];
+  let placedQty = 0;
+  let firstErr = null;
+  for (let i = 0; i < n; i++) {
+    // Last slice absorbs the accumulated rounding remainder so Σ slices ≈ total.
+    const rawQty = i === n - 1 ? (totalQtyTarget - placedQty) : (sliceNotional / markPrice);
+    let steps = Math.floor(rawQty / tick);
+    let qty = parseFloat((steps * tick).toFixed(decimals));
+    // Ceil up one step if snapping dipped the slice under min_notional (same guard as /trade).
+    if (minNotional && qty * markPrice < minNotional) { steps += 1; qty = parseFloat((steps * tick).toFixed(decimals)); }
+    if (qty < min || qty <= 0) { firstErr = firstErr || `slice ${i} qty ${qty} < base_min ${min}`; continue; }
+    placedQty += qty;
+    out.push({ seq: i, qty, notionalEst: parseFloat((qty * markPrice).toFixed(2)), offsetMs: i * intervalMs, side });
+  }
+  if (!out.length) return { ok: false, reason: firstErr || "no valid slices", slices: [] };
+  return { ok: true, reason: null, count: out.length, intervalMs, totalQtyEst: parseFloat(placedQty.toFixed(decimals)), slices: out };
+}
