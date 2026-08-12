@@ -607,13 +607,16 @@ only** (user's Anthropic/OpenAI key in localStorage; browser calls provider REST
 no SDK — key never hits a Nexus server). Files: `app/components/NexusAssistant.tsx` (mounted in
 `App.tsx` inside `<OrderlyProvider>`), `app/config/assistant.ts` (`runChat`/`runChatStream`+`readSSE`,
 `SYSTEM_PROMPT` w/ advice-line guardrail, `listModels`, per-provider `LS_MODEL(p)`/`LS_KEY(p)`),
-`app/config/assistantTools.ts` (12 tools, `ToolCtx`). **Streaming** (SSE) keeps the full bounded
+`app/config/assistantTools.ts` (31 tools, `ToolCtx`). **Streaming** (SSE) keeps the full bounded
 tool-loop (max 5) for both providers; non-streaming `runChat` is the fallback. **Models fetched live
 from the key's `/v1/models`** (stale `*-latest` ids 404 — `loadModel()` migrates them + rejects
 cross-provider ids; Anthropic browser calls need header `anthropic-dangerous-direct-browser-access`).
-**12 tools**: read (market, regime, open positions, my performance, agent status, get_trader, top
-agents, verified callers) + action/no-execution (open_symbol/trader/leaderboard, draft_thesis →
-localStorage `nexus_thesis_draft` + `/lab?tab=thesis`; Lab reads `?tab=`, ThesisView consumes draft).
+**31 tools** (SYSTEM_PROMPT steers when to use them): read (market/explain_move, regime, open
+positions, my performance, edge/operator profile, call advice, agent status/directive, get_trader,
+top agents, verified callers, smart money, mispriced board, forecasts, arena, contested/contrarians,
+xray_wallet, DeFi/macro/indicators) + action/no-execution (open_symbol/trader/xray/leaderboard/
+mispriced/autocopy, draft_thesis/directive → localStorage `nexus_thesis_draft` + `/lab?tab=thesis`;
+Lab reads `?tab=`, ThesisView consumes draft).
 Persists chat (`nexus_ai_chat`), markdown render (incl. tables), discovery nudge (`nexus_ai_seen`),
 local personal-insight teaser. ⚠️ Thesis form symbol = BARE ticker ("BTC"), not PERP_. Next: **hosted
 inference** (pay-in-$NEXUS/USDC worker proxy) — the BYOK-wall unlock, BLOCKED on the treasury Safe; fold
