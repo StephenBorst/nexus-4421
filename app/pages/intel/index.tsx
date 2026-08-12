@@ -779,7 +779,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
           )}
 
           <div style={{ color: DIM, fontSize: "10px", marginTop: "12px", letterSpacing: "0.05em" }}>
-            // VIA BINANCE FUTURES · ORDERLY NETWORK
+            // VIA OKX · ORDERLY NETWORK
           </div>
         </Card>
 
@@ -844,7 +844,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
       <Card style={{ marginBottom: "10px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
           <SectionTitle style={{ marginBottom: 0 }}>// LIQUIDATIONS 24H</SectionTitle>
-          <span style={{ color: DIM, fontSize: "10px" }}>VIA BINANCE FUTURES</span>
+          <span style={{ color: DIM, fontSize: "10px" }}>VIA OKX + ORDERLY OI</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "10px" }}>
           {(["BTC", "ETH", "SOL"] as const).map(sym => {
@@ -895,7 +895,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
           })}
         </div>
         <div style={{ color: DIM, fontSize: "10px", marginTop: "8px", letterSpacing: "0.05em" }}>
-          // EST. = ESTIMATED FROM OI × TYPICAL DAILY LIQ RATE · L/S FROM BINANCE FUTURES GLOBAL RATIO
+          // EST. = ESTIMATED FROM OI × TYPICAL DAILY LIQ RATE · L/S FROM OKX ACCOUNT RATIO
         </div>
       </Card>
 
@@ -903,7 +903,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
       <Card style={{ marginBottom: "10px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
           <SectionTitle style={{ marginBottom: 0 }}>// LONG / SHORT POSITIONING</SectionTitle>
-          <span style={{ color: DIM, fontSize: "10px" }}>VIA BINANCE FUTURES GLOBAL RATIO</span>
+          <span style={{ color: DIM, fontSize: "10px" }}>VIA OKX ACCOUNT RATIO</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "10px" }}>
           {(["BTC", "ETH", "SOL"] as const).map(sym => {
@@ -1073,7 +1073,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
 
       {/* ── Footer ──────────────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px", color: DIM, fontSize: "10px", letterSpacing: "0.05em", marginTop: "4px" }}>
-        <div>// DATA: COINGECKO · BINANCE FUTURES · ORDERLY NETWORK · ALTERNATIVE.ME</div>
+        <div>// DATA: COINGECKO · OKX · ORDERLY NETWORK · ALTERNATIVE.ME</div>
         <div>AUTO-REFRESH: {REFRESH_INTERVAL}s · {countdown}s AGO</div>
       </div>
 
