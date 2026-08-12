@@ -230,7 +230,7 @@ export default function MiniApp() {
     return () => { cancelled = true; };
   }, [sym]);
 
-  // Full tradable market list (all 100+ Orderly perps) for the search picker. Once on mount.
+  // Full tradable market list (all 130+ Orderly perps) for the search picker. Once on mount.
   useEffect(() => {
     fetch("https://api-evm.orderly.org/v1/public/info").then((r) => r.json())
       .then((d) => {

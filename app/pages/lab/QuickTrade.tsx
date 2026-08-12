@@ -78,7 +78,7 @@ export function QuickTrade() {
 
   const [symbol, setSymbol] = useState(SYMBOLS[0]);
   const [notional, setNotional] = useState(100);
-  // Full tradable market list (all ~106 Orderly perps) for the search picker —
+  // Full tradable market list (all 130+ Orderly perps) for the search picker —
   // same source as the Farcaster mini app. Fetched once, fail-soft.
   const [allMarkets, setAllMarkets] = useState<string[]>([]);
   const [mktSearch, setMktSearch] = useState("");
