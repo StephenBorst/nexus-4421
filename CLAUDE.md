@@ -254,8 +254,8 @@ Sweep → Save → Publish → Community board → COPY → activate → graded.
 - **Bankr skill** = `github.com/BankrBot/skills` → `nexus-trading-labs/SKILL.md` + `references/*.md` (markdown skill,
   YAML frontmatter `name: nexus` + trigger `description`). Published/maintained by Nexus. Update = edit SKILL.md/refs,
   PR to BankrBot/skills. Our fork = **`StephenBorst/skills`**, branch **`add-autonomous-agent`** (agent control +
-  full config surface) — PR pending at `github.com/StephenBorst/skills/pull/new/add-autonomous-agent` → base
-  `BankrBot/skills:main`. Local staging clone: `C:\Users\steph\bankr-skills-stage`.
+  full config surface) — ✅ MERGED into `BankrBot/skills` (the agent-control module is live in the published
+  Bankr skill). Local staging clone: `C:\Users\steph\bankr-skills-stage`.
 - **Repo source-of-truth copies:** `docs/SKILL.md` (full updated skill), `docs/bankr-skill-agent-module.md` (=
   `references/agent.md`), `docs/bankr-agent-spec.md` (build spec), `docs/skill-agent-additions.md` (apply guide).
 - **Marketing:** `marketing/lab-article.md` (flagship X long-form article + 3 hook tweets + pull-quotes),
