@@ -92,7 +92,9 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
     }
   };
 
-  const openEdit = () => { setActualInput(t.actualPnl !== null ? String(t.actualPnl) : ""); setInputVisible(true); };
+  // Seed the optional exact-fill field with the auto-estimate so the trader tweaks a
+  // number rather than typing one from scratch.
+  const openEdit = () => { const seed = t.actualPnl ?? autoPnlFor(eff); setActualInput(seed != null ? String(seed) : ""); setInputVisible(true); };
 
   const saveActual = () => {
     const val = parseFloat(actualInput);
@@ -257,6 +259,21 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
             </div>
           );
         }
+        if (eff === "HIT_TP" || eff === "STOPPED_OUT") {
+          // Resolved by an earlier self-mark (legacy / pre-grade) — NOT objectively graded
+          // yet. Shown neutrally (not claimed as "graded"); the objective grade lands
+          // automatically from public price. REOPEN clears the self-mark back to live.
+          const win = eff === "HIT_TP";
+          const color = win ? "#3ecf8e" : "#f7525f";
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", border: `1px solid ${color}33`, background: `${color}0c`, borderRadius: 4, padding: "8px 10px", marginBottom: 10 }}>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: 700, color }}>● {win ? "WIN" : "LOSS"} <span style={{ color: "#52525b", fontWeight: 400 }}>· self-marked</span></span>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a" }}>Nexus grades every public call from public price — the objective grade lands automatically.</span>
+              <button onClick={() => handleStatusClick(eff)} title="Reopen — clear this self-mark and let Nexus grade it from public price"
+                style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 10px", borderRadius: 3, border: "1px solid #232327", background: "transparent", color: "#71717a", cursor: "pointer" }}>↺ REOPEN</button>
+            </div>
+          );
+        }
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
             <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a" }}>◷ LIVE — Nexus grades this automatically from public price the moment it resolves. Nothing to mark.</span>
@@ -373,41 +390,43 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
         );
       })()}
 
-      {/* Actual P&L — only shown when closed */}
-      {isClosed && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, paddingTop: 8, borderTop: "1px solid #232327" }}>
-          <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", whiteSpace: "nowrap" }}>ACTUAL P&L</div>
-          {t.actualPnl !== null && !inputVisible ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ fontSize: 16, color: t.actualPnl >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>
-                {formatPnl(t.actualPnl)}
-              </div>
-              {accuracy !== null && (
-                <div style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>
-                  {accuracy.toFixed(0)}% of plan
+      {/* P&L — AUTO-ESTIMATED from the resolved outcome at your planned levels; it never
+          demands manual entry. "LOG EXACT FILL" is optional (slippage / partials). The
+          graded record is R vs public price and is independent of this dollar figure. */}
+      {isClosed && (() => {
+        const shown = t.actualPnl ?? autoPnlFor(eff);
+        const isEst = t.actualPnl === null;
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, paddingTop: 8, borderTop: "1px solid #232327", flexWrap: "wrap" }}>
+            <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", whiteSpace: "nowrap" }}>P&amp;L</div>
+            {!inputVisible ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ fontSize: 16, color: (shown ?? 0) >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>
+                  {shown != null ? formatPnl(shown) : "—"}
                 </div>
-              )}
-              <button onClick={openEdit} title="Auto-graded from your entry → exit × size. Click to enter the exact fill (slippage / partials)." style={{ ...navBtnStyle, fontSize: 9, padding: "3px 8px" }}>EDIT</button>
-            </div>
-          ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <input
-                type="number"
-                placeholder="exact fill — e.g. 142.50 or -87.00"
-                value={actualInput}
-                onChange={(e) => setActualInput(e.target.value)}
-                style={{ ...inputStyle, width: 180, padding: "5px 8px", fontSize: 11 }}
-                // eslint-disable-next-line jsx-a11y/no-autofocus
-                autoFocus
-              />
-              <button onClick={saveActual} style={{ ...navBtnStyle, fontSize: 10, color: "#ededf0", borderColor: "#33333a" }}>SAVE</button>
-              {t.actualPnl !== null && (
+                {isEst
+                  ? (shown != null && <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>est. at planned levels</div>)
+                  : (accuracy !== null && <div style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{accuracy.toFixed(0)}% of plan</div>)}
+                <button onClick={openEdit} title="Optional — log your exact fill (slippage / partials). Doesn't touch your graded record." style={{ ...navBtnStyle, fontSize: 9, padding: "3px 8px" }}>{isEst ? "LOG EXACT FILL" : "EDIT"}</button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="number"
+                  placeholder="exact fill — e.g. 142.50 or -87.00"
+                  value={actualInput}
+                  onChange={(e) => setActualInput(e.target.value)}
+                  style={{ ...inputStyle, width: 180, padding: "5px 8px", fontSize: 11 }}
+                  // eslint-disable-next-line jsx-a11y/no-autofocus
+                  autoFocus
+                />
+                <button onClick={saveActual} style={{ ...navBtnStyle, fontSize: 10, color: "#ededf0", borderColor: "#33333a" }}>SAVE</button>
                 <button onClick={() => setInputVisible(false)} style={{ ...navBtnStyle, fontSize: 10 }}>CANCEL</button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Charts — validated per-item at RENDER time, so one bad stored URL is dropped
           and the rest still show. Single chart goes full width; multiples pair up. */}
