@@ -1257,7 +1257,7 @@ export function AgentView() {
                 </div>
                 {!isPro ? (
                   <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
-                    Average into a position on adverse moves and take profit off the blended entry — an PRO feature. The whole ladder stays inside your CAPITAL / TRADE budget.
+                    Average into a position on adverse moves and take profit off the blended entry — a Nexus PRO feature. The whole ladder stays inside your CAPITAL / TRADE budget.
                   </div>
                 ) : on && (
                   <>
@@ -1294,7 +1294,7 @@ export function AgentView() {
             </div>
             {!isPro ? (
               <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
-                Route TradingView (or any external) alerts straight to your agent — it executes them through the same guardrails + trustless grading. An PRO feature: hold ARCHITECT-tier $NEXUS or subscribe.
+                Route TradingView (or any external) alerts straight to your agent — it executes them through the same guardrails + trustless grading. A Nexus PRO feature: hold ARCHITECT-tier $NEXUS or subscribe.
               </div>
             ) : !webhookEnabled ? (
               <div style={{ marginTop: 10 }}>

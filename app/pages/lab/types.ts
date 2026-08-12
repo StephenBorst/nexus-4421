@@ -211,7 +211,8 @@ export const DEFAULT_CONFIG: AgentConfig = {
   // ⭐ The one BACKTESTED net-positive config (60d BTC/ETH/SOL): FUNDING_ONLY +
   // fundingPercentileMin 95 → fade the crowd ONLY when funding is in its top 5%
   // most extreme vs history. Flipped the strategy from -$55 to +$22 (PF ~1.45,
-  // 56% win). CONFLUENCE stays available (flagship) but can't be backtested yet.
+  // 56% win). CONFLUENCE stays available (the flagship) and becomes backtestable
+  // automatically once recorded oi:hist matures — the engine gates on OI coverage.
   fundingPercentileMin: 95,
   volTargetPct: 0, // off by default; >0 enables vol-targeted sizing (exec computes realized vol)
   signalMode: "FUNDING_ONLY",
