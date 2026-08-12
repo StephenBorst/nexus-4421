@@ -7,6 +7,7 @@ import { formatSymbol, generatePageTitle } from "@/utils/utils";
 import { useOrderlyConfig } from "@/utils/config";
 import { getPageMeta } from "@/utils/seo";
 import { renderSEOTags } from "@/utils/seo-tags";
+import { TwapPanel } from "./TwapPanel";
 
 export default function PerpSymbol() {
   const params = useParams();
@@ -44,6 +45,8 @@ export default function PerpSymbol() {
         tradingViewConfig={config.tradingPage.tradingViewConfig}
         sharePnLConfig={config.tradingPage.sharePnLConfig}
       />
+      {/* Native TWAP execution — work a large order over time (our own, on-infra) */}
+      <TwapPanel symbol={symbol} />
       <div className="md:hidden pb-2 pt-8 text-center">
         <span className="oui-text-2xs oui-text-base-contrast-54">
           Charts powered by{" "}
