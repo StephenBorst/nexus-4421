@@ -62,8 +62,9 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
   const [inputVisible, setInputVisible] = useState(false);
   const [poster, setPoster] = useState<PosterData | null>(null);
   const navigate = useNavigate();
-  const cfg = STATUS_CONFIG[effectiveStatus(t)] ?? STATUS_CONFIG.ACTIVE;
-  const isClosed = CLOSED_STATUSES.includes(t.status);
+  const eff = effectiveStatus(t); // objective grade wins over self-report — used everywhere the card branches on outcome
+  const cfg = STATUS_CONFIG[eff] ?? STATUS_CONFIG.ACTIVE;
+  const isClosed = CLOSED_STATUSES.includes(eff);
 
   // Auto-grade the dollar P&L from the plan the trader already logged, so a HIT TP /
   // STOPPED OUT click fills the number instead of making them do entry→exit × size
@@ -109,7 +110,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
       ...cardStyle,
       border: `1px solid ${cfg.border}`,
       background: isClosed ? "#0a0a0b" : "#141416",
-      opacity: t.status === "INVALIDATED" ? 0.7 : 1,
+      opacity: eff === "INVALIDATED" ? 0.7 : 1,
     }}>
       {poster && <SharePoster data={poster} onClose={() => setPoster(null)} />}
       {/* Top row */}
@@ -140,7 +141,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
         <div style={{ display: "flex", flexDirection: isMobile ? "row" : "column", alignItems: isMobile ? "center" : "flex-end", justifyContent: isMobile ? "space-between" : "flex-start", gap: 6, flexShrink: 0 }}>
           {!isMobile && <div style={{ fontSize: 9, color: "#33333a", fontFamily: "var(--nx-font-mono)" }}>{new Date(t.createdAt).toLocaleDateString()}</div>}
           <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-            {t.status === "ACTIVE" && walletAddress && (
+            {eff === "ACTIVE" && walletAddress && (
               <a
                 href={`https://t.me/nexustradinglabs_bot?start=${walletAddress.toLowerCase()}`}
                 target="_blank"
@@ -227,23 +228,43 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
         </div>
       </div>
 
-      {/* Status buttons */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
-        {(Object.keys(STATUS_CONFIG) as ThesisStatus[]).map((s) => {
-          const c = STATUS_CONFIG[s];
-          const active = t.status === s;
+      {/* Outcome — the objective grade LEADS; win/loss is never self-reported. Graded
+          → an authoritative banner (the tape decided). Un-resolved → a calm "it grades
+          itself" line. INVALIDATE (abandon early) is the one call the grader genuinely
+          can't infer, so it's the only manual control left. */}
+      {(() => {
+        const isGraded = t.gradedOutcome === "WIN" || t.gradedOutcome === "LOSS";
+        if (isGraded) {
+          const win = t.gradedOutcome === "WIN";
+          const color = win ? "#3ecf8e" : "#f7525f";
           return (
-            <button key={s} onClick={() => handleStatusClick(s)} style={{
-              fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "6px 12px",
-              cursor: "pointer", borderRadius: 3, letterSpacing: "0.06em",
-              minHeight: 32,
-              border: `1px solid ${active ? c.border : "#232327"}`,
-              background: active ? c.bg : "transparent",
-              color: active ? c.color : "#33333a",
-            }}>{c.label}</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", border: `1px solid ${color}55`, background: `${color}10`, borderRadius: 4, padding: "8px 10px", marginBottom: 10 }}>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: 700, color }}>
+                ✓ NEXUS GRADED · {win ? "WIN" : "LOSS"}{t.gradedR != null ? ` ${t.gradedR >= 0 ? "+" : ""}${t.gradedR.toFixed(2)}R` : ""}
+              </span>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a" }}>
+                first-touch {win ? "TP1" : "stop"} vs public price{t.gradedAt ? ` · ${new Date(t.gradedAt).toLocaleDateString()}` : ""} — the tape marked this, not you
+              </span>
+            </div>
           );
-        })}
-      </div>
+        }
+        if (eff === "INVALIDATED") {
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a" }}>◌ INVALIDATED — you abandoned this thesis before it resolved (excluded from your graded record)</span>
+              <button onClick={() => handleStatusClick("INVALIDATED")} title="Reopen — put this thesis back live so Nexus grades it from public price on resolution"
+                style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 10px", borderRadius: 3, border: "1px solid #232327", background: "transparent", color: "#71717a", cursor: "pointer" }}>↺ REOPEN</button>
+            </div>
+          );
+        }
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a" }}>◷ LIVE — Nexus grades this automatically from public price the moment it resolves. Nothing to mark.</span>
+            <button onClick={() => handleStatusClick("INVALIDATED")} title="Abandon this thesis early — it's no longer valid. The grader can't infer this, so it's the one call that's yours to make."
+              style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "5px 10px", borderRadius: 3, border: "1px solid #232327", background: "transparent", color: "#52525b", cursor: "pointer" }}>◌ INVALIDATE</button>
+          </div>
+        );
+      })()}
 
       {/* ── LIFECYCLE TIMELINE — a call is a story, not a frozen post.
           Editable while the thesis is open; read-only once it's closed (the story
@@ -295,35 +316,26 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
         );
       })()}
 
-      {/* Auto-resolve nudge. Two tiers, authoritative first:
-          (1) If Nexus has already GRADED this public call from public price
-              (gradedOutcome, first-touch OHLC) but the self-reported status is still
-              ACTIVE, surface the real result and offer to sync the log (auto-fills P&L).
-          (2) Otherwise, if live mark has tagged a level, offer a provisional resolve.
-          Never an auto-commit — the graded record stands on its own regardless. */}
-      {t.status === "ACTIVE" && (() => {
+      {/* Provisional pending notice — the live mark has tagged a level but Nexus hasn't
+          stamped the objective grade yet (first-touch OHLC, computed server-side).
+          Informational ONLY: the grade lands automatically from public price, so there's
+          nothing to click. Once graded, the authoritative banner above takes over. */}
+      {eff === "ACTIVE" && (() => {
         const sug = resolveSuggestion(t, markPrice);
-        if (!sug) return null;
-        const { outcome, graded } = sug;
-        const isTp = outcome === "HIT_TP";
+        if (!sug || sug.graded) return null; // graded → shown by the grade banner above
+        const isTp = sug.outcome === "HIT_TP";
         const color = isTp ? "#3ecf8e" : "#f7525f";
-        const label = graded
-          ? `✓ Nexus graded this a ${isTp ? "WIN" : "LOSS"}${t.gradedR != null ? ` (${t.gradedR >= 0 ? "+" : ""}${t.gradedR.toFixed(2)}R)` : ""} — sync your log?`
-          : `◆ price ${isTp ? "tagged your TP1" : "tagged your stop"}${markPrice != null ? ` at $${markPrice.toFixed(markPrice < 10 ? 4 : 2)}` : ""} — resolve this call?`;
         return (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", border: `1px solid ${color}55`, background: `${color}10`, borderRadius: 4, padding: "8px 10px", marginBottom: 10 }}>
-            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color }}>{label}</span>
-            <button onClick={() => handleStatusClick(outcome)}
-              title={graded ? "Nexus already scored this from public price — this only aligns your own P&L log" : "Provisional: based on the current mark; the graded record is independent"}
-              style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "5px 12px", borderRadius: 3, border: `1px solid ${color}`, background: "transparent", color, cursor: "pointer", whiteSpace: "nowrap" }}>
-              {graded ? "SYNC LOG" : `MARK ${isTp ? "HIT TP" : "STOPPED OUT"}`} →
-            </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", border: `1px solid ${color}55`, background: `${color}10`, borderRadius: 4, padding: "8px 10px", marginBottom: 10 }}>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color }}>
+              ◆ price {isTp ? "tagged your TP1" : "tagged your stop"}{markPrice != null ? ` at $${markPrice.toFixed(markPrice < 10 ? 4 : 2)}` : ""} — Nexus is grading this from public price…
+            </span>
           </div>
         );
       })()}
 
-      {/* Live P&L — only shown for ACTIVE theses with a mark price */}
-      {t.status === "ACTIVE" && markPrice != null && (() => {
+      {/* Live P&L — only shown for still-live (ungraded) theses with a mark price */}
+      {eff === "ACTIVE" && markPrice != null && (() => {
         const { pnl, pct } = calcUnrealizedPnl(t.direction, t.entryPrice, markPrice, t.positionSize);
         const toSL = distancePct(markPrice, t.stopLoss);
         const toTP = distancePct(markPrice, t.takeProfit1);
@@ -441,14 +453,17 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
 
 // ─── Thesis Analytics Section ─────────────────────────────
 function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
-  const closedTrades = trades.filter((t) => CLOSED_STATUSES.includes(t.status));
+  // Objective grade drives every count — win rate reflects how Nexus scored the calls
+  // from public price (first-touch OHLC), NOT what the trader clicked. INVALIDATED is
+  // the one user action the grader can't infer, so effectiveStatus preserves it.
+  const closedTrades = trades.filter((t) => CLOSED_STATUSES.includes(effectiveStatus(t)));
   const withPnl = closedTrades.filter((t) => t.actualPnl !== null);
 
   if (closedTrades.length === 0) return null;
 
-  const hits = trades.filter((t) => t.status === "HIT_TP").length;
-  const stoppedOut = trades.filter((t) => t.status === "STOPPED_OUT").length;
-  const invalidated = trades.filter((t) => t.status === "INVALIDATED").length;
+  const hits = trades.filter((t) => effectiveStatus(t) === "HIT_TP").length;
+  const stoppedOut = trades.filter((t) => effectiveStatus(t) === "STOPPED_OUT").length;
+  const invalidated = trades.filter((t) => effectiveStatus(t) === "INVALIDATED").length;
   const winRate = closedTrades.length ? Math.round((hits / closedTrades.length) * 100) : 0;
   const totalActualPnl = withPnl.reduce((s, t) => s + (t.actualPnl ?? 0), 0);
 
