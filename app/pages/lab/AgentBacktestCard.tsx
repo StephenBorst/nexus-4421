@@ -52,7 +52,7 @@ export function AgentBacktestCard({
       </div>
       {!isPro ? (
         <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
-          Replay this exact config over 60 days of real BTC/ETH/SOL data — using the same engine the agent runs on — before risking a cent. An PRO feature.
+          Replay this exact config over 60 days of real BTC/ETH/SOL data — using the same engine the agent runs on — before risking a cent. A Nexus PRO feature.
         </div>
       ) : (
         <>
@@ -162,7 +162,9 @@ export function AgentBacktestCard({
                 </div>
               </div>
               <div style={{ color: "#52525b", fontFamily: "var(--nx-font-ui)", fontSize: 9, marginTop: 8, lineHeight: 1.5 }}>
-                ↑ Click any row to apply that config to the editor. CONFLUENCE/OI aren't in the sweep (no OI history yet). Every config here was graded on real price — apply a winner, then paper-test before going live.
+                ↑ Click any row to apply that config to the editor. {sweep.oiTested
+                  ? `CONFLUENCE + OI-divergence are now in the sweep${sweep.oiCoverage?.minDays ? `, graded on ${sweep.oiCoverage.minDays}d of recorded OI history` : ""}.`
+                  : "CONFLUENCE/OI aren't in the sweep yet — they fold in automatically once recorded OI history is deep enough."} Every config here was graded on real price — apply a winner, then paper-test before going live.
               </div>
             </div>
           )}
