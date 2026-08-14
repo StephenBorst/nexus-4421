@@ -897,6 +897,12 @@ export function ThesisView() {
   const [fundingBusy, setFundingBusy] = useState(false);
   const [chartBusy, setChartBusy] = useState<number | null>(null); // index being uploaded
   const [chartErr, setChartErr] = useState<string | null>(null);
+  // ⚡ Quick Call — the premium fast path. Two knobs (stop %, target R); a build fetches
+  // the live mark and sets entry/stop/TP atomically (sequential helpers can't — setForm
+  // is async). Defaults tuned so "symbol → side → post" needs zero typing.
+  const [quickBusy, setQuickBusy] = useState(false);
+  const [quickStopPct, setQuickStopPct] = useState(2);
+  const [quickTpR, setQuickTpR] = useState(2);
 
   // Full listed-markets set → validate the symbol (a typo makes an ungradeable call)
   // and power the autocomplete datalist. Fetched once, fail-soft (no list ⇒ no warning).
@@ -1041,6 +1047,45 @@ export function ThesisView() {
     const risk = Math.abs(e - s);
     const tp = form.direction === "LONG" ? e + mult * risk : e - mult * risk;
     set("takeProfit1", String(roundPrice(tp)));
+  };
+
+  // ⚡ Quick Call build: ONE fetch → entry (live mark) + stop (stopPct) + TP (tpR·risk) +
+  // live funding, all set atomically (a sequence of the single-field helpers can't — each
+  // setForm is async, so the next would read a stale entry). Pass `dir` when the side is
+  // changing this same tick so we don't read a stale form.direction. Fail-soft.
+  const quickSetup = async (stopPct: number, tpR: number, dir?: "LONG" | "SHORT") => {
+    const direction = dir ?? form.direction;
+    if (!form.symbol) return;
+    setQuickBusy(true);
+    try {
+      const sym = `PERP_${form.symbol.toUpperCase()}_USDC`;
+      const d = await (await fetch(`https://api-evm.orderly.org/v1/public/futures/${sym}`)).json();
+      const mark = parseFloat(d?.data?.mark_price);
+      const fr = parseFloat(d?.data?.last_funding_rate);
+      if (mark > 0) {
+        const entry = roundPrice(mark);
+        const stop = direction === "LONG" ? entry * (1 - stopPct / 100) : entry * (1 + stopPct / 100);
+        const risk = Math.abs(entry - stop);
+        const tp = direction === "LONG" ? entry + tpR * risk : entry - tpR * risk;
+        setForm((f) => ({
+          ...f, direction,
+          entryPrice: String(entry),
+          stopLoss: String(roundPrice(stop)),
+          takeProfit1: String(roundPrice(tp)),
+          fundingRate: Number.isFinite(fr) ? String(Math.round(fr * 100 * 1e4) / 1e4) : f.fundingRate,
+        }));
+      }
+    } catch { /* fail-soft — leave the form as-is */ }
+    finally { setQuickBusy(false); }
+  };
+  // Re-snap stop + TP off the EXISTING entry (adjusting the knobs after a build; no refetch).
+  const rebuildLevels = (stopPct: number, tpR: number) => {
+    const entry = parseFloat(form.entryPrice);
+    if (!(entry > 0)) return;
+    const stop = form.direction === "LONG" ? entry * (1 - stopPct / 100) : entry * (1 + stopPct / 100);
+    const risk = Math.abs(entry - stop);
+    const tp = form.direction === "LONG" ? entry + tpR * risk : entry - tpR * risk;
+    setForm((f) => ({ ...f, stopLoss: String(roundPrice(stop)), takeProfit1: String(roundPrice(tp)) }));
   };
 
   const persist = (updated: ThesisTrade[]) => saveTheses(updated);
@@ -1314,6 +1359,130 @@ export function ThesisView() {
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 320px", gap: 12, alignItems: "start" }}>
         {/* Form */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {/* ⚡ QUICK CALL — the premium fast path: symbol → side → post, auto-built from
+              live price, on-chain + graded, zero manual marking. The detailed form below
+              is the "fine-tune" for power users; this is how most calls should be made. */}
+          {(() => {
+            const built = parseFloat(form.entryPrice) > 0 && parseFloat(form.stopLoss) > 0 && parseFloat(form.takeProfit1) > 0;
+            const long = form.direction === "LONG";
+            const entryN = parseFloat(form.entryPrice), stopN = parseFloat(form.stopLoss), tpN = parseFloat(form.takeProfit1);
+            const stopPctShown = entryN > 0 ? Math.abs((entryN - stopN) / entryN) * 100 : 0;
+            const px = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: n < 10 ? 4 : 2 })}`;
+            const knob = (on: boolean, accent: string): React.CSSProperties => ({
+              fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "5px 10px", borderRadius: 3, cursor: "pointer",
+              border: `1px solid ${on ? accent : "#232327"}`, background: on ? `${accent}1e` : "#0a0a0b", color: on ? accent : "#71717a",
+            });
+            const canBuild = !!form.symbol && symbolListed;
+            return (
+              <div style={{ ...cardStyle, borderColor: "#33333a", background: "linear-gradient(180deg,#15151a 0%,#0f0f11 100%)" }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 700, color: "#ededf0", letterSpacing: "0.04em" }}>⚡ QUICK CALL</span>
+                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a" }}>on-chain · graded from public price · no manual marking</span>
+                </div>
+                {published && (
+                  <div className="nx-fade-in" style={{ marginBottom: 10, padding: "8px 10px", borderRadius: 4, border: "1px solid #3ecf8e55", background: "#0f2318", fontFamily: "var(--nx-font-mono)", fontSize: 10.5, color: "#3ecf8e", lineHeight: 1.5 }}>
+                    ◆ Call posted on-chain — it&apos;s grading itself against public price now. Fire off another. 🎯
+                  </div>
+                )}
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 210px", gap: 8 }}>
+                  <div>
+                    <span style={fieldLabelStyle}>SYMBOL</span>
+                    <input style={{ ...inputStyle, borderColor: symbolListed ? "#232327" : "#4a1e22" }} placeholder="BTC, ETH, SOL…" value={form.symbol}
+                      list="nexus-thesis-symbols" autoCapitalize="characters" autoComplete="off" onChange={(e) => set("symbol", e.target.value)} />
+                  </div>
+                  <div>
+                    <span style={fieldLabelStyle}>DIRECTION</span>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      {(["LONG", "SHORT"] as const).map((d) => (
+                        <button key={d} onClick={() => { set("direction", d); if (canBuild) quickSetup(quickStopPct, quickTpR, d); }} style={{
+                          flex: 1, padding: "8px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11, cursor: "pointer", borderRadius: 3, border: "1px solid",
+                          background: form.direction === d ? (d === "LONG" ? "#1a1a1e" : "#241012") : "#0f0f11",
+                          borderColor: form.direction === d ? (d === "LONG" ? "#3ecf8e" : "#f7525f") : "#232327",
+                          color: form.direction === d ? (d === "LONG" ? "#3ecf8e" : "#f7525f") : "#52525b",
+                        }}>{d === "LONG" ? "↑ LONG" : "↓ SHORT"}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                {!symbolListed && form.symbol && (
+                  <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9.5, color: "#fbbf24", marginTop: 6 }}>⚠ Not a listed market — pick from the list so Nexus can grade it.</div>
+                )}
+
+                {!built ? (
+                  <button onClick={() => quickSetup(quickStopPct, quickTpR)} disabled={!canBuild || quickBusy}
+                    style={{ marginTop: 12, width: "100%", padding: "11px 0", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", cursor: canBuild && !quickBusy ? "pointer" : "not-allowed", borderRadius: 4,
+                      border: `1px solid ${canBuild ? "#33333a" : "#232327"}`, background: canBuild ? "#1a1a1e" : "#0a0a0b", color: canBuild ? "#ededf0" : "#52525b" }}>
+                    {quickBusy ? "BUILDING…" : "⚡ BUILD IT — auto-fill from live price"}
+                  </button>
+                ) : (
+                  <>
+                    <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(70px, 1fr))", gap: 8, padding: "10px 12px", border: "1px solid #232327", borderRadius: 6, background: "#0a0a0b" }}>
+                      {[
+                        { l: "ENTRY", v: entryN > 0 ? px(entryN) : "—", c: "#a1a1aa" },
+                        { l: `STOP ${long ? "−" : "+"}${stopPctShown.toFixed(1)}%`, v: stopN > 0 ? px(stopN) : "—", c: "#f7525f" },
+                        { l: `TP ${quickTpR}R`, v: tpN > 0 ? px(tpN) : "—", c: "#ededf0" },
+                        { l: "SIZE", v: calc ? `$${calc.positionSize.toFixed(0)}` : "—", c: "#d4d4d8" },
+                        { l: "R:R", v: calc ? `1:${calc.riskReward.toFixed(2)}` : "—", c: calc && calc.riskReward >= 2 ? "#3ecf8e" : "#fbbf24" },
+                      ].map(({ l, v, c }) => (
+                        <div key={l}>
+                          <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.03em", whiteSpace: "nowrap" }}>{l}</div>
+                          <div style={{ fontSize: 13, color: c, fontFamily: "var(--nx-font-mono)", fontWeight: 700 }}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                      <span style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>STOP</span>
+                      {[1, 2, 3].map((p) => (
+                        <button key={p} onClick={() => { setQuickStopPct(p); rebuildLevels(p, quickTpR); }} style={knob(Math.abs(quickStopPct - p) < 0.01, "#f7525f")}>−{p}%</button>
+                      ))}
+                      <span style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginLeft: 6 }}>TARGET</span>
+                      {[1.5, 2, 3].map((r) => (
+                        <button key={r} onClick={() => { setQuickTpR(r); rebuildLevels(quickStopPct, r); }} style={knob(Math.abs(quickTpR - r) < 0.01, "#ededf0")}>{r}R</button>
+                      ))}
+                      <button onClick={() => quickSetup(quickStopPct, quickTpR)} title="Re-anchor entry to the current mark" style={{ ...knob(false, "#33333a"), marginLeft: "auto", color: "#71717a" }}>{quickBusy ? "…" : "⟳ re-price"}</button>
+                    </div>
+                    {!(parseFloat(form.accountSize) > 0) ? (
+                      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginTop: 10 }}>
+                        <div style={{ flex: 1 }}>
+                          <span style={fieldLabelStyle}>ACCOUNT SIZE (USDC) — sizes your call</span>
+                          <input style={inputStyle} type="number" placeholder="10000" value={form.accountSize} onChange={(e) => set("accountSize", e.target.value)} />
+                        </div>
+                        {Number(availableBalance) > 0 && (
+                          <button onClick={() => set("accountSize", String(Math.floor(Number(availableBalance))))} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "9px 10px", borderRadius: 3, border: "1px solid #33333a", background: "#0a0a0b", color: "#d4d4d8", cursor: "pointer", whiteSpace: "nowrap" }}>= MY COLLATERAL</button>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 8 }}>sized off ${Math.round(parseFloat(form.accountSize)).toLocaleString()} account · {form.riskPercent}% risk · change in fine-tune ↓</div>
+                    )}
+                    {formValid && (
+                      <div style={{ marginTop: 10 }}>
+                        <ThesisAdvisor symbol={form.symbol} direction={form.direction} entryPrice={form.entryPrice} stopLoss={form.stopLoss} takeProfit1={form.takeProfit1} riskReward={calc?.riskReward} wallet={walletAddress} compact />
+                      </div>
+                    )}
+                    {planWarnings.length > 0 && (
+                      <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
+                        {planWarnings.map((msg, i) => <div key={i} style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9.5, color: "#fbbf24", lineHeight: 1.4 }}>⚠ {msg}</div>)}
+                      </div>
+                    )}
+                    <button onClick={publishAsCall} disabled={!formValid || publishing}
+                      style={{ marginTop: 12, width: "100%", padding: "13px 0", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 700, letterSpacing: "0.06em", cursor: formValid && !publishing ? "pointer" : "not-allowed", borderRadius: 4,
+                        border: `1px solid ${formValid || published ? "#3ecf8e" : "#232327"}`,
+                        background: published ? "#0f2318" : formValid ? "#12241a" : "#0a0a0b",
+                        color: formValid || published ? "#3ecf8e" : "#52525b" }}>
+                      {published ? "◆ PUBLISHED — NOW GRADED" : publishing ? "PUBLISHING…" : "◆ POST CALL — grades itself"}
+                    </button>
+                    <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8.5, color: "#52525b", textAlign: "center", marginTop: 6, lineHeight: 1.5 }}>
+                      Posts on-chain + public. Nexus grades it from public price — first-touch TP vs stop. You never mark it yourself.
+                    </div>
+                  </>
+                )}
+                <div style={{ borderTop: "1px solid #1a1a1e", marginTop: 12, paddingTop: 8, textAlign: "center" }}>
+                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b" }}>want a catalyst, charts, TP2, or a live order? fine-tune below ↓</span>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Paste-to-fill: import a TradingView analysis (or any thesis text) */}
           <div style={cardStyle}>
             <button
