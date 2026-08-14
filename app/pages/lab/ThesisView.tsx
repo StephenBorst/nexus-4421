@@ -845,7 +845,7 @@ export function ThesisView() {
 
   // Live prices for all active theses
   const activeSymbols = useMemo(
-    () => [...new Set(trades.filter((t) => t.status === "ACTIVE").map((t) => t.symbol))],
+    () => [...new Set(trades.filter((t) => effectiveStatus(t) === "ACTIVE").map((t) => t.symbol))],
     [trades]
   );
   const livePrices = useLivePrices(activeSymbols);
@@ -1235,10 +1235,15 @@ export function ThesisView() {
 
   const fundingIsPositive = parseFloat(form.fundingRate) >= 0;
 
-  const closedTrades = trades.filter((t) => CLOSED_STATUSES.includes(t.status));
-  const hits = trades.filter((t) => t.status === "HIT_TP").length;
+  // Objective grade drives header stats + the filter — a call Nexus graded from public
+  // price counts as resolved even if the trader never self-marked it (raw status ACTIVE).
+  const closedTrades = trades.filter((t) => CLOSED_STATUSES.includes(effectiveStatus(t)));
+  const hits = trades.filter((t) => effectiveStatus(t) === "HIT_TP").length;
   const thesisAccuracy = closedTrades.length ? Math.round((hits / closedTrades.length) * 100) : null;
-  const filteredTrades = filter === "ALL" ? trades : trades.filter((t) => t.status === filter);
+  const filteredTrades = filter === "ALL" ? trades : trades.filter((t) => effectiveStatus(t) === filter);
+  // The trustless count: calls Nexus objectively graded from public price (WIN/LOSS),
+  // as opposed to ones you abandoned. This is the number that builds your caller record.
+  const gradedCount = trades.filter((t) => t.gradedOutcome === "WIN" || t.gradedOutcome === "LOSS").length;
 
   // "To resolve" summary — ACTIVE calls that have tagged a level or been graded but not
   // yet synced, surfaced at the top so they aren't buried below the fold.
@@ -1278,6 +1283,11 @@ export function ThesisView() {
               <div style={{ fontSize: 20, color: thesisAccuracy >= 50 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{thesisAccuracy}%</div>
             </div>
             <div style={{ width: 1, background: "#232327" }} />
+            <div title="Calls Nexus objectively graded from public price — first-touch TP vs stop. The trustless record that builds your caller rank.">
+              <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>GRADED</div>
+              <div style={{ fontSize: 20, color: gradedCount > 0 ? "#3ecf8e" : "#52525b", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{gradedCount}</div>
+            </div>
+            <div style={{ width: 1, background: "#232327" }} />
             <div>
               <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>CLOSED</div>
               <div style={{ fontSize: 20, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{closedTrades.length}</div>
@@ -1285,7 +1295,7 @@ export function ThesisView() {
             <div style={{ width: 1, background: "#232327" }} />
             <div>
               <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>ACTIVE</div>
-              <div style={{ fontSize: 20, color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{trades.filter((t) => t.status === "ACTIVE").length}</div>
+              <div style={{ fontSize: 20, color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{trades.filter((t) => effectiveStatus(t) === "ACTIVE").length}</div>
             </div>
           </div>
         )}
