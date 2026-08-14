@@ -557,8 +557,8 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
                     <div style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>1:{bestThesis.riskReward.toFixed(2)} R:R</div>
                   </div>
                 </div>
-                <div style={{ fontSize: 9, color: STATUS_CONFIG[bestThesis.status].color, fontFamily: "var(--nx-font-mono)", letterSpacing: "0.06em" }}>
-                  {STATUS_CONFIG[bestThesis.status].label}
+                <div style={{ fontSize: 9, color: STATUS_CONFIG[effectiveStatus(bestThesis)].color, fontFamily: "var(--nx-font-mono)", letterSpacing: "0.06em" }}>
+                  {STATUS_CONFIG[effectiveStatus(bestThesis)].label}
                 </div>
               </>
             ) : (
@@ -583,8 +583,8 @@ function ThesisAnalyticsSection({ trades }: { trades: ThesisTrade[] }) {
                     <div style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>1:{worstThesis.riskReward.toFixed(2)} R:R</div>
                   </div>
                 </div>
-                <div style={{ fontSize: 9, color: STATUS_CONFIG[worstThesis.status].color, fontFamily: "var(--nx-font-mono)", letterSpacing: "0.06em" }}>
-                  {STATUS_CONFIG[worstThesis.status].label}
+                <div style={{ fontSize: 9, color: STATUS_CONFIG[effectiveStatus(worstThesis)].color, fontFamily: "var(--nx-font-mono)", letterSpacing: "0.06em" }}>
+                  {STATUS_CONFIG[effectiveStatus(worstThesis)].label}
                 </div>
               </>
             ) : (

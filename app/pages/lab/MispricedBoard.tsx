@@ -266,7 +266,7 @@ export function MispricedBoard() {
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontFamily: MONO, fontSize: 10, marginBottom: 8 }}>
                 <span style={{ color: C.text.muted, textTransform: "uppercase", letterSpacing: "0.14em", fontSize: 8.5 }}>Funding edge</span>
                 <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 22, fontWeight: 600, color: C.text.bright }}>
-                  {m.fundingAnnualPct >= 0 ? "+" : ""}{m.fundingAnnualPct}%<span style={{ fontSize: 11, color: C.text.faint }}>/yr</span>
+                  {m.fundingAnnualPct >= 0 ? "+" : ""}{m.fundingAnnualPct}%<span title="Annualized — what the funding rate adds up to over a year if today's rate held. 'yr' = per year." style={{ fontSize: 11, color: C.text.faint, marginLeft: 3 }}>/yr</span>
                 </span>
               </div>
               {pos && pos.points.length >= 8
@@ -383,7 +383,7 @@ export function MispricedBoard() {
                         <div>
                           <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: C.text.muted, marginBottom: 3 }}>Funding edge</div>
                           <div style={{ fontFamily: MONO, fontSize: 31, fontWeight: 600, color: C.text.bright, lineHeight: 0.9, letterSpacing: "-0.02em" }}>
-                            {m.fundingAnnualPct >= 0 ? "+" : ""}{m.fundingAnnualPct}<span style={{ fontSize: 13, color: C.text.faint }}>%/yr</span>
+                            {m.fundingAnnualPct >= 0 ? "+" : ""}{m.fundingAnnualPct}<span title="Annualized — what the funding rate adds up to over a year if today's rate held. 'yr' = per year." style={{ fontSize: 13, color: C.text.faint, marginLeft: 4 }}>%/yr</span>
                           </div>
                         </div>
                       </div>
