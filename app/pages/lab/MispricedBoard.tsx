@@ -429,7 +429,7 @@ export function MispricedBoard() {
                       <div style={{ position: "absolute", top: 0, bottom: 0, background: C.borderStrong, ...(m.direction === "LONG" ? { right: "50%" } : { left: "50%" }), width: `${Math.min(46, (m.edge / maxEdge) * 46)}%` }} />
                     </div>}
                     {isMobile && <span />}
-                    <span style={{ fontFamily: MONO, fontSize: 10.5, color: C.text.muted, textAlign: "right" }}>{m.fundingAnnualPct >= 0 ? "+" : ""}{m.fundingAnnualPct}%/yr</span>
+                    <span title="Annualized — what the funding rate adds up to over a year if today's rate held. 'yr' = per year." style={{ fontFamily: MONO, fontSize: 10.5, color: C.text.muted, textAlign: "right" }}>{m.fundingAnnualPct >= 0 ? "+" : ""}{m.fundingAnnualPct}%/yr</span>
                     <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.08em", color: C.text.faint, textAlign: "right" }}>FAIR</span>
                   </div>
                 ))}
