@@ -1421,8 +1421,10 @@ export function ThesisView() {
                         { l: "ENTRY", v: entryN > 0 ? px(entryN) : "—", c: "#a1a1aa" },
                         { l: `STOP ${long ? "−" : "+"}${stopPctShown.toFixed(1)}%`, v: stopN > 0 ? px(stopN) : "—", c: "#f7525f" },
                         { l: `TP ${quickTpR}R`, v: tpN > 0 ? px(tpN) : "—", c: "#ededf0" },
-                        { l: "SIZE", v: calc ? `$${calc.positionSize.toFixed(0)}` : "—", c: "#d4d4d8" },
-                        { l: "R:R", v: calc ? `1:${calc.riskReward.toFixed(2)}` : "—", c: calc && calc.riskReward >= 2 ? "#3ecf8e" : "#fbbf24" },
+                        { l: "SIZE", v: calc ? `$${calc.positionSize.toFixed(0)}` : "set acct ↓", c: calc ? "#d4d4d8" : "#52525b" },
+                        // R:R is fixed by the target knob (TP built at exactly tpR·risk), so show it
+                        // always — it doesn't need the account size the way position SIZE does.
+                        { l: "R:R", v: `1:${quickTpR.toFixed(2)}`, c: quickTpR >= 2 ? "#3ecf8e" : "#fbbf24" },
                       ].map(({ l, v, c }) => (
                         <div key={l}>
                           <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.03em", whiteSpace: "nowrap" }}>{l}</div>
