@@ -15,6 +15,7 @@ import {
   gradeCall, REGIME, classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets,
   regimeEdge, planQuality, planSummary, expectancyStats, convictionCalibration, rankCaller,
   consensusBySymbol, stanceAtPost, classifyContrarian, aggregateSideRecord, contrarianEdgeScore,
+  normalizeSymbol,
 } from "./logic.mjs";
 
 // ── Historical stance snapshots (contrarian grading) ─────────────────────────
@@ -86,10 +87,15 @@ export const ADVICE_FLAG_TEXT = {
 };
 
 export async function fetchGradeHistory(symbol, createdAt) {
+  // ⚠️ The thesis FORM stores BARE tickers ("BTC"), but Orderly /tv/history needs the
+  // canonical perp id (PERP_BTC_USDC). Without normalizing, bare-ticker calls fetch
+  // NOTHING → gradeCall gets no candles → they never grade. That silently blocked
+  // caller-grading for basically every form-posted call (only full-symbol theses graded).
+  const sym = normalizeSymbol(symbol) || symbol;
   const now = Math.floor(Date.now() / 1000);
   const from = Math.max(Math.floor((createdAt || Date.now()) / 1000) - REGIME_PAD_S, now - 60 * 86400 - REGIME_PAD_S);
   try {
-    const r = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${symbol}&resolution=60&from=${from}&to=${now}`);
+    const r = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${sym}&resolution=60&from=${from}&to=${now}`);
     const d = await r.json();
     if (d && d.s === "ok" && Array.isArray(d.t)) return { t: d.t, h: d.h, l: d.l, c: d.c };
   } catch (e) { console.error("[grade] history", symbol, e.message); }
