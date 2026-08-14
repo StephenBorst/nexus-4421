@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { usePrivateQuery, useAccount } from "@orderly.network/hooks";
+import { usePrivateQuery } from "@orderly.network/hooks";
 import { deployToAgent } from "@/utils/agentPrefill";
 import { Sparkline } from "@/pages/lab/components";
 import { C } from "@/config/theme";
@@ -331,7 +331,6 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
   }, []);
 
   // ── Live positions from Orderly (wallet must be connected) ──
-  const { state: accountState } = useAccount();
   const { data: posData } = usePrivateQuery("/v1/positions", { revalidateOnFocus: false }) as { data: { rows?: any[] } | null };
   const openPositions: any[] = (posData as any)?.rows ?? [];
 
@@ -659,7 +658,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
       })()}
 
       {/* ── Portfolio Context ──────────────────────────────────── */}
-      {portfolioLongPct !== null && accountState?.status === "SignedIn" && (() => {
+      {portfolioLongPct !== null && (() => {
         const netLong   = portfolioLongPct;
         const netShort  = 100 - netLong;
         const regScore  = regime.score;

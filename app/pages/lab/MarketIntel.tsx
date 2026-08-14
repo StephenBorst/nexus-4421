@@ -71,7 +71,7 @@ function NewsTab() {
   const [countdown, setCountdown] = useState(300);
   const isMob = useIsMobile();
 
-  const TEAL   = "#ededf0", GREEN = "#a1a1aa";
+  const TEAL   = "#ededf0";
   const DIM    = "rgba(255,255,255,0.35)", MUTED = "rgba(255,255,255,0.60)", BRIGHT = "rgba(255,255,255,0.87)";
   const CATS   = ["ALL", "CRYPTO", "MACRO", "DEFI", "MARKETS", "GEOPOLITICS"];
   // Category tags carry NO semantic weight — every one renders as the same bone-white
@@ -103,7 +103,7 @@ function NewsTab() {
   const shown = filter === "ALL" ? items : items.filter(i => i.category === filter);
 
   return (
-    <div style={{ fontFamily: "'Courier New', Courier, monospace", color: BRIGHT, fontSize: 13 }}>
+    <div style={{ fontFamily: "var(--nx-font-mono)", color: BRIGHT, fontSize: 13 }}>
 
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 6 }}>
