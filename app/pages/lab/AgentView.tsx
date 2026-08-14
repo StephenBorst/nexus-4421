@@ -1010,13 +1010,13 @@ export function AgentView() {
             <div style={agentLabelStyle}>// STRATEGY — SIGNAL MODE</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
               {([
-                { v: "CONFLUENCE", label: "CONFLUENCE", hint: "Funding AND OI must agree (strictest, validated default)" },
+                { v: "CONFLUENCE", label: "CONFLUENCE", hint: "Funding AND OI must agree — the strictest filter, so the fewest entries" },
                 { v: "FUNDING_ONLY", label: "FUNDING", hint: "Fade funding extremes only" },
                 { v: "OI_ONLY", label: "OI DIVERGENCE", hint: "Open-interest divergence only" },
                 { v: "MOMENTUM", label: "MOMENTUM", hint: "Trade WITH the move (trend-follow)" },
                 { v: "MEAN_REVERSION", label: "MEAN REVERSION", hint: "Fade the move (buy dip / sell rip)" },
               ] as const).map(({ v, label, hint }) => {
-                const sel = (config.signalMode ?? "CONFLUENCE") === v;
+                const sel = (config.signalMode ?? "FUNDING_ONLY") === v;
                 const locked = isProStrategy(v) && !isPro;
                 return (
                   <button key={v} title={locked ? "Advanced strategy — PRO" : hint}
@@ -1038,12 +1038,12 @@ export function AgentView() {
             )}
             <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 8, color: "#71717a" }}>
               {({
-                CONFLUENCE: "Both funding + OI-divergence must agree. Fewest, highest-quality entries.",
+                CONFLUENCE: "Both funding + OI-divergence must agree — the strictest filter, so the fewest, most-selective entries.",
                 FUNDING_ONLY: "Trades funding extremes alone. More entries, lower selectivity.",
                 OI_ONLY: "Trades OI-divergence alone. Funding ignored.",
                 MOMENTUM: "Trades WITH a price move above your threshold — rides strength. Noisy on short ticks; test in PAPER.",
                 MEAN_REVERSION: "FADES a price move above your threshold — buy the dip, sell the rip. Test in PAPER.",
-              } as Record<string, string>)[config.signalMode ?? "CONFLUENCE"]}
+              } as Record<string, string>)[config.signalMode ?? "FUNDING_ONLY"]}
             </div>
           </div>
 
