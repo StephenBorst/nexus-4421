@@ -368,32 +368,47 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
             // LIVE SIGNAL FEED
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#3ecf8e", boxShadow: "0 0 6px #3ecf8e" }} />
           </div>
-          <div style={{ marginTop: 8, display: "flex", flexDirection: "column" }}>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#52525b", marginTop: 3, lineHeight: 1.5 }}>
+            Top on-chain traders opening &amp; closing positions in real time — ⚡ copies a move into a trade your agent manages.
+          </div>
+          <div style={{ marginTop: 10, display: "flex", flexDirection: "column" }}>
             {events.slice(0, 20).map((e, i) => {
               const watched = watch.includes(e.addr);
+              const isOpen = e.type === "OPEN";
+              const long = e.side === "LONG";
+              const sideColor = long ? "#3ecf8e" : "#f7525f";
               return (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 6px", borderBottom: "1px solid #232327", minWidth: 0, flexWrap: "nowrap", overflowX: "auto", background: watched ? "#ededf010" : "transparent", borderLeft: watched ? `2px solid ${TRACKED}` : "2px solid transparent" }}>
-                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", width: 34, flexShrink: 0 }}>{ago(e.ts)}</span>
-                <span title={e.source === "orderly" ? "Orderly (native)" : "Hyperliquid"} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: e.source === "orderly" ? "#3ecf8e" : "#52525b", width: 12, flexShrink: 0 }}>{e.source === "orderly" ? "◆" : "H"}</span>
-                <span style={{ display: "flex", alignItems: "center", gap: 3, flex: "1 1 96px", minWidth: 96 }}>
-                  {watched && <span style={{ color: TRACKED, fontSize: 9 }}>★</span>}
-                  <span onClick={() => openDetail(e.addr, e.source)} title="View trader detail" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: watched ? TRACKED : "#71717a", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#232327" }}>{short(e.addr)}</span>
-                </span>
-                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: 700, color: e.type === "OPEN" ? "#3ecf8e" : "#a1a1aa", width: 42, flexShrink: 0 }}>{e.type}</span>
-                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ededf0", flex: "1 1 56px", minWidth: 56 }}>{e.sym}</span>
-                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: e.side === "LONG" ? "#3ecf8e" : "#f7525f", width: 46, flexShrink: 0 }}>{e.side === "LONG" ? "↑ L" : "↓ S"}</span>
-                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#a1a1aa", flex: "1 1 64px", minWidth: 64, textAlign: "right" }}>{usd(e.szUsd)}</span>
-                <span title="Entry price" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#71717a", flex: "1 1 76px", minWidth: 76, textAlign: "right" }}>
-                  {e.price ? `@ ${usd(e.price)}` : ""}
-                </span>
-                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: e.closedPnl == null ? "#52525b" : e.closedPnl >= 0 ? "#3ecf8e" : "#f7525f", flex: "1 1 72px", minWidth: 72, textAlign: "right" }}>
-                  {e.closedPnl == null ? "" : `${e.closedPnl >= 0 ? "+" : ""}${usd(e.closedPnl)}`}
-                </span>
-                <span style={{ marginLeft: 10, display: "flex", gap: 6, flexShrink: 0 }}>
-                  {e.type === "OPEN" && shareBtn({ kind: "smart", symbol: e.sym, direction: e.side, szUsd: e.szUsd, trader: short(e.addr) })}
-                  {e.type === "OPEN" && thesisBtn(() => openThesis(e.sym, e.side, e.price, `${short(e.addr)} (smart money) opened ${e.side} ${e.sym}.`))}
-                  {e.type === "OPEN" && tradeBtn(() => copy(e.sym, e.side, e.price, null, e.addr))}
-                </span>
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "9px 6px", paddingLeft: watched ? 8 : 6, borderBottom: "1px solid #1a1a1e", background: watched ? "#ededf008" : "transparent", borderLeft: watched ? `2px solid ${TRACKED}` : "2px solid transparent" }}>
+                {/* event dot — a fresh OPEN glows in the side's color, a CLOSE is muted */}
+                <span title={isOpen ? "Opened a position" : "Closed a position"} style={{ marginTop: 5, width: 7, height: 7, borderRadius: "50%", flexShrink: 0, background: isOpen ? sideColor : "#3f3f46", boxShadow: isOpen ? `0 0 6px ${sideColor}66` : "none" }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {/* primary line — reads like a sentence: who · action · side · market */}
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", fontFamily: "var(--nx-font-mono)" }}>
+                    {watched && <span style={{ color: TRACKED, fontSize: 10 }}>★</span>}
+                    <span onClick={() => openDetail(e.addr, e.source)} title="View trader detail" style={{ fontSize: 11, color: watched ? TRACKED : "#a1a1aa", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#33333a" }}>{short(e.addr)}</span>
+                    <span style={{ fontSize: 11, color: isOpen ? "#d4d4d8" : "#71717a" }}>{isOpen ? "opened" : "closed"}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: sideColor }}>{long ? "LONG" : "SHORT"}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#ededf0" }}>{e.sym}</span>
+                  </div>
+                  {/* meta line — size · price · realized pnl (on close) · source · age */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", marginTop: 3 }}>
+                    <span style={{ color: "#a1a1aa" }}>{usd(e.szUsd)}</span>
+                    {e.price ? <span style={{ color: "#52525b" }}>@ {usd(e.price)}</span> : null}
+                    {e.closedPnl != null && <span style={{ color: e.closedPnl >= 0 ? "#3ecf8e" : "#f7525f", fontWeight: 700 }}>{e.closedPnl >= 0 ? "+" : ""}{usd(e.closedPnl)}</span>}
+                    <span style={{ color: "#3f3f46" }}>·</span>
+                    <span title={e.source === "orderly" ? "Orderly (native)" : "Hyperliquid"} style={{ color: e.source === "orderly" ? "#3ecf8e" : "#52525b" }}>{e.source === "orderly" ? "◆ Orderly" : "Hyperliquid"}</span>
+                    <span style={{ color: "#3f3f46" }}>·</span>
+                    <span>{ago(e.ts)} ago</span>
+                  </div>
+                </div>
+                {/* actions — only a fresh OPEN is copyable */}
+                {isOpen && (
+                  <span style={{ display: "flex", gap: 6, flexShrink: 0, marginTop: 1 }}>
+                    {shareBtn({ kind: "smart", symbol: e.sym, direction: e.side, szUsd: e.szUsd, trader: short(e.addr) })}
+                    {thesisBtn(() => openThesis(e.sym, e.side, e.price, `${short(e.addr)} (smart money) opened ${e.side} ${e.sym}.`))}
+                    {tradeBtn(() => copy(e.sym, e.side, e.price, null, e.addr))}
+                  </span>
+                )}
               </div>
               );
             })}
