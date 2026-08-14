@@ -50,21 +50,42 @@ export function ErrorBoundary() {
                               (error instanceof Error && error.message.includes('Failed to fetch'));
 
   // Self-heal stale-chunk errors: a tab left open across a deploy tries to lazy-load
-  // an old chunk hash that the deploy removed → 404. Clear caches + reload ONCE to
-  // pull the fresh index.html + current chunk graph. Guarded by a 15s sessionStorage
-  // stamp so a genuine, persistent failure shows the page instead of reload-looping.
+  // an old chunk hash the deploy replaced → import fails. Clear caches + reload ONCE to
+  // the fresh build. Guarded by a 15s sessionStorage stamp so a genuinely persistent
+  // failure shows the real error page instead of reload-looping. `canSelfHeal` is also
+  // read at render time to show a calm "updating…" screen instead of the red crash.
+  const RELOAD_KEY = 'nexus_chunk_reload_ts';
+  const lastReloadAt = Number((typeof sessionStorage !== 'undefined' && sessionStorage.getItem(RELOAD_KEY)) || 0);
+  const canSelfHeal = isModuleImportError && (Date.now() - lastReloadAt >= 15000);
   useEffect(() => {
-    if (!isModuleImportError) return;
-    const KEY = 'nexus_chunk_reload_ts';
-    if (Date.now() - Number(sessionStorage.getItem(KEY) || 0) < 15000) return;
-    sessionStorage.setItem(KEY, String(Date.now()));
+    if (!canSelfHeal) return;
+    try { sessionStorage.setItem(RELOAD_KEY, String(Date.now())); } catch { /* ignore */ }
     (async () => {
       try {
         if ('caches' in window) { const ks = await caches.keys(); await Promise.all(ks.map((k) => caches.delete(k))); }
       } catch { /* best-effort */ }
-      window.location.reload();
+      // Cache-bust the HTML fetch so a wedged/edge-cached index.html can't be reused —
+      // a plain reload can re-serve the same stale document graph.
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.set('_v', String(Date.now()));
+        window.location.replace(u.toString());
+      } catch { window.location.reload(); }
     })();
-  }, [isModuleImportError]);
+  }, [canSelfHeal]);
+
+  // Stale-chunk error that we're about to auto-recover from → show a calm "updating"
+  // screen, not the alarming red error dump. If the reload also fails (guard blocks
+  // canSelfHeal on the next mount), we fall through to the full error below.
+  if (canSelfHeal) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0f0f11', color: '#a1a1aa', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, fontFamily: 'var(--nx-font-mono), monospace' }}>
+        <div style={{ fontSize: 24, color: '#ededf0' }}>◆</div>
+        <div style={{ fontSize: 13, letterSpacing: '0.04em', color: '#ededf0' }}>Updating Nexus to the latest version…</div>
+        <div style={{ fontSize: 11, color: '#52525b' }}>A new build just shipped — reloading.</div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -143,7 +164,7 @@ export function ErrorBoundary() {
             }}>
               <strong style={{ color: '#fbbf24' }}>Module Import Error Detected</strong>
               <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#ccc' }}>
-                This appears to be a dynamic module import failure. This can happen after a deployment when the service worker cache is out of sync. Try refreshing the page or clearing your browser cache.
+                A dynamic module import failed and an automatic refresh didn&apos;t clear it. This usually means a new build shipped mid-session. Do a hard refresh (Ctrl/Cmd+Shift+R) to pull the latest version.
               </div>
             </div>
           )}
