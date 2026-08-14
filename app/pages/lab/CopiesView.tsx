@@ -5,8 +5,8 @@ import { useAccount } from "@orderly.network/hooks";
 import { useLabStorage } from "@/hooks/useLabStorage";
 import { useIsMobile } from "./useIsMobile";
 import type { ThesisTrade } from "./types";
-import { cardStyle, labelStyle, navBtnStyle, STATUS_CONFIG } from "./styles";
-import { formatPnl } from "./helpers";
+import { STATUS_CONFIG } from "./styles";
+import { effectiveStatus } from "./helpers";
 import { EmptyState } from "./components";
 
 export function CopiesView() {
@@ -38,7 +38,7 @@ export function CopiesView() {
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {copiedTheses.map((t) => {
             const ticker = t.symbol.replace("PERP_", "").replace("_USDC", "");
-            const cfg = STATUS_CONFIG[t.status] ?? STATUS_CONFIG.ACTIVE;
+            const cfg = STATUS_CONFIG[effectiveStatus(t)] ?? STATUS_CONFIG.ACTIVE;
             const shortWallet = t.copiedFromWallet
               ? `${t.copiedFromWallet.slice(0, 6)}...${t.copiedFromWallet.slice(-4)}`
               : null;
@@ -65,7 +65,7 @@ export function CopiesView() {
                   }}>
                     {cfg.label}
                   </div>
-                  {t.actualPnl !== null && t.status !== "ACTIVE" && (
+                  {t.actualPnl !== null && effectiveStatus(t) !== "ACTIVE" && (
                     <span style={{
                       fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: "bold",
                       color: t.actualPnl >= 0 ? "#3ecf8e" : "#f7525f",
