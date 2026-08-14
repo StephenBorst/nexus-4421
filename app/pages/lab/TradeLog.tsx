@@ -6,6 +6,7 @@ import { cardStyle, labelStyle, navBtnStyle, inputStyle } from "./styles";
 import { formatPnl, daysInMonth, firstDayOfMonth, MONTH_NAMES } from "./helpers";
 import { EmptyState } from "./components";
 import { useIsMobile } from "./useIsMobile";
+import { C } from "@/config/theme";
 
 function CalendarView({ dayGroups, onDayClick, viewMonth, viewYear, onPrevMonth, onNextMonth, totalPnl }: { dayGroups: Record<string, DayGroup>; onDayClick: (key: string, day: number) => void; viewMonth: number; viewYear: number; onPrevMonth: () => void; onNextMonth: () => void; totalPnl: number; }) {
   const isMobile = useIsMobile();
@@ -207,8 +208,8 @@ export function TradeLogAllView({
                 borderColor: g.pnl >= 0 ? "#232327" : "#4a1e22",
                 transition: "background 0.15s",
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = "#141416")}
-              onMouseLeave={e => (e.currentTarget.style.background = "#141416")}
+              onMouseEnter={e => (e.currentTarget.style.background = "#1a1a1e")}
+              onMouseLeave={e => (e.currentTarget.style.background = C.surfaceAlt)}
             >
               {/* date */}
               <div>
