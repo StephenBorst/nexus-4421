@@ -200,7 +200,11 @@ export async function computeCallerStats(env, maxHorizonS = 30 * 86400, opts = {
     try {
       // Pad the window backwards so each call has prior bars to classify (see REGIME_PAD_S).
       const from = Math.max(fromS - REGIME_PAD_S, now - maxHorizonS - REGIME_PAD_S);
-      const r = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${sym}&resolution=60&from=${from}&to=${now}`);
+      // ⚠️ Normalize the BARE ticker theses store ("BTC") to the Orderly perp id — the
+      // /tv/history call returns nothing for a bare symbol, which silently graded every
+      // form-posted call PENDING here (so the leaderboard never counted them). Same fix
+      // as fetchGradeHistory; this fetch is independent of it.
+      const r = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${normalizeSymbol(sym) || sym}&resolution=60&from=${from}&to=${now}`);
       const d = await r.json();
       if (d && d.s === "ok" && Array.isArray(d.t)) history[sym] = { t: d.t, h: d.h, l: d.l, c: d.c };
     } catch (e) { console.error("[caller-stats] history fetch", sym, e.message); }
