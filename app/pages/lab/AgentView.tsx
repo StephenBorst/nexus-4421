@@ -64,6 +64,9 @@ export function AgentView() {
   const tradingKey = findOrderlyTradingKey();
   const { isPro } = useSubscription(walletAddress);
   const [proNote, setProNote] = useState(false);
+  // Advanced config (scale-out exits, DCA ladder, external webhooks) is collapsed
+  // by default — the agent runs on sensible defaults; this is opt-in tuning.
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [standing, setStanding] = useState<AgentStanding | null>(null);
   const [backtest, setBacktest] = useState<any | null>(null);
   const [backtesting, setBacktesting] = useState(false);
@@ -1167,6 +1170,27 @@ export function AgentView() {
             </div>
           </div>
 
+          {/* Advanced config — power-user surfaces (scale-out exits, DCA ladder,
+              external webhooks) collapsed by default so the core "set style → pick
+              mode → activate" flow stays clean. The agent runs on the defaults;
+              open this only to hand-tune. */}
+          {(() => {
+            const advancedActive = (Array.isArray(config.takeProfits) && config.takeProfits.length > 1)
+              || (config.trailingStopPct ?? 0) > 0 || (config.breakevenTriggerPct ?? 0) > 0
+              || !!config.dcaEnabled || webhookEnabled;
+            return (
+              <div style={{ display: "flex", justifyContent: "center", margin: "4px 0 8px" }}>
+                <button onClick={() => setShowAdvanced((v) => !v)} style={{
+                  fontFamily: "var(--nx-font-mono)", fontSize: 10, letterSpacing: "0.08em",
+                  padding: "7px 16px", borderRadius: 6, cursor: "pointer",
+                  background: showAdvanced || advancedActive ? "#ededf015" : "transparent",
+                  border: `1px solid ${showAdvanced || advancedActive ? "#ededf0" : "#232327"}`,
+                  color: showAdvanced || advancedActive ? "#ededf0" : "#71717a",
+                }}>{showAdvanced ? "▾ HIDE ADVANCED SETTINGS" : advancedActive ? "▸ ADVANCED SETTINGS · ON — scale-out, DCA, webhooks" : "▸ ADVANCED SETTINGS — scale-out, DCA, webhooks"}</button>
+              </div>
+            );
+          })()}
+          {showAdvanced && (<>
           {/* ── ADVANCED EXITS — multi-level take-profit + trailing stop ── */}
           {(() => {
             const tps = config.takeProfits;
@@ -1367,6 +1391,7 @@ export function AgentView() {
               </div>
             )}
           </div>
+          </>)}
 
           <div style={agentCardStyle}>
             <div style={agentLabelStyle}>// RISK SUMMARY</div>
