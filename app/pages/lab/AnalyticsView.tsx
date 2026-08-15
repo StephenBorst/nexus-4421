@@ -117,9 +117,9 @@ function TradingScoreSection({ orders, winRate }: { orders: ProcessedTrade[]; wi
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
             {metrics.details.map((d) => (
-              <div key={d.label} style={{ background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4, padding: "8px 10px" }}>
+              <div key={d.label} style={{ background: "#0a0a0b", border: "1px solid #232327", borderRadius: 6, padding: "8px 10px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.08em" }}>{d.label}</span>
+                  <span style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.16em", textTransform: "uppercase" }}>{d.label}</span>
                   <span style={{ fontSize: 8, color: "#33333a", fontFamily: "var(--nx-font-mono)" }}>{d.weight}</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -237,8 +237,8 @@ function BreakdownRow({ orders }: { orders: ProcessedTrade[] }) {
           ))}
         </div>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <div><div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>WEEKDAY WR</div><div style={{ fontSize: 16, color: "#ededf0", fontFamily: "var(--nx-font-mono)" }}>{weekday.weekdayWR}%</div></div>
-          <div style={{ textAlign: "right" }}><div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>WEEKEND WR</div><div style={{ fontSize: 16, color: parseFloat(weekday.weekendWR) > 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)" }}>{weekday.weekendWR}%</div></div>
+          <div><div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.16em", textTransform: "uppercase" }}>WEEKDAY WR</div><div style={{ fontSize: 16, color: "#ededf0", fontFamily: "var(--nx-font-mono)" }}>{weekday.weekdayWR}%</div></div>
+          <div style={{ textAlign: "right" }}><div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.16em", textTransform: "uppercase" }}>WEEKEND WR</div><div style={{ fontSize: 16, color: parseFloat(weekday.weekendWR) > 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)" }}>{weekday.weekendWR}%</div></div>
         </div>
       </div>
 
@@ -290,7 +290,7 @@ function TopAssets({ orders }: { orders: ProcessedTrade[] }) {
         {assets.map(([sym, data]) => {
           const wr = Math.round((data.wins / data.trades) * 100);
           return (
-            <div key={sym} style={{ background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4, padding: "10px 12px" }}>
+            <div key={sym} style={{ background: "#0a0a0b", border: "1px solid #232327", borderRadius: 6, padding: "10px 12px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                 <span style={{ fontSize: 13, color: "#fff", fontWeight: "bold", fontFamily: "var(--nx-font-mono)" }}>{sym}</span>
                 <span style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{data.trades}</span>
@@ -422,7 +422,7 @@ function TimingAndRisk({ orders }: { orders: ProcessedTrade[] }) {
           {stats.peak.length === 0
             ? <span style={{ fontSize: 11, color: "#33333a", fontFamily: "var(--nx-font-mono)" }}>no timing data</span>
             : stats.peak.map((b) => (
-              <div key={b.h} style={{ background: "#141416", border: "1px solid #232327", borderRadius: 4, padding: "6px 10px" }}>
+              <div key={b.h} style={{ background: "#141416", border: "1px solid #232327", borderRadius: 6, padding: "6px 10px" }}>
                 <div style={{ fontSize: 12, color: "#fff", fontFamily: "var(--nx-font-mono)" }}>{fmtHr(b.h)}-{fmtHr((b.h + 1) % 24)}</div>
                 <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{b.trades} trades · <span style={{ color: "#ededf0" }}>{Math.round((b.wins / b.trades) * 100)}%</span></div>
               </div>
@@ -458,7 +458,7 @@ function PerformanceAnalysis({ orders }: { orders: ProcessedTrade[] }) {
         <div style={{ fontSize: 10, color: "#71717a", letterSpacing: "0.1em", marginBottom: 12, fontFamily: "var(--nx-font-mono)" }}>&#9632; PERFORMANCE ANALYSIS</div>
         <div style={{ marginBottom: 8 }}>
           <div style={{ fontSize: 9, color: "#ededf0", fontFamily: "var(--nx-font-mono)", marginBottom: 4 }}>Best Trade</div>
-          <div style={{ background: "#141416", border: "1px solid #232327", borderRadius: 4, padding: "10px 12px" }}>
+          <div style={{ background: "#141416", border: "1px solid #232327", borderRadius: 6, padding: "10px 12px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <span style={{ fontSize: 14, color: "#fff", fontWeight: "bold", fontFamily: "var(--nx-font-mono)" }}>{bestSym} {data.best.direction.toLowerCase()}</span>
               <span style={{ fontSize: 16, color: "#ededf0", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{formatPnl(data.best.pnl)}</span>
@@ -468,7 +468,7 @@ function PerformanceAnalysis({ orders }: { orders: ProcessedTrade[] }) {
         </div>
         <div>
           <div style={{ fontSize: 9, color: "#f7525f", fontFamily: "var(--nx-font-mono)", marginBottom: 4 }}>Worst Trade</div>
-          <div style={{ background: "#241012", border: "1px solid #4a1e22", borderRadius: 4, padding: "10px 12px" }}>
+          <div style={{ background: "#241012", border: "1px solid #4a1e22", borderRadius: 6, padding: "10px 12px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <span style={{ fontSize: 14, color: "#fff", fontWeight: "bold", fontFamily: "var(--nx-font-mono)" }}>{worstSym} {data.worst.direction.toLowerCase()}</span>
               <span style={{ fontSize: 16, color: "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{formatPnl(data.worst.pnl)}</span>
@@ -594,7 +594,7 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral, theses = 
       <SectionHeader
         eyebrow="Grade · Analytics"
         title="Performance Analytics"
-        note={<a href="/analyze" style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, letterSpacing: "0.08em", textDecoration: "none", border: "1px solid #232327", borderRadius: 4, padding: "5px 10px" }}>▶ X-RAY ANY WALLET</a>}
+        note={<a href="/analyze" style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, letterSpacing: "0.08em", textDecoration: "none", border: "1px solid #232327", borderRadius: 6, padding: "5px 10px" }}>▶ X-RAY ANY WALLET</a>}
       />
       {/* SYNTHESIS FIRST — one point of view, before the instrument panel. Everything
           below is the evidence for it. */}

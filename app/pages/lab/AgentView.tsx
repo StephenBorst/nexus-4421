@@ -741,7 +741,7 @@ export function AgentView() {
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 12, marginTop: 10, marginBottom: 10, fontFamily: "var(--nx-font-mono)" }}>
               <span style={{ fontSize: 18, color: "#fff", fontWeight: "bold" }}>{tk}</span>
-              <span style={{ fontSize: 13, color: isLong ? "#3ecf8e" : "#f7525f", fontWeight: "bold" }}>{isLong ? "↑ LONG" : "↓ SHORT"}</span>
+              <span style={{ fontSize: 13, color: "#a1a1aa", fontWeight: "bold" }}>{isLong ? "↑ LONG" : "↓ SHORT"}</span>
               {directiveDraft.leverage ? <span style={{ fontSize: 12, color: "#a1a1aa" }}>{directiveDraft.leverage}x</span> : null}
               <span style={{ fontSize: 12, color: rr >= 2 ? "#ededf0" : "#fbbf24" }}>R:R 1:{rr.toFixed(2)}</span>
             </div>
@@ -757,8 +757,8 @@ export function AgentView() {
                 { label: "TP1", val: num(directiveDraft.takeProfit1), color: "#ededf0" },
                 ...(directiveDraft.takeProfit2 ? [{ label: "TP2", val: num(directiveDraft.takeProfit2), color: "#ededf0" }] : []),
               ].map(({ label, val, color }) => (
-                <div key={label} style={{ background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4, padding: "6px 10px" }}>
-                  <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
+                <div key={label} style={{ background: "#08080a", border: "1px solid #232327", borderRadius: 6, padding: "6px 10px" }}>
+                  <div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.16em", textTransform: "uppercase" }}>{label}</div>
                   <div style={{ fontSize: 13, color, fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{val}</div>
                 </div>
               ))}
@@ -840,7 +840,7 @@ export function AgentView() {
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 12, marginTop: 10, marginBottom: 10, fontFamily: "var(--nx-font-mono)" }}>
               <span style={{ fontSize: 16, color: "#fff", fontWeight: "bold" }}>{tk}</span>
-              <span style={{ fontSize: 12, color: isLong ? "#3ecf8e" : "#f7525f", fontWeight: "bold" }}>{isLong ? "↑ LONG" : "↓ SHORT"}</span>
+              <span style={{ fontSize: 12, color: "#a1a1aa", fontWeight: "bold" }}>{isLong ? "↑ LONG" : "↓ SHORT"}</span>
               {activeDirective.leverage ? <span style={{ fontSize: 11, color: "#a1a1aa" }}>{activeDirective.leverage}x</span> : null}
               {activeDirective.filledPrice ? <span style={{ fontSize: 11, color: "#ededf0" }}>filled {num(activeDirective.filledPrice)}</span> : null}
             </div>
@@ -1493,7 +1493,7 @@ export function AgentView() {
                     <span style={{ color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>
                       {t.symbol.replace("PERP_", "").replace("_USDC", "")}
                     </span>
-                    <span style={{ color: t.direction === "LONG" ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>
+                    <span style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>
                       {t.direction}
                     </span>
                     <span style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 11 }}>
@@ -1674,7 +1674,7 @@ export function AgentView() {
                 </div>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>DIRECTION</div>
-                  <div style={{ color: agentState.current_position.direction === "LONG" ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: 600 }}>
+                  <div style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: 600 }}>
                     {agentState.current_position.direction}
                   </div>
                 </div>
@@ -1726,7 +1726,7 @@ export function AgentView() {
                 </div>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>DIRECTION</div>
-                  <div style={{ color: agentState.last_signal.direction === "LONG" ? "#3ecf8e" : agentState.last_signal.direction === "SHORT" ? "#f7525f" : "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>
+                  <div style={{ color: agentState.last_signal.direction === "LONG" || agentState.last_signal.direction === "SHORT" ? "#a1a1aa" : "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 600 }}>
                     {agentState.last_signal.direction}
                   </div>
                 </div>
@@ -1817,7 +1817,7 @@ export function AgentView() {
                   >
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1fr 0.8fr 0.6fr 1.3fr", gap: 8, padding: "9px 0" }}>
                       <span style={{ color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>{asset}</span>
-                      <span style={{ color: trade.direction === "LONG" ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
+                      <span style={{ color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
                         {trade.direction}
                       </span>
                       <span style={{ color: "#d4d4d8", fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>${trade.entry_price.toLocaleString()}</span>
@@ -1856,7 +1856,7 @@ export function AgentView() {
                             const col = winSide ? "#3ecf8e" : "#f7525f";
                             return (
                               <div style={{ display: "flex", alignItems: "center", gap: 8, maxWidth: 320 }}>
-                                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#52525b", width: 30 }}>MOVE</span>
+                                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", letterSpacing: "0.16em", textTransform: "uppercase", width: 30 }}>MOVE</span>
                                 <div style={{ position: "relative", flex: 1, height: 6, background: "#141416", borderRadius: 3 }}>
                                   <div style={{ position: "absolute", left: "50%", top: -2, bottom: -2, width: 1, background: "#33333a" }} />
                                   <div style={{
