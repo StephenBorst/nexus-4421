@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useMemo } from "react";
-import { useAccount } from "@orderly.network/hooks";
+import { useAccount, useCollateral } from "@orderly.network/hooks";
 import { useNavigate } from "react-router-dom";
 import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePrices";
 import { fetchOnChainRepScore } from "@/hooks/useThesisRegistry";
@@ -115,19 +115,26 @@ const COPY_PREFS_KEY = "nexus-copy-prefs";
 function CopyModal({
   thesis,
   walletAddress,
+  accountBalance,
   onClose,
 }: {
   thesis: FeedThesis;
   walletAddress: string;
+  accountBalance?: number | null;
   onClose: () => void;
 }) {
   const ticker = thesis.symbol.replace("PERP_", "").replace("_USDC", "");
   const traderName = thesis.displayName ?? `${thesis.wallet.slice(0, 6)}…${thesis.wallet.slice(-4)}`;
 
+  // Auto-sized from the connected trading balance — no manual account number to type.
+  // A stored override (if the user edited it before) still wins.
+  const autoSize = accountBalance != null && accountBalance > 0 ? String(Math.floor(accountBalance)) : "";
   const [accountSize, setAccountSize] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(COPY_PREFS_KEY) ?? "{}").accountSize ?? ""; }
-    catch { return ""; }
+    try { const stored = JSON.parse(localStorage.getItem(COPY_PREFS_KEY) ?? "{}").accountSize; if (stored) return stored; }
+    catch { /* ignore */ }
+    return autoSize;
   });
+  const usingAutoSize = accountSize === autoSize && autoSize !== "";
   const [riskPct, setRiskPct] = useState(() => {
     try { return JSON.parse(localStorage.getItem(COPY_PREFS_KEY) ?? "{}").riskPct ?? "1.5"; }
     catch { return "1.5"; }
@@ -299,7 +306,7 @@ function CopyModal({
         {/* Editable: account size + risk + funding */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: 10, marginBottom: 4 }}>
           <div>
-            <div style={labelStyle}>ACCOUNT SIZE ($)</div>
+            <div style={labelStyle}>ACCOUNT SIZE ($){usingAutoSize && <span style={{ color: "#71717a", letterSpacing: 0 }}> · from your balance</span>}</div>
             <input
               style={{ ...inputStyle, borderColor: accErr ? "#4a1e22" : "#232327" }}
               type="number"
@@ -654,10 +661,12 @@ function FeedCard({
         );
       })()}
 
-      {/* Actual PnL (if closed) */}
-      {thesis.actualPnl !== null && thesis.status !== "ACTIVE" && (
-        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: thesis.actualPnl >= 0 ? "#3ecf8e" : "#f7525f", marginBottom: 8 }}>
-          ACTUAL PnL: {thesis.actualPnl >= 0 ? "+" : ""}${thesis.actualPnl.toFixed(2)}
+      {/* Outcome is the TRUSTLESS grade only — no self-reported P&L. When the tape
+          has resolved the call, we say so; the dollar figure a trader could type is
+          gone (the status badge above already reflects the objective grade). */}
+      {(thesis.gradedOutcome === "WIN" || thesis.gradedOutcome === "LOSS") && (
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", marginBottom: 8 }}>
+          ✓ graded {thesis.gradedOutcome} · first-touch vs public price — the tape marked this, not the trader
         </div>
       )}
 
@@ -1433,6 +1442,9 @@ export default function FeedPage() {
   // Get connected wallet address
   const { state: accountState } = useAccount();
   const walletAddress = (accountState as { address?: string })?.address ?? null;
+  // Auto-size copies: pull the connected trading balance so the copy modal computes
+  // your size instead of making you type an account number.
+  const { availableBalance } = useCollateral();
 
   // Ph19: fetch on-chain wallet roster in parallel with feed
   useEffect(() => {
@@ -1557,6 +1569,7 @@ export default function FeedPage() {
         <CopyModal
           thesis={copyTarget}
           walletAddress={walletAddress}
+          accountBalance={typeof availableBalance === "number" ? availableBalance : null}
           onClose={() => setCopyTarget(null)}
         />
       )}
