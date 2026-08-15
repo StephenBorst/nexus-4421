@@ -575,10 +575,39 @@ export function AgentView() {
   }
 
   if (!walletAddress) {
+    // Disconnected → don't dead-end on "connect wallet". Show the agent's real arsenal
+    // as a preview (eyes on the prize) with a connect prompt that points at the top-right
+    // connector — the app's established pattern (LabWelcome does the same). No wallet needed.
+    const feature = (label: string, desc: string, tag?: string) => (
+      <div style={{ ...agentCardStyle, marginBottom: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+          <span style={agentLabelStyle}>{label}</span>
+          {tag && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#ededf0", border: "1px solid #33333a", borderRadius: 3, padding: "1px 6px" }}>{tag}</span>}
+        </div>
+        <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 11, color: "#a1a1aa", lineHeight: 1.55 }}>{desc}</div>
+      </div>
+    );
     return (
-      <div style={{ ...agentCardStyle, textAlign: "center", padding: 40 }}>
-        <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 13 }}>
-          // CONNECT WALLET TO CONFIGURE AGENT
+      <div>
+        <div style={{ ...agentCardStyle, borderColor: "#33333a", background: "linear-gradient(180deg,#15151a 0%,#0f0f11 100%)", textAlign: "center", padding: "28px 22px" }}>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 8 }}>Automate</div>
+          <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 26, fontWeight: 700, color: "#f4f4f5", lineHeight: 1.1, letterSpacing: "-0.01em" }}>Autonomous Trading Agent</div>
+          <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 12.5, color: "#a1a1aa", lineHeight: 1.6, maxWidth: 560, margin: "12px auto 0" }}>
+            An agent that runs <strong style={{ color: "#d4d4d8" }}>your</strong> strategy 24/7 within hard guardrails — and grades every trade objectively on-chain, no self-reporting. Non-custodial, order-only (it can <strong style={{ color: "#d4d4d8" }}>never withdraw</strong>), killable anytime. Start risk-free in 🧪 PAPER.
+          </div>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 16, fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ededf0", border: "1px solid #33333a", background: "#1a1a1e", borderRadius: 4, padding: "9px 16px", letterSpacing: "0.04em" }}>
+            <span className="nx-pulse" style={{ width: 6, height: 6, borderRadius: "50%", background: "#ededf0", boxShadow: "0 0 8px #ededf0" }} />
+            Connect your wallet (top right) to configure &amp; deploy
+          </div>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 10 }}>Here&apos;s the full arsenal you&apos;ll get ↓</div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 8, marginTop: 8 }}>
+          {feature("// EXECUTION MODES", "🧪 PAPER — simulated, no key, zero risk. ASSISTED — it surfaces signals you place yourself. AUTONOMOUS — it trades within your risk limits.")}
+          {feature("// SIGNAL STRATEGIES", "Funding-fade, OI-divergence, and confluence — plus momentum & mean-reversion, or bring your own signal via webhook.", "5 modes")}
+          {feature("// HARD GUARDRAILS", "Daily-loss cap, max trades/day, take-profit, stop-loss, max-hold — and a one-tap KILL switch. Order-only keys cannot withdraw a cent.")}
+          {feature("// ADVANCED EXITS", "Multi-level scale-out, trailing stop, and breakeven — the agent manages the whole exit for you, then grades each slice on-chain.")}
+          {feature("// BACKTEST + VALIDATE", "Replay any config on 60d of real price + a walk-forward across markets — prove an edge before you risk a cent.", "◆ PRO")}
+          {feature("// TRUSTLESS RECORD", "Every trade settles on Orderly with an on-chain order ID, graded objectively and ranked on the TOP AGENTS board — a record nobody can fake.")}
         </div>
       </div>
     );
