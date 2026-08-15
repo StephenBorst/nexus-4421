@@ -44,9 +44,9 @@ function price(n: number | null): string {
 // and Feed tab, since this strip is global. minWidth keeps them legible when wrapped.
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: "1 1 90px", minWidth: 70 }}>
-      <span style={{ fontSize: 8, letterSpacing: "0.12em", color: C.text.faint }}>{label}</span>
-      <span style={{ fontSize: 14, fontWeight: "bold", color: C.text.bright }}>{value}</span>
+    <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: "1 1 90px", minWidth: 70 }}>
+      <span style={{ fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: C.text.muted }}>{label}</span>
+      <span style={{ fontSize: 14, fontWeight: 700, color: C.text.bright }}>{value}</span>
     </div>
   );
 }
@@ -79,9 +79,9 @@ export function NexusMarket() {
     <div style={{
       display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap",
       padding: "12px 16px", background: C.surfaceAlt, border: `1px solid ${C.border}`,
-      borderRadius: 4, fontFamily: "var(--nx-font-mono)",
+      borderRadius: 6, fontFamily: "var(--nx-font-mono)",
     }}>
-      <span style={{ fontSize: 11, fontWeight: "bold", color: C.accent, letterSpacing: "0.1em" }}>$NEXUS</span>
+      <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, letterSpacing: "0.14em" }}>$NEXUS</span>
       <Stat label="PRICE" value={price(m.price)} />
       <Stat label="MARKET CAP" value={usd(m.marketCap)} />
       <Stat label="24H VOL" value={usd(m.volume24h)} />

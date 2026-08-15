@@ -18,7 +18,7 @@ import { NexusMarket } from "@/components/NexusMarket";
 import type { ThesisTrade } from "@/pages/lab/types";
 import CommentsPanel from "@/components/CommentsPanel";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
-import { Sparkline } from "@/pages/lab/components";
+import { Sparkline, SectionHeader } from "@/pages/lab/components";
 import { getAgentSig } from "@/pages/lab/agentKeys";
 import { chartImageList, effectiveStatus } from "@/pages/lab/helpers";
 import LiveNow from "./LiveNow";
@@ -1533,6 +1533,15 @@ export default function FeedPage() {
     </div>
   );
 
+  // Editorial header — same signature system as Proof / Arena / the x-ray (mono
+  // eyebrow → serif headline → fading bone rule). The eyebrow is stable brand;
+  // the headline tracks the active view so the page reads as one place.
+  const feedHead = {
+    feed:      { eyebrow: "// THE FEED", title: "Every call, graded by the tape" },
+    ranks:     { eyebrow: "// THE FEED", title: "Verified callers, ranked" },
+    following: { eyebrow: "// THE FEED", title: "Traders you follow" },
+  }[view];
+
   return (
     <div style={{ background: "#0a0a0b", minHeight: "100svh", padding: 0 }}>
       {/* Copy modal */}
@@ -1543,6 +1552,11 @@ export default function FeedPage() {
           onClose={() => setCopyTarget(null)}
         />
       )}
+
+      {/* Editorial header — leads the page; tabs below act as sub-nav. */}
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: isMobile ? "18px 16px 2px" : "26px 16px 4px" }}>
+        <SectionHeader eyebrow={feedHead.eyebrow} title={feedHead.title} />
+      </div>
 
       {/* Tab bar / header */}
       <div style={{ display: "flex", gap: 8, padding: "8px 16px", borderBottom: "1px solid #232327", background: "#0f0f11", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", rowGap: 8 }}>

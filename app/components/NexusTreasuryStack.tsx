@@ -44,19 +44,19 @@ export function NexusTreasuryStack({ compact = false }: { compact?: boolean }) {
 
   return (
     <div style={{
-      display: "flex", alignItems: "center", gap: compact ? 12 : 20, flexWrap: "wrap",
+      display: "flex", alignItems: "center", gap: compact ? 14 : 22, flexWrap: "wrap",
       padding: compact ? "8px 12px" : "12px 16px",
-      background: "#141416", border: "1px solid #232327", borderRadius: 4,
+      background: C.surfaceAlt, border: `1px solid ${C.border}`, borderRadius: 6,
       fontFamily: "var(--nx-font-mono)",
     }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <span style={{ fontSize: 8, letterSpacing: "0.12em", color: C.text.faint }}>💎 $NEXUS IN TREASURY</span>
-        <span style={{ fontSize: compact ? 14 : 18, fontWeight: "bold", color: C.text.bright }}>{held}</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        <span style={{ fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: C.text.muted }}>$NEXUS in treasury</span>
+        <span style={{ fontSize: compact ? 14 : 18, fontWeight: 700, color: C.text.bright }}>{held}</span>
       </div>
       <div style={{ width: 1, alignSelf: "stretch", background: C.border }} />
-      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <span style={{ fontSize: 8, letterSpacing: "0.12em", color: C.text.faint }}>% OF SUPPLY</span>
-        <span style={{ fontSize: compact ? 14 : 18, fontWeight: "bold", color: C.text.bright }}>{pct}%</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        <span style={{ fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: C.text.muted }}>% of supply</span>
+        <span style={{ fontSize: compact ? 14 : 18, fontWeight: 700, color: C.text.bright }}>{pct}%</span>
       </div>
     </div>
   );
