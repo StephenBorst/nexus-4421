@@ -29,11 +29,11 @@ const TONE: Record<Insight["tone"], { bar: string; dot: string }> = {
 
 function InsightRow({ ins, onSelectTab }: { ins: Insight; onSelectTab: (t: TabId) => void }) {
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", borderBottom: "1px solid #131316", borderLeft: `2px solid ${TONE[ins.tone].bar}` }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: TONE[ins.tone].dot, flexShrink: 0, marginTop: 5 }} />
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "8px 14px", borderBottom: "1px solid #131316", borderLeft: `2px solid ${TONE[ins.tone].bar}` }}>
+      <span style={{ width: 5, height: 5, borderRadius: "50%", background: TONE[ins.tone].dot, flexShrink: 0, marginTop: 5 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12.5, color: "#f4f4f5", fontWeight: 600, lineHeight: 1.35 }}>{ins.title}</div>
-        <div style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: 12, color: "#a1a1aa", lineHeight: 1.55, marginTop: 3 }}>{ins.detail}</div>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#f4f4f5", fontWeight: 600, lineHeight: 1.3 }}>{ins.title}</div>
+        <div style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: 11.5, color: "#a1a1aa", lineHeight: 1.5, marginTop: 2 }}>{ins.detail}</div>
       </div>
       {ins.action?.tab && (
         <button
@@ -158,7 +158,7 @@ export function NexusBriefing({
   const market = useMemo(
     () => buildMarketRead({ rows, signals, liveAgents, tape })
       .filter((m) => !fusion.some((f) => f.detail.startsWith(m.title.split(" ")[0]))) // avoid echoing the fusion's symbol read
-      .slice(0, (personal.length ? 3 : 4) - Math.min(fusion.length, 1)),
+      .slice(0, (personal.length ? 3 : 3) - Math.min(fusion.length, 1)),
     [rows, signals, liveAgents, tape, personal.length, fusion]
   );
 

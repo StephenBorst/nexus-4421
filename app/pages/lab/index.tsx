@@ -276,11 +276,10 @@ export default function TheLabPage() {
           </>
         )}
         {activeTab === "copies" && <CopiesView />}
-        {activeTab === "intel" && (
-          <>
-            {/* The Briefing reads the MARKET for everyone (wallet-free) and adds a
-                personal lens when connected — so the Lab feels intelligent on the
-                first visit, before any wallet or history. */}
+        {activeTab === "intel" && (() => {
+          // The Briefing reads the MARKET for everyone (wallet-free) and adds a personal
+          // lens when connected — so the Lab feels intelligent on the first visit.
+          const briefing = (
             <NexusBriefing
               trades={connected ? processedTrades : []}
               winRate={winRate}
@@ -289,9 +288,15 @@ export default function TheLabPage() {
               wallet={rootWalletAddress}
               onSelectTab={setActiveTab}
             />
-            {connected ? <MarketIntelView /> : <LabWelcome />}
-          </>
-        )}
+          );
+          // Connected → the Briefing IS your terminal read, so it leads, then the
+          // instruments. Disconnected → lead with the welcome (the value prop / the
+          // prize), Briefing below as proof the Lab is already intelligent — so a
+          // first-timer isn't met with a wall of market rows before the pitch.
+          return connected
+            ? <>{briefing}<MarketIntelView /></>
+            : <><LabWelcome />{briefing}</>;
+        })()}
         {activeTab === "mispriced" && <MispricedBoard />}
         {activeTab === "smart" && <SmartMoneyView myPositions={openPositions} />}
         {activeTab === "agent" && <AgentView />}
