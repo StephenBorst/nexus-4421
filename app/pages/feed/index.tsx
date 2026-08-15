@@ -14,7 +14,6 @@ import { fetchOnChainRepScore } from "@/hooks/useThesisRegistry";
 import { NexusTierBadge } from "@/components/NexusTierBadge";
 import { MessageTraderButton } from "@/components/MessageTraderButton";
 import { NexusTreasuryStack } from "@/components/NexusTreasuryStack";
-import { NexusTreasury } from "@/components/NexusTreasury";
 import { NexusMarket } from "@/components/NexusMarket";
 import type { ThesisTrade } from "@/pages/lab/types";
 import CommentsPanel from "@/components/CommentsPanel";
@@ -1530,7 +1529,6 @@ export default function FeedPage() {
   const flywheel = (
     <div style={{ padding: isMobile ? "10px 12px" : "10px 16px", maxWidth: 860, margin: "0 auto", width: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 8 }}>
       <NexusMarket />
-      <NexusTreasury />
       <NexusTreasuryStack />
     </div>
   );

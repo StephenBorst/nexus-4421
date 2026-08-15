@@ -11,7 +11,6 @@
  */
 
 import { useEffect, useState } from "react";
-import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { fetchHeldStats } from "@/hooks/useNexusTier";
 import { NEXUS_TREASURY_ADDRESS } from "@/components/NexusTreasury";
 import { C } from "@/config/theme";
@@ -43,7 +42,6 @@ export function NexusTreasuryStack({ compact = false }: { compact?: boolean }) {
   const held = stats ? fmt(stats.held) : "—";
   const pct = stats ? stats.pctHeld.toFixed(4) : "—";
 
-  const isMobile = useIsMobile();
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: compact ? 12 : 20, flexWrap: "wrap",
@@ -60,13 +58,6 @@ export function NexusTreasuryStack({ compact = false }: { compact?: boolean }) {
         <span style={{ fontSize: 8, letterSpacing: "0.12em", color: C.text.faint }}>% OF SUPPLY</span>
         <span style={{ fontSize: compact ? 14 : 18, fontWeight: "bold", color: C.text.bright }}>{pct}%</span>
       </div>
-      {!compact && !isMobile && (
-        <div style={{ flex: 1, minWidth: 0, fontSize: 8, color: "#33333a", lineHeight: 1.4, textAlign: "right" }}>
-          fees → buy the lows → held by treasury
-          <br />
-          provable on-chain · funds Season rewards
-        </div>
-      )}
     </div>
   );
 }
