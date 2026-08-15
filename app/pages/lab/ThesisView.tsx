@@ -58,8 +58,6 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
   isMobile?: boolean;
   markPrice?: number | null;
 }) {
-  const [actualInput, setActualInput] = useState(t.actualPnl !== null ? String(t.actualPnl) : "");
-  const [inputVisible, setInputVisible] = useState(false);
   const [poster, setPoster] = useState<PosterData | null>(null);
   const navigate = useNavigate();
   const eff = effectiveStatus(t); // objective grade wins over self-report — used everywhere the card branches on outcome
@@ -70,8 +68,8 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
   // STOPPED OUT click fills the number instead of making them do entry→exit × size
   // math by hand. HIT_TP → exit at TP1, STOPPED_OUT → exit at stop, INVALIDATED →
   // never triggered → $0. It's an estimate at the planned levels (ignores slippage /
-  // partials) — EDIT stays for the exact fill. (Doesn't touch the on-chain grade,
-  // which is computed objectively vs public price regardless of this figure.)
+  // partials) and is fully DERIVED — never typed. The on-chain grade is computed
+  // objectively vs public price regardless of this figure.
   const autoPnlFor = (s: ThesisStatus): number | null => {
     if (s === "INVALIDATED") return 0;
     const exit = s === "HIT_TP" ? t.takeProfit1 : s === "STOPPED_OUT" ? t.stopLoss : null;
@@ -84,28 +82,10 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
     if (CLOSED_STATUSES.includes(next)) {
       const auto = autoPnlFor(next);
       onUpdate(t.id, auto !== null ? { status: next, actualPnl: auto } : { status: next });
-      if (auto !== null) setActualInput(String(auto));
-      setInputVisible(false); // auto-filled; EDIT reveals the field for the exact fill
     } else {
       onUpdate(t.id, { status: next });
-      setInputVisible(false);
     }
   };
-
-  // Seed the optional exact-fill field with the auto-estimate so the trader tweaks a
-  // number rather than typing one from scratch.
-  const openEdit = () => { const seed = t.actualPnl ?? autoPnlFor(eff); setActualInput(seed != null ? String(seed) : ""); setInputVisible(true); };
-
-  const saveActual = () => {
-    const val = parseFloat(actualInput);
-    if (!isNaN(val)) onUpdate(t.id, { actualPnl: val });
-    setInputVisible(false);
-  };
-
-  const plannedPnl = t.riskReward * (t.riskPercent / 100) * t.accountSize;
-  const accuracy = t.actualPnl !== null && plannedPnl !== 0
-    ? Math.min(200, Math.max(0, (t.actualPnl / plannedPnl) * 100))
-    : null;
 
   return (
     <div style={{
@@ -390,40 +370,19 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
         );
       })()}
 
-      {/* P&L — AUTO-ESTIMATED from the resolved outcome at your planned levels; it never
-          demands manual entry. "LOG EXACT FILL" is optional (slippage / partials). The
-          graded record is R vs public price and is independent of this dollar figure. */}
+      {/* P&L — fully DERIVED by the engine from the resolved outcome at the planned
+          levels. No manual entry: the graded record is R vs public price (shown above),
+          and this dollar figure follows from it — never typed. */}
       {isClosed && (() => {
         const shown = t.actualPnl ?? autoPnlFor(eff);
-        const isEst = t.actualPnl === null;
+        if (shown == null) return null;
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, paddingTop: 8, borderTop: "1px solid #232327", flexWrap: "wrap" }}>
             <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", whiteSpace: "nowrap" }}>P&amp;L</div>
-            {!inputVisible ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <div style={{ fontSize: 16, color: (shown ?? 0) >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>
-                  {shown != null ? formatPnl(shown) : "—"}
-                </div>
-                {isEst
-                  ? (shown != null && <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>est. at planned levels</div>)
-                  : (accuracy !== null && <div style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{accuracy.toFixed(0)}% of plan</div>)}
-                <button onClick={openEdit} title="Optional — log your exact fill (slippage / partials). Doesn't touch your graded record." style={{ ...navBtnStyle, fontSize: 9, padding: "3px 8px" }}>{isEst ? "LOG EXACT FILL" : "EDIT"}</button>
-              </div>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <input
-                  type="number"
-                  placeholder="exact fill — e.g. 142.50 or -87.00"
-                  value={actualInput}
-                  onChange={(e) => setActualInput(e.target.value)}
-                  style={{ ...inputStyle, width: 180, padding: "5px 8px", fontSize: 11 }}
-                  // eslint-disable-next-line jsx-a11y/no-autofocus
-                  autoFocus
-                />
-                <button onClick={saveActual} style={{ ...navBtnStyle, fontSize: 10, color: "#ededf0", borderColor: "#33333a" }}>SAVE</button>
-                <button onClick={() => setInputVisible(false)} style={{ ...navBtnStyle, fontSize: 10 }}>CANCEL</button>
-              </div>
-            )}
+            <div style={{ fontSize: 16, color: shown >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>
+              {formatPnl(shown)}
+            </div>
+            <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>est. at planned levels</div>
           </div>
         );
       })()}
