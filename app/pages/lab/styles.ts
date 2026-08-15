@@ -7,7 +7,7 @@ import { C, S, RADIUS, MONO } from "./tokens";
 export const cardStyle: CSSProperties = {
   background: C.surfaceAlt,
   border: `1px solid ${C.border}`,
-  borderRadius: RADIUS.sm,
+  borderRadius: RADIUS.md, // 6 — matches the Proof/Arena/feed card radius (was sm/3)
   padding: "12px 14px",
   // Materiality: a 1px top inner-highlight reads as a lit edge — depth without a
   // drop shadow (the elevation law). Applies app-wide to every inline card.
@@ -16,8 +16,9 @@ export const cardStyle: CSSProperties = {
 
 export const labelStyle: CSSProperties = {
   fontSize: 9,
-  letterSpacing: "0.12em",
-  color: C.text.faint,
+  letterSpacing: "0.16em",
+  textTransform: "uppercase",
+  color: C.text.muted, // was faint/#52525b — muted reads as the house micro-label
   marginBottom: S.sm,
   fontFamily: MONO,
 };

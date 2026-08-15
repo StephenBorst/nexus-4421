@@ -63,6 +63,9 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
   const eff = effectiveStatus(t); // objective grade wins over self-report — used everywhere the card branches on outcome
   const cfg = STATUS_CONFIG[eff] ?? STATUS_CONFIG.ACTIVE;
   const isClosed = CLOSED_STATUSES.includes(eff);
+  // 2px state left-rule (Proof/feed card signature). Win/loss carry the only
+  // chroma; active/other stay a quiet neutral.
+  const leftRule = eff === "HIT_TP" ? "#3ecf8e" : eff === "STOPPED_OUT" ? "#f7525f" : eff === "INVALIDATED" ? "#3f3f46" : "#33333a";
 
   // Auto-grade the dollar P&L from the plan the trader already logged, so a HIT TP /
   // STOPPED OUT click fills the number instead of making them do entry→exit × size
@@ -90,8 +93,9 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
   return (
     <div style={{
       ...cardStyle,
-      border: `1px solid ${cfg.border}`,
-      background: isClosed ? "#0a0a0b" : "#141416",
+      border: "1px solid #232327",
+      borderLeft: `2px solid ${leftRule}`,
+      background: isClosed ? "#08080a" : "#0f0f11",
       opacity: eff === "INVALIDATED" ? 0.7 : 1,
     }}>
       {poster && <SharePoster data={poster} onClose={() => setPoster(null)} />}
@@ -100,7 +104,7 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
         <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flex: 1, minWidth: 0 }}>
           <div style={{ minWidth: 52 }}>
             <div style={{ fontSize: 16, color: "#fff", fontWeight: "bold", fontFamily: "var(--nx-font-mono)" }}>{t.symbol.replace("PERP_","").replace("_USDC","")}</div>
-            <div style={{ fontSize: 10, color: t.direction === "LONG" ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)" }}>
+            <div style={{ fontSize: 10, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)" }}>
               {t.direction === "LONG" ? "↑" : "↓"} {t.direction} · {t.leverage.toFixed(1)}x
             </div>
           </div>
@@ -114,8 +118,8 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
               { label: "72H FUND", val: `$${t.fundingCost72h.toFixed(3)}`, color: "#a1a1aa" },
             ].map(({ label, val, color }) => (
               <div key={label}>
-                <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
-                <div style={{ fontSize: 12, color: color ?? "#a1a1aa", fontFamily: "var(--nx-font-mono)" }}>{val}</div>
+                <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
+                <div style={{ fontSize: 12, color: color ?? "#a1a1aa", fontFamily: "var(--nx-font-mono)", marginTop: 2 }}>{val}</div>
               </div>
             ))}
           </div>

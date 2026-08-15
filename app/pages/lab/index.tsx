@@ -173,7 +173,7 @@ export default function TheLabPage() {
             { label: "BALANCE", num: connected && availableBalance != null ? (availableBalance as number) : null, fmt: (v: number) => `$${v.toFixed(2)}`, color: "#f4f4f5" },
           ] as { label: string; num: number | null; fmt: (v: number) => string; color: string }[]).map(({ label, num, fmt, color }) => (
             <div key={label} style={{ display: "flex", flexDirection: "column", alignItems: isMobile ? "center" : "flex-start", gap: 1 }}>
-              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.12em" }}>{label}</span>
+              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a" }}>{label}</span>
               <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: isMobile ? 11 : 12, color, fontWeight: "bold", letterSpacing: "0.05em" }}>
                 {num == null ? "—" : <CountUp value={num} format={fmt} />}
               </span>
