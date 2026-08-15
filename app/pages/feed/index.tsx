@@ -973,9 +973,9 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
 
         return (
           <div key={trader.wallet} style={{
-            background: "#141416",
+            background: "#0f0f11",
             border: `1px solid ${rank === 1 ? "#33333a" : "#232327"}`,
-            borderRadius: 4,
+            borderRadius: 6,
             overflow: "hidden",
           }}>
             {/* Trader row */}
@@ -1055,14 +1055,14 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                   not just a number. Only for graded callers with ≥2 resolved calls. */}
               {trader.graded && trader.graded.rSeries.length >= 2 && (
                 <div style={{ flex: "1 1 72px", minWidth: 72, textAlign: "center" }}>
-                  <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)", marginBottom: 2 }}>R CURVE</div>
+                  <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)", marginBottom: 2 }}>R CURVE</div>
                   <Sparkline points={trader.graded.rSeries} width={72} height={22} />
                 </div>
               )}
 
               {/* Win rate — hero stat */}
               <div style={{ textAlign: "center", flex: "1 1 60px", minWidth: 60 }}>
-                <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>WIN RATE</div>
+                <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)" }}>WIN RATE</div>
                 <div style={{
                   fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: "bold",
                   color: closed === 0 ? "#52525b" : trader.winRate >= 60 ? "#3ecf8e" : trader.winRate >= 40 ? "#fbbf24" : "#f7525f",
@@ -1073,7 +1073,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
 
               {/* W / L */}
               <div style={{ textAlign: "center", flex: "1 1 44px", minWidth: 44 }}>
-                <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>W / L</div>
+                <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)" }}>W / L</div>
                 <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
                   <span style={{ color: "#ededf0" }}>{trader.wins}</span>
                   <span style={{ color: "#52525b" }}> / </span>
@@ -1083,7 +1083,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
 
               {/* Avg R:R */}
               <div style={{ textAlign: "center", flex: "1 1 50px", minWidth: 50 }}>
-                <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>AVG R:R</div>
+                <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)" }}>AVG R:R</div>
                 <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: trader.avgRR >= 2 ? "#ededf0" : "#fbbf24" }}>
                   1:{trader.avgRR.toFixed(1)}
                 </div>
@@ -1091,7 +1091,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
 
               {/* Active */}
               <div style={{ textAlign: "center", flex: "1 1 40px", minWidth: 40 }}>
-                <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>ACTIVE</div>
+                <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)" }}>ACTIVE</div>
                 <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: trader.active > 0 ? "#d4d4d8" : "#52525b" }}>
                   {trader.active}
                 </div>
@@ -1104,7 +1104,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                 const isOnChain = onChain != null;
                 return (
                   <div style={{ textAlign: "center", flex: "1 1 44px", minWidth: 44 }}>
-                    <div style={{ fontSize: 8, color: isOnChain ? "#ededf0" : "#52525b", fontFamily: "var(--nx-font-mono)" }}>
+                    <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: isOnChain ? "#ededf0" : "#71717a", fontFamily: "var(--nx-font-mono)" }}>
                       {isOnChain ? "⛓REP" : "REP"}
                     </div>
                     <div style={{
@@ -1175,8 +1175,8 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                   const ticker = t.symbol.replace("PERP_", "").replace("_USDC", "");
                   return (
                     <div key={t.id} style={{
-                      background: "#0f0f11", border: `1px solid ${cfg.border}`,
-                      borderRadius: 3, padding: "10px 12px",
+                      background: "#08080a", border: `1px solid ${cfg.border}`,
+                      borderRadius: 5, padding: "10px 12px",
                       display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
                     }}>
                       <div style={{ flex: 1, minWidth: 120 }}>
