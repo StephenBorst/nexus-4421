@@ -460,7 +460,11 @@ function FeedCard({
   following: Set<string>;
   onFollowToggle: (wallet: string) => void;
 }) {
-  const cfg = STATUS_CONFIG[effectiveStatus(thesis)] ?? STATUS_CONFIG.ACTIVE;
+  const eff = effectiveStatus(thesis);
+  const cfg = STATUS_CONFIG[eff] ?? STATUS_CONFIG.ACTIVE;
+  // 2px state left-rule (Proof-card signature). Win/loss carry the only chroma;
+  // active/other stay a quiet neutral so a screen isn't a stack of colors.
+  const leftRule = eff === "HIT_TP" ? "#3ecf8e" : eff === "STOPPED_OUT" ? "#f7525f" : eff === "INVALIDATED" ? "#3f3f46" : "#33333a";
   const shortAddr = `${thesis.wallet.slice(0, 6)}…${thesis.wallet.slice(-4)}`;
   const ticker = thesis.symbol.replace("PERP_", "").replace("_USDC", "");
   const isOwnThesis = walletAddress?.toLowerCase() === thesis.wallet.toLowerCase();
@@ -479,11 +483,12 @@ function FeedCard({
 
   return (
     <div style={{
-      background: "#141416",
-      border: `1px solid ${cfg.border}`,
-      borderRadius: 4,
+      background: "#0f0f11",
+      border: "1px solid #232327",
+      borderLeft: `2px solid ${leftRule}`,
+      borderRadius: 6,
       overflow: "hidden",
-      opacity: thesis.status === "INVALIDATED" ? 0.65 : 1,
+      opacity: eff === "INVALIDATED" ? 0.65 : 1,
     }}>
       <div style={{ padding: "14px 16px" }}>
       {/* Header: avatar + identity + status + time + copy. Wraps on narrow
@@ -567,19 +572,22 @@ function FeedCard({
         >💬 {commentCount}</button>
       </div>
 
-      {/* Symbol + direction */}
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+      {/* Symbol + direction — direction is a MONOCHROME chip (positioning, not P&L);
+          only realized outcomes carry pos/neg chroma. Mirrors the Proof card. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
         <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: "bold", color: "#fff" }}>{ticker}</span>
         <span style={{
-          fontFamily: "var(--nx-font-mono)", fontSize: 11,
-          color: thesis.direction === "LONG" ? "#3ecf8e" : "#f7525f",
+          fontFamily: "var(--nx-font-mono)", fontSize: 8.5, fontWeight: 700, letterSpacing: "0.05em",
+          color: "#f4f4f5", background: "#141416", border: "1px solid #232327",
+          borderRadius: 3, padding: "2px 6px",
         }}>
-          {thesis.direction === "LONG" ? "↑" : "↓"} {thesis.direction} · {thesis.leverage.toFixed(1)}x
+          {thesis.direction === "LONG" ? "↑" : "↓"} {thesis.direction}
         </span>
+        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a" }}>{thesis.leverage.toFixed(1)}x</span>
         {(thesis.copyCount ?? 0) > 0 && (
           <span style={{
             fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#a1a1aa",
-            background: "#1a1a1e", border: "1px solid #232327",
+            background: "#141416", border: "1px solid #232327",
             borderRadius: 3, padding: "2px 6px",
           }}>
             📋 {thesis.copyCount} {thesis.copyCount === 1 ? "copy" : "copies"}
@@ -587,8 +595,8 @@ function FeedCard({
         )}
         {(thesis.copyCount ?? 0) >= 3 && (
           <span style={{
-            fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#fbbf24",
-            background: "#2a1a00", border: "1px solid #4a3a00",
+            fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: 700, color: "#f4f4f5",
+            background: "#141416", border: "1px solid #33333a",
             borderRadius: 3, padding: "2px 6px",
           }}>
             🔥 HOT
@@ -607,8 +615,8 @@ function FeedCard({
           { label: "SIZE",  val: `$${thesis.positionSize.toFixed(0)}`, color: undefined },
         ].map(({ label, val, color }) => (
           <div key={label}>
-            <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
-            <div style={{ fontSize: 12, color: color ?? "#a1a1aa", fontFamily: "var(--nx-font-mono)" }}>{val}</div>
+            <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
+            <div style={{ fontSize: 12, color: color ?? "#a1a1aa", fontFamily: "var(--nx-font-mono)", marginTop: 2 }}>{val}</div>
           </div>
         ))}
       </div>
@@ -622,25 +630,25 @@ function FeedCard({
         return (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(70px, 1fr))", gap: "8px 12px", marginBottom: 10, paddingTop: 10, borderTop: "1px solid #232327" }}>
             <div>
-              <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>MARK</div>
-              <div style={{ fontSize: 12, color: "#fff", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>
+              <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)" }}>MARK</div>
+              <div style={{ fontSize: 12, color: "#fff", fontFamily: "var(--nx-font-mono)", fontWeight: "bold", marginTop: 2 }}>
                 ${markPrice.toFixed(markPrice < 10 ? 4 : 2)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>UNREALIZED</div>
-              <div style={{ fontSize: 12, fontFamily: "var(--nx-font-mono)", fontWeight: "bold", color: isWinning ? "#3ecf8e" : "#f7525f" }}>
+              <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)" }}>UNREALIZED</div>
+              <div style={{ fontSize: 12, fontFamily: "var(--nx-font-mono)", fontWeight: "bold", marginTop: 2, color: isWinning ? "#3ecf8e" : "#f7525f" }}>
                 {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
                 <span style={{ fontSize: 9, marginLeft: 3, opacity: 0.7 }}>({pct >= 0 ? "+" : ""}{pct.toFixed(2)}%)</span>
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>TO SL</div>
-              <div style={{ fontSize: 12, color: "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{toSL.toFixed(2)}%</div>
+              <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)" }}>TO SL</div>
+              <div style={{ fontSize: 12, color: "#f7525f", fontFamily: "var(--nx-font-mono)", fontWeight: "bold", marginTop: 2 }}>{toSL.toFixed(2)}%</div>
             </div>
             <div>
-              <div style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>TO TP1</div>
-              <div style={{ fontSize: 12, color: "#ededf0", fontFamily: "var(--nx-font-mono)", fontWeight: "bold" }}>{toTP.toFixed(2)}%</div>
+              <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)" }}>TO TP1</div>
+              <div style={{ fontSize: 12, color: "#ededf0", fontFamily: "var(--nx-font-mono)", fontWeight: "bold", marginTop: 2 }}>{toTP.toFixed(2)}%</div>
             </div>
           </div>
         );
