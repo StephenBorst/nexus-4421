@@ -32,6 +32,8 @@ type FeedThesis = {
   positionSize: number;
   leverage: number;
   status: "ACTIVE" | "HIT_TP" | "STOPPED_OUT" | "INVALIDATED" | "CLOSED";
+  gradedOutcome?: "WIN" | "LOSS"; // trustless price-grade (cron-stamped)
+  gradedR?: number;               // graded R-multiple result
   actualPnl: number | null;
   createdAt: number;
   notes: string;
@@ -253,7 +255,7 @@ export default function ThesisPage() {
   })();
 
   const markPrice = livePrices[thesis.symbol] ?? null;
-  const isClosed = thesis.status === "HIT_TP" || thesis.status === "STOPPED_OUT";
+  const isClosed = thesis.status === "HIT_TP" || thesis.status === "STOPPED_OUT" || thesis.gradedOutcome === "WIN" || thesis.gradedOutcome === "LOSS";
 
   // Outbound share — pre-filled X / Farcaster posts that pull external eyes back
   // Share via the worker OG proxy — crawlers can't see the SPA's JS-injected OG tags,
@@ -362,6 +364,24 @@ export default function ThesisPage() {
               {thesis.direction === "LONG" ? "↑" : "↓"} {thesis.direction} · {thesis.leverage.toFixed(1)}x
             </span>
           </div>
+
+          {/* Graded result — the trustless proof, heroed on the shared-call landing
+              (matches the OG card + the Lab thesis card). The tape decided, not the trader. */}
+          {(thesis.gradedOutcome === "WIN" || thesis.gradedOutcome === "LOSS") && (() => {
+            const win = thesis.gradedOutcome === "WIN";
+            const color = win ? "#3ecf8e" : "#f7525f";
+            const rTxt = typeof thesis.gradedR === "number" ? ` ${thesis.gradedR >= 0 ? "+" : ""}${thesis.gradedR.toFixed(2)}R` : "";
+            return (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", border: `1px solid ${color}55`, background: `${color}10`, borderRadius: 6, padding: "12px 14px", marginBottom: 18 }}>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color }}>
+                  ✓ NEXUS GRADED · {win ? "WIN" : "LOSS"}{rTxt}
+                </span>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a" }}>
+                  first-touch {win ? "TP1" : "stop"} vs public price — the tape marked this, not the trader
+                </span>
+              </div>
+            );
+          })()}
 
           {/* Key levels */}
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(3, minmax(0, 1fr))" : "repeat(5, minmax(0, 1fr))", gap: "10px 16px", marginBottom: 16, padding: 14, background: "#0f0f11", borderRadius: 4, border: "1px solid #232327" }}>
