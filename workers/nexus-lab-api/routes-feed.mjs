@@ -150,6 +150,20 @@ export async function handleFeed(parts, request, env) {
 
   // ── /profile/:address ──────────────────────────────────
 
+  // ── /comments/counts (POST {ids:[...]}) → batched comment counts for the feed.
+  // Kept OFF the hot /feed path: one call resolves counts for the visible theses in
+  // parallel, so cards show real counts without N extra KV reads on every feed poll.
+  if (parts[0] === "comments" && parts[1] === "counts" && request.method === "POST") {
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+    const ids = Array.isArray(body?.ids) ? body.ids.filter((x) => typeof x === "string").slice(0, 200) : [];
+    const entries = await Promise.all(ids.map(async (id) => {
+      try { const raw = await env.LAB_STORE.get(`comments:${id}`); return [id, raw ? JSON.parse(raw).length : 0]; }
+      catch { return [id, 0]; }
+    }));
+    return json({ counts: Object.fromEntries(entries) }, request);
+  }
+
   // ── Ph29: /comments/:thesisId ─────────────────────────
   if (parts[0] === "comments" && parts[1]) {
     const thesisId = parts[1];

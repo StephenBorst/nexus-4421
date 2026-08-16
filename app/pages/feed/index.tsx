@@ -459,6 +459,7 @@ function FeedCard({
   onCopy,
   following,
   onFollowToggle,
+  initialCommentCount,
 }: {
   thesis: FeedThesis;
   markPrice?: number | null;
@@ -466,6 +467,7 @@ function FeedCard({
   onCopy: (t: FeedThesis) => void;
   following: Set<string>;
   onFollowToggle: (wallet: string) => void;
+  initialCommentCount?: number;
 }) {
   // Treat a physical phone as mobile even in desktop-site mode (useIsMobile() reads
   // a desktop width there) so the labelled card actions don't revert to cryptic icons.
@@ -489,7 +491,10 @@ function FeedCard({
     return "just now";
   })();
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [commentCount, setCommentCount] = useState(0);
+  // Seed from the batched feed count so the social bar shows a real number upfront;
+  // the CommentsPanel's onCountChange takes over once the thread is opened.
+  const [commentCount, setCommentCount] = useState(initialCommentCount ?? 0);
+  useEffect(() => { setCommentCount(initialCommentCount ?? 0); }, [initialCommentCount]);
 
   return (
     <div style={{
@@ -1431,6 +1436,9 @@ export default function FeedPage() {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const [feed, setFeed] = useState<FeedThesis[]>([]);
+  // Real comment counts per thesis id (batched fetch after the feed loads) → the
+  // social bar shows a true count upfront instead of "Comment" until first opened.
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   // Resolution events ride in the same /feed payload but are NOT thesis-shaped — they
   // carry no levels or status. Split out so FeedCard never sees one and so they can't
   // skew the trader/thesis counts derived from `feed`.
@@ -1516,8 +1524,18 @@ export default function FeedPage() {
           leverage: num(t.leverage),
           actualPnl: t.actualPnl == null ? null : num(t.actualPnl),
         }));
-        setFeed(all.filter((t) => !t.resolution) as FeedThesis[]);
+        const feedItems = all.filter((t) => !t.resolution) as FeedThesis[];
+        setFeed(feedItems);
         setResolutions(all.filter((t) => t.resolution) as unknown as ResolutionEvent[]);
+        // Real comment counts for the visible calls — ONE batched call, off the hot
+        // /feed path, so each card's social bar shows its true count upfront.
+        const ids = feedItems.map((t) => t.id).filter(Boolean);
+        if (ids.length) {
+          fetch(`${API_BASE}/comments/counts`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids }),
+          }).then((r) => r.json()).then((d) => setCommentCounts(d?.counts ?? {})).catch(() => {});
+        }
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
@@ -1724,6 +1742,7 @@ export default function FeedPage() {
                     onCopy={setCopyTarget}
                     following={following}
                     onFollowToggle={handleFollowToggle}
+                    initialCommentCount={commentCounts[t.id] ?? 0}
                   />
                 ))}
               </div>
@@ -1887,6 +1906,7 @@ export default function FeedPage() {
                     onCopy={setCopyTarget}
                     following={following}
                     onFollowToggle={handleFollowToggle}
+                    initialCommentCount={commentCounts[t.id] ?? 0}
                   />
                 ))}
                 {/* Thin feed → invite contribution instead of just trailing off.

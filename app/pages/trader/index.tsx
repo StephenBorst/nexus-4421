@@ -242,23 +242,6 @@ function ThesisRow({
           >COPY</button>
         )}
 
-        {/* Comments toggle */}
-        <button
-          onClick={(e) => { e.stopPropagation(); setCommentsOpen((o) => !o); }}
-          style={{
-            background: commentsOpen ? "#1a1a1e" : "none",
-            border: `1px solid ${commentsOpen ? "#ededf0" : "#232327"}`,
-            borderRadius: 3,
-            color: commentsOpen ? "#ededf0" : "#52525b",
-            fontFamily: "var(--nx-font-mono)",
-            fontSize: 9,
-            padding: "3px 7px",
-            cursor: "pointer",
-            flexShrink: 0,
-          }}
-        >
-          💬 {commentCount}
-        </button>
         <div style={{ color: "#33333a", fontSize: 10 }}>{expanded ? "▲" : "▼"}</div>
       </div>
 
@@ -298,6 +281,19 @@ function ThesisRow({
           )}
         </div>
       )}
+      {/* Social bar — always with the post, congruent with the feed card. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 2, borderTop: "1px solid #232327", padding: "6px 12px" }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); setCommentsOpen((o) => !o); }}
+          title="React to this call"
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, cursor: "pointer", padding: "4px 6px", borderRadius: 4 }}
+        >🔥 React</button>
+        <button
+          onClick={(e) => { e.stopPropagation(); setCommentsOpen((o) => !o); }}
+          title="Comment on this call"
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: commentsOpen ? "#ededf0" : "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, cursor: "pointer", padding: "4px 6px", borderRadius: 4 }}
+        >💬 {commentCount > 0 ? `${commentCount} ${commentCount === 1 ? "Comment" : "Comments"}` : "Comment"}</button>
+      </div>
       <CommentsPanel
         thesisId={thesis.id}
         walletAddress={walletAddress}
