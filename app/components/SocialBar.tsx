@@ -163,8 +163,9 @@ export function SocialBar({
         </div>
       )}
 
-      {/* Compose — always present when connected (Instagram-style), not a pop-up */}
-      {walletAddress && (
+      {/* Compose — appears inline under the thread when you open comments (keeps a
+          38-card feed clean instead of showing an input on every post), not a pop-up */}
+      {walletAddress && open && (
         <div style={{ display: "flex", gap: 6, alignItems: "center", padding: "0 2px 8px" }}>
           <input
             value={text}
