@@ -510,16 +510,24 @@ export default function NexusAssistant() {
     );
   }
 
-  const panelW = isMobile ? "100vw" : 400;
-  const panelH = isMobile ? "80dvh" : 560;
+  // A phone in "Desktop site" mode reports a desktop innerWidth, so useIsMobile()
+  // is false and we'd render the fixed-height desktop panel — which overflows the
+  // small visible viewport and hides the input. screen.width is the PHYSICAL device
+  // width (unaffected by desktop-site zoom), so it detects a real phone regardless.
+  const isPhone = typeof window !== "undefined" && Math.min(window.screen?.width ?? 9999, window.screen?.height ?? 9999) < 768;
+  const compact = isMobile || isPhone;
+  const panelW = compact ? "100vw" : 400;
+  const panelH = compact ? "80dvh" : 560;
 
   return (
     <div
       style={{
-        position: "fixed", right: isMobile ? 0 : 16, bottom: isMobile ? 0 : 16, zIndex: 99999,
-        width: panelW, height: panelH, maxWidth: "100vw",
+        position: "fixed", right: compact ? 0 : 16, bottom: compact ? 0 : 16, zIndex: 99999,
+        // Never taller than the viewport, so the footer/input is always reachable and
+        // the message list (flex:1, overflowY:auto) scrolls within the panel.
+        width: panelW, height: panelH, maxWidth: "100vw", maxHeight: "calc(100dvh - 32px)",
         background: "#0f0f11", border: `1px solid ${GREEN}`,
-        borderRadius: isMobile ? "10px 10px 0 0" : 8, overflow: "hidden",
+        borderRadius: compact ? "10px 10px 0 0" : 8, overflow: "hidden",
         display: "flex", flexDirection: "column",
         boxShadow: "0 0 24px rgba(0,0,0,0.6)",
       }}
