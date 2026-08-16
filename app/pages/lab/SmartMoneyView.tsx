@@ -33,10 +33,14 @@ interface SmEvent { source?: "orderly" | "hl"; addr: string; coin: string; sym: 
 
 const TRACKED = "#ededf0"; // watchlist/tracked accent — bone, NOT blue (blue is teaching copy only)
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
-const usd = (n: number) => {
-  const a = Math.abs(n);
+const usd = (n: number | null | undefined) => {
+  // Coerce first: several callers pass fields straight off external (HL / Orderly)
+  // payloads, where a missing value would make `.toFixed` throw and crash the view —
+  // the same class as the trader-profile crash. NaN/undefined → $0, never a throw.
+  const v = Number(n) || 0;
+  const a = Math.abs(v);
   const s = a >= 1e9 ? `${(a / 1e9).toFixed(1)}B` : a >= 1e6 ? `${(a / 1e6).toFixed(1)}M` : a >= 1e3 ? `${(a / 1e3).toFixed(0)}K` : `${a.toFixed(0)}`;
-  return `${n < 0 ? "-" : ""}$${s}`;
+  return `${v < 0 ? "-" : ""}$${s}`;
 };
 const ago = (ts: number) => {
   const m = Math.max(0, Math.round((Date.now() - ts) / 60000));
