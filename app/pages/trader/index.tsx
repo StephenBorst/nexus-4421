@@ -42,6 +42,7 @@ type FeedThesis = {
   positionSize: number;
   leverage: number;
   status: "ACTIVE" | "HIT_TP" | "STOPPED_OUT" | "INVALIDATED" | "CLOSED";
+  gradedOutcome?: "WIN" | "LOSS"; // trustless price-grade (cron-stamped); absent = not yet graded
   actualPnl: number | null;
   createdAt: number;
   notes: string;
@@ -537,9 +538,11 @@ export default function TraderPage() {
 
   // Derived stats
   const stats = useMemo(() => {
-    const wins = theses.filter((t) => t.status === "HIT_TP").length;
-    const losses = theses.filter((t) => t.status === "STOPPED_OUT").length;
-    const active = theses.filter((t) => t.status === "ACTIVE").length;
+    // Trustless: WIN/LOSS come from the objective grade (gradedOutcome), not raw /
+    // self-reported statuses — consistent with the RANKS board + share cards.
+    const wins = theses.filter((t) => t.gradedOutcome === "WIN").length;
+    const losses = theses.filter((t) => t.gradedOutcome === "LOSS").length;
+    const active = theses.filter((t) => t.status === "ACTIVE" && t.gradedOutcome !== "WIN" && t.gradedOutcome !== "LOSS").length;
     const invalidated = theses.filter((t) => t.status === "INVALIDATED").length;
     const closed = wins + losses;
     const winRate = closed > 0 ? (wins / closed) * 100 : null;

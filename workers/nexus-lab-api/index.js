@@ -740,9 +740,12 @@ export default {
       const profile = profileRaw ? JSON.parse(profileRaw) : {};
       const theses = data.theses || [];
 
-      const wins = theses.filter((t) => t.status === "HIT_TP").length;
-      const losses = theses.filter((t) => t.status === "STOPPED_OUT").length;
-      const active = theses.filter((t) => t.status === "ACTIVE").length;
+      // Trustless: count the OBJECTIVE grade (gradedOutcome), not self-reported /
+      // agent-exec statuses — a shared card must not advertise an inflated self-report.
+      // Matches the RANKS board fix.
+      const wins = theses.filter((t) => t.gradedOutcome === "WIN").length;
+      const losses = theses.filter((t) => t.gradedOutcome === "LOSS").length;
+      const active = theses.filter((t) => t.status === "ACTIVE" && t.gradedOutcome !== "WIN" && t.gradedOutcome !== "LOSS").length;
       const closed = wins + losses;
       const winRate = closed > 0 ? Math.round((wins / closed) * 100) : null;
       const avgRR =
