@@ -263,9 +263,13 @@ export default function ThesisPage() {
   // meta and redirects humans back here.
   const shareUrl = wallet && id ? `https://og.nexustradinglabs.com/share/thesis/${wallet.toLowerCase()}/${id}` : "";
   const shareText =
-    `📡 ${ticker} ${thesis.direction} ${thesis.leverage.toFixed(1)}x\n\n` +
-    `Entry $${thesis.entryPrice.toFixed(2)} · Stop $${thesis.stopLoss.toFixed(2)} · TP $${thesis.takeProfit1.toFixed(2)} (R:R 1:${thesis.riskReward.toFixed(2)})\n\n` +
-    `Graded on-chain vs public price on Nexus Trading Labs 👇`;
+    (thesis.gradedOutcome === "WIN" || thesis.gradedOutcome === "LOSS")
+      // Resolved → lead with the TRUSTLESS RESULT, not the planned R:R.
+      ? `📡 ${ticker} ${thesis.direction} — ✓ NEXUS GRADED ${thesis.gradedOutcome}${typeof thesis.gradedR === "number" ? ` ${thesis.gradedR >= 0 ? "+" : ""}${thesis.gradedR.toFixed(2)}R` : ""}\n\n` +
+        `First-touch vs public price — the tape marked this, not me.\n\nEvery call graded on-chain on Nexus Trading Labs 👇`
+      : `📡 ${ticker} ${thesis.direction} ${thesis.leverage.toFixed(1)}x\n\n` +
+        `Entry $${thesis.entryPrice.toFixed(2)} · Stop $${thesis.stopLoss.toFixed(2)} · TP $${thesis.takeProfit1.toFixed(2)} (R:R 1:${thesis.riskReward.toFixed(2)})\n\n` +
+        `Graded on-chain vs public price on Nexus Trading Labs 👇`;
   const shareX = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
   const shareFc = `https://warpcast.com/~/compose?text=${encodeURIComponent(shareText + "\n\n" + shareUrl)}&embeds[]=${encodeURIComponent(shareUrl)}`;
 

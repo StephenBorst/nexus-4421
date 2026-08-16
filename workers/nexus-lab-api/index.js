@@ -1029,10 +1029,16 @@ Loading the record… <a style="color:#ededf0" href="${appUrl}">view on Nexus �
       const profile = profileRaw ? JSON.parse(profileRaw) : {};
       const ticker = thesis.symbol.replace("PERP_", "").replace("_USDC", "");
       const name = esc(profile.displayName || `${wallet.slice(0, 6)}…${wallet.slice(-4)}`);
-      const st = thesis.gradedOutcome ? gradedStatusOf(thesis.gradedOutcome) : "ACTIVE";
-      const stWord = st === "HIT_TP" ? "✓ HIT TP" : st === "STOPPED_OUT" ? "STOPPED OUT" : "ACTIVE";
-      const title = `${esc(ticker)} ${esc(thesis.direction)} by ${name} · ${stWord}`;
-      const desc = `Entry $${(+thesis.entryPrice).toFixed(2)} · SL $${(+thesis.stopLoss).toFixed(2)} · TP $${(+thesis.takeProfit1).toFixed(2)} · R:R 1:${(+thesis.riskReward).toFixed(2)} — graded from public price, on-chain.`;
+      // Resolved calls lead the unfurl copy with the TRUSTLESS RESULT (+R), matching the
+      // card image; unresolved keep the plan (entry/stop/target).
+      const resolved = thesis.gradedOutcome === "WIN" || thesis.gradedOutcome === "LOSS";
+      const rTxt = resolved && typeof thesis.gradedR === "number" ? `${thesis.gradedR >= 0 ? "+" : ""}${thesis.gradedR.toFixed(2)}R` : "";
+      const title = resolved
+        ? `${esc(ticker)} ${esc(thesis.direction)} · ✓ GRADED ${thesis.gradedOutcome}${rTxt ? " " + rTxt : ""} · by ${name}`
+        : `${esc(ticker)} ${esc(thesis.direction)} by ${name} · ACTIVE`;
+      const desc = resolved
+        ? `Graded ${thesis.gradedOutcome}${rTxt ? " " + rTxt : ""} — first-touch vs public price, on-chain. The tape marked this, not the trader.`
+        : `Entry $${(+thesis.entryPrice).toFixed(2)} · SL $${(+thesis.stopLoss).toFixed(2)} · TP $${(+thesis.takeProfit1).toFixed(2)} · R:R 1:${(+thesis.riskReward).toFixed(2)} — graded from public price, on-chain.`;
       const img = `https://og.nexustradinglabs.com/og/thesis/${wallet}/${thesisId}.png`;
       const shareUrl = `https://og.nexustradinglabs.com/share/thesis/${wallet}/${thesisId}`;
       const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">

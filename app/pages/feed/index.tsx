@@ -59,6 +59,7 @@ type FeedThesis = {
   leverage: number;
   status: "ACTIVE" | "HIT_TP" | "STOPPED_OUT" | "INVALIDATED" | "CLOSED";
   gradedOutcome?: "WIN" | "LOSS"; // trustless price-grade (cron-stamped); absent = not yet graded
+  gradedR?: number;               // graded R-multiple result (present once resolved)
   actualPnl: number | null;
   createdAt: number;
   notes: string;
@@ -721,7 +722,12 @@ function FeedCard({
         initialReactions={social?.reactions}
         initialYouReacted={social?.you}
         initialCommentCount={social?.c ?? 0}
-        shareHref={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`📡 ${ticker} ${thesis.direction} ${thesis.leverage.toFixed(1)}x\n\nEntry $${thesis.entryPrice.toFixed(2)} · Stop $${thesis.stopLoss.toFixed(2)} · TP $${thesis.takeProfit1.toFixed(2)} (R:R 1:${thesis.riskReward.toFixed(2)})\n\nGraded on-chain vs public price on Nexus Trading Labs 👇`)}&url=${encodeURIComponent(`https://og.nexustradinglabs.com/share/thesis/${thesis.wallet.toLowerCase()}/${thesis.id}`)}`}
+        shareHref={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+          (thesis.gradedOutcome === "WIN" || thesis.gradedOutcome === "LOSS")
+            // Resolved → lead with the TRUSTLESS RESULT, not the planned R:R.
+            ? `📡 ${ticker} ${thesis.direction} — ✓ NEXUS GRADED ${thesis.gradedOutcome}${typeof thesis.gradedR === "number" ? ` ${thesis.gradedR >= 0 ? "+" : ""}${thesis.gradedR.toFixed(2)}R` : ""}\n\nFirst-touch vs public price — the tape marked this, not me.\n\nEvery call graded on-chain on Nexus Trading Labs 👇`
+            : `📡 ${ticker} ${thesis.direction} ${thesis.leverage.toFixed(1)}x\n\nEntry $${thesis.entryPrice.toFixed(2)} · Stop $${thesis.stopLoss.toFixed(2)} · TP $${thesis.takeProfit1.toFixed(2)} (R:R 1:${thesis.riskReward.toFixed(2)})\n\nGraded on-chain vs public price on Nexus Trading Labs 👇`
+        )}&url=${encodeURIComponent(`https://og.nexustradinglabs.com/share/thesis/${thesis.wallet.toLowerCase()}/${thesis.id}`)}`}
         onCopy={() => onCopy(thesis)}
         canCopy={!!walletAddress && !isOwnThesis}
         onMessage={() => navigate(`/messages?dm=${thesis.wallet}&re=${encodeURIComponent(`Re: your ${ticker} ${thesis.direction} call — `)}`)}
