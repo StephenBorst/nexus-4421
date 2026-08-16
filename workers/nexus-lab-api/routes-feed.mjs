@@ -150,16 +150,27 @@ export async function handleFeed(parts, request, env) {
 
   // ── /profile/:address ──────────────────────────────────
 
-  // ── /comments/counts (POST {ids:[...]}) → batched comment counts for the feed.
-  // Kept OFF the hot /feed path: one call resolves counts for the visible theses in
-  // parallel, so cards show real counts without N extra KV reads on every feed poll.
+  // ── /comments/counts (POST {ids, wallet?}) → batched social summary for the feed.
+  // Kept OFF the hot /feed path: one call resolves comment counts + 🔥-like counts (and
+  // whether the viewer liked) for the visible theses in parallel, so the SocialBar shows
+  // real numbers immediately without N extra KV reads on every feed poll.
   if (parts[0] === "comments" && parts[1] === "counts" && request.method === "POST") {
     let body;
     try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
     const ids = Array.isArray(body?.ids) ? body.ids.filter((x) => typeof x === "string").slice(0, 200) : [];
+    const wallet = typeof body?.wallet === "string" ? body.wallet.toLowerCase() : null;
     const entries = await Promise.all(ids.map(async (id) => {
-      try { const raw = await env.LAB_STORE.get(`comments:${id}`); return [id, raw ? JSON.parse(raw).length : 0]; }
-      catch { return [id, 0]; }
+      try {
+        const [cRaw, rRaw] = await Promise.all([
+          env.LAB_STORE.get(`comments:${id}`),
+          env.LAB_STORE.get(`reactions:${id}`),
+        ]);
+        const c = cRaw ? JSON.parse(cRaw).length : 0;
+        const reactions = rRaw ? JSON.parse(rRaw) : {};
+        const fire = Array.isArray(reactions["🔥"]) ? reactions["🔥"] : [];
+        const youLiked = wallet ? fire.some((w) => String(w).toLowerCase() === wallet) : false;
+        return [id, { c, likes: fire.length, youLiked }];
+      } catch { return [id, { c: 0, likes: 0, youLiked: false }]; }
     }));
     return json({ counts: Object.fromEntries(entries) }, request);
   }

@@ -15,7 +15,7 @@ import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePr
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { chartImageList, effectiveStatus } from "@/pages/lab/helpers";
 import { MessageTraderButton } from "@/components/MessageTraderButton";
-import CommentsPanel from "@/components/CommentsPanel";
+import { SocialBar } from "@/components/SocialBar";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 const OG_BASE  = "https://og.nexustradinglabs.com";
@@ -505,16 +505,17 @@ export default function ThesisPage() {
             Posting notifies the author (comment → lifecycle notification). */}
         <div style={{ marginTop: 16 }}>
           <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a", letterSpacing: "0.1em", marginBottom: 8 }}>◆ DISCUSSION</div>
-          <div style={{ background: "#141416", border: "1px solid #232327", borderRadius: 4, overflow: "hidden" }}>
-            <CommentsPanel
-              thesisId={id!}
-              walletAddress={myWallet}
-              isOpen
-              authorWallet={thesis.wallet}
-              symbol={thesis.symbol}
-              direction={thesis.direction}
-            />
-          </div>
+          {/* Same native SocialBar as the feed + profile — one-tap like, inline thread —
+              expanded by default since a permalink IS the discussion page. */}
+          <SocialBar
+            thesisId={id!}
+            walletAddress={myWallet}
+            authorWallet={thesis.wallet}
+            symbol={thesis.symbol}
+            direction={thesis.direction}
+            autoload
+            defaultOpen
+          />
         </div>
       </div>
     </div>

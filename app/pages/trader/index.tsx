@@ -13,7 +13,7 @@ import { fetchOnChainRepScore } from "@/hooks/useThesisRegistry";
 import { NexusTierBadge } from "@/components/NexusTierBadge";
 import { MessageTraderButton } from "@/components/MessageTraderButton";
 import type { ThesisTrade } from "@/pages/lab/types";
-import CommentsPanel from "@/components/CommentsPanel";
+import { SocialBar } from "@/components/SocialBar";
 import { deployToAgent } from "@/utils/agentPrefill";
 import { deriveStyle } from "@/config/agentStyles";
 import { PublicOperatorProfile, InFlightCalls, VenueEvidence } from "./ProfileSynthesis";
@@ -128,8 +128,6 @@ function ThesisRow({
   walletAddress: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [commentsOpen, setCommentsOpen] = useState(false);
-  const [commentCount, setCommentCount] = useState(0);
   const cfg = STATUS_CONFIG[thesis.status] ?? STATUS_FALLBACK;
   const ticker = thesis.symbol.replace("PERP_", "").replace("_USDC", "");
   const timeAgo = (() => {
@@ -281,25 +279,16 @@ function ThesisRow({
           )}
         </div>
       )}
-      {/* Social bar — always with the post, congruent with the feed card. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 2, borderTop: "1px solid #232327", padding: "6px 12px" }}>
-        <button
-          onClick={(e) => { e.stopPropagation(); setCommentsOpen((o) => !o); }}
-          title="React to this call"
-          style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, cursor: "pointer", padding: "4px 6px", borderRadius: 4 }}
-        >🔥 React</button>
-        <button
-          onClick={(e) => { e.stopPropagation(); setCommentsOpen((o) => !o); }}
-          title="Comment on this call"
-          style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: commentsOpen ? "#ededf0" : "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, cursor: "pointer", padding: "4px 6px", borderRadius: 4 }}
-        >💬 {commentCount > 0 ? `${commentCount} ${commentCount === 1 ? "Comment" : "Comments"}` : "Comment"}</button>
+      {/* Same native social layer as the feed — one-tap like, inline comments. */}
+      <div style={{ padding: "0 12px" }} onClick={(e) => e.stopPropagation()}>
+        <SocialBar
+          thesisId={thesis.id}
+          walletAddress={walletAddress}
+          symbol={thesis.symbol}
+          direction={thesis.direction}
+          autoload
+        />
       </div>
-      <CommentsPanel
-        thesisId={thesis.id}
-        walletAddress={walletAddress}
-        isOpen={commentsOpen}
-        onCountChange={setCommentCount}
-      />
     </div>
   );
 }

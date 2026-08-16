@@ -16,8 +16,8 @@ import { MessageTraderButton } from "@/components/MessageTraderButton";
 import { NexusTreasuryStack } from "@/components/NexusTreasuryStack";
 import { NexusMarket } from "@/components/NexusMarket";
 import type { ThesisTrade } from "@/pages/lab/types";
-import CommentsPanel from "@/components/CommentsPanel";
-import { useIsMobile, useIsPhone } from "@/pages/lab/useIsMobile";
+import { SocialBar } from "@/components/SocialBar";
+import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { Sparkline, SectionHeader } from "@/pages/lab/components";
 import { getAgentSig } from "@/pages/lab/agentKeys";
 import { chartImageList, effectiveStatus } from "@/pages/lab/helpers";
@@ -459,7 +459,7 @@ function FeedCard({
   onCopy,
   following,
   onFollowToggle,
-  initialCommentCount,
+  social,
 }: {
   thesis: FeedThesis;
   markPrice?: number | null;
@@ -467,11 +467,8 @@ function FeedCard({
   onCopy: (t: FeedThesis) => void;
   following: Set<string>;
   onFollowToggle: (wallet: string) => void;
-  initialCommentCount?: number;
+  social?: { c: number; likes: number; youLiked: boolean };
 }) {
-  // Treat a physical phone as mobile even in desktop-site mode (useIsMobile() reads
-  // a desktop width there) so the labelled card actions don't revert to cryptic icons.
-  const isMobile = useIsMobile() || useIsPhone();
   const eff = effectiveStatus(thesis);
   const cfg = STATUS_CONFIG[eff] ?? STATUS_CONFIG.ACTIVE;
   // 2px state left-rule (Proof-card signature). Win/loss carry the only chroma;
@@ -490,11 +487,6 @@ function FeedCard({
     if (h > 0) return `${h}h ago`;
     return "just now";
   })();
-  const [commentsOpen, setCommentsOpen] = useState(false);
-  // Seed from the batched feed count so the social bar shows a real number upfront;
-  // the CommentsPanel's onCountChange takes over once the thread is opened.
-  const [commentCount, setCommentCount] = useState(initialCommentCount ?? 0);
-  useEffect(() => { setCommentCount(initialCommentCount ?? 0); }, [initialCommentCount]);
 
   return (
     <div style={{
@@ -533,7 +525,13 @@ function FeedCard({
         }}>
           {cfg.label}
         </div>
-        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#33333a", flexShrink: 0 }}>{timeAgo}</div>
+        {/* Timestamp doubles as the permalink (native: tap the post to open it). */}
+        <a
+          href={`/feed/thesis/${thesis.wallet}/${thesis.id}`}
+          onClick={(e) => { e.preventDefault(); navigate(`/feed/thesis/${thesis.wallet}/${thesis.id}`); }}
+          title="Open this call"
+          style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", flexShrink: 0, textDecoration: "none" }}
+        >{timeAgo} ↗</a>
         {/* On-chain verified badge */}
         {thesis.onChainId !== undefined && (
           thesis.onChainTxHash ? (
@@ -549,36 +547,20 @@ function FeedCard({
             <span title={`On-chain verified · thesis #${thesis.onChainId}`} style={{ fontSize: 12, flexShrink: 0 }}>⛓</span>
           )
         )}
-        {/* Card actions — quiet by default (accent rationed), with real hover/focus/
-            motion from the .nx-* CSS layer instead of hand-rolled handlers. */}
-        <button
-          className="nx-btn nx-btn-icon"
-          onClick={() => navigate(`/feed/thesis/${thesis.wallet}/${thesis.id}`)}
-          title="View thesis permalink"
-          style={{ flexShrink: 0 }}
-        >{isMobile ? "↗ VIEW" : "↗"}</button>
+        {/* Follow — the one identity action in the header, labelled on every breakpoint.
+            Like / Comment / Share / Copy / Message all live in the SocialBar below. */}
         {walletAddress && !isOwnThesis && (
           <button
-            className={`nx-btn nx-btn-icon${isFollowing ? " is-active" : ""}`}
             onClick={() => onFollowToggle(thesis.wallet.toLowerCase())}
             title={isFollowing ? "Unfollow trader" : "Follow trader"}
-            style={{ flexShrink: 0 }}
-          >{isMobile ? (isFollowing ? "✓ FOLLOWING" : "+ FOLLOW") : (isFollowing ? "✓" : "+")}</button>
-        )}
-        <MessageTraderButton
-          wallet={thesis.wallet}
-          myWallet={walletAddress}
-          variant={isMobile ? "full" : "icon"}
-          label={isMobile ? "⬡ DM" : undefined}
-          context={{ symbol: thesis.symbol, direction: thesis.direction }}
-        />
-        {walletAddress && !isOwnThesis && (
-          <button
-            className="nx-btn nx-btn-icon"
-            onClick={() => onCopy(thesis)}
-            title="Copy this thesis to your LAB"
-            style={{ flexShrink: 0 }}
-          >COPY</button>
+            style={{
+              flexShrink: 0, fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "4px 11px",
+              borderRadius: 6, cursor: "pointer", letterSpacing: "0.03em",
+              border: `1px solid ${isFollowing ? "#33333a" : "#ededf0"}`,
+              background: isFollowing ? "none" : "#ededf012",
+              color: isFollowing ? "#71717a" : "#ededf0",
+            }}
+          >{isFollowing ? "✓ Following" : "+ Follow"}</button>
         )}
       </div>
 
@@ -728,31 +710,24 @@ function FeedCard({
         );
       })()}
 
-      {/* Social bar — always WITH the post, like any top-tier feed. React or comment
-          right here; the reaction bar + thread + compose open inline just below (no
-          cryptic header icon to hunt for). */}
-      <div style={{ display: "flex", alignItems: "center", gap: 2, borderTop: "1px solid #232327", paddingTop: 8, marginTop: 8 }}>
-        <button
-          onClick={() => setCommentsOpen((o) => !o)}
-          title="React to this call"
-          style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 11, cursor: "pointer", padding: "5px 8px", borderRadius: 4, letterSpacing: "0.03em" }}
-        >🔥 React</button>
-        <button
-          onClick={() => setCommentsOpen((o) => !o)}
-          title="Comment on this call"
-          style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: commentsOpen ? "#ededf0" : "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 11, cursor: "pointer", padding: "5px 8px", borderRadius: 4, letterSpacing: "0.03em" }}
-        >💬 {commentCount > 0 ? `${commentCount} ${commentCount === 1 ? "Comment" : "Comments"}` : "Comment"}</button>
-      </div>
-      </div>
-      <CommentsPanel
+      {/* Native social layer — one-tap 🔥 like, inline comments, one-tap ↗ Share to X
+          (the distribution loop). No panels; everything happens in place. */}
+      <SocialBar
         thesisId={thesis.id}
         walletAddress={walletAddress}
-        isOpen={commentsOpen}
-        onCountChange={setCommentCount}
         authorWallet={thesis.wallet}
         symbol={thesis.symbol}
         direction={thesis.direction}
+        initialLikes={social?.likes ?? 0}
+        initialYouLiked={social?.youLiked ?? false}
+        initialCommentCount={social?.c ?? 0}
+        shareHref={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`📡 ${ticker} ${thesis.direction} ${thesis.leverage.toFixed(1)}x\n\nEntry $${thesis.entryPrice.toFixed(2)} · Stop $${thesis.stopLoss.toFixed(2)} · TP $${thesis.takeProfit1.toFixed(2)} (R:R 1:${thesis.riskReward.toFixed(2)})\n\nGraded on-chain vs public price on Nexus Trading Labs 👇`)}&url=${encodeURIComponent(`https://og.nexustradinglabs.com/share/thesis/${thesis.wallet.toLowerCase()}/${thesis.id}`)}`}
+        onCopy={() => onCopy(thesis)}
+        canCopy={!!walletAddress && !isOwnThesis}
+        onMessage={() => navigate(`/messages?dm=${thesis.wallet}&re=${encodeURIComponent(`Re: your ${ticker} ${thesis.direction} call — `)}`)}
+        canMessage={!!walletAddress && !isOwnThesis}
       />
+      </div>
     </div>
   );
 }
@@ -1436,9 +1411,10 @@ export default function FeedPage() {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const [feed, setFeed] = useState<FeedThesis[]>([]);
-  // Real comment counts per thesis id (batched fetch after the feed loads) → the
-  // social bar shows a true count upfront instead of "Comment" until first opened.
-  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  // Real social summary per thesis id (batched, off the hot /feed path) → the SocialBar
+  // shows true 🔥-like + comment counts (and whether YOU liked) upfront. Refetched when
+  // the feed or the connected wallet changes.
+  const [socialData, setSocialData] = useState<Record<string, { c: number; likes: number; youLiked: boolean }>>({});
   // Resolution events ride in the same /feed payload but are NOT thesis-shaped — they
   // carry no levels or status. Split out so FeedCard never sees one and so they can't
   // skew the trader/thesis counts derived from `feed`.
@@ -1524,22 +1500,26 @@ export default function FeedPage() {
           leverage: num(t.leverage),
           actualPnl: t.actualPnl == null ? null : num(t.actualPnl),
         }));
-        const feedItems = all.filter((t) => !t.resolution) as FeedThesis[];
-        setFeed(feedItems);
+        setFeed(all.filter((t) => !t.resolution) as FeedThesis[]);
         setResolutions(all.filter((t) => t.resolution) as unknown as ResolutionEvent[]);
-        // Real comment counts for the visible calls — ONE batched call, off the hot
-        // /feed path, so each card's social bar shows its true count upfront.
-        const ids = feedItems.map((t) => t.id).filter(Boolean);
-        if (ids.length) {
-          fetch(`${API_BASE}/comments/counts`, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ids }),
-          }).then((r) => r.json()).then((d) => setCommentCounts(d?.counts ?? {})).catch(() => {});
-        }
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
+
+  // Batched social summary (🔥-likes + comment counts + whether YOU liked) for the
+  // visible calls. One call, off the hot /feed path; refetches when the feed loads or
+  // the wallet connects so "you liked" is accurate.
+  useEffect(() => {
+    const ids = feed.map((t) => t.id).filter(Boolean);
+    if (!ids.length) return;
+    let dead = false;
+    fetch(`${API_BASE}/comments/counts`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, wallet: walletAddress }),
+    }).then((r) => r.json()).then((d) => { if (!dead) setSocialData(d?.counts ?? {}); }).catch(() => {});
+    return () => { dead = true; };
+  }, [feed, walletAddress]);
 
   // Live prices for all active feed theses
   const activeSymbols = useMemo(
@@ -1742,7 +1722,7 @@ export default function FeedPage() {
                     onCopy={setCopyTarget}
                     following={following}
                     onFollowToggle={handleFollowToggle}
-                    initialCommentCount={commentCounts[t.id] ?? 0}
+                    social={socialData[t.id]}
                   />
                 ))}
               </div>
@@ -1906,7 +1886,7 @@ export default function FeedPage() {
                     onCopy={setCopyTarget}
                     following={following}
                     onFollowToggle={handleFollowToggle}
-                    initialCommentCount={commentCounts[t.id] ?? 0}
+                    social={socialData[t.id]}
                   />
                 ))}
                 {/* Thin feed → invite contribution instead of just trailing off.
