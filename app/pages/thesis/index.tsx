@@ -269,11 +269,12 @@ export default function ThesisPage() {
 
   return (
     <div style={{ background: "#0a0a0b", minHeight: "100svh", padding: 0 }}>
-      {/* Top bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderBottom: "1px solid #232327", background: "#0f0f11" }}>
+      {/* Top bar — every action button shares ONE size (font / padding / min-width) so
+          they read as a matched, congruent set on every breakpoint. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderBottom: "1px solid #232327", background: "#0f0f11", flexWrap: "wrap", rowGap: 8 }}>
         <button
           onClick={() => navigate(-1)}
-          style={{ background: "none", border: "1px solid #232327", borderRadius: 3, color: "#52525b", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 10px", cursor: "pointer" }}
+          style={{ background: "none", border: "1px solid #232327", borderRadius: 4, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "6px 12px", cursor: "pointer", letterSpacing: "0.05em", minWidth: 82, textAlign: "center" }}
         >← BACK</button>
         <div style={{ flex: 1 }} />
         {/* Discuss THIS call with its author — seeds the DM with the call context */}
@@ -283,18 +284,18 @@ export default function ThesisPage() {
           context={{ symbol: thesis.symbol, direction: thesis.direction }}
           label="⬡ DISCUSS"
           title="Discuss this call with the trader — encrypted DM"
-          style={{ border: "1px solid #232327", borderRadius: 3, background: "none", color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 9px", letterSpacing: "0.05em", cursor: "pointer" }}
+          style={{ border: "1px solid #232327", borderRadius: 4, background: "none", color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "6px 12px", letterSpacing: "0.05em", cursor: "pointer", minWidth: 82, textAlign: "center" }}
         />
         {/* Outbound share — X / Farcaster / copy link */}
         <a
           href={shareX} target="_blank" rel="noopener noreferrer"
           title="Share on X"
-          style={{ textDecoration: "none", border: "1px solid #232327", borderRadius: 3, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 9px", letterSpacing: "0.05em" }}
+          style={{ textDecoration: "none", border: "1px solid #232327", borderRadius: 4, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "6px 12px", letterSpacing: "0.05em", minWidth: 82, textAlign: "center" }}
         >𝕏 SHARE</a>
         <a
           href={shareFc} target="_blank" rel="noopener noreferrer"
           title="Share on Farcaster"
-          style={{ textDecoration: "none", border: "1px solid #232327", borderRadius: 3, color: "#6cb6ff", fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 9px", letterSpacing: "0.05em" }}
+          style={{ textDecoration: "none", border: "1px solid #232327", borderRadius: 4, color: "#6cb6ff", fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "6px 12px", letterSpacing: "0.05em", minWidth: 82, textAlign: "center" }}
         >✦ CAST</a>
         <button
           onClick={handleShare}
@@ -302,8 +303,8 @@ export default function ThesisPage() {
           style={{
             background: copied ? "#1a1a1e" : "none",
             border: `1px solid ${copied ? "#ededf0" : "#232327"}`,
-            borderRadius: 3, color: copied ? "#ededf0" : "#52525b",
-            fontFamily: "var(--nx-font-mono)", fontSize: 9, padding: "4px 10px", cursor: "pointer", letterSpacing: "0.05em",
+            borderRadius: 4, color: copied ? "#ededf0" : "#a1a1aa",
+            fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "6px 12px", cursor: "pointer", letterSpacing: "0.05em", minWidth: 82, textAlign: "center",
           }}
         >{copied ? "✓ COPIED" : "⧉ LINK"}</button>
       </div>

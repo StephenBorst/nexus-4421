@@ -641,15 +641,19 @@ export default function TraderPage() {
         <div style={{ flex: 1, fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#33333a", letterSpacing: "0.05em" }}>
           / TRADER
         </div>
-        {/* DM button — shared affordance; hidden for your own profile */}
-        <MessageTraderButton wallet={wallet} myWallet={walletAddress} variant="full" />
-        {/* Share link button */}
+        {/* Header actions — one shared size so MESSAGE + SHARE read as a matched set. */}
+        <MessageTraderButton
+          wallet={wallet}
+          myWallet={walletAddress}
+          variant="full"
+          style={{ background: "none", border: "1px solid #232327", borderRadius: 4, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "6px 14px", cursor: "pointer", letterSpacing: "0.05em", justifyContent: "center", minWidth: 108 }}
+        />
         <button
           onClick={copyLink}
           style={{
-            background: "none", border: "1px solid #232327", borderRadius: 3,
-            color: copied ? "#ededf0" : "#52525b", fontFamily: "var(--nx-font-mono)", fontSize: 9,
-            padding: "4px 10px", cursor: "pointer", letterSpacing: "0.05em",
+            background: "none", border: "1px solid #232327", borderRadius: 4,
+            color: copied ? "#ededf0" : "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 10,
+            padding: "6px 14px", cursor: "pointer", letterSpacing: "0.05em", minWidth: 108,
           }}
         >
           {copied ? "✓ COPIED" : "⎘ SHARE"}

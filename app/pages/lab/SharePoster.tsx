@@ -4,7 +4,7 @@
 // a modal, and exported to PNG entirely client-side (SVG → canvas → blob, no
 // deps). Share buttons deep-link X / Farcaster. Brand register: terminal-black,
 // monospace, rationed green, "verify — don't trust".
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 
 const GREEN = "#3ecf8e";   // profit ONLY (realized) — never decoration or a planned metric
 const ACCENT = "#ededf0";  // bone/white — the brand accent (labels, brand column, plan metrics)
@@ -167,6 +167,26 @@ export function SharePoster({ data, onClose }: { data: PosterData; onClose: () =
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Pin the overlay to the VISUAL viewport, not the layout viewport. In a phone's
+  // "Desktop site" mode `position:fixed; inset:0` centers inside the tall desktop
+  // layout viewport, dropping the modal far below the fold so you have to scroll to
+  // find it. visualViewport gives the actually-visible region; body scroll is locked
+  // while open so it stays put. Falls back to inset:0 where the API is absent.
+  const [vv, setVv] = useState<{ top: number; height: number } | null>(null);
+  useEffect(() => {
+    const v = typeof window !== "undefined" ? window.visualViewport : null;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    if (v) {
+      const update = () => setVv({ top: v.offsetTop, height: v.height });
+      update();
+      v.addEventListener("resize", update);
+      v.addEventListener("scroll", update);
+      return () => { v.removeEventListener("resize", update); v.removeEventListener("scroll", update); document.body.style.overflow = prevOverflow; };
+    }
+    return () => { document.body.style.overflow = prevOverflow; };
+  }, []);
+
   const shareText = data.kind === "trade"
     ? `${asset(data.symbol)} ${data.direction} closed ${data.pnlPct != null ? `${data.pnlPct >= 0 ? "+" : ""}${data.pnlPct.toFixed(2)}%` : ""} — autonomous, on-chain-anchored. // Nexus Trading Labs`
     : data.kind === "smart"
@@ -222,9 +242,13 @@ export function SharePoster({ data, onClose }: { data: PosterData; onClose: () =
   return (
     <div
       onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 9100, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(2px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+      style={{
+        position: "fixed", left: 0, zIndex: 9100, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(2px)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 20, boxSizing: "border-box",
+        ...(vv ? { top: vv.top, width: "100vw", height: vv.height } : { inset: 0 }),
+      }}
     >
-      <div className="nx-fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "min(720px, 96vw)", background: "#0f0f11", border: "1px solid #33333a", borderRadius: 10, overflow: "hidden" }}>
+      <div className="nx-fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "min(720px, 96vw)", maxHeight: "100%", overflowY: "auto", background: "#0f0f11", border: "1px solid #33333a", borderRadius: 10 }}>
         <div style={{ padding: 16 }}>
           <PosterSVG data={data} svgRef={svgRef} />
         </div>
