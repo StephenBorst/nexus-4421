@@ -467,6 +467,7 @@ function FeedCard({
   following: Set<string>;
   onFollowToggle: (wallet: string) => void;
 }) {
+  const isMobile = useIsMobile();
   const eff = effectiveStatus(thesis);
   const cfg = STATUS_CONFIG[eff] ?? STATUS_CONFIG.ACTIVE;
   // 2px state left-rule (Proof-card signature). Win/loss carry the only chroma;
@@ -548,19 +549,20 @@ function FeedCard({
           onClick={() => navigate(`/feed/thesis/${thesis.wallet}/${thesis.id}`)}
           title="View thesis permalink"
           style={{ flexShrink: 0 }}
-        >↗</button>
+        >{isMobile ? "↗ OPEN" : "↗"}</button>
         {walletAddress && !isOwnThesis && (
           <button
             className={`nx-btn nx-btn-icon${isFollowing ? " is-active" : ""}`}
             onClick={() => onFollowToggle(thesis.wallet.toLowerCase())}
             title={isFollowing ? "Unfollow trader" : "Follow trader"}
             style={{ flexShrink: 0 }}
-          >{isFollowing ? "✓" : "+"}</button>
+          >{isMobile ? (isFollowing ? "✓ FOLLOWING" : "+ FOLLOW") : (isFollowing ? "✓" : "+")}</button>
         )}
         <MessageTraderButton
           wallet={thesis.wallet}
           myWallet={walletAddress}
-          variant="icon"
+          variant={isMobile ? "full" : "icon"}
+          label={isMobile ? "⬡ DM" : undefined}
           context={{ symbol: thesis.symbol, direction: thesis.direction }}
         />
         {walletAddress && !isOwnThesis && (
@@ -1664,16 +1666,10 @@ export default function FeedPage() {
         </div>
       </div>
 
-      {/* $NEXUS flywheel — top on desktop, moved below the feed on mobile. */}
-      {!isMobile && flywheel}
-
       <div className="nx-stagger" style={{ padding: 16, maxWidth: 860, margin: "0 auto" }}>
 
         {/* 👁 Watch-only framing for disconnected visitors (cold-start friction) */}
         {!walletAddress && <WatchOnlyBanner />}
-
-        {/* ◆ LIVE NOW — open positions (agents + opted-in humans, live & verifiable) */}
-        {view === "feed" && <LiveNow />}
 
         {/* Cold-start: when the feed is sparse, put the "post the first call" CTA up top
             so every visitor sees it immediately (not buried at the bottom). */}
@@ -1751,7 +1747,6 @@ export default function FeedPage() {
         {/* ── FEED VIEW ── */}
         {view === "feed" && (
           <>
-            {!loading && !error && <FeedPulse feed={feed} />}
             {/* AgentTrackRecord hidden: paper-strat backtest shows the live agent's
                 edge is net-negative/breakeven — don't surface it as social proof
                 until a proven edge returns. Component kept for easy re-enable. */}
@@ -1856,8 +1851,9 @@ export default function FeedPage() {
                 )
             )}
 
-            {!loading && !error && <Resolved events={resolutions} />}
-
+            {/* THE CALLS LEAD — the whole point of opening /feed. Everything else
+                (live positions, the just-resolved tape, pulse stats, token strip)
+                now follows below so a visitor sees calls first, not chrome. */}
             {!loading && !error && filtered.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {sortedFiltered.map((t) => (
@@ -1876,12 +1872,22 @@ export default function FeedPage() {
                 {feed.length >= 3 && feed.length < 12 && <ContributePrompt />}
               </div>
             )}
+
+            {/* ── CONTEXT (below the calls) — live positions, the just-resolved tape,
+                and pulse stats. Real signal, but not the feed itself, so it trails. */}
+            {!loading && !error && (
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #232327", display: "flex", flexDirection: "column", gap: 12 }}>
+                <LiveNow />
+                <Resolved events={resolutions} />
+                <FeedPulse feed={feed} />
+              </div>
+            )}
           </>
         )}
       </div>
 
-      {/* Flywheel at the foot on mobile — the calls lead, the token chrome follows. */}
-      {isMobile && flywheel}
+      {/* Flywheel at the foot on every breakpoint — the calls lead, the token chrome follows. */}
+      {flywheel}
     </div>
   );
 }
