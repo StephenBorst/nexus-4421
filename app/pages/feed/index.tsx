@@ -467,7 +467,12 @@ function FeedCard({
   following: Set<string>;
   onFollowToggle: (wallet: string) => void;
 }) {
-  const isMobile = useIsMobile();
+  // Treat a physical phone as mobile even in desktop-site mode (where innerWidth
+  // reports a desktop width, so useIsMobile() is false) — otherwise the labelled
+  // card actions silently revert to cryptic icons there. screen.width is the real
+  // device width, immune to desktop-site zoom. Same fix as the copilot panel.
+  const isPhone = typeof window !== "undefined" && Math.min(window.screen?.width ?? 9999, window.screen?.height ?? 9999) < 768;
+  const isMobile = useIsMobile() || isPhone;
   const eff = effectiveStatus(thesis);
   const cfg = STATUS_CONFIG[eff] ?? STATUS_CONFIG.ACTIVE;
   // 2px state left-rule (Proof-card signature). Win/loss carry the only chroma;
@@ -549,7 +554,7 @@ function FeedCard({
           onClick={() => navigate(`/feed/thesis/${thesis.wallet}/${thesis.id}`)}
           title="View thesis permalink"
           style={{ flexShrink: 0 }}
-        >{isMobile ? "↗ OPEN" : "↗"}</button>
+        >{isMobile ? "↗ VIEW" : "↗"}</button>
         {walletAddress && !isOwnThesis && (
           <button
             className={`nx-btn nx-btn-icon${isFollowing ? " is-active" : ""}`}
@@ -578,7 +583,7 @@ function FeedCard({
           onClick={() => setCommentsOpen((o) => !o)}
           title="Comments"
           style={{ flexShrink: 0 }}
-        >💬 {commentCount}</button>
+        >{isMobile ? `💬 COMMENT${commentCount ? ` ${commentCount}` : ""}` : `💬 ${commentCount}`}</button>
       </div>
 
       {/* Symbol + direction — direction is a MONOCHROME chip (positioning, not P&L);

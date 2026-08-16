@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import OrderlyProvider from "@/components/orderlyProvider";
 import { HttpsRequiredWarning } from "@/components/HttpsRequiredWarning";
@@ -21,6 +21,12 @@ export default function App() {
       setShowOnboarding(false);
     }
   }, []);
+
+  // Reset scroll to the top on every route change. SPA navigations otherwise carry
+  // the previous page's scroll onto the new route — clicking a trader from a
+  // scrolled-down feed dropped you into the MIDDLE of the profile instead of its top.
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
 
   return (
     <>
