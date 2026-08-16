@@ -968,7 +968,14 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
       {sortedBoard.map((trader, i) => {
         const rank = i + 1;
         const isOnChainVerified = onChainStats.has(trader.wallet.toLowerCase());
-        const closed = trader.wins + trader.losses;
+        // Trustless columns: show the GRADED record so the stats match the verified /
+        // emerging tier. Self-reported / agent-exec statuses are a DIFFERENT metric —
+        // showing an "80% win rate · 8/2" next to an "emerging, 1 graded call" badge is
+        // contradictory. Ungraded callers (emerging / unranked) show "—" until verified.
+        const g = trader.graded;
+        const gWins = g ? Math.round((g.hitRate / 100) * g.calls) : 0;
+        const gLosses = g ? Math.max(0, g.calls - gWins) : 0;
+        const closed = g ? g.calls : 0;
         const shortAddr = `${trader.wallet.slice(0, 6)}…${trader.wallet.slice(-4)}`;
         const isExpanded = expandedWallet === trader.wallet.toLowerCase();
         const traderTheses = feed.filter(t => t.wallet.toLowerCase() === trader.wallet.toLowerCase());
@@ -1068,9 +1075,9 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                 <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)" }}>WIN RATE</div>
                 <div style={{
                   fontFamily: "var(--nx-font-mono)", fontSize: 16, fontWeight: "bold",
-                  color: closed === 0 ? "#52525b" : trader.winRate >= 60 ? "#3ecf8e" : trader.winRate >= 40 ? "#fbbf24" : "#f7525f",
+                  color: !g ? "#52525b" : g.hitRate >= 60 ? "#3ecf8e" : g.hitRate >= 40 ? "#fbbf24" : "#f7525f",
                 }}>
-                  {closed === 0 ? "—" : `${trader.winRate.toFixed(0)}%`}
+                  {g ? `${g.hitRate.toFixed(0)}%` : "—"}
                 </div>
               </div>
 
@@ -1078,9 +1085,13 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               <div style={{ textAlign: "center", flex: "1 1 44px", minWidth: 44 }}>
                 <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)" }}>W / L</div>
                 <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12 }}>
-                  <span style={{ color: "#ededf0" }}>{trader.wins}</span>
-                  <span style={{ color: "#52525b" }}> / </span>
-                  <span style={{ color: "#f7525f" }}>{trader.losses}</span>
+                  {g ? (
+                    <>
+                      <span style={{ color: "#ededf0" }}>{gWins}</span>
+                      <span style={{ color: "#52525b" }}> / </span>
+                      <span style={{ color: "#f7525f" }}>{gLosses}</span>
+                    </>
+                  ) : <span style={{ color: "#52525b" }}>—</span>}
                 </div>
               </div>
 
@@ -1103,7 +1114,9 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
               {/* Rep Score — Ph26: on-chain value when available */}
               {(() => {
                 const onChain = (trader as typeof trader & { onChainRepScore?: number | null }).onChainRepScore;
-                const rep = onChain ?? calcRepScore(trader.wins, trader.losses, trader.avgRR);
+                // REP from the GRADED record too, so it can't read 99 on a self-reported
+                // 8/2 while the caller is only "emerging". Ungraded → "—" via closed===0.
+                const rep = onChain ?? calcRepScore(gWins, gLosses, trader.avgRR);
                 const isOnChain = onChain != null;
                 return (
                   <div style={{ textAlign: "center", flex: "1 1 44px", minWidth: 44 }}>
