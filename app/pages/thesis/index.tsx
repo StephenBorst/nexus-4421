@@ -137,7 +137,21 @@ export default function ThesisPage() {
         return r.json();
       })
       .then((data) => {
-        if (data?.thesis) setThesis(data.thesis);
+        // Agent-feed theses can arrive without the full numeric fields; the render
+        // calls .toFixed() on them (entryPrice/stopLoss/…), which crashed the page.
+        // Coerce to safe numbers on load — same guard as the trader profile.
+        if (data?.thesis) {
+          const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+          const t = data.thesis;
+          setThesis({
+            ...t,
+            entryPrice: num(t.entryPrice), stopLoss: num(t.stopLoss),
+            takeProfit1: num(t.takeProfit1), takeProfit2: num(t.takeProfit2),
+            riskReward: num(t.riskReward), positionSize: num(t.positionSize),
+            leverage: num(t.leverage),
+            actualPnl: t.actualPnl == null ? null : num(t.actualPnl),
+          });
+        }
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));

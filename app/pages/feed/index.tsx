@@ -1493,7 +1493,17 @@ export default function FeedPage() {
     fetch(`${API_BASE}/feed`)
       .then((r) => r.json())
       .then((data: { feed: (FeedThesis & { resolution?: boolean })[] }) => {
-        const all = data.feed ?? [];
+        // Coerce numeric fields so an agent-feed entry missing entryPrice/riskReward/etc
+        // can't crash a FeedCard's .toFixed() (same guard as the trader + thesis pages).
+        const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+        const all = (data.feed ?? []).map((t) => t.resolution ? t : ({
+          ...t,
+          entryPrice: num(t.entryPrice), stopLoss: num(t.stopLoss),
+          takeProfit1: num(t.takeProfit1), takeProfit2: num(t.takeProfit2),
+          riskReward: num(t.riskReward), positionSize: num(t.positionSize),
+          leverage: num(t.leverage),
+          actualPnl: t.actualPnl == null ? null : num(t.actualPnl),
+        }));
         setFeed(all.filter((t) => !t.resolution) as FeedThesis[]);
         setResolutions(all.filter((t) => t.resolution) as unknown as ResolutionEvent[]);
       })
