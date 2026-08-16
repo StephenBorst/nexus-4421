@@ -42,6 +42,15 @@ export default function NotificationBell() {
     }
   };
 
+  // The resolution moment is the most shareable thing that happens (your call hit +XR),
+  // so turn it into a one-tap post — the message already carries the graded result.
+  const shareResolution = (n: Notification) => {
+    if (!n.thesisId || !walletAddress) return;
+    const url = `https://og.nexustradinglabs.com/share/thesis/${walletAddress.toLowerCase()}/${n.thesisId}`;
+    const text = `📡 ${n.message} — graded on-chain vs public price. The tape marked this, not me. // Nexus Trading Labs 👇`;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, "_blank", "noopener");
+  };
+
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -230,6 +239,13 @@ export default function NotificationBell() {
                       {relativeTime(n.createdAt)}
                     </div>
                   </div>
+                  {n.type === "call_resolved" && n.thesisId && walletAddress && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); shareResolution(n); }}
+                      title="Share this graded result on X"
+                      style={{ background: "none", border: "1px solid #33333a", borderRadius: 4, color: "#a1a1aa", cursor: "pointer", fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.04em", padding: "3px 8px", flexShrink: 0, whiteSpace: "nowrap" }}
+                    >↗ SHARE</button>
+                  )}
                   <button
                     onClick={(e) => { e.stopPropagation(); deleteNotification(n.id); }}
                     title="Dismiss"
