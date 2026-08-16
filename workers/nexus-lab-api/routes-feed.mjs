@@ -167,10 +167,14 @@ export async function handleFeed(parts, request, env) {
         ]);
         const c = cRaw ? JSON.parse(cRaw).length : 0;
         const reactions = rRaw ? JSON.parse(rRaw) : {};
-        const fire = Array.isArray(reactions["🔥"]) ? reactions["🔥"] : [];
-        const youLiked = wallet ? fire.some((w) => String(w).toLowerCase() === wallet) : false;
-        return [id, { c, likes: fire.length, youLiked }];
-      } catch { return [id, { c: 0, likes: 0, youLiked: false }]; }
+        const counts = {}; const you = [];
+        for (const [emoji, list] of Object.entries(reactions)) {
+          const arr = Array.isArray(list) ? list : [];
+          if (arr.length) counts[emoji] = arr.length;
+          if (wallet && arr.some((w) => String(w).toLowerCase() === wallet)) you.push(emoji);
+        }
+        return [id, { c, reactions: counts, you }];
+      } catch { return [id, { c: 0, reactions: {}, you: [] }]; }
     }));
     return json({ counts: Object.fromEntries(entries) }, request);
   }

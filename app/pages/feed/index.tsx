@@ -467,7 +467,7 @@ function FeedCard({
   onCopy: (t: FeedThesis) => void;
   following: Set<string>;
   onFollowToggle: (wallet: string) => void;
-  social?: { c: number; likes: number; youLiked: boolean };
+  social?: { c: number; reactions: Record<string, number>; you: string[] };
 }) {
   const eff = effectiveStatus(thesis);
   const cfg = STATUS_CONFIG[eff] ?? STATUS_CONFIG.ACTIVE;
@@ -718,8 +718,8 @@ function FeedCard({
         authorWallet={thesis.wallet}
         symbol={thesis.symbol}
         direction={thesis.direction}
-        initialLikes={social?.likes ?? 0}
-        initialYouLiked={social?.youLiked ?? false}
+        initialReactions={social?.reactions}
+        initialYouReacted={social?.you}
         initialCommentCount={social?.c ?? 0}
         shareHref={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`📡 ${ticker} ${thesis.direction} ${thesis.leverage.toFixed(1)}x\n\nEntry $${thesis.entryPrice.toFixed(2)} · Stop $${thesis.stopLoss.toFixed(2)} · TP $${thesis.takeProfit1.toFixed(2)} (R:R 1:${thesis.riskReward.toFixed(2)})\n\nGraded on-chain vs public price on Nexus Trading Labs 👇`)}&url=${encodeURIComponent(`https://og.nexustradinglabs.com/share/thesis/${thesis.wallet.toLowerCase()}/${thesis.id}`)}`}
         onCopy={() => onCopy(thesis)}
@@ -1414,7 +1414,7 @@ export default function FeedPage() {
   // Real social summary per thesis id (batched, off the hot /feed path) → the SocialBar
   // shows true 🔥-like + comment counts (and whether YOU liked) upfront. Refetched when
   // the feed or the connected wallet changes.
-  const [socialData, setSocialData] = useState<Record<string, { c: number; likes: number; youLiked: boolean }>>({});
+  const [socialData, setSocialData] = useState<Record<string, { c: number; reactions: Record<string, number>; you: string[] }>>({});
   // Resolution events ride in the same /feed payload but are NOT thesis-shaped — they
   // carry no levels or status. Split out so FeedCard never sees one and so they can't
   // skew the trader/thesis counts derived from `feed`.
