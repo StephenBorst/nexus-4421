@@ -44,11 +44,13 @@ export default function Resolved({ events }: { events: ResolutionEvent[] }) {
           // Green/red here is P&L, which is the one place chroma is allowed.
           const tone = e.outcome === "WIN" ? C.pos : C.neg;
           return (
-            // ⚠️ /feed/trader/:wallet — the trader page is a CHILD of the feed route.
-            // A bare /trader/... hard-404s the app (verified on prod).
+            // Land on the specific CALL permalink (it heroes the graded result + carries
+            // the share buttons + conversion strip) rather than the general profile;
+            // fall back to the trader page when there's no thesisId. ⚠️ Both routes are
+            // CHILDREN of /feed — a bare /trader|/thesis hard-404s (verified on prod).
             <div
               key={`${e.wallet}-${e.thesisId ?? i}`}
-              onClick={() => navigate(`/feed/trader/${e.wallet}`)}
+              onClick={() => navigate(e.thesisId ? `/feed/thesis/${e.wallet}/${e.thesisId}` : `/feed/trader/${e.wallet}`)}
               style={{ cursor: "pointer" }}
             >
               <div style={{
