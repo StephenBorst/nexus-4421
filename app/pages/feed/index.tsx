@@ -1509,16 +1509,22 @@ export default function FeedPage() {
 
   // Batched social summary (🔥-likes + comment counts + whether YOU liked) for the
   // visible calls. One call, off the hot /feed path; refetches when the feed loads or
-  // the wallet connects so "you liked" is accurate.
+  // the wallet connects, and POLLS every 30s so likes + comment counts update LIVE
+  // across the feed (skips while the tab is hidden — no wasted requests in the bg).
   useEffect(() => {
     const ids = feed.map((t) => t.id).filter(Boolean);
     if (!ids.length) return;
     let dead = false;
-    fetch(`${API_BASE}/comments/counts`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids, wallet: walletAddress }),
-    }).then((r) => r.json()).then((d) => { if (!dead) setSocialData(d?.counts ?? {}); }).catch(() => {});
-    return () => { dead = true; };
+    const load = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      fetch(`${API_BASE}/comments/counts`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, wallet: walletAddress }),
+      }).then((r) => r.json()).then((d) => { if (!dead) setSocialData(d?.counts ?? {}); }).catch(() => {});
+    };
+    load();
+    const iv = setInterval(load, 30000);
+    return () => { dead = true; clearInterval(iv); };
   }, [feed, walletAddress]);
 
   // Live prices for all active feed theses

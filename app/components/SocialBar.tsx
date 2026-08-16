@@ -8,7 +8,7 @@
 //     breakpoint — no hover-only meaning, so desktop and phone read the same.
 // Initial like/comment counts come from the feed's batched /comments/counts call, so
 // the bar shows real numbers immediately; the thread lazy-loads only when expanded.
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { fetchComments, fetchReactions, addComment, deleteComment, toggleReaction, type Comment } from "@/hooks/useComments";
 
 function relTime(ts: number): string {
@@ -65,7 +65,11 @@ export function SocialBar({
   const [likes, setLikes] = useState(initialLikes);
   const [youLiked, setYouLiked] = useState(initialYouLiked);
   const [count, setCount] = useState(initialCommentCount);
-  useEffect(() => { setLikes(initialLikes); setYouLiked(initialYouLiked); }, [initialLikes, initialYouLiked]);
+  // Once you tap Like, your local state is authoritative — a live count poll landing
+  // mid-flight must not stomp the optimistic toggle back. Comment count still syncs
+  // live regardless (it isn't affected by the like race).
+  const interacted = useRef(false);
+  useEffect(() => { if (!interacted.current) { setLikes(initialLikes); setYouLiked(initialYouLiked); } }, [initialLikes, initialYouLiked]);
   useEffect(() => { setCount(initialCommentCount); }, [initialCommentCount]);
 
   const [open, setOpen] = useState(defaultOpen);
@@ -91,8 +95,21 @@ export function SocialBar({
     return () => { dead = true; };
   }, [autoload, thesisId, walletLower]);
 
+  // Live thread — while comments are open, poll for new ones so the discussion updates
+  // in place with no manual refresh (no push infra; matches the app's live-feed cadence).
+  // Pauses while the tab is hidden.
+  useEffect(() => {
+    if (!open) return;
+    const iv = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      fetchComments(thesisId).then((c) => { setComments(c); setCount(c.length); }).catch(() => { /* ignore */ });
+    }, 12000);
+    return () => clearInterval(iv);
+  }, [open, thesisId]);
+
   async function like() {
     if (!walletAddress) return;
+    interacted.current = true;
     const next = !youLiked;
     setYouLiked(next);                       // optimistic
     setLikes((n) => Math.max(0, n + (next ? 1 : -1)));
