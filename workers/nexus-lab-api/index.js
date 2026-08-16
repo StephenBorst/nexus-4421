@@ -408,7 +408,7 @@ function buildIdentitySvg({ profile, wallet, displayName, fontFamily = "'JetBrai
 // `chartDataUri` is optional and already SSRF-gated + size-capped by fetchChartDataUri().
 // With a chart we run a two-column layout; without one we keep the full-width layout so
 // the card never has a dead half.
-function buildThesisOgSvg({ displayName, wallet, ticker, direction, entryPrice, stopLoss, takeProfit1, riskReward, status, notes, chartDataUri = null, fontFamily = "'Courier New', Courier, monospace" }) {
+function buildThesisOgSvg({ displayName, wallet, ticker, direction, entryPrice, stopLoss, takeProfit1, riskReward, status, gradedR = null, notes, chartDataUri = null, fontFamily = "'Courier New', Courier, monospace" }) {
   const shortAddr = `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
   const name = esc(displayName || shortAddr);
   const dirColor = direction === "LONG" ? "#3ecf8e" : "#f7525f";
@@ -452,9 +452,22 @@ function buildThesisOgSvg({ displayName, wallet, ticker, direction, entryPrice, 
   <text x="1152" y="54" fill="#71717a" font-size="13" text-anchor="end">trade.nexustradinglabs.com</text>
   <text x="48" y="180" fill="#f4f4f5" font-size="86" font-weight="bold">${esc(ticker)}</text>
   <text x="48" y="232" fill="${dirColor}" font-size="32" font-weight="bold">${dirArrow} ${esc(direction)}</text>
-  <text x="1152" y="180" fill="${statusColor}" font-size="22" font-weight="bold" text-anchor="end">${statusLabel}</text>
+  ${(() => {
+    // Resolved calls HERO the graded R result — the scroll-stopping proof ("+2R,
+    // graded on-chain"), not a 22px corner label. Unresolved keep the calm status.
+    const resolved = (status === "HIT_TP" || status === "STOPPED_OUT") && gradedR != null;
+    if (resolved) {
+      const won = status === "HIT_TP";
+      const rTxt = `${gradedR >= 0 ? "+" : ""}${Math.round(gradedR * 100) / 100}R`;
+      return `<text x="1152" y="162" fill="${won ? "#3ecf8e" : "#f7525f"}" font-size="60" font-weight="bold" text-anchor="end">${won ? "✓ WIN" : "✗ LOSS"} ${rTxt}</text>
+  <text x="1152" y="196" fill="#71717a" font-size="15" text-anchor="end">GRADED · first-touch vs public price</text>
+  <text x="1152" y="228" fill="#a1a1aa" font-size="14" text-anchor="end">${name}</text>
+  <text x="1152" y="248" fill="#71717a" font-size="12" text-anchor="end">${esc(shortAddr)}</text>`;
+    }
+    return `<text x="1152" y="180" fill="${statusColor}" font-size="22" font-weight="bold" text-anchor="end">${statusLabel}</text>
   <text x="1152" y="214" fill="#a1a1aa" font-size="14" text-anchor="end">${name}</text>
-  <text x="1152" y="234" fill="#71717a" font-size="12" text-anchor="end">${esc(shortAddr)}</text>
+  <text x="1152" y="234" fill="#71717a" font-size="12" text-anchor="end">${esc(shortAddr)}</text>`;
+  })()}
   <line x1="48" y1="270" x2="1152" y2="270" stroke="#232327" stroke-width="1"/>
   ${levels}
   ${chartPanel}
@@ -852,17 +865,18 @@ export default {
       const ticker = thesis.symbol.replace("PERP_", "").replace("_USDC", "");
       // Card shows the OBJECTIVE grade, never the self-report — grade live if unresolved.
       let ogStatus = thesis.gradedOutcome ? gradedStatusOf(thesis.gradedOutcome) : "ACTIVE";
+      let ogGradedR = (thesis.gradedOutcome === "WIN" || thesis.gradedOutcome === "LOSS") && typeof thesis.gradedR === "number" ? thesis.gradedR : null;
       if (ogStatus === "ACTIVE" && thesis.gradedOutcome !== "WIN" && thesis.gradedOutcome !== "LOSS") {
         try {
           const g = gradeCall(thesis, await fetchGradeHistory(thesis.symbol, thesis.createdAt));
-          if (g.outcome === "WIN" || g.outcome === "LOSS") ogStatus = gradedStatusOf(g.outcome);
+          if (g.outcome === "WIN" || g.outcome === "LOSS") { ogStatus = gradedStatusOf(g.outcome); ogGradedR = g.r; }
         } catch { /* keep ACTIVE */ }
       }
       const payload = {
         displayName: profile.displayName || null, wallet, ticker,
         direction: thesis.direction, entryPrice: thesis.entryPrice,
         stopLoss: thesis.stopLoss, takeProfit1: thesis.takeProfit1,
-        riskReward: thesis.riskReward, status: ogStatus, notes: thesis.notes || "",
+        riskReward: thesis.riskReward, status: ogStatus, gradedR: ogGradedR, notes: thesis.notes || "",
       };
       // Chart is fetched ONLY for the PNG path — the SVG path would need the same
       // inlining anyway (resvg can't pull remote refs), and X/Twitter unfurls the PNG.
