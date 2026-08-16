@@ -51,11 +51,13 @@ export async function toggleReaction(
   thesisId: string,
   emoji: string,
   wallet: string,
+  // Ride-along call context so the worker can notify the call's author on an ADD.
+  ctx?: { authorWallet?: string; symbol?: string; direction?: string },
 ): Promise<void> {
   const r = await fetch(`${API_BASE}/reactions/${thesisId}/${encodeURIComponent(emoji)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ wallet }),
+    body: JSON.stringify({ wallet, ...(ctx ?? {}) }),
   });
   if (!r.ok) throw new Error(`toggleReaction: ${r.status}`);
 }

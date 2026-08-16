@@ -131,7 +131,7 @@ export function SocialBar({
     const has = youReacted.includes(emoji);
     setYouReacted((y) => (has ? y.filter((e) => e !== emoji) : [...y, emoji]));       // optimistic
     setReactions((r) => ({ ...r, [emoji]: Math.max(0, (r[emoji] || 0) + (has ? -1 : 1)) }));
-    try { await toggleReaction(thesisId, emoji, walletAddress); }
+    try { await toggleReaction(thesisId, emoji, walletAddress, { authorWallet, symbol, direction }); }
     catch {
       setYouReacted((y) => (has ? [...y, emoji] : y.filter((e) => e !== emoji)));
       setReactions((r) => ({ ...r, [emoji]: Math.max(0, (r[emoji] || 0) + (has ? 1 : -1)) }));

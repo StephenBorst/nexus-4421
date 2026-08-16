@@ -19,6 +19,7 @@ function typeIcon(type: Notification["type"]): string {
   if (type === "copy") return "📋";
   if (type === "thesis_closed" || type === "call_resolved") return "◈";
   if (type === "comment") return "💬";
+  if (type === "reaction") return "🔥";
   if (type === "challenge") return "⚔";
   return "🔔";
 }

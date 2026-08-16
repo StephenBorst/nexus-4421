@@ -263,10 +263,26 @@ export async function handleFeed(parts, request, env) {
       const reactions = raw ? JSON.parse(raw) : {};
       const reactors = reactions[emoji] ?? [];
       const idx = reactors.indexOf(wallet);
+      const added = idx < 0;
       if (idx >= 0) reactors.splice(idx, 1);
       else reactors.push(wallet);
       reactions[emoji] = reactors;
       await env.LAB_STORE.put(reactionKey, JSON.stringify(reactions));
+      // Notify the call's author when someone ADDS a reaction (skip removals + self).
+      // Call context rides along from the client so the message can name the call.
+      const rAuthor = typeof body.authorWallet === "string" ? body.authorWallet.toLowerCase().trim() : null;
+      if (added && rAuthor && rAuthor !== wallet) {
+        const sym = typeof body.symbol === "string" ? body.symbol.replace("PERP_", "").replace("_USDC", "") : "";
+        const dir = typeof body.direction === "string" ? ` ${body.direction}` : "";
+        await appendNotification(env, rAuthor, {
+          id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          type: "reaction",
+          message: sym ? `${emoji} reacted to your ${sym}${dir} call` : `${emoji} reacted to your call`,
+          fromWallet: wallet,
+          thesisId,
+          createdAt: Date.now(),
+        });
+      }
       return json({ ok: true }, request);
     }
 
