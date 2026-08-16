@@ -310,6 +310,22 @@ export default function ThesisPage() {
 
       <div style={{ padding: 16, maxWidth: 720, margin: "0 auto" }}>
 
+        {/* Conversion layer for a wallet-less visitor arriving from a shared link — the
+            payoff of the share loop. Gives instant "you're on Nexus + here's why + a path
+            in" so the viral traffic explores instead of bouncing. Hidden once connected. */}
+        {!myWallet && (
+          <div style={{ marginBottom: 12, border: "1px solid #232327", borderLeft: "2px solid #ededf0", borderRadius: 6, background: "#0f0f11", padding: "14px 16px" }}>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase", color: "#71717a", marginBottom: 6 }}>// NEXUS TRADING LABS</div>
+            <div style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: 13.5, color: "#a1a1aa", lineHeight: 1.6, marginBottom: 12 }}>
+              This call is graded <b style={{ color: "#f4f4f5" }}>on-chain vs public price</b> — the tape decides the outcome, not the trader. Explore live calls from verified callers, or x-ray any wallet's real record. <span style={{ color: "#71717a" }}>No login to look.</span>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button onClick={() => navigate("/feed")} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, letterSpacing: "0.04em", color: "#0a0a0b", background: "#ededf0", border: "1px solid #ededf0", borderRadius: 6, padding: "8px 14px", cursor: "pointer", fontWeight: 700 }}>Explore the live feed →</button>
+              <a href="/analyze" style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, letterSpacing: "0.04em", color: "#ededf0", background: "none", border: "1px solid #33333a", borderRadius: 6, padding: "8px 14px", textDecoration: "none" }}>X-ray any wallet free →</a>
+            </div>
+          </div>
+        )}
+
         {/* Thesis card */}
         <div style={{ background: "#141416", border: `1px solid ${cfg.border}`, borderRadius: 4, padding: "20px 24px", marginBottom: 12 }}>
 
