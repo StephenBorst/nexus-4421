@@ -829,6 +829,14 @@ export function ThesisView() {
     chartUrls: [""] as string[],
   });
 
+  // Done-for-you: seed account size from the connected collateral so position sizing
+  // works without typing an account number. Only fills when the field is empty, so it
+  // never clobbers an edit; the "= MY COLLATERAL" button still re-fills on demand.
+  useEffect(() => {
+    const bal = Number(availableBalance);
+    if (bal > 0) setForm((f) => (f.accountSize === "" ? { ...f, accountSize: String(Math.floor(bal)) } : f));
+  }, [availableBalance]);
+
 
   // Paste-to-fill: drop a TradingView analysis (or any freeform thesis) and the
   // heuristic parser prefills the fields the trader already wrote out. Conservative
