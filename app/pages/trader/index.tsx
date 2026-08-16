@@ -508,7 +508,19 @@ export default function TraderPage() {
     fetch(`${API_BASE}/feed`)
       .then((r) => r.json())
       .then((data: { feed: FeedThesis[] }) => {
-        const all = data.feed ?? [];
+        // Agent-feed entries can arrive without the full human-thesis numeric fields.
+        // The FeedThesis type says these are numbers, so anything downstream calls
+        // .toFixed() on them — coerce to safe numbers on load so one malformed entry
+        // can't crash the whole profile (was: "Cannot read properties of undefined").
+        const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+        const all = (data.feed ?? []).map((t) => ({
+          ...t,
+          entryPrice: num(t.entryPrice), stopLoss: num(t.stopLoss),
+          takeProfit1: num(t.takeProfit1), takeProfit2: num(t.takeProfit2),
+          riskReward: num(t.riskReward), positionSize: num(t.positionSize),
+          leverage: num(t.leverage),
+          actualPnl: t.actualPnl == null ? null : num(t.actualPnl),
+        }));
         setTheses(all.filter((t) => t.wallet.toLowerCase() === wallet.toLowerCase()));
       })
       .catch(() => setError(true))
