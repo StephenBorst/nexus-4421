@@ -263,6 +263,46 @@ export default function AnalyzePage() {
         <div style={{ fontFamily: MONO, fontSize: 12, color: FOG }}>$ ./xray.sh --wallet {address?.slice(0, 8)}… <span style={{ color: BONE }}>reading hyperliquid + orderly…</span></div>
       )}
 
+      {/* ── X-RAY VERDICT ── one-glance authoritative read that synthesizes BOTH
+          sources (Hyperliquid tape + Orderly indexer) the moment results land, so a
+          pasted wallet gives an immediate verdict instead of a wall of tables. */}
+      {!loading && address && ((trades && trades.length > 0) || (orderly && orderly.venues.length > 0)) && (() => {
+        const hlPnl = trades && trades.length ? totalPnl : 0;
+        const orRealized = orderly ? orderly.totalRealized : 0;
+        const combined = hlPnl + orRealized;
+        const markets = orderly?.markets ?? 0;
+        const openNow = orderly ? orderly.venues.reduce((a, v) => a + v.openPositions, 0) : 0;
+        const profitablePct = orderly && orderly.venues.length
+          ? Math.round(orderly.venues.reduce((a, v) => a + v.profitableMarketsPct, 0) / orderly.venues.length) : null;
+        const good = combined >= 0;
+        const srcs = [trades && trades.length ? "Hyperliquid" : null, orderly && orderly.venues.length ? "Orderly" : null].filter(Boolean).join(" + ");
+        const stats = ([
+          trades && trades.length ? { l: "HL WIN RATE", v: `${winRate.toFixed(0)}%`, c: winRate >= 50 ? POS : NEG } : null,
+          trades && trades.length ? { l: "HL TRADES", v: String(trades.length), c: BRIGHT } : null,
+          markets ? { l: "MARKETS", v: String(markets), c: BRIGHT } : null,
+          profitablePct != null ? { l: "PROFITABLE MKTS", v: `${profitablePct}%`, c: BRIGHT } : null,
+          { l: "OPEN NOW", v: String(openNow), c: openNow ? BRIGHT : FAINT },
+        ].filter(Boolean)) as { l: string; v: string; c: string }[];
+        return (
+          <div className="nx-fade-in" style={{ border: `1px solid ${BORDER}`, borderLeft: `3px solid ${good ? POS : NEG}`, borderRadius: 8, background: SURFACE_ALT, padding: "18px 20px", marginBottom: 22 }}>
+            <div style={{ ...label, marginBottom: 12 }}>◆ X-RAY VERDICT · {short(address)}</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", marginBottom: 16 }}>
+              <span style={{ fontFamily: UI, fontSize: 24, fontWeight: 700, color: good ? POS : NEG, letterSpacing: "-0.01em" }}>{good ? "Net profitable" : "Underwater"}</span>
+              <span style={{ fontFamily: MONO, fontSize: 18, fontWeight: 700, color: good ? POS : NEG }}>{usd(combined)}</span>
+              <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>realized · {srcs}</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 12 }}>
+              {stats.map((s) => (
+                <div key={s.l}>
+                  <div style={{ ...label, fontSize: 8, letterSpacing: "0.12em" }}>{s.l}</div>
+                  <div style={{ fontFamily: MONO, fontSize: 16, fontWeight: 700, color: s.c, marginTop: 2 }}>{s.v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {trades && trades.length > 0 && (
         <div className="nx-fade-in">
           <div style={{ fontFamily: MONO, fontSize: 11, color: FOG, marginBottom: 10 }}>
