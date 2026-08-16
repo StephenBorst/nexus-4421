@@ -14,7 +14,10 @@ import { useState, useEffect, useRef } from "react";
 import { fetchComments, fetchReactions, addComment, deleteComment, toggleReaction, type Comment } from "@/hooks/useComments";
 
 const LIKE = "🔥";
-const EXTRA = ["💎", "📉", "✅", "❌"]; // secondary reactions (the 🔥 like has its own button)
+// Curated trading-flavoured palette for the 😀 add-picker (the 🔥 like has its own
+// button). Any emoji that already has reactions still renders as a chip — including
+// legacy ✅ ❌ — so nothing is lost when the palette changes.
+const PALETTE = ["🚀", "📈", "📉", "💎", "🎯", "💀"];
 
 function relTime(ts: number): string {
   const m = Math.floor((Date.now() - ts) / 60000);
@@ -168,7 +171,8 @@ export function SocialBar({
   }
 
   const likeCount = reactions[LIKE] || 0;
-  const chips = EXTRA.filter((e) => (reactions[e] || 0) > 0);
+  // Any reacted emoji except the primary 🔥 renders as a chip (legacy emojis included).
+  const chips = Object.keys(reactions).filter((e) => e !== LIKE && (reactions[e] || 0) > 0);
 
   return (
     <div style={{ borderTop: "1px solid #232327", marginTop: 8 }}>
@@ -194,7 +198,7 @@ export function SocialBar({
               </button>
             );
           })}
-          {palette && EXTRA.map((e) => (
+          {palette && PALETTE.map((e) => (
             <button key={e} onClick={(ev) => { ev.stopPropagation(); react(e); }} title="React"
               style={{ background: "none", border: "1px dashed #33333a", borderRadius: 20, fontSize: 14, padding: "2px 8px", cursor: "pointer", opacity: youReacted.includes(e) ? 1 : 0.7 }}>
               {e}

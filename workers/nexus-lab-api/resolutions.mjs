@@ -78,7 +78,7 @@ export async function notifyResolution(env, wallet, t, outcome, r) {
       thesisId: t?.id ?? undefined,
       createdAt: Date.now(),
       read: false,
-    });
+    }, { telegram: false }); // this fn sends its own richer Telegram DM below
   } catch (e) { console.error("[resolve] notif failed", e.message); }
 
   try {

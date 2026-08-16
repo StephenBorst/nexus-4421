@@ -89,10 +89,30 @@ Timestamp: ${ts}`;
  * Lives here because both the /notifications route and the resolution fan-out write
  * it — importing it from index.js would make route modules circular.
  */
-export async function appendNotification(env, wallet, notif) {
-  const key = `notif:${wallet}`;
+export async function appendNotification(env, wallet, notif, opts = {}) {
+  const w = String(wallet).toLowerCase();
+  const key = `notif:${w}`;
   const raw = await env.LAB_STORE.get(key);
   const list = raw ? JSON.parse(raw) : [];
   list.unshift(notif);
   await env.LAB_STORE.put(key, JSON.stringify(list.slice(0, 50)));
+
+  // Fan the SAME alert out to Telegram if this wallet linked a chat — so comments,
+  // reactions, follows and copies all reach the bot, not just call resolutions.
+  // Best-effort: the in-app notification is already written above, so a Telegram
+  // outage can't cost it. `opts.telegram === false` lets a caller that sends its own
+  // richer Telegram message (notifyResolution) opt out of this generic one.
+  if (opts.telegram === false) return;
+  try {
+    const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+    const chatId = await AGENT_KV.get(`tg:chat:${w}`);
+    if (chatId && env.TELEGRAM_TOKEN && notif?.message) {
+      const link = notif?.thesisId ? `\nhttps://trade.nexustradinglabs.com/feed/thesis/${w}/${notif.thesisId}` : "";
+      await fetch(`https://api.telegram.org/bot${env.TELEGRAM_TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text: `🔔 ${notif.message}${link}`, disable_web_page_preview: true }),
+      });
+    }
+  } catch (e) { console.error("[notif] telegram failed", e.message); }
 }

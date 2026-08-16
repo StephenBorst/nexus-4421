@@ -245,7 +245,8 @@ export async function handleFeed(parts, request, env) {
   if (parts[0] === "reactions" && parts[1]) {
     const thesisId = parts[1];
     const reactionKey = `reactions:${thesisId}`;
-    const ALLOWED_EMOJIS = ["🔥", "💎", "📉", "✅", "❌"];
+    // Superset kept backward-compatible (old ✅ ❌ stay toggleable) + richer trading set.
+    const ALLOWED_EMOJIS = ["🔥", "🚀", "📈", "📉", "💎", "🎯", "💀", "✅", "❌"];
 
     if (request.method === "GET" && parts.length === 2) {
       const raw = await env.LAB_STORE.get(reactionKey);
