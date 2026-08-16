@@ -580,13 +580,16 @@ export function ThesisAnalyticsView() {
   const walletAddress = (accountState as { address?: string })?.address ?? null;
   const { theses } = useLabStorage(walletAddress);
 
+  // Count the OBJECTIVE grade (effectiveStatus prefers gradedOutcome over the raw /
+  // self-reported status) so these analytics agree with the breakdown card above and
+  // with every public trustless surface, instead of quietly using two truth sources.
   const closed = useMemo(
-    () => theses.filter((t) => t.status === "HIT_TP" || t.status === "STOPPED_OUT"),
+    () => theses.filter((t) => { const e = effectiveStatus(t); return e === "HIT_TP" || e === "STOPPED_OUT"; }),
     [theses]
   );
 
   const summaryStats = useMemo(() => {
-    const wins = closed.filter((t) => t.status === "HIT_TP").length;
+    const wins = closed.filter((t) => effectiveStatus(t) === "HIT_TP").length;
     const winRate = closed.length > 0 ? (wins / closed.length) * 100 : 0;
     const avgRR = theses.length > 0 ? theses.reduce((s, t) => s + t.riskReward, 0) / theses.length : 0;
     const totalPnl = closed.reduce((s, t) => s + (t.actualPnl ?? 0), 0);
@@ -603,14 +606,14 @@ export function ThesisAnalyticsView() {
     const sortedDesc = [...closed].sort((a, b) => b.createdAt - a.createdAt);
     let current = 0;
     for (const t of sortedDesc) {
-      if (t.status === "HIT_TP") current++;
+      if (effectiveStatus(t) === "HIT_TP") current++;
       else break;
     }
     const sortedAsc = [...closed].sort((a, b) => a.createdAt - b.createdAt);
     let best = 0;
     let streak = 0;
     for (const t of sortedAsc) {
-      if (t.status === "HIT_TP") { streak++; if (streak > best) best = streak; }
+      if (effectiveStatus(t) === "HIT_TP") { streak++; if (streak > best) best = streak; }
       else streak = 0;
     }
     return { current, best };
@@ -623,7 +626,7 @@ export function ThesisAnalyticsView() {
       if (!map.has(sym)) map.set(sym, { wins: 0, total: 0, rrSum: 0 });
       const s = map.get(sym)!;
       s.total++;
-      if (t.status === "HIT_TP") s.wins++;
+      if (effectiveStatus(t) === "HIT_TP") s.wins++;
       s.rrSum += t.riskReward;
     }
     return [...map.entries()]
