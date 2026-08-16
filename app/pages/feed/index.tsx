@@ -17,7 +17,7 @@ import { NexusTreasuryStack } from "@/components/NexusTreasuryStack";
 import { NexusMarket } from "@/components/NexusMarket";
 import type { ThesisTrade } from "@/pages/lab/types";
 import CommentsPanel from "@/components/CommentsPanel";
-import { useIsMobile } from "@/pages/lab/useIsMobile";
+import { useIsMobile, useIsPhone } from "@/pages/lab/useIsMobile";
 import { Sparkline, SectionHeader } from "@/pages/lab/components";
 import { getAgentSig } from "@/pages/lab/agentKeys";
 import { chartImageList, effectiveStatus } from "@/pages/lab/helpers";
@@ -467,12 +467,9 @@ function FeedCard({
   following: Set<string>;
   onFollowToggle: (wallet: string) => void;
 }) {
-  // Treat a physical phone as mobile even in desktop-site mode (where innerWidth
-  // reports a desktop width, so useIsMobile() is false) — otherwise the labelled
-  // card actions silently revert to cryptic icons there. screen.width is the real
-  // device width, immune to desktop-site zoom. Same fix as the copilot panel.
-  const isPhone = typeof window !== "undefined" && Math.min(window.screen?.width ?? 9999, window.screen?.height ?? 9999) < 768;
-  const isMobile = useIsMobile() || isPhone;
+  // Treat a physical phone as mobile even in desktop-site mode (useIsMobile() reads
+  // a desktop width there) so the labelled card actions don't revert to cryptic icons.
+  const isMobile = useIsMobile() || useIsPhone();
   const eff = effectiveStatus(thesis);
   const cfg = STATUS_CONFIG[eff] ?? STATUS_CONFIG.ACTIVE;
   // 2px state left-rule (Proof-card signature). Win/loss carry the only chroma;
@@ -578,12 +575,6 @@ function FeedCard({
             style={{ flexShrink: 0 }}
           >COPY</button>
         )}
-        <button
-          className={`nx-btn nx-btn-icon${commentsOpen ? " is-active" : ""}`}
-          onClick={() => setCommentsOpen((o) => !o)}
-          title="Comments"
-          style={{ flexShrink: 0 }}
-        >{isMobile ? `💬 COMMENT${commentCount ? ` ${commentCount}` : ""}` : `💬 ${commentCount}`}</button>
       </div>
 
       {/* Symbol + direction — direction is a MONOCHROME chip (positioning, not P&L);
@@ -731,6 +722,22 @@ function FeedCard({
           </div>
         );
       })()}
+
+      {/* Social bar — always WITH the post, like any top-tier feed. React or comment
+          right here; the reaction bar + thread + compose open inline just below (no
+          cryptic header icon to hunt for). */}
+      <div style={{ display: "flex", alignItems: "center", gap: 2, borderTop: "1px solid #232327", paddingTop: 8, marginTop: 8 }}>
+        <button
+          onClick={() => setCommentsOpen((o) => !o)}
+          title="React to this call"
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 11, cursor: "pointer", padding: "5px 8px", borderRadius: 4, letterSpacing: "0.03em" }}
+        >🔥 React</button>
+        <button
+          onClick={() => setCommentsOpen((o) => !o)}
+          title="Comment on this call"
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: commentsOpen ? "#ededf0" : "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 11, cursor: "pointer", padding: "5px 8px", borderRadius: 4, letterSpacing: "0.03em" }}
+        >💬 {commentCount > 0 ? `${commentCount} ${commentCount === 1 ? "Comment" : "Comments"}` : "Comment"}</button>
+      </div>
       </div>
       <CommentsPanel
         thesisId={thesis.id}
@@ -1163,7 +1170,7 @@ function LeaderboardView({ feed, walletAddress, onCopy }: {
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 4 }}>
                   {/* Message this caller — wrapped so it doesn't toggle the row */}
                   <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex" }}>
-                    <MessageTraderButton wallet={trader.wallet} myWallet={walletAddress} variant="icon" />
+                    <MessageTraderButton wallet={trader.wallet} myWallet={walletAddress} variant="full" label="⬡ MESSAGE" />
                   </span>
                   {/* Verify the caller's real venue record before copying them. */}
                   <a
