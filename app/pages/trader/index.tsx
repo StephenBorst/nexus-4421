@@ -566,7 +566,11 @@ export default function TraderPage() {
   const shortAddr = wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : "";
 
   function copyLink() {
-    navigator.clipboard.writeText(window.location.href).then(() => {
+    // Share the crawler-friendly /share/identity proxy — it unfurls the PREMIUM identity
+    // card (merit rank + graded record) and bounces humans back to this profile. Sharing
+    // the raw app URL would unfurl the generic static card (crawlers don't run our JS).
+    const link = wallet ? `https://og.nexustradinglabs.com/share/identity/${wallet.toLowerCase()}` : window.location.href;
+    navigator.clipboard.writeText(link).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -594,11 +598,12 @@ export default function TraderPage() {
     const OG_BASE = "https://og.nexustradinglabs.com"; // Ph20: custom domain on nexus-lab-api Worker
     setMeta("og:title", title);
     setMeta("og:description", description);
-    setMeta("og:image", `${OG_BASE}/og/trader/${wallet}`);            // SVG — Discord, Telegram, iMessage
+    // The PREMIUM identity card (merit rank + graded record), not the legacy /og/trader.
+    setMeta("og:image", `${OG_BASE}/og/identity/${wallet}`);          // SVG — Discord, Telegram, iMessage
     setMeta("twitter:card", "summary_large_image");
     setMeta("twitter:title", title);
     setMeta("twitter:description", description);
-    setMeta("twitter:image", `${OG_BASE}/og/trader/${wallet}.png`);   // Ph21: PNG for Twitter
+    setMeta("twitter:image", `${OG_BASE}/og/identity/${wallet}.png`); // Ph21: PNG for Twitter
     setMeta("og:url", window.location.href);
     document.title = title;
 

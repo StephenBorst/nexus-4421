@@ -421,12 +421,8 @@ export default function ThesisPage() {
             );
           })()}
 
-          {/* Actual PnL if closed */}
-          {thesis.actualPnl !== null && thesis.status !== "ACTIVE" && (
-            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, color: thesis.actualPnl >= 0 ? "#3ecf8e" : "#f7525f", marginBottom: 12 }}>
-              ACTUAL PnL: {thesis.actualPnl >= 0 ? "+" : ""}${thesis.actualPnl.toFixed(2)}
-            </div>
-          )}
+          {/* No self-reported P&L here — the graded result above (✓ NEXUS GRADED · +R)
+              is the trustless truth. A trader-typed dollar figure would only contradict it. */}
 
           {/* Charts — validated per item at render time; bad hosts simply don't show. */}
           {(() => {
