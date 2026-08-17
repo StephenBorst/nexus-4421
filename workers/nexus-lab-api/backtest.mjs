@@ -137,6 +137,12 @@ export function runBacktest(candles, fundingAt, config, fundingPctAt = null, oiC
       const oiChange = oiChangeAt ? (oiChangeAt(c.t) ?? 0) : 0;
       const raw = { priceChange, oiChange, fundingRate: fundingAt(c.t) || 0, hasPrev: true };
       if (fundingPctAt && (config.fundingPercentileMin || 0) > 0) raw.fundingPct = fundingPctAt(c.t, raw.fundingRate);
+      // Regime-conditioning inputs (opt-in gates in deriveSignal read these) — computed
+      // with NO lookahead so sim matches the live brain: session from the bar's UTC hour,
+      // ATR% from bars strictly before i.
+      raw.hourUtc = new Date(c.t * 1000).getUTCHours();
+      const atr = atrPctAt(candles, i);
+      if (Number.isFinite(atr)) raw.atrPct = atr;
       const sig = deriveSignal(raw, config);
       if (sig.direction && sig.direction !== "NONE" && (sig.confidence ?? 0) >= 50
           && (!entryFilter || entryFilter(candles, i, sig, config))) {

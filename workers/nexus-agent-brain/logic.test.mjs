@@ -216,3 +216,41 @@ test("EXTERNAL: does not fall through to the CONFLUENCE default", () => {
   assert.notEqual(confluence.direction, "NONE", "sanity: this raw fires confluence");
   assert.equal(external.direction, "NONE");
 });
+
+// ── opt-in regime conditioning (session + volatility gates) ─────────────────
+test("session gate: entry suppressed outside tradeSessions", () => {
+  const cfg = { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01, tradeSessions: ["US", "EUROPE"] };
+  // hourUtc 3 = ASIA → gated
+  const asia = deriveSignal(raw({ fundingRate: -0.0002, hourUtc: 3 }), cfg);
+  assert.equal(asia.direction, "NONE");
+  assert.match(asia.reason, /session-gated/);
+  // hourUtc 18 = US → allowed
+  const us = deriveSignal(raw({ fundingRate: -0.0002, hourUtc: 18 }), cfg);
+  assert.equal(us.direction, "LONG");
+});
+
+test("session gate: no-op when tradeSessions unset or hourUtc absent", () => {
+  const cfg = { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01 };
+  assert.equal(deriveSignal(raw({ fundingRate: -0.0002, hourUtc: 3 }), cfg).direction, "LONG");
+  const cfg2 = { ...cfg, tradeSessions: ["US"] };
+  // hourUtc missing → cannot gate, so it trades (fail-open, matches other opt-in gates)
+  assert.equal(deriveSignal(raw({ fundingRate: -0.0002 }), cfg2).direction, "LONG");
+});
+
+test("volatility gate: min suppresses calm, max suppresses hot", () => {
+  const base = { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01 };
+  // minVolAtrPct 0.7 → atr 0.4 gated, atr 0.9 allowed
+  assert.equal(deriveSignal(raw({ fundingRate: -0.0002, atrPct: 0.4 }), { ...base, minVolAtrPct: 0.7 }).direction, "NONE");
+  assert.equal(deriveSignal(raw({ fundingRate: -0.0002, atrPct: 0.9 }), { ...base, minVolAtrPct: 0.7 }).direction, "LONG");
+  // maxVolAtrPct 0.5 → atr 0.9 gated, atr 0.3 allowed
+  assert.equal(deriveSignal(raw({ fundingRate: -0.0002, atrPct: 0.9 }), { ...base, maxVolAtrPct: 0.5 }).direction, "NONE");
+  assert.equal(deriveSignal(raw({ fundingRate: -0.0002, atrPct: 0.3 }), { ...base, maxVolAtrPct: 0.5 }).direction, "LONG");
+});
+
+test("regime gates apply BEFORE invert (suppress the faded entry too)", () => {
+  const cfg = { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01, invertSignal: true, minVolAtrPct: 0.7 };
+  // calm → gated even though invert would otherwise flip it
+  assert.equal(deriveSignal(raw({ fundingRate: -0.0002, atrPct: 0.3 }), cfg).direction, "NONE");
+  // high vol → fires and inverts (funding LONG → SHORT)
+  assert.equal(deriveSignal(raw({ fundingRate: -0.0002, atrPct: 1.0 }), cfg).direction, "SHORT");
+});

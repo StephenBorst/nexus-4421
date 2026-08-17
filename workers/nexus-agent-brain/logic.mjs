@@ -130,6 +130,29 @@ export function deriveSignal(raw, config = {}, regime = null, smartConsensus = n
     return { direction: "NONE", confidence: 0, reason: `smart-money-gated (${smartConsensus.count} traders ${smartConsensus.side})` };
   }
 
+  // ── Opt-in REGIME CONDITIONING (backtest-validated: the edge is in WHEN a signal
+  //    fires, not the signal). Both default OFF, so existing agents are unchanged. The
+  //    caller (brain live + backtest) supplies raw.hourUtc + raw.atrPct so the SAME gate
+  //    runs in sim and in prod — no drift. ──
+  // SESSION: only enter during selected UTC sessions (ASIA <8h · EUROPE 8-15h · US 15-24h).
+  // Backtest finding: Asia is where funding fades bleed; excluding it lifts win rate.
+  if (direction !== "NONE" && Array.isArray(config.tradeSessions) && config.tradeSessions.length && Number.isFinite(raw.hourUtc)) {
+    const sess = raw.hourUtc < 8 ? "ASIA" : raw.hourUtc < 15 ? "EUROPE" : "US";
+    if (!config.tradeSessions.includes(sess)) {
+      return { direction: "NONE", confidence: 0, reason: `session-gated (${sess} not in [${config.tradeSessions.join(",")}])` };
+    }
+  }
+  // VOLATILITY: only enter when recent ATR% is in [minVolAtrPct, maxVolAtrPct]. Finding:
+  // fades (invert-confluence) want HIGH vol (a min); mean-reversion wants CALM (a max).
+  if (direction !== "NONE" && Number.isFinite(raw.atrPct)) {
+    if ((config.minVolAtrPct ?? 0) > 0 && raw.atrPct < config.minVolAtrPct) {
+      return { direction: "NONE", confidence: 0, reason: `vol-gated (atr ${raw.atrPct.toFixed(2)}% < min ${config.minVolAtrPct}%)` };
+    }
+    if ((config.maxVolAtrPct ?? 0) > 0 && raw.atrPct > config.maxVolAtrPct) {
+      return { direction: "NONE", confidence: 0, reason: `vol-gated (atr ${raw.atrPct.toFixed(2)}% > max ${config.maxVolAtrPct}%)` };
+    }
+  }
+
   // ── INVERT (fade your own signal) ──────────────────────────────────────────
   // If a signal is SYSTEMATICALLY wrong (net-negative in the direction it fires),
   // then the edge is the OPPOSITE trade — short when it says long. This flips the
