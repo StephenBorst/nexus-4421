@@ -15,6 +15,7 @@ import { NexusTierBadge } from "@/components/NexusTierBadge";
 import { MessageTraderButton } from "@/components/MessageTraderButton";
 import { NexusTreasuryStack } from "@/components/NexusTreasuryStack";
 import { NexusMarket } from "@/components/NexusMarket";
+import { NexusTicker } from "@/components/NexusTicker";
 import type { ThesisTrade } from "@/pages/lab/types";
 import { SocialBar } from "@/components/SocialBar";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
@@ -1611,6 +1612,8 @@ export default function FeedPage() {
 
   return (
     <div style={{ background: "#0a0a0b", minHeight: "100svh", padding: 0 }}>
+      {/* Live market tape — same Wall-Street ticker as the Lab, up top. */}
+      <NexusTicker />
       {/* Copy modal */}
       {copyTarget && walletAddress && (
         <CopyModal

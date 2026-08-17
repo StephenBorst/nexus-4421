@@ -13,11 +13,13 @@
 // for "today's price move" (same treatment as the sibling Mispriced/GAPS board).
 // $NEXUS is bone/accent, pinned first. Pauses on hover; honors reduced-motion.
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { C, MONO } from "@/config/theme";
 
 const PROXY = "https://orderly-proxy.stephenpatrick24.workers.dev";
 const NEXUS_TOKEN = "0x3D958634ab725B627919EF8F2Ed59227309fDba3";
 const GT_API = `https://api.geckoterminal.com/api/v2/networks/base/tokens/${NEXUS_TOKEN}`;
+const GT_PAGE = `https://www.geckoterminal.com/base/tokens/${NEXUS_TOKEN}`;
 
 interface Row {
   symbol: string;
@@ -59,6 +61,7 @@ function fmtChg(p: number): string {
 export function NexusTicker() {
   const [items, setItems] = useState<Item[] | null>(null);
   const nexus = useRef<Item | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     let alive = true;
@@ -107,12 +110,25 @@ export function NexusTicker() {
   const durationSec = Math.max(40, items.length * 3.6);
   const track = [...items, ...items];
 
+  // Click a market → its trading page; click $NEXUS → GeckoTerminal. Pause-on-hover
+  // stops the scroll so the target sits still under the cursor.
+  const onCell = (it: Item) => {
+    if (it.house) { window.open(GT_PAGE, "_blank", "noopener,noreferrer"); return; }
+    navigate(`/perp/${it.key}`);
+  };
+
   const Cell = ({ it, i }: { it: Item; i: number }) => (
     <span
       key={`${it.key}-${i}`}
+      className="nx-ticker-cell"
+      role="link"
+      tabIndex={0}
+      title={it.house ? "View $NEXUS on GeckoTerminal ↗" : `Trade ${it.sym}`}
+      onClick={() => onCell(it)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onCell(it); } }}
       style={{
         display: "inline-flex", alignItems: "center", gap: 7, padding: "0 16px",
-        borderRight: `1px solid ${C.border}`, whiteSpace: "nowrap", fontFamily: MONO, fontSize: 11,
+        borderRight: `1px solid ${C.border}`, whiteSpace: "nowrap", fontFamily: MONO, fontSize: 11, cursor: "pointer",
       }}
     >
       <span style={{ color: it.house ? C.accent : C.text.fog, fontWeight: it.house ? 700 : 600, letterSpacing: it.house ? "0.1em" : "0.02em" }}>{it.sym}</span>
@@ -136,6 +152,8 @@ export function NexusTicker() {
         @keyframes nx-ticker-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
         .nx-ticker-track { display: flex; align-items: center; white-space: nowrap; animation: nx-ticker-scroll ${durationSec}s linear infinite; will-change: transform; }
         .nx-ticker:hover .nx-ticker-track { animation-play-state: paused; }
+        .nx-ticker-cell { transition: background 120ms ease; outline: none; }
+        .nx-ticker-cell:hover, .nx-ticker-cell:focus-visible { background: ${C.surface}; }
         @media (prefers-reduced-motion: reduce) { .nx-ticker-track { animation: none; } }
       `}</style>
       <div className="nx-ticker-track">
