@@ -130,9 +130,19 @@ export function deriveSignal(raw, config = {}, regime = null, smartConsensus = n
     return { direction: "NONE", confidence: 0, reason: `smart-money-gated (${smartConsensus.count} traders ${smartConsensus.side})` };
   }
 
+  // ── INVERT (fade your own signal) ──────────────────────────────────────────
+  // If a signal is SYSTEMATICALLY wrong (net-negative in the direction it fires),
+  // then the edge is the OPPOSITE trade — short when it says long. This flips the
+  // final direction so the whole pipeline (feed, exec, and crucially the BACKTEST)
+  // reflects the faded call, letting you PROVE whether inverting is actually +EV for
+  // a given config rather than guessing. No-op on NONE. Off by default.
+  if (config.invertSignal && (direction === "LONG" || direction === "SHORT")) {
+    direction = direction === "LONG" ? "SHORT" : "LONG";
+  }
+
   const reason = direction === "NONE"
     ? why
-    : `${why} funding=${fundingRate.toFixed(6)} oiΔ=${(oiChange * 100).toFixed(3)}% priceΔ=${(priceChange * 100).toFixed(3)}%`;
+    : `${config.invertSignal ? "↺ inverted · " : ""}${why} funding=${fundingRate.toFixed(6)} oiΔ=${(oiChange * 100).toFixed(3)}% priceΔ=${(priceChange * 100).toFixed(3)}%`;
 
   return { direction, confidence, reason };
 }

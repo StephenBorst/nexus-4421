@@ -104,6 +104,7 @@ export interface AgentConfig {
   priceChangeThreshold: number; // % price move on the tick that triggers MOMENTUM / MEAN_REVERSION
   respectRegime?: boolean; // opt-in: brain skips NEW entries that fight a strong market regime
   respectSmartMoney?: boolean; // opt-in: brain skips NEW entries that fight strong smart-money consensus
+  invertSignal?: boolean; // opt-in: flip every entry to the OPPOSITE direction (fade a systematically-wrong signal)
   volScaledStops?: boolean; // opt-in: TP/SL scaled to each symbol's ATR instead of a flat %
   slAtrMult?: number;       // optional: stop = slAtrMult × ATR (default 1.0 in exec)
   // Multi-level take-profit ladder (scale-out). Unset = single 100% TP at tpPercent

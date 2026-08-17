@@ -1079,6 +1079,15 @@ export function AgentView() {
             </div>
           </div>
 
+          {/* Opt-in INVERT — the "fade your own signal" lever. If a config is
+              systematically wrong, the edge is the opposite trade. */}
+          <AgentToggleCard
+            label="// INVERT SIGNAL — fade the edge"
+            description={<>Flip every entry to the OPPOSITE direction — short when the signal says long, and vice-versa. If a config is systematically WRONG (net-negative in the direction it fires), the edge IS the fade. <b style={{ color: "#ededf0" }}>Prove it first:</b> run Test / Sweep with this on and compare the net R against it off. Off by default.</>}
+            on={!!config.invertSignal}
+            onToggle={() => setConfig({ ...config, invertSignal: !config.invertSignal })}
+          />
+
           {/* Opt-in market-TAPE filter — gates entries that fight a strong tape.
               Server-enforced in the brain; never flips direction or touches positions.
               ⚠️ The stored config key stays `respectRegime` — it's persisted in KV, read
