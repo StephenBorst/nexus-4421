@@ -80,6 +80,27 @@ function bySymbol(trades: BriefingTrade[]) {
   return { best: arr[0], worst: arr[arr.length - 1] };
 }
 
+// Trading session (UTC) each trade opened in — the "when" lens. Three coarse
+// windows so buckets stay populated: Asia (00–08), Europe (08–15), Americas
+// (15–24 UTC). Coarse on purpose — enough to expose a session leak without
+// slicing the sample so thin the read is noise.
+function sessionOf(ts: number): "Asia" | "Europe" | "US" {
+  const h = new Date(ts).getUTCHours();
+  return h < 8 ? "Asia" : h < 15 ? "Europe" : "US";
+}
+function bySession(trades: BriefingTrade[]) {
+  const m = new Map<string, { net: number; n: number; wins: number }>();
+  for (const t of trades) {
+    const k = sessionOf(t.timestamp);
+    const cur = m.get(k) || { net: 0, n: 0, wins: 0 };
+    cur.net += t.pnl; cur.n += 1; if (t.pnl > 0) cur.wins += 1; m.set(k, cur);
+  }
+  const arr = [...m.entries()].filter(([, v]) => v.n >= 4);
+  if (arr.length < 2) return null;
+  arr.sort((a, b) => b[1].net - a[1].net);
+  return { best: arr[0], worst: arr[arr.length - 1] };
+}
+
 // ── THE READ — the general (wallet-free) market synthesis ────────────────────
 // The personal Briefing reads YOUR record; this reads THE MARKET, in the same
 // voice, so the Lab feels intelligent to anyone — connected or not. Sourced from
@@ -522,6 +543,46 @@ export function buildBriefing(input: BriefingInput): Insight[] {
         }
       }
     }
+  }
+
+  // 5b — Tilt: do the trades you take right after a loss underperform? The classic
+  // revenge-trade leak — measurable only from your own sequenced record. Fires when
+  // after-a-loss trades win materially less than your baseline (real sample only).
+  if (n >= 8) {
+    const asc = [...trades].sort((a, b) => a.timestamp - b.timestamp);
+    const afterLoss: BriefingTrade[] = [];
+    for (let i = 1; i < asc.length; i++) if (asc[i - 1].pnl < 0) afterLoss.push(asc[i]);
+    if (afterLoss.length >= 5) {
+      const alWr = wrOf(afterLoss);
+      const alNet = afterLoss.reduce((s, t) => s + t.pnl, 0);
+      if (winRate - alWr >= 12) {
+        out.push({
+          id: "tilt-after-loss",
+          priority: 72,
+          tone: "caution",
+          title: "You trade worse right after a loss",
+          detail: `${alWr}% win rate on the ${afterLoss.length} trades you took immediately after a red close (${money(alNet)}) vs ${winRate.toFixed(0)}% overall — that's tilt. After a loss, step back before the next entry instead of pressing.`,
+          action: { label: "Open the log", tab: "tradelog" },
+        });
+      }
+    }
+  }
+
+  // 5c — Session edge: WHEN you trade well. Buckets by UTC session (Asia/Europe/US)
+  // and surfaces it only when one clearly pays and another clearly bleeds — the
+  // "trade your hours" read, computable from your own timestamps.
+  const sess = bySession(trades);
+  if (sess && sess.best[0] !== sess.worst[0] && sess.best[1].net > 0 && sess.worst[1].net < 0) {
+    const [bName, bV] = sess.best;
+    const [wName, wV] = sess.worst;
+    out.push({
+      id: "session-edge",
+      priority: 58,
+      tone: "info",
+      title: `Your edge is in the ${bName} session`,
+      detail: `${bName} hours ${money(bV.net)} over ${bV.n} trades (${Math.round((bV.wins / bV.n) * 100)}% win) — ${wName} hours ${money(wV.net)} over ${wV.n} (${Math.round((wV.wins / wV.n) * 100)}%). Trade when you're sharp; sit out the ${wName} session or size down.`,
+      action: { label: "By-time stats", tab: "analytics" },
+    });
   }
 
   // 6 — Proven record, no agent running → automate the edge.
