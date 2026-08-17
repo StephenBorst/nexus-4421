@@ -39,6 +39,7 @@ interface Row {
   play: { klass: "CONFLUENCE" | "FADE" | "TREND" | "LEAN" | null; dir: Dir | null; label: string; strong: boolean };
   score: number;
   mine: { tone: "pos" | "caution"; text: string } | null;
+  record: { net: number; n: number; wr: number } | null;   // your graded record on THIS market
 }
 
 const tk = (s: string) => s.replace("PERP_", "").replace("_USDC", "");
@@ -87,7 +88,20 @@ function scoreOf(play: Row["play"], funding: number): number {
 // on (userSide) and their counter-trend/with-trend align edge — the same inputs the
 // Briefing's fusion uses, applied per row. Honest: it states your record, never that
 // you'll win because of it.
-type Trade = { direction: Dir; pnl: number };
+type Trade = { symbol: string; direction: Dir; pnl: number };
+
+// Your realized record per market (bare ticker) — the most granular personal lens,
+// and the one that fires for ANY symbol you've actually traded, even without a
+// directional side edge. "Should I take this BTC play? I'm +$26 net on BTC."
+function symbolRecords(trades: Trade[]): Record<string, { net: number; n: number; wins: number }> {
+  const m: Record<string, { net: number; n: number; wins: number }> = {};
+  for (const t of trades) {
+    const k = tk(t.symbol);
+    const cur = m[k] || (m[k] = { net: 0, n: 0, wins: 0 });
+    cur.net += t.pnl; cur.n += 1; if (t.pnl > 0) cur.wins += 1;
+  }
+  return m;
+}
 type ProcessEdge = { align?: { bucket: string; avgR: number }; contrarian?: { calls: number; avgR: number } } | null;
 type Edge = { side: Dir | null; wr: number; alignClass: "AGAINST_TREND" | "WITH_TREND" | null; alignAvgR: number };
 
@@ -147,7 +161,8 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
   }, [wallet]);
 
   const edge = useMemo(() => computeEdge(trades ?? [], proc), [trades, proc]);
-  const hasLens = !!(edge.side || edge.alignClass);
+  const records = useMemo(() => symbolRecords(trades ?? []), [trades]);
+  const hasLens = !!(edge.side || edge.alignClass || Object.keys(records).length);
 
   useEffect(() => {
     let alive = true;
@@ -189,10 +204,11 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
         play,
         score: scoreOf(play, s.funding_rate_8h),
         mine: personalRead(play, edge),
+        record: (() => { const rec = records[s.symbol]; return rec && rec.n >= 2 ? { net: rec.net, n: rec.n, wr: Math.round((rec.wins / rec.n) * 100) } : null; })(),
       } as Row;
     });
-    // "mine" ranks your-edge plays first (positive tag), then off-your-side, then the rest.
-    const mineRank = (r: Row) => (r.mine?.tone === "pos" ? 0 : r.mine?.tone === "caution" ? 1 : 2);
+    // "mine" ranks your-edge plays first, then any market you have a record on, then the rest.
+    const mineRank = (r: Row) => (r.mine?.tone === "pos" ? 0 : r.record ? 1 : r.mine?.tone === "caution" ? 2 : 3);
     const cmp: Record<SortMode, (a: Row, b: Row) => number> = {
       actionable: (a, b) => b.score - a.score,
       funding: (a, b) => Math.abs(b.funding) - Math.abs(a.funding),
@@ -200,7 +216,7 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
       mine: (a, b) => (mineRank(a) - mineRank(b)) || (b.score - a.score),
     };
     return out.sort(cmp[sort]);
-  }, [signals, tape, consensus, sort, edge]);
+  }, [signals, tape, consensus, sort, edge, records]);
 
   // OBSERVE → PLAN handoff: a clean read is a thesis waiting to be written. Draft the
   // play into the Thesis Engine (same contract the Mispriced board + copilot use).
@@ -324,11 +340,16 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
                           <span style={{ color: r.play.dir === "LONG" ? C.pos : C.neg, opacity: 0.55 }}>{r.play.dir === "LONG" ? "↑" : "↓"}</span>{r.play.label}
                         </span>
                       : <span style={{ color: C.text.faint, fontSize: 11 }}>—</span>}
-                    {r.mine && (
+                    {r.mine ? (
                       <span style={{ fontSize: 8.5, letterSpacing: "0.02em", color: r.mine.tone === "pos" ? C.pos : C.warn, display: "inline-flex", alignItems: "center", gap: 4 }}>
                         <span style={{ fontSize: 9 }}>{r.mine.tone === "pos" ? "◆" : "△"}</span>{r.mine.text}
                       </span>
-                    )}
+                    ) : r.record ? (
+                      <span style={{ fontSize: 8.5, letterSpacing: "0.02em", color: C.text.faint, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        your record <b style={{ color: r.record.net >= 0 ? C.pos : C.neg }}>{r.record.net >= 0 ? "+" : "−"}${Math.abs(r.record.net) >= 1000 ? `${(Math.abs(r.record.net) / 1000).toFixed(1)}k` : Math.abs(r.record.net).toFixed(0)}</b>
+                        <span style={{ color: C.text.faint }}>· {r.record.n}t · {r.record.wr}%</span>
+                      </span>
+                    ) : null}
                   </div>
                   {/* Action — draft the play as a thesis (real setups only) */}
                   <div style={{ ...cell, justifyContent: "flex-end" }}>
