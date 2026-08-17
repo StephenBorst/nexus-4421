@@ -77,7 +77,12 @@ export function oiSeriesInfo(rows) {
 // (decimal) at/before ts. oiChangeAt(tsSec) → fractional OI change (or null) —
 // pass it to make CONFLUENCE/OI_ONLY testable; omit for funding/price-only modes.
 // config: an agent config. Returns aggregate + trade list.
-export function runBacktest(candles, fundingAt, config, fundingPctAt = null, oiChangeAt = null) {
+// entryFilter (optional): (candles, i, sig, config) => boolean. A no-lookahead gate
+// applied AFTER deriveSignal fires — returns false to SUPPRESS an otherwise-valid
+// entry. This is the conditioning hook: it lets research test "the signal only works
+// in <regime/session/vol>" without changing the signal itself. Default null = no gate,
+// so every existing caller (lab-api endpoints) is byte-for-byte unchanged.
+export function runBacktest(candles, fundingAt, config, fundingPctAt = null, oiChangeAt = null, entryFilter = null) {
   const trades = [];
   let pos = null;
   let lastExitIdx = -Infinity;
@@ -133,7 +138,8 @@ export function runBacktest(candles, fundingAt, config, fundingPctAt = null, oiC
       const raw = { priceChange, oiChange, fundingRate: fundingAt(c.t) || 0, hasPrev: true };
       if (fundingPctAt && (config.fundingPercentileMin || 0) > 0) raw.fundingPct = fundingPctAt(c.t, raw.fundingRate);
       const sig = deriveSignal(raw, config);
-      if (sig.direction && sig.direction !== "NONE" && (sig.confidence ?? 0) >= 50) {
+      if (sig.direction && sig.direction !== "NONE" && (sig.confidence ?? 0) >= 50
+          && (!entryFilter || entryFilter(candles, i, sig, config))) {
         // Vol-scaled stops: size the stop to recent ATR at entry (no lookahead),
         // preserving the configured reward:risk. Falls back to fixed when ATR unavailable.
         let lvl = null;
