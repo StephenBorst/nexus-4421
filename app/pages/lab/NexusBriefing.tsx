@@ -12,6 +12,9 @@ import { SectionHeader } from "./components";
 import type { TabId, ProcessedTrade } from "./types";
 import { buildBriefing, buildMarketRead, buildFusion, buildForecastRead, computeTape, type BriefingTrade, type Insight, type MarketSignal, type ForecastRead } from "./briefing";
 import { recordFlag, coachingInsight } from "@/lib/coaching.mjs";
+import { buildOperatorProfile, profileNarrative } from "@/lib/operatorProfile.mjs";
+import { tiltRead, sessionEdge } from "@/lib/behavioral.mjs";
+import { computeEdge } from "@/config/edge";
 
 const FLAGS_KEY = "nexus_flagged_setups";
 const money = (n: number) => `${n < 0 ? "-" : "+"}$${Math.abs(n) >= 1000 ? `${(Math.abs(n) / 1000).toFixed(1)}K` : Math.abs(n).toFixed(2)}`;
@@ -70,6 +73,7 @@ export function NexusBriefing({
   const [consensus, setConsensus] = useState<Consensus | null>(null);
   const [myContrarian, setMyContrarian] = useState<{ calls: number; avgR: number } | null>(null);
   const [myAlignEdge, setMyAlignEdge] = useState<{ best: { bucket: string; avgR: number } } | null>(null);
+  const [process, setProcess] = useState<Record<string, unknown> | null>(null);
   const [forecasts, setForecasts] = useState<ForecastRead[] | null>(null);
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(COLLAPSE_KEY) === "1"; } catch { return false; }
@@ -101,6 +105,7 @@ export function NexusBriefing({
     fetch(`${AGENT_API}/theses/process/${wallet}`).then((r) => r.json())
       .then((d) => {
         if (!alive) return;
+        setProcess(d && typeof d === "object" ? d : null);
         setMyContrarian(d?.contrarian ? { calls: d.contrarian.calls, avgR: d.contrarian.avgR } : null);
         setMyAlignEdge(d?.regimeEdges?.align?.best ? { best: { bucket: d.regimeEdges.align.best.bucket, avgR: d.regimeEdges.align.best.avgR } } : null);
       })
@@ -125,6 +130,24 @@ export function NexusBriefing({
     const bt: BriefingTrade[] = trades.map((t) => ({ symbol: t.symbol, direction: t.direction, pnl: t.pnl, timestamp: t.timestamp }));
     return buildFusion({ trades: bt, signals, consensus, tape, contrarian: myContrarian, alignEdge: myAlignEdge }).slice(0, 2);
   }, [trades, signals, consensus, tape, myContrarian, myAlignEdge]);
+
+  // ⭐ THE OPERATOR READ — the Lab's one point of view about YOU, surfaced proactively
+  // on the OBSERVE tab instead of buried in Analytics. Composed from the same builder
+  // (archetype + severity-ranked reads); the full card + share + unlocks stay in
+  // Analytics. Only fires once the record is real (tier ≠ UNKNOWN).
+  const operator = useMemo(() => {
+    if (!wallet || !trades.length) return null;
+    const bt: BriefingTrade[] = trades.map((t) => ({ symbol: t.symbol, direction: t.direction, pnl: t.pnl, timestamp: t.timestamp }));
+    const p = buildOperatorProfile({
+      process,
+      edge: computeEdge(trades.map((t) => ({ symbol: t.symbol, pnl: t.pnl, side: t.side || t.direction }))),
+      behavioral: { tilt: tiltRead(bt), session: sessionEdge(bt) },
+      trades,
+    });
+    if (!p || p.tier === "UNKNOWN" || (!p.archetype && !p.reads.length)) return null;
+    // Lead with WHO you are + your single costliest read (severity-ranked already).
+    return { archetype: p.archetype, lead: p.reads[0] || null, meritRank: p.meritRank, tier: p.tier, narrative: profileNarrative(p, { max: 2 }) };
+  }, [wallet, trades, process]);
 
   // Coaching loop — remember every "your setup" the fusion flags, so follow-through
   // can be measured against your actual trades. Continuity, not a goldfish.
@@ -206,6 +229,27 @@ export function NexusBriefing({
 
       {!collapsed && (
         <div style={{ border: "1px solid #1c1c20", borderRadius: 8, overflow: "hidden", background: "#0c0c0e", marginTop: -6 }}>
+          {/* ⭐ THE OPERATOR READ — who you are + your single costliest habit, leading the
+              briefing so the you-engine greets you here, not just in Analytics. */}
+          {operator && (
+            <div style={{ padding: "12px 14px", borderBottom: "1px solid #1c1c20", background: "#0e0e12" }}>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                  <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8.5, letterSpacing: "0.2em", color: "#52525b", textTransform: "uppercase" }}>Your operator read</span>
+                  {operator.meritRank && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#a1a1aa", border: "1px solid #33333a", borderRadius: 2, padding: "0 4px" }}>{operator.meritRank.glyph} {operator.meritRank.title.toUpperCase()}</span>}
+                </span>
+                <button onClick={() => onSelectTab("analytics")} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.05em", color: "#a1a1aa", background: "none", border: "none", cursor: "pointer", padding: 0 }}>full profile →</button>
+              </div>
+              {operator.archetype && (
+                <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 17, color: "#f4f4f5", marginTop: 5, lineHeight: 1.2, letterSpacing: "-0.01em" }}>{operator.archetype.label}</div>
+              )}
+              {operator.lead && (
+                <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 12, color: "#a1a1aa", lineHeight: 1.55, marginTop: 5 }}>
+                  {operator.lead.text.charAt(0).toUpperCase() + operator.lead.text.slice(1)}.
+                </div>
+              )}
+            </div>
+          )}
           {/* ⭐ The fusion leads — "is this setup mine". Labeled only when other lenses show. */}
           {fusion.length > 0 && (
             <>
