@@ -224,6 +224,11 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
   const cols = "minmax(64px,0.9fr) minmax(78px,1fr) minmax(88px,1.1fr) 64px minmax(74px,0.9fr) minmax(76px,0.9fr) minmax(120px,1.3fr) 40px";
   const cell: React.CSSProperties = { fontFamily: MONO, fontSize: 11, display: "flex", alignItems: "center", minWidth: 0 };
   const head: React.CSSProperties = { fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", textTransform: "uppercase", color: C.text.faint, display: "flex", alignItems: "center" };
+  // Tighter grid on phones — less column gap + row padding so the dense table doesn't
+  // waste vertical space (the two-line PLAY cell already adds height).
+  const gridGap = isMobile ? 6 : 10;
+  const rowPad = isMobile ? "6px 8px" : "9px 10px";
+  const headPad = isMobile ? "0 8px 6px" : "0 10px 8px";
 
   return (
     <div style={{ marginBottom: 28 }}>
@@ -253,7 +258,7 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
         <div style={{ overflowX: "auto" }}>
           <div style={{ minWidth: 640 }}>
             {/* header row */}
-            <div style={{ display: "grid", gridTemplateColumns: cols, gap: 10, padding: "0 10px 8px", borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ display: "grid", gridTemplateColumns: cols, gap: gridGap, padding: headPad, borderBottom: `1px solid ${C.border}` }}>
               <div style={head}>Market</div>
               <div style={head}>Last / 24h</div>
               <div style={head}>Funding /8h</div>
@@ -266,7 +271,7 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
             {rows.map((r) => {
               const fundHot = Math.abs(r.funding) >= CROWDED;
               return (
-                <div key={r.sym} style={{ display: "grid", gridTemplateColumns: cols, gap: 10, padding: "9px 10px", borderBottom: `1px solid ${C.surfaceAlt}`, alignItems: "center" }}>
+                <div key={r.sym} style={{ display: "grid", gridTemplateColumns: cols, gap: gridGap, padding: rowPad, borderBottom: `1px solid ${C.surfaceAlt}`, alignItems: "center" }}>
                   {/* Market */}
                   <div style={{ ...cell, fontSize: 13, fontWeight: 700, color: C.text.bright }}>{r.sym}</div>
                   {/* Last / 24h */}
