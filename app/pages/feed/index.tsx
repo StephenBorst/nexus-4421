@@ -1631,8 +1631,10 @@ export default function FeedPage() {
         <SectionHeader eyebrow={feedHead.eyebrow} title={feedHead.title} />
       </div>
 
-      {/* Tab bar / header */}
-      <div style={{ display: "flex", gap: 8, padding: "8px 16px", borderBottom: "1px solid #232327", background: "#0f0f11", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", rowGap: 8 }}>
+      {/* Tab bar / header — full-bleed divider, but the controls align to the same
+          860 content column as the header + feed so everything shares one left edge. */}
+      <div style={{ borderBottom: "1px solid #232327", background: "#0f0f11" }}>
+      <div style={{ maxWidth: 860, margin: "0 auto", display: "flex", gap: 8, padding: "8px 16px", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", rowGap: 8, boxSizing: "border-box" }}>
         <div style={{ display: "flex", gap: isMobile ? 4 : 6, flexWrap: isMobile ? "nowrap" : "wrap", rowGap: 6, width: isMobile ? "100%" : undefined }}>
           <button
             onClick={() => setView("feed")}
@@ -1714,6 +1716,7 @@ export default function FeedPage() {
             );
           })()}
         </div>
+      </div>
       </div>
 
       <div className="nx-stagger" style={{ padding: 16, maxWidth: 860, margin: "0 auto" }}>
