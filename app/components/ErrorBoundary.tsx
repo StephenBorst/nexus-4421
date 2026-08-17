@@ -197,10 +197,10 @@ export function ErrorBoundary() {
           marginTop: '1.5rem',
           padding: '1rem',
           background: '#232327',
-          borderLeft: '3px solid #4a9',
+          borderLeft: '3px solid #33333a',
           borderRadius: '4px',
         }}>
-          <strong style={{ color: '#4a9' }}>Developer Information</strong>
+          <strong style={{ color: '#ededf0' }}>Developer Information</strong>
           <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#aaa' }}>
             Full error details including stack trace have been logged to the browser console. 
             Check the console for complete debugging information.
@@ -218,18 +218,18 @@ export function ErrorBoundary() {
             onClick={() => window.location.reload()}
             style={{
               padding: '0.75rem 1.5rem',
-              background: '#4a9',
-              color: '#fff',
+              background: '#ededf0',
+              color: '#141416',
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
               fontSize: '1rem',
               fontWeight: 'bold',
             }}
-            onMouseOver={(e) => e.currentTarget.style.background = '#5ba'}
-            onMouseOut={(e) => e.currentTarget.style.background = '#4a9'}
-            onFocus={(e) => e.currentTarget.style.background = '#5ba'}
-            onBlur={(e) => e.currentTarget.style.background = '#4a9'}
+            onMouseOver={(e) => e.currentTarget.style.background = '#fff'}
+            onMouseOut={(e) => e.currentTarget.style.background = '#ededf0'}
+            onFocus={(e) => e.currentTarget.style.background = '#fff'}
+            onBlur={(e) => e.currentTarget.style.background = '#ededf0'}
           >
             Reload Page
           </button>
