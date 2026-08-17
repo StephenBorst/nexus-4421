@@ -94,7 +94,7 @@ export function deriveArchetype({ regimeEdges, expectancy, holdHours, gradedCall
 // Severity-ordered so the narrative opens with the thing that costs the most money.
 // `provenance: "graded"` = derived from public price and safe to show publicly;
 // "private" = the user's own fills or self-reported tags — coaching only.
-export const READ_ORDER = ["MONEY_LEAK", "REGIME", "PAYOFF", "DISCIPLINE", "CALIBRATION", "SYMBOL"];
+export const READ_ORDER = ["MONEY_LEAK", "TILT", "REGIME", "PAYOFF", "DISCIPLINE", "CALIBRATION", "SESSION", "SYMBOL"];
 export const PUBLIC_READS = new Set(["REGIME", "PAYOFF", "DISCIPLINE", "CALIBRATION"]);
 
 const BUCKET_WORD = {
@@ -116,8 +116,9 @@ const word = (b) => BUCKET_WORD[b] ?? b;
  * @param {object|null} [i.adherence]  adherenceReport(theses, trades) (private)
  * @param {object|null} [i.leaks]      leakProfile(theses) (private, self-reported)
  * @param {object[]|null} [i.trades]   closed positions (private, for hold time)
+ * @param {object|null} [i.behavioral] { tilt, session } from behavioral.mjs (private, sequenced fills)
  */
-export function buildOperatorProfile({ process, edge, adherence, leaks, trades } = {}) {
+export function buildOperatorProfile({ process, edge, adherence, leaks, trades, behavioral } = {}) {
   const gradedCalls = Number(process?.calls) || 0;
   const expectancy = process?.expectancy || null;
   const regimeEdges = process?.regimeEdges || null;
@@ -142,6 +143,18 @@ export function buildOperatorProfile({ process, edge, adherence, leaks, trades }
       kind: "MONEY_LEAK", provenance: "private", severity: 3,
       key: c.label, costUsd: c.cost, count: c.count,
       text: `costing you ${money(c.cost)} across ${c.count} ${c.count === 1 ? "trade" : "trades"}`,
+    });
+  }
+
+  // 1b. TILT — the behavioral money-leak the ledger can't tag: do the trades you take
+  // right after a loss underperform? Only your sequenced fills reveal it; ranks with the
+  // money leaks because pressing to get even is exactly where records bleed.
+  if (behavioral?.tilt) {
+    const t = behavioral.tilt;
+    reads.push({
+      kind: "TILT", provenance: "private", severity: 3,
+      afterLossWr: t.afterLossWr, baselineWr: t.baselineWr, gapPts: t.gapPts, count: t.n, netUsd: t.netUsd,
+      text: `you trade worse right after a loss — ${t.afterLossWr}% win on the ${t.n} trades after a red close vs ${t.baselineWr}% overall, so step back before pressing`,
     });
   }
 
@@ -201,6 +214,17 @@ export function buildOperatorProfile({ process, edge, adherence, leaks, trades }
       text: w && w.symbol !== b.symbol && w.trades >= 3
         ? `you make money on ${b.symbol} (${money(b.pnl)}) and give it back on ${w.symbol} (${money(w.pnl)})`
         : `${b.symbol} is your most profitable market (${money(b.pnl)})`,
+    });
+  }
+
+  // 7. SESSION — WHEN you trade well. A private "trade your hours" read; low severity
+  // (it's a filter, not a leak) but a genuinely useful lever the graded record can't see.
+  if (behavioral?.session) {
+    const s = behavioral.session;
+    reads.push({
+      kind: "SESSION", provenance: "private", severity: 1,
+      best: s.best.name, worst: s.worst.name,
+      text: `your edge is in the ${s.best.name} session (+${money(s.best.net)} over ${s.best.n}) and it bleeds in the ${s.worst.name} (−${money(s.worst.net)}) — trade when you're sharp`,
     });
   }
 

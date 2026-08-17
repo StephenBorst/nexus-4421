@@ -276,3 +276,34 @@ test("unlocks: never tells a connected user to connect their wallet", () => {
   assert.ok(!/^Connect your wallet/i.test(walletLine.text), `misleading for a connected user: ${walletLine.text}`);
   assert.match(walletLine.text, /no closed trades/i);
 });
+
+// ── behavioral reads (tilt / session) compose in ────────────────────────────
+test("TILT read composes in as a high-severity private read", () => {
+  const p = buildOperatorProfile({
+    process: { calls: 12 },
+    behavioral: { tilt: { afterLossWr: 20, baselineWr: 55, gapPts: 35, n: 8, netUsd: -120 } },
+  });
+  const tilt = p.reads.find((r) => r.kind === "TILT");
+  assert.ok(tilt, "expected a TILT read");
+  assert.equal(tilt.severity, 3);
+  assert.equal(tilt.provenance, "private");
+  assert.ok(/after a loss/.test(tilt.text));
+  assert.ok(!PUBLIC_READS.has("TILT"), "tilt is private, never public");
+});
+
+test("SESSION read composes in and shows signed nets", () => {
+  const p = buildOperatorProfile({
+    process: { calls: 12 },
+    behavioral: { session: { best: { name: "US", net: 200, n: 20, wr: 60 }, worst: { name: "Asia", net: -90, n: 10, wr: 35 } } },
+  });
+  const s = p.reads.find((r) => r.kind === "SESSION");
+  assert.ok(s, "expected a SESSION read");
+  assert.ok(/US session \(\+\$200/.test(s.text), s.text);
+  assert.ok(/Asia \(−\$90/.test(s.text), s.text);
+});
+
+test("no behavioral input → no tilt/session reads (fail-soft)", () => {
+  const p = buildOperatorProfile({ process: { calls: 12 } });
+  assert.equal(p.reads.find((r) => r.kind === "TILT"), undefined);
+  assert.equal(p.reads.find((r) => r.kind === "SESSION"), undefined);
+});
