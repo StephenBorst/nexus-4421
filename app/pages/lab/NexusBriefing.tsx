@@ -8,6 +8,7 @@
 // Deterministic (no LLM, no key, instant), with a one-tap hand-off to NEXUS AI to
 // go deeper. Renders nothing when there's genuinely nothing to say (cold-start safe).
 import { useEffect, useMemo, useState } from "react";
+import { SectionHeader } from "./components";
 import type { TabId, ProcessedTrade } from "./types";
 import { buildBriefing, buildMarketRead, buildFusion, buildForecastRead, computeTape, type BriefingTrade, type Insight, type MarketSignal, type ForecastRead } from "./briefing";
 import { recordFlag, coachingInsight } from "@/lib/coaching.mjs";
@@ -183,25 +184,28 @@ export function NexusBriefing({
   }));
 
   return (
-    <div className="nx-fade-in" style={{ border: "1px solid #232327", borderRadius: 8, background: "linear-gradient(180deg,#111113,#0d0d0f)", marginBottom: 16, overflow: "hidden" }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderBottom: collapsed ? "none" : "1px solid #1c1c20" }}>
-        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 700, letterSpacing: "0.14em", color: "#ededf0" }}>◆ THE BRIEFING</span>
-        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", letterSpacing: "0.06em" }}>
-          {personal.length ? "your terminal + the market, read" : "the market, right now"} · {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-        </span>
-        {tape && (
-          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: tape.label === "RISK-OFF" ? "#f7525f" : tape.label === "RISK-ON" ? "#ededf0" : "#a1a1aa", letterSpacing: "0.06em" }}>
-            · {tape.label} {tape.score}
+    <div className="nx-fade-in" style={{ marginBottom: 24 }}>
+      {/* Editorial header — congruent with THE BOARD + The Market Terminal (eyebrow →
+          serif headline → amber rule). The live meta (read type · date · tape) and the
+          collapse control ride in the note slot. */}
+      <SectionHeader
+        eyebrow="// THE BRIEFING"
+        title="What matters right now"
+        note={
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+            <span>
+              {personal.length ? "your terminal + the market" : "the market, right now"} · {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              {tape && <span style={{ color: tape.label === "RISK-OFF" ? "#f7525f" : tape.label === "RISK-ON" ? "#ededf0" : "#a1a1aa" }}> · {tape.label} {tape.score}</span>}
+            </span>
+            <button onClick={toggle} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", background: "none", border: "1px solid #232327", borderRadius: 3, padding: "3px 8px", cursor: "pointer", letterSpacing: "0.05em" }}>
+              {collapsed ? `SHOW (${total})` : "HIDE"}
+            </button>
           </span>
-        )}
-        <button onClick={toggle} style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", background: "none", border: "1px solid #232327", borderRadius: 3, padding: "3px 8px", cursor: "pointer", letterSpacing: "0.05em" }}>
-          {collapsed ? `SHOW (${total})` : "HIDE"}
-        </button>
-      </div>
+        }
+      />
 
       {!collapsed && (
-        <div>
+        <div style={{ border: "1px solid #1c1c20", borderRadius: 8, overflow: "hidden", background: "#0c0c0e", marginTop: -6 }}>
           {/* ⭐ The fusion leads — "is this setup mine". Labeled only when other lenses show. */}
           {fusion.length > 0 && (
             <>

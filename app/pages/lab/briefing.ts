@@ -457,24 +457,28 @@ export function buildBriefing(input: BriefingInput): Insight[] {
     }
   }
 
-  // 2 — Recent streak (behavioral; acts on the last few closes).
+  // 2 — Recent streak (behavioral; acts on the last few closes). Count the ACTUAL
+  // run length off the newest trades — don't hardcode "three"/"four" (a 7-win streak
+  // was rendering as "Four wins in a row"). A break-even (pnl === 0) ends a run.
   if (n >= 3) {
-    const last3 = sorted.slice(0, 3);
-    if (last3.every((t) => t.pnl < 0)) {
+    let winRun = 0, lossRun = 0;
+    for (const t of sorted) { if (t.pnl > 0) winRun++; else break; }
+    for (const t of sorted) { if (t.pnl < 0) lossRun++; else break; }
+    if (lossRun >= 3) {
       out.push({
         id: "streak-cold",
         priority: 85,
         tone: "caution",
-        title: "Three straight losses",
+        title: `${lossRun} straight losses`,
         detail: "Cold streaks compound when you press to get even. Size down or step away — the tape will still be here tomorrow.",
         action: { label: "Review the log", tab: "tradelog" },
       });
-    } else if (n >= 4 && sorted.slice(0, 4).every((t) => t.pnl > 0)) {
+    } else if (winRun >= 4) {
       out.push({
         id: "streak-hot",
         priority: 55,
         tone: "positive",
-        title: "Four wins in a row",
+        title: `${winRun} wins in a row`,
         detail: "You're in rhythm. Press the edge, but keep the same risk per trade — streaks end when size creeps.",
         action: { label: "See what's working", tab: "analytics" },
       });
