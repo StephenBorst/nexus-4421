@@ -22,9 +22,16 @@ import { STRATEGY_PRESETS } from "@/config/strategyPresets";
 const PROVEN_EDGE = STRATEGY_PRESETS.find((p) => p.id === "proven-edge")?.config ?? {};
 
 const bg = "#0a0a0b";
-const green = "#ededf0";
+// Color law (monochrome editorial rebrand): accent = bone #ededf0 (CTAs, interaction,
+// brand); profit-green #3ecf8e = up / profit / live / long ONLY; red = loss / down.
+const accent = "#ededf0";
+const profit = "#3ecf8e";
+const green = accent;   // legacy alias for the CTA/interaction sites; value-coloring uses `profit`
 const red = "#f7525f";
 const mono = "var(--nx-font-mono)";
+const serif = "var(--nx-font-serif)";
+const ui = "var(--nx-font-ui)";
+const amber = "#fbbf24";
 const APP = "https://trade.nexustradinglabs.com";
 const API = "https://og.nexustradinglabs.com";
 const NEXUS = "0x3D958634ab725B627919EF8F2Ed59227309fDba3";
@@ -654,15 +661,18 @@ export default function MiniApp() {
 
   return (
     <div style={shell}>
-      {/* Header */}
+      {/* Header — editorial lockup: mono wordmark → serif headline → amber hairline rule */}
       <div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ color: green, fontWeight: "bold", letterSpacing: "0.25em" }}>//</span>
-          <span style={{ color: "#fff", fontWeight: "bold", letterSpacing: "0.2em" }}>NEXUS</span>
-          <button onClick={saveApp} style={{ marginLeft: "auto", background: added ? "#1a1a1e" : "none", border: `1px solid ${added ? "#33333a" : "#232327"}`, borderRadius: 3, color: added ? green : "#a1a1aa", fontFamily: mono, fontSize: 9, padding: "3px 9px", cursor: "pointer", letterSpacing: "0.06em" }}>{added ? "★ SAVED" : "★ SAVE"}</button>
+          <span style={{ color: accent, fontWeight: "bold", letterSpacing: "0.25em", fontFamily: mono }}>//</span>
+          <span style={{ color: "#fff", fontWeight: "bold", letterSpacing: "0.2em", fontFamily: mono }}>NEXUS</span>
+          <span style={{ fontSize: 8, color: "#52525b", letterSpacing: "0.18em", fontFamily: mono }}>TRADING&nbsp;LABS</span>
+          <button onClick={saveApp} style={{ marginLeft: "auto", background: added ? "#1a1a1e" : "none", border: `1px solid ${added ? "#33333a" : "#232327"}`, borderRadius: 3, color: added ? profit : "#a1a1aa", fontFamily: mono, fontSize: 9, padding: "3px 9px", cursor: "pointer", letterSpacing: "0.06em" }}>{added ? "★ SAVED" : "★ SAVE"}</button>
         </div>
-        <div style={{ fontSize: 9, color: "#71717a", marginTop: 4, letterSpacing: "0.05em" }}>the terminal that makes you a better trader</div>
-        {addErr && <div style={{ fontSize: 9, color: "#fbbf24", marginTop: 6, lineHeight: 1.5, wordBreak: "break-word" }}>add failed: {addErr}</div>}
+        <div style={{ fontFamily: serif, fontSize: 19, color: "#fff", marginTop: 9, lineHeight: 1.15, letterSpacing: "-0.01em" }}>The terminal that<br />makes you better.</div>
+        <div style={{ height: 2, width: 40, background: amber, marginTop: 9, borderRadius: 1 }} />
+        <div style={{ fontSize: 9, color: "#71717a", marginTop: 8, letterSpacing: "0.04em", fontFamily: ui }}>Verifiable track records · autonomous agents · one-tap perps.</div>
+        {addErr && <div style={{ fontSize: 9, color: amber, marginTop: 6, lineHeight: 1.5, wordBreak: "break-word" }}>add failed: {addErr}</div>}
       </div>
 
       {!booted && <div style={{ ...card, color: "#71717a", fontSize: 12 }}>loading…</div>}
@@ -679,7 +689,7 @@ export default function MiniApp() {
         <div style={{ ...card, display: "flex", alignItems: "center", gap: 10, padding: "9px 12px" }}>
           {user.pfpUrl && <img src={user.pfpUrl} alt="" style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid #232327" }} />}
           <div style={{ fontSize: 12, color: "#fff", fontWeight: "bold" }}>{user.displayName || user.username || "you"}</div>
-          <span style={{ marginLeft: "auto", fontSize: 9, color: green }}>● live</span>
+          <span style={{ marginLeft: "auto", fontSize: 9, color: profit }}>● live</span>
         </div>
       )}
 
@@ -693,7 +703,7 @@ export default function MiniApp() {
           {/* Step 1+2 — connect → enable (one-time) */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             {connectedAddr
-              ? <span style={{ fontSize: 10, color: green }}>● {shortAddr(connectedAddr)}</span>
+              ? <span style={{ fontSize: 10, color: profit }}>● {shortAddr(connectedAddr)}</span>
               : <button onClick={connectWallet} style={{ background: "#1a1a1e", color: green, border: `1px solid ${green}`, borderRadius: 4, padding: "7px 14px", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: "pointer", letterSpacing: "0.05em" }}>CONNECT WALLET</button>}
             <button onClick={enableTrading} disabled={enabling} style={{ marginLeft: "auto", background: "#1a1a1e", color: green, border: "1px solid #33333a", borderRadius: 4, padding: "7px 12px", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: enabling ? "wait" : "pointer", letterSpacing: "0.05em", opacity: enabling ? 0.6 : 1 }}>{enabling ? "ENABLING…" : "◆ ENABLE TRADING"}</button>
           </div>
@@ -723,9 +733,9 @@ export default function MiniApp() {
               return (
                 <div key={p.symbol} style={{ display: "flex", alignItems: "center", gap: 8, background: "#0a0a0b", border: "1px solid #232327", borderRadius: 4, padding: "7px 9px" }}>
                   <span style={{ fontSize: 12, fontWeight: "bold", color: "#fff", flexShrink: 0 }}>{tk(p.symbol)}</span>
-                  <span style={{ fontSize: 9, color: long ? green : red, flexShrink: 0 }}>{long ? "↑ LONG" : "↓ SHORT"} {Math.abs(qty)}</span>
+                  <span style={{ fontSize: 9, color: long ? profit : red, flexShrink: 0 }}>{long ? "↑ LONG" : "↓ SHORT"} {Math.abs(qty)}</span>
                   {mark > 0 && <span style={{ fontSize: 8, color: "#a1a1aa", flexShrink: 0 }}>@ {entry.toFixed(entry < 10 ? 4 : 2)}→{mark.toFixed(mark < 10 ? 4 : 2)}</span>}
-                  <span style={{ fontSize: 9, color: !hasPnl ? "#a1a1aa" : pnl >= 0 ? green : red, marginLeft: "auto", flexShrink: 0 }}>{hasPnl ? `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : "—"}</span>
+                  <span style={{ fontSize: 9, color: !hasPnl ? "#a1a1aa" : pnl >= 0 ? profit : red, marginLeft: "auto", flexShrink: 0 }}>{hasPnl ? `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}` : "—"}</span>
                   <button onClick={() => sharePosition(p)} title="Share to cast" style={{ flexShrink: 0, background: "#1a1a1e", color: green, border: "1px solid #33333a", borderRadius: 4, padding: "5px 9px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: "pointer" }}>↗</button>
                   <button onClick={() => closePosition(p.symbol)} disabled={closingSym === p.symbol} style={{ flexShrink: 0, background: "#241012", color: red, border: `1px solid ${red}55`, borderRadius: 4, padding: "5px 10px", fontFamily: mono, fontSize: 10, fontWeight: "bold", cursor: closingSym === p.symbol ? "wait" : "pointer", letterSpacing: "0.05em", opacity: closingSym === p.symbol ? 0.6 : 1 }}>{closingSym === p.symbol ? "…" : "CLOSE"}</button>
                 </div>
@@ -738,8 +748,8 @@ export default function MiniApp() {
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
               <span style={{ fontSize: 15, fontWeight: "bold", color: "#fff" }}>{sym}</span>
               <span style={{ fontSize: 14, color: "#fff" }}>{mkt ? `$${fmtPrice(mkt.price)}` : "—"}</span>
-              {mkt && <span style={{ fontSize: 11, color: mkt.change >= 0 ? green : red }}>{mkt.change >= 0 ? "▲" : "▼"} {Math.abs(mkt.change).toFixed(2)}%</span>}
-              {mkt && <span style={{ marginLeft: "auto", fontSize: 9, color: "#a1a1aa" }}>funding <b style={{ color: mkt.funding >= 0 ? green : red }}>{(mkt.funding * 100).toFixed(4)}%</b></span>}
+              {mkt && <span style={{ fontSize: 11, color: mkt.change >= 0 ? profit : red }}>{mkt.change >= 0 ? "▲" : "▼"} {Math.abs(mkt.change).toFixed(2)}%</span>}
+              {mkt && <span style={{ marginLeft: "auto", fontSize: 9, color: "#a1a1aa" }}>funding <b style={{ color: mkt.funding >= 0 ? profit : red }}>{(mkt.funding * 100).toFixed(4)}%</b></span>}
             </div>
             <AssetChart data={candles} />
             {mkt && (mkt.high > 0 || mkt.low > 0) && (
@@ -807,7 +817,7 @@ export default function MiniApp() {
           {belowMin && <div style={{ fontSize: 9, color: "#fbbf24", lineHeight: 1.5 }}>↑ {sym} needs ≥ ${minNotional} notional. Raise SIZE to ${minNotional} (bump leverage if the margin doesn&apos;t fit your balance).</div>}
           {/* Long / Short */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <button onClick={() => placeTrade("LONG")} disabled={tradeBusy || notional <= 0 || belowMin} style={{ background: green, color: "#141416", border: `1px solid ${green}`, borderRadius: 4, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: belowMin ? "not-allowed" : "pointer", letterSpacing: "0.06em", opacity: belowMin ? 0.4 : tradeBusy && confirmSide !== "LONG" ? 0.4 : 1, boxShadow: prefillSide === "LONG" ? `0 0 0 2px ${green}` : "none" }}>{tradeBusy ? "…" : confirmSide === "LONG" ? "TAP TO CONFIRM ✓" : "↑ LONG"}</button>
+            <button onClick={() => placeTrade("LONG")} disabled={tradeBusy || notional <= 0 || belowMin} style={{ background: profit, color: "#052e1c", border: `1px solid ${profit}`, borderRadius: 4, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: belowMin ? "not-allowed" : "pointer", letterSpacing: "0.06em", opacity: belowMin ? 0.4 : tradeBusy && confirmSide !== "LONG" ? 0.4 : 1, boxShadow: prefillSide === "LONG" ? `0 0 0 2px ${profit}` : "none" }}>{tradeBusy ? "…" : confirmSide === "LONG" ? "TAP TO CONFIRM ✓" : "↑ LONG"}</button>
             <button onClick={() => placeTrade("SHORT")} disabled={tradeBusy || notional <= 0 || belowMin} style={{ background: red, color: "#fff", border: `1px solid ${red}`, borderRadius: 4, padding: "12px 0", fontFamily: mono, fontSize: 13, fontWeight: "bold", cursor: belowMin ? "not-allowed" : "pointer", letterSpacing: "0.06em", opacity: belowMin ? 0.4 : tradeBusy && confirmSide !== "SHORT" ? 0.4 : 1, boxShadow: prefillSide === "SHORT" ? `0 0 0 2px ${red}` : "none" }}>{tradeBusy ? "…" : confirmSide === "SHORT" ? "TAP TO CONFIRM ✓" : "↓ SHORT"}</button>
           </div>
           {tradeMsg && (
@@ -874,7 +884,7 @@ export default function MiniApp() {
               <>
                 <div style={{ fontSize: 11, color: "#a1a1aa", lineHeight: 1.5 }}>
                   Running <span style={{ color: "#fff" }}>{agentStatus?.config?.signalMode ?? "FUNDING_ONLY"}</span> on {tk((agentStatus?.config?.symbols ?? ["PERP_BTC_USDC"])[0])}.
-                  {paper.length > 0 && <> Paper: <span style={{ color: paperNet >= 0 ? green : red }}>{paperNet >= 0 ? "+" : ""}${paperNet.toFixed(2)}</span> over {paper.length} trade{paper.length === 1 ? "" : "s"}.</>}
+                  {paper.length > 0 && <> Paper: <span style={{ color: paperNet >= 0 ? profit : red }}>{paperNet >= 0 ? "+" : ""}${paperNet.toFixed(2)}</span> over {paper.length} trade{paper.length === 1 ? "" : "s"}.</>}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                   <a href={`${APP}/lab?tab=agent`} style={{ fontSize: 10, color: green, textDecoration: "none", border: "1px solid #33333a", borderRadius: 5, padding: "8px 0", textAlign: "center", fontFamily: mono, fontWeight: "bold", letterSpacing: "0.04em" }}>⚙ MANAGE ↗</a>
@@ -897,7 +907,7 @@ export default function MiniApp() {
       {/* Live calls feed */}
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 2 }}>
         <span style={{ fontSize: 9, color: "#71717a", letterSpacing: "0.12em" }}>📡 LIVE CALLS</span>
-        {liveCount > 0 && <span style={{ fontSize: 9, color: green }}>{liveCount} active</span>}
+        {liveCount > 0 && <span style={{ fontSize: 9, color: profit }}>{liveCount} active</span>}
       </div>
       {feed === null && <div style={{ ...card, color: "#71717a", fontSize: 11 }}>loading feed…</div>}
       {feed && feed.length === 0 && <div style={{ ...card, color: "#71717a", fontSize: 11 }}>no calls yet — be the first 🟢</div>}
@@ -913,8 +923,8 @@ export default function MiniApp() {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ fontSize: 15, fontWeight: "bold", color: "#fff" }}>{tk(t.symbol)}</span>
-              <span style={{ fontSize: 10, color: t.direction === "LONG" ? green : red }}>{t.direction === "LONG" ? "↑" : "↓"} {t.direction}</span>
-              <span style={{ fontSize: 10, color: t.riskReward >= 2 ? green : "#fbbf24" }}>R:R 1:{t.riskReward?.toFixed?.(2) ?? "—"}</span>
+              <span style={{ fontSize: 10, color: t.direction === "LONG" ? profit : red }}>{t.direction === "LONG" ? "↑" : "↓"} {t.direction}</span>
+              <span style={{ fontSize: 10, color: t.riskReward >= 2 ? profit : amber }}>R:R 1:{t.riskReward?.toFixed?.(2) ?? "—"}</span>
               <button onClick={() => tradeThis(t)} title="Trade this call" style={{ marginLeft: "auto", flexShrink: 0, background: "#1a1a1e", color: green, border: "1px solid #33333a", borderRadius: 3, fontFamily: mono, fontSize: 9, fontWeight: "bold", padding: "3px 9px", cursor: "pointer", letterSpacing: "0.05em" }}>⚡ TRADE</button>
             </div>
           </div>
