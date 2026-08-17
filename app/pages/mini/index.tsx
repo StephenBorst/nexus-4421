@@ -562,7 +562,13 @@ export default function MiniApp() {
       const accts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
       const addr = accts?.[0];
       if (!addr) throw new Error("connect a wallet");
-      try { await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0xa4b1" }] }); } catch { /* may already be on Arbitrum */ }
+      try { await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0xa4b1" }] }); } catch { /* may already be on Arbitrum, or the switch was declined — verified below */ }
+      // HARD guard: the deposit txs (approve + deposit) target Arbitrum contracts, so
+      // never send them if the wallet isn't actually on Arbitrum. Without this, a declined
+      // switch would fire USDC-approve/deposit calls on whatever chain is active (wrong
+      // contract → wasted gas or worse). Fail loudly instead.
+      const chainId = (await provider.request({ method: "eth_chainId" })) as string;
+      if (chainId?.toLowerCase() !== "0xa4b1") { setDepositMsg({ ok: false, text: "Switch your wallet to Arbitrum One to deposit (the network switch was declined)." }); return; }
 
       const prep = await fetch(`${API}/deposit/prepare`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet: addr, amount: depositAmt }) }).then((r) => r.json());
       if (prep.error === "no_orderly_account") { setDepositMsg({ ok: false, text: "enable trading first (creates your account)." }); return; }
