@@ -37,6 +37,7 @@ interface Row {
   consensus: { side: "LONG" | "SHORT" | "SPLIT"; participants: number } | null;
   play: { klass: "CONFLUENCE" | "FADE" | "TREND" | null; dir: Dir | null; label: string };
   score: number;
+  mine: { tone: "pos" | "caution"; text: string } | null;
 }
 
 const tk = (s: string) => s.replace("PERP_", "").replace("_USDC", "");
@@ -67,14 +68,73 @@ function scoreOf(play: Row["play"], funding: number): number {
   return base + Math.min(99, Math.abs(funding) * 100000);
 }
 
-type SortMode = "actionable" | "funding" | "movers";
+// ── The personal edge lens ───────────────────────────────────────────────────
+// The insight nobody else can compute: is THIS market's play YOUR kind of trade?
+// Derived from the user's own graded record — which direction they measurably win
+// on (userSide) and their counter-trend/with-trend align edge — the same inputs the
+// Briefing's fusion uses, applied per row. Honest: it states your record, never that
+// you'll win because of it.
+type Trade = { direction: Dir; pnl: number };
+type ProcessEdge = { align?: { bucket: string; avgR: number }; contrarian?: { calls: number; avgR: number } } | null;
+type Edge = { side: Dir | null; wr: number; alignClass: "AGAINST_TREND" | "WITH_TREND" | null; alignAvgR: number };
 
-export function DecisionBoard({ onSelectTab }: { onSelectTab?: (tab: TabId) => void }) {
+const wrOf = (r: Trade[]) => (r.length ? Math.round((r.filter((t) => t.pnl > 0).length / r.length) * 1000) / 10 : 0);
+
+function computeEdge(trades: Trade[], proc: ProcessEdge): Edge {
+  const longs = trades.filter((t) => t.direction === "LONG");
+  const shorts = trades.filter((t) => t.direction === "SHORT");
+  let side: Dir | null = null, wr = 0;
+  if (longs.length >= 4 && shorts.length >= 4) {
+    const lw = wrOf(longs), sw = wrOf(shorts);
+    if (Math.abs(lw - sw) >= 12) { side = lw > sw ? "LONG" : "SHORT"; wr = Math.max(lw, sw); }
+  }
+  const bucket = proc?.align?.bucket || null;
+  const alignClass = bucket === "align:AGAINST_TREND" ? "AGAINST_TREND" : bucket === "align:WITH_TREND" ? "WITH_TREND" : null;
+  return { side, wr, alignClass, alignAvgR: proc?.align?.avgR ?? 0 };
+}
+
+// The per-row personal tag — mirrors the fusion's your-setup / not-your-side / your-class
+// branches. Returns null when there's no honest personal read for this row.
+function personalRead(play: Row["play"], edge: Edge): { tone: "pos" | "caution"; text: string } | null {
+  if (!play.dir) return null;
+  if (edge.side && play.dir === edge.side) return { tone: "pos", text: `your side · ${edge.wr}% win` };
+  if (edge.side && play.dir !== edge.side) return { tone: "caution", text: "off your side" };
+  if (!edge.side && edge.alignClass) {
+    const counterTrend = play.klass === "FADE" || play.klass === "CONFLUENCE";
+    if (counterTrend && edge.alignClass === "AGAINST_TREND") return { tone: "pos", text: `your class · +${edge.alignAvgR}R counter-trend` };
+    if (play.klass === "TREND" && edge.alignClass === "WITH_TREND") return { tone: "pos", text: `your class · +${edge.alignAvgR}R with trend` };
+  }
+  return null;
+}
+
+type SortMode = "actionable" | "funding" | "movers" | "mine";
+
+export function DecisionBoard({ onSelectTab, trades, wallet }: {
+  onSelectTab?: (tab: TabId) => void;
+  trades?: Trade[];          // the user's closed trades — powers the personal edge lens
+  wallet?: string | null;
+}) {
   const isMobile = useIsMobile();
   const [signals, setSignals] = useState<MarketSignal[] | null>(null);
   const [tape, setTape] = useState<Record<string, { price: number; change: number }>>({});
   const [consensus, setConsensus] = useState<Consensus | null>(null);
+  const [proc, setProc] = useState<ProcessEdge>(null);
   const [sort, setSort] = useState<SortMode>("actionable");
+
+  // Personal edge = which side the user measurably wins on + their align (counter/with-
+  // trend) class. From their own trades + graded process record. Fail-soft; empty when
+  // disconnected → the board stays purely market-level.
+  useEffect(() => {
+    if (!wallet) { setProc(null); return; }
+    let alive = true;
+    fetch(`${AGENT_API}/theses/process/${wallet}`).then((r) => r.json())
+      .then((d) => { if (alive) setProc(d?.regimeEdges?.align?.best || d?.contrarian ? { align: d?.regimeEdges?.align?.best, contrarian: d?.contrarian } : null); })
+      .catch(() => { /* lens still works off trades alone */ });
+    return () => { alive = false; };
+  }, [wallet]);
+
+  const edge = useMemo(() => computeEdge(trades ?? [], proc), [trades, proc]);
+  const hasLens = !!(edge.side || edge.alignClass);
 
   useEffect(() => {
     let alive = true;
@@ -115,15 +175,19 @@ export function DecisionBoard({ onSelectTab }: { onSelectTab?: (tab: TabId) => v
         consensus: c ? { side: c.side, participants: c.participants } : null,
         play,
         score: scoreOf(play, s.funding_rate_8h),
+        mine: personalRead(play, edge),
       } as Row;
     });
+    // "mine" ranks your-edge plays first (positive tag), then off-your-side, then the rest.
+    const mineRank = (r: Row) => (r.mine?.tone === "pos" ? 0 : r.mine?.tone === "caution" ? 1 : 2);
     const cmp: Record<SortMode, (a: Row, b: Row) => number> = {
       actionable: (a, b) => b.score - a.score,
       funding: (a, b) => Math.abs(b.funding) - Math.abs(a.funding),
       movers: (a, b) => Math.abs(b.change24h ?? 0) - Math.abs(a.change24h ?? 0),
+      mine: (a, b) => (mineRank(a) - mineRank(b)) || (b.score - a.score),
     };
     return out.sort(cmp[sort]);
-  }, [signals, tape, consensus, sort]);
+  }, [signals, tape, consensus, sort, edge]);
 
   // OBSERVE → PLAN handoff: a clean read is a thesis waiting to be written. Draft the
   // play into the Thesis Engine (same contract the Mispriced board + copilot use).
@@ -172,11 +236,13 @@ export function DecisionBoard({ onSelectTab }: { onSelectTab?: (tab: TabId) => v
       {/* Honesty framing — the whole point of the moat. */}
       <div style={{ fontFamily: UI, fontSize: 11, lineHeight: 1.5, color: C.text.muted, marginTop: -8, marginBottom: 14 }}>
         Funding, open interest and trend are <b style={{ color: C.text.bright }}>public facts</b>. <b style={{ color: C.text.bright }}>The play</b> is the mechanical read — what the rules say, not a promise — and it gets <b style={{ color: C.text.bright }}>graded from the tape</b> afterward, same as every call. No score to trust; a record to verify.
+        {hasLens && <> Each play is matched against <b style={{ color: C.pos }}>your own graded edge</b> — <span style={{ color: C.pos }}>◆ your side/class</span> vs <span style={{ color: C.warn }}>△ off your edge</span>.</>}
       </div>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
         <span style={{ fontFamily: MONO, fontSize: 9, color: C.text.faint, alignSelf: "center", letterSpacing: "0.06em" }}>SORT</span>
-        {sortBtn("actionable", "◆ ACTIONABLE")}
+        {hasLens && sortBtn("mine", "◆ MINE")}
+        {sortBtn("actionable", "ACTIONABLE")}
         {sortBtn("funding", "FUNDING")}
         {sortBtn("movers", "MOVERS")}
       </div>
@@ -226,8 +292,8 @@ export function DecisionBoard({ onSelectTab }: { onSelectTab?: (tab: TabId) => v
                       ? <span style={{ color: r.consensus.side === "LONG" ? C.pos : C.neg }}>{r.consensus.side === "LONG" ? "long" : "short"} <span style={{ color: C.text.faint }}>{r.consensus.participants}</span></span>
                       : <span style={{ color: C.text.faint }}>{r.consensus ? "split" : "—"}</span>}
                   </div>
-                  {/* THE PLAY — the mechanical read */}
-                  <div style={{ ...cell }}>
+                  {/* THE PLAY — the mechanical read, + your personal edge lens below it */}
+                  <div style={{ ...cell, flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
                     {r.play.klass
                       ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                           <span style={{ width: 6, height: 6, borderRadius: "50%", background: dirColor(r.play.dir), flexShrink: 0 }} />
@@ -235,6 +301,11 @@ export function DecisionBoard({ onSelectTab }: { onSelectTab?: (tab: TabId) => v
                           {r.play.klass === "CONFLUENCE" && <span style={{ fontSize: 8, color: C.text.faint, border: `1px solid ${C.border}`, borderRadius: 3, padding: "0 4px" }}>◆</span>}
                         </span>
                       : <span style={{ color: C.text.faint, fontSize: 11 }}>no clean read</span>}
+                    {r.mine && (
+                      <span style={{ fontSize: 8.5, letterSpacing: "0.02em", color: r.mine.tone === "pos" ? C.pos : C.warn, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ fontSize: 9 }}>{r.mine.tone === "pos" ? "◆" : "△"}</span>{r.mine.text}
+                      </span>
+                    )}
                   </div>
                   {/* Action — draft the play as a thesis */}
                   <div style={{ ...cell, justifyContent: "flex-end" }}>

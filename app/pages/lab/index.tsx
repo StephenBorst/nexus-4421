@@ -300,7 +300,7 @@ export default function TheLabPage() {
           // The Board (every market, one verifiable read) sits between the narrative
           // Briefing and the deep Market Intel — scan the whole book at a glance. Shown
           // to everyone; it's market-level, no wallet needed.
-          const board = <DecisionBoard onSelectTab={setActiveTab} />;
+          const board = <DecisionBoard onSelectTab={setActiveTab} trades={connected ? processedTrades : undefined} wallet={rootWalletAddress} />;
           return connected
             ? <>{briefing}{board}<MarketIntelView /></>
             : <><LabWelcome />{briefing}{board}</>;
