@@ -1787,6 +1787,12 @@ export default function FeedPage() {
                 <span style={{ flexShrink: 0, fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.06em", color: "#ededf0", background: "#1a1a1e", border: "1px solid #33333a", borderRadius: 4, padding: "5px 10px" }}>OPEN PROOF →</span>
               </div>
             )}
+            {/* Ecosystem context — relocated out of the feed's tail so the feed is
+                pure calls. RANKS is the natural home: live positions, the just-resolved
+                grade tape, and the pulse stats all describe the caller ecosystem. */}
+            {!loading && !error && <FeedPulse feed={feed} />}
+            {!loading && !error && <LiveNow />}
+            {!loading && !error && <Resolved events={resolutions} />}
             {!loading && !error && <Contested />}
             {!loading && !error && <Contrarians />}
             {!loading && !error && (
@@ -1928,21 +1934,16 @@ export default function FeedPage() {
               </div>
             )}
 
-            {/* ── CONTEXT (below the calls) — live positions, the just-resolved tape,
-                and pulse stats. Real signal, but not the feed itself, so it trails. */}
-            {!loading && !error && (
-              <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #232327", display: "flex", flexDirection: "column", gap: 12 }}>
-                <LiveNow />
-                <Resolved events={resolutions} />
-                <FeedPulse feed={feed} />
-              </div>
-            )}
+            {/* The feed ends with the feed — the ecosystem context (live positions,
+                just-resolved tape, pulse stats) now lives in RANKS, its natural home,
+                so this tab stays pure calls. */}
           </>
         )}
       </div>
 
-      {/* Flywheel at the foot on every breakpoint — the calls lead, the token chrome follows. */}
-      {flywheel}
+      {/* Token chrome ($NEXUS buy + treasury) follows the RANKS/FOLLOWING views only —
+          the FEED stays pure (the top ticker already carries the live $NEXUS price). */}
+      {view !== "feed" && flywheel}
     </div>
   );
 }
