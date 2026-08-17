@@ -22,6 +22,7 @@ import type { TabId } from "./types";
 const AGENT_API = "https://og.nexustradinglabs.com";
 const FUTURES = "https://api-evm.orderly.org/v1/public/futures";
 const CROWDED = 0.0004;   // |funding|/8h at/above which the crowd is extended (fade band)
+const LEAN_MIN = 0.00003; // |funding|/8h above which we show a faint directional lean (not a setup)
 
 type Consensus = Record<string, { side: "LONG" | "SHORT" | "SPLIT"; lean: number; participants: number }>;
 type Dir = "LONG" | "SHORT";
@@ -35,7 +36,7 @@ interface Row {
   trendMove: number | null;
   trendOi: number | null;
   consensus: { side: "LONG" | "SHORT" | "SPLIT"; participants: number } | null;
-  play: { klass: "CONFLUENCE" | "FADE" | "TREND" | null; dir: Dir | null; label: string };
+  play: { klass: "CONFLUENCE" | "FADE" | "TREND" | "LEAN" | null; dir: Dir | null; label: string; strong: boolean };
   score: number;
   mine: { tone: "pos" | "caution"; text: string } | null;
 }
@@ -45,26 +46,38 @@ const pct = (n: number, d = 2) => `${n >= 0 ? "+" : ""}${n.toFixed(d)}%`;
 const fmtPrice = (n: number) => (n >= 1000 ? n.toLocaleString("en-US", { maximumFractionDigits: 2 }) : n.toLocaleString("en-US", { maximumFractionDigits: n < 1 ? 5 : n < 100 ? 3 : 2 }));
 
 // The mechanical play for one market — mirrors the agent's own rule priority
-// (confluence > crowded-funding fade > OI/trend), never invents a signal.
+// (confluence > crowded-funding fade > OI/trend), never invents a signal. STRONG
+// plays (confluence/fade/trend) are real setups and render bright; below them, a
+// faint LEAN tier shows which way the crowd/tape tilts so a calm market still reads
+// as information, not a wall of "no read" — but a lean is explicitly NOT a setup.
 function derivePlay(s: MarketSignal): Row["play"] {
   if (s.confluence === "LONG" || s.confluence === "SHORT") {
-    return { klass: "CONFLUENCE", dir: s.confluence, label: `Confluence ${s.confluence === "LONG" ? "long" : "short"}` };
+    return { klass: "CONFLUENCE", dir: s.confluence, label: `Confluence ${s.confluence === "LONG" ? "long" : "short"}`, strong: true };
   }
   if (Math.abs(s.funding_rate_8h) >= CROWDED) {
     const dir: Dir = s.funding_rate_8h > 0 ? "SHORT" : "LONG";
-    return { klass: "FADE", dir, label: `Fade ${dir === "LONG" ? "long" : "short"}` };
+    return { klass: "FADE", dir, label: `Fade ${dir === "LONG" ? "long" : "short"}`, strong: true };
   }
   if ((s.trend === "TREND_UP" || s.trend === "TREND_DOWN") && (s.trend_oi_pct ?? 0) >= 1) {
     const dir: Dir = s.trend === "TREND_UP" ? "LONG" : "SHORT";
-    return { klass: "TREND", dir, label: `Ride ${dir === "LONG" ? "up" : "down"}` };
+    return { klass: "TREND", dir, label: `Ride ${dir === "LONG" ? "up" : "down"}`, strong: true };
   }
-  return { klass: null, dir: null, label: "—" };
+  // ── faint leans (informational, not a setup) ──
+  if (Math.abs(s.funding_rate_8h) >= LEAN_MIN) {
+    const dir: Dir = s.funding_rate_8h > 0 ? "SHORT" : "LONG";
+    return { klass: "LEAN", dir, label: `leans ${dir === "LONG" ? "long" : "short"}`, strong: false };
+  }
+  if (s.trend === "TREND_UP" || s.trend === "TREND_DOWN") {
+    const dir: Dir = s.trend === "TREND_UP" ? "LONG" : "SHORT";
+    return { klass: "LEAN", dir, label: `${dir === "LONG" ? "up" : "down"}-trend, thin OI`, strong: false };
+  }
+  return { klass: null, dir: null, label: "—", strong: false };
 }
 
 // Actionability: confluence beats a crowded fade beats a confirmed trend, plus the raw
 // funding magnitude as a tiebreak. Only the DEFAULT sort — the read itself isn't ranked.
 function scoreOf(play: Row["play"], funding: number): number {
-  const base = play.klass === "CONFLUENCE" ? 300 : play.klass === "FADE" ? 200 : play.klass === "TREND" ? 100 : 0;
+  const base = play.klass === "CONFLUENCE" ? 300 : play.klass === "FADE" ? 200 : play.klass === "TREND" ? 100 : play.klass === "LEAN" ? 10 : 0;
   return base + Math.min(99, Math.abs(funding) * 100000);
 }
 
@@ -96,7 +109,7 @@ function computeEdge(trades: Trade[], proc: ProcessEdge): Edge {
 // The per-row personal tag — mirrors the fusion's your-setup / not-your-side / your-class
 // branches. Returns null when there's no honest personal read for this row.
 function personalRead(play: Row["play"], edge: Edge): { tone: "pos" | "caution"; text: string } | null {
-  if (!play.dir) return null;
+  if (!play.dir || !play.strong) return null;   // only real setups get a personal read, not faint leans
   if (edge.side && play.dir === edge.side) return { tone: "pos", text: `your side · ${edge.wr}% win` };
   if (edge.side && play.dir !== edge.side) return { tone: "caution", text: "off your side" };
   if (!edge.side && edge.alignClass) {
@@ -297,24 +310,29 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
                       ? <span style={{ color: r.consensus.side === "LONG" ? C.pos : C.neg }}>{r.consensus.side === "LONG" ? "long" : "short"} <span style={{ color: C.text.faint }}>{r.consensus.participants}</span></span>
                       : <span style={{ color: C.text.faint }}>{r.consensus ? "split" : "—"}</span>}
                   </div>
-                  {/* THE PLAY — the mechanical read, + your personal edge lens below it */}
+                  {/* THE PLAY — the mechanical read (strong = a real setup, bright; lean =
+                      faint tilt, informational), + your personal edge lens below it */}
                   <div style={{ ...cell, flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
-                    {r.play.klass
+                    {r.play.strong
                       ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                           <span style={{ width: 6, height: 6, borderRadius: "50%", background: dirColor(r.play.dir), flexShrink: 0 }} />
                           <span style={{ color: dirColor(r.play.dir), fontSize: 11, fontWeight: 600 }}>{r.play.label}</span>
                           {r.play.klass === "CONFLUENCE" && <span style={{ fontSize: 8, color: C.text.faint, border: `1px solid ${C.border}`, borderRadius: 3, padding: "0 4px" }}>◆</span>}
                         </span>
-                      : <span style={{ color: C.text.faint, fontSize: 11 }}>no clean read</span>}
+                      : r.play.klass === "LEAN"
+                      ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, color: C.text.faint }}>
+                          <span style={{ color: r.play.dir === "LONG" ? C.pos : C.neg, opacity: 0.55 }}>{r.play.dir === "LONG" ? "↑" : "↓"}</span>{r.play.label}
+                        </span>
+                      : <span style={{ color: C.text.faint, fontSize: 11 }}>—</span>}
                     {r.mine && (
                       <span style={{ fontSize: 8.5, letterSpacing: "0.02em", color: r.mine.tone === "pos" ? C.pos : C.warn, display: "inline-flex", alignItems: "center", gap: 4 }}>
                         <span style={{ fontSize: 9 }}>{r.mine.tone === "pos" ? "◆" : "△"}</span>{r.mine.text}
                       </span>
                     )}
                   </div>
-                  {/* Action — draft the play as a thesis */}
+                  {/* Action — draft the play as a thesis (real setups only) */}
                   <div style={{ ...cell, justifyContent: "flex-end" }}>
-                    {r.play.dir && (
+                    {r.play.strong && r.play.dir && (
                       <button onClick={() => draftPlay(r)} title="Structure this as a graded thesis" style={{
                         background: "#1a1a1e", border: `1px solid ${C.border}`, color: C.accent, fontFamily: MONO, fontSize: 11,
                         width: 26, height: 24, borderRadius: RADIUS.sm, cursor: "pointer", lineHeight: 1,
