@@ -24,6 +24,7 @@ import { LabWelcome, OnboardingChecklist } from "./Onboarding";
 import { LabStanding } from "./LabStanding";
 import { CommandPalette } from "./CommandPalette";
 import { NexusBriefing } from "./NexusBriefing";
+import { DecisionBoard } from "./DecisionBoard";
 import { CountUp } from "./components";
 
 export default function TheLabPage() {
@@ -296,9 +297,13 @@ export default function TheLabPage() {
           // instruments. Disconnected → lead with the welcome (the value prop / the
           // prize), Briefing below as proof the Lab is already intelligent — so a
           // first-timer isn't met with a wall of market rows before the pitch.
+          // The Board (every market, one verifiable read) sits between the narrative
+          // Briefing and the deep Market Intel — scan the whole book at a glance. Shown
+          // to everyone; it's market-level, no wallet needed.
+          const board = <DecisionBoard onSelectTab={setActiveTab} />;
           return connected
-            ? <>{briefing}<MarketIntelView /></>
-            : <><LabWelcome />{briefing}</>;
+            ? <>{briefing}{board}<MarketIntelView /></>
+            : <><LabWelcome />{briefing}{board}</>;
         })()}
         {activeTab === "mispriced" && <MispricedBoard />}
         {activeTab === "smart" && <SmartMoneyView myPositions={openPositions} />}
