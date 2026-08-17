@@ -4,9 +4,8 @@ import { useCollateral, usePrivateQuery, useAccount } from "@orderly.network/hoo
 import { useLabStorage } from "@/hooks/useLabStorage";
 import { HoldersRoom } from "@/components/HoldersRoom";
 import { QuickTrade } from "./QuickTrade";
-import { NexusMarket } from "@/components/NexusMarket";
 import { NexusTicker } from "@/components/NexusTicker";
-import { NexusBrokerStats } from "@/components/NexusBrokerStats";
+import { NexusBuyBar } from "@/components/NexusBuyBar";
 import { NexusPro } from "@/components/NexusPro";
 import type { TabId, DayGroup, ProcessedTrade } from "./types";
 import { getDayKey } from "./helpers";
@@ -307,15 +306,13 @@ export default function TheLabPage() {
         {activeTab === "holders" && <HoldersRoom walletAddress={rootWalletAddress} />}
         {activeTab === "quicktrade" && <QuickTrade />}
         </div>
-        {/* Ambient context — token flywheel, network verification, PRO status. Real
-            signal, but not the task, so it sits below the fold instead of in front
-            of it. Hairline rule separates it from the working surface above. */}
+        {/* Slim footer — the live $NEXUS price now lives in the top ticker, so the
+            bulky 4-stat market card + the lone "verify on Orderly" band were just
+            redundant clutter. Keep only the actionable bits: a thin BUY $NEXUS row
+            and (connected) the PRO status/upsell. Hairline rule separates it from
+            the working surface above. */}
         <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #232327", display: "flex", flexDirection: "column", gap: 12 }}>
-          <NexusMarket />
-          {/* compact: Orderly's by-broker dashboard endpoint currently 404s, so this
-              only renders the "verify on Orderly" trust link — no reason to give it a
-              full band until the volume/fees source is restored. */}
-          <NexusBrokerStats compact />
+          <NexusBuyBar />
           {connected && <NexusPro walletAddress={rootWalletAddress} />}
         </div>
       </div>

@@ -14,8 +14,8 @@ import { fetchOnChainRepScore } from "@/hooks/useThesisRegistry";
 import { NexusTierBadge } from "@/components/NexusTierBadge";
 import { MessageTraderButton } from "@/components/MessageTraderButton";
 import { NexusTreasuryStack } from "@/components/NexusTreasuryStack";
-import { NexusMarket } from "@/components/NexusMarket";
 import { NexusTicker } from "@/components/NexusTicker";
+import { NexusBuyBar } from "@/components/NexusBuyBar";
 import type { ThesisTrade } from "@/pages/lab/types";
 import { SocialBar } from "@/components/SocialBar";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
@@ -1596,7 +1596,9 @@ export default function FeedPage() {
   // mobile so the feed content leads.
   const flywheel = (
     <div style={{ padding: isMobile ? "10px 12px" : "10px 16px", maxWidth: 860, margin: "0 auto", width: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 8 }}>
-      <NexusMarket />
+      {/* The bulky $NEXUS stat card was redundant with the top ticker — keep the slim
+          BUY $NEXUS row and the treasury flywheel. */}
+      <NexusBuyBar />
       <NexusTreasuryStack />
     </div>
   );
