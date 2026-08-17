@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const highlightDepositButton = () => {
   removeDepositHighlight();
@@ -55,8 +55,14 @@ export default function OnboardingModal({ onComplete, onSkip }) {
   const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
   const [chainIdx, setChainIdx] = useState(0);
+  const modalRef = useRef(null);
 
   useEffect(() => { const t = setTimeout(() => setVisible(true), 100); return () => clearTimeout(t); }, []);
+  // Own focus: move it INTO the modal (it defaulted to <body>), so the first click
+  // isn't consumed as an outside-click by another open layer (the AI popup / dropdowns),
+  // which was the "have to press Esc first" bug. Focus the CARD (tabIndex -1) not a
+  // button, so there's no stray focus ring. Also lets Esc close immediately.
+  useEffect(() => { if (visible && modalRef.current) modalRef.current.focus(); }, [visible]);
   useEffect(() => { if (step !== 1) return; const interval = setInterval(() => setChainIdx((i) => (i + 1) % CHAINS.length), 1200); return () => clearInterval(interval); }, [step]);
 
   const handleClose = useCallback(() => { setExiting(true); setTimeout(() => onSkip?.(), 400); }, [onSkip]);
@@ -65,6 +71,12 @@ export default function OnboardingModal({ onComplete, onSkip }) {
     if (step === STEPS.length - 1) { setExiting(true); setTimeout(() => onComplete?.(), 400); return; }
     setStep((s) => s + 1);
   }, [step, onComplete]);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") handleClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleClose]);
 
   const current = STEPS[step];
 
@@ -109,8 +121,14 @@ export default function OnboardingModal({ onComplete, onSkip }) {
         .ntl-fl{font-size:9px;color:#2e2e2e;letter-spacing:.07em;text-decoration:underline;cursor:pointer;background:none;border:none;font-family:inherit;padding:0}
         .ntl-fl:hover{color:#555}
       `}</style>
-      <div className={`ntl-ov ${visible ? "v" : ""} ${exiting ? "x" : ""}`}> 
-        <div className="ntl-m">
+      <div
+        className={`ntl-ov ${visible ? "v" : ""} ${exiting ? "x" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="ntl-m" ref={modalRef} tabIndex={-1} style={{ outline: "none" }}>
           <div className="ntl-sc" />
           <div className="ntl-co tl" /><div className="ntl-co tr" />
           <div className="ntl-co bl" /><div className="ntl-co br" />
