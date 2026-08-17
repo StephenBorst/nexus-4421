@@ -5,6 +5,7 @@ import { useLabStorage } from "@/hooks/useLabStorage";
 import { HoldersRoom } from "@/components/HoldersRoom";
 import { QuickTrade } from "./QuickTrade";
 import { NexusMarket } from "@/components/NexusMarket";
+import { NexusTicker } from "@/components/NexusTicker";
 import { NexusBrokerStats } from "@/components/NexusBrokerStats";
 import { NexusPro } from "@/components/NexusPro";
 import type { TabId, DayGroup, ProcessedTrade } from "./types";
@@ -154,6 +155,9 @@ export default function TheLabPage() {
   return (
     <div style={{ background: "#0a0a0b", minHeight: "100dvh", padding: 0 }}>
       <style>{`@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px #ededf0}50%{opacity:0.4;box-shadow:0 0 2px #ededf0}}`}</style>
+      {/* ── LIVE MARKET TICKER ── the Wall-Street tape up top (market presence
+          restored to the fold as one thin ambient line, not the old 415px stack). */}
+      <NexusTicker />
       {/* ── BRIEFING HEADER ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "6px 10px" : "6px 18px", background: "#0f0f11", borderBottom: "1px solid #232327", flexWrap: "wrap", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

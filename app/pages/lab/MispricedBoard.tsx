@@ -22,6 +22,7 @@ import { C, MONO, UI, RADIUS } from "@/config/theme";
 import { AGENT_API } from "./agentTypes";
 import { useIsMobile } from "./useIsMobile";
 import { SectionHeader } from "./components";
+import { ForecastDivergence } from "./ForecastDivergence";
 
 type EdgeQuality = { tier: "PROVEN" | "TRAP" | "MIXED" | "UNPROVEN"; revertedPct: number | null; samples: number };
 type Market = {
@@ -443,6 +444,14 @@ export function MispricedBoard() {
         Funding annualized (per-8h × 1095). |edge| ≥ 12%/yr on a market with ≥ $50k open interest ⇒ Mispriced · Watching; else priced fair.
         Caller lean is merit-weighted from open positions + active public calls. A read on positioning, not advice — a stretched market can stay stretched.
       </p>
+
+      {/* The forecasting-crowd sibling of the funding board above: same "the crowd is
+          offside here" lens, read from Polymarket instead of funding. Pairing them puts
+          both gap surfaces in one place (GAPS) instead of burying this at the bottom of
+          the Intel tab. */}
+      <div style={{ marginTop: 28, paddingTop: 4, borderTop: `1px solid ${C.border}` }}>
+        <ForecastDivergence />
+      </div>
     </div>
   );
 }
