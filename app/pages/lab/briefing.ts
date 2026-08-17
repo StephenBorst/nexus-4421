@@ -145,7 +145,10 @@ export function buildMarketRead(input: MarketReadInput): Insight[] {
   const { rows, signals, liveAgents, tape } = input;
   const out: Insight[] = [];
 
-  // 1 — Tape headline: what the whole market is doing + what it favors.
+  // 1 — Tape headline: the BREADTH lens (what setups the tape favors) — NOT a second
+  // market-mood SCORE. The Market Terminal's "// THE MARKET READ" gauge is the one
+  // canonical numeric regime read on this tab (fear-greed + BTC dom + mcap); this line
+  // stays qualitative (label + setup guidance) so the two don't read as duplicate scores.
   if (tape) {
     const guide =
       tape.label === "RISK-ON" ? "Broad strength — momentum/trend setups favored; funding fades are riskier into a bid."
@@ -155,9 +158,9 @@ export function buildMarketRead(input: MarketReadInput): Insight[] {
       id: "read-tape",
       priority: 60,
       tone: tape.label === "RISK-OFF" ? "caution" : "info",
-      title: `${tape.label} tape · ${tape.score}/100`,
+      title: `${tape.label} tape — what the breadth favors`,
       detail: guide,
-      action: { label: "Market Intel", tab: "intel" },
+      action: { label: "Full regime read", tab: "intel" },
     });
   }
 
@@ -450,7 +453,7 @@ export function buildBriefing(input: BriefingInput): Insight[] {
           priority: 95,
           tone: "caution",
           title: `Your ${p.direction} ${ticker(p.symbol)} is against a ${tape.label} tape`,
-          detail: `Broad ${tape.label === "RISK-OFF" ? "weakness" : "strength"} (${tape.score}/100) — tighten the stop or size down unless your thesis is specifically a fade.`,
+          detail: `Broad ${tape.label === "RISK-OFF" ? "weakness" : "strength"} on the tape — tighten the stop or size down unless your thesis is specifically a fade.`,
           action: { label: "Check the tape", tab: "smart" },
         });
       }

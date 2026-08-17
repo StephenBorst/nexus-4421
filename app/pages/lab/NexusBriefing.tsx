@@ -195,7 +195,7 @@ export function NexusBriefing({
           <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
             <span>
               {personal.length ? "your terminal + the market" : "the market, right now"} · {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-              {tape && <span style={{ color: tape.label === "RISK-OFF" ? "#f7525f" : tape.label === "RISK-ON" ? "#ededf0" : "#a1a1aa" }}> · {tape.label} {tape.score}</span>}
+              {tape && <span style={{ color: tape.label === "RISK-OFF" ? "#f7525f" : tape.label === "RISK-ON" ? "#ededf0" : "#a1a1aa" }}> · {tape.label} tape</span>}
             </span>
             <button onClick={toggle} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", background: "none", border: "1px solid #232327", borderRadius: 3, padding: "3px 8px", cursor: "pointer", letterSpacing: "0.05em" }}>
               {collapsed ? `SHOW (${total})` : "HIDE"}
