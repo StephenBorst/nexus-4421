@@ -1,0 +1,30 @@
+name = "nexus-carry-engine"
+main = "index.js"
+compatibility_date = "2024-09-23"
+
+# Hourly cron. The engine only rebalances when CARRY_REBAL_H (default 24h) has elapsed
+# since the last rebalance; the intervening ticks accrue funding + mark to market.
+[triggers]
+crons = ["0 * * * *"]
+
+# ⚠️ DEPLOY HANDOFF: create the KV namespace, then paste its id below.
+#   npx wrangler kv namespace create CARRY
+# Reuse across deploys; state lives at key carry:state.
+[[kv_namespaces]]
+binding = "CARRY"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+[vars]
+CARRY_MODE = "paper"        # paper only in this worker; the live maker executor is separate
+CARRY_CAPITAL = "1000"
+CARRY_PERSIDE = "1"          # the validated carry-dominant setting (RV-v4)
+CARRY_REBAL_H = "24"
+CARRY_MAKER_BPS = "-0.1"     # maker rebate; the sleeve is not deployable on taker fees
+
+[observability.logs]
+enabled = true
+
+# Optional ops secret to gate POST /carry/tick and /carry/reset:
+#   npx wrangler secret put CARRY_ADMIN_TOKEN
+# Sent as the x-carry-token header (never a query string). If unset, those POSTs are open —
+# set it before deploy.
