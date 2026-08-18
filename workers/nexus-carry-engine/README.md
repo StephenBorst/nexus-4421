@@ -38,19 +38,32 @@ Run tests: `node --test workers/nexus-carry-engine/carryBasket.test.mjs` (and `c
 Hourly cron; rebalances only when `CARRY_REBAL_H` (24h) has elapsed. Tunables in
 `wrangler.toml [vars]`: capital, perSide, rebalance hours, maker bps, min funding spread.
 
-## Phase 3b — live maker executor (money-path)
-The **provably-correct core is built + tested** (`carryExec.mjs`, 10 tests): `planOrders`
-turns a `diffBook` diff into concrete **POST_ONLY** (maker) specs — correct side, price that
-rests on the book (BUY→bid, SELL→ask, so it never crosses and pays taker), `snapQty`
-step-snapped to clear base_min + min_notional, FLIP as a single order through zero.
-`planIsBalanced` is an abort guard: if a data glitch skews the target book directional, don't
-send. NO signing / NO network / NO order placement in this module.
+## Phase 3b — live maker executor (money-path) — BUILT, deployed DISARMED
+Fully wired and deployed, dormant until armed. Modules:
+- `carryExec.mjs` (10 tests) — `planOrders`: diff → **POST_ONLY** maker specs (BUY rests on the
+  bid / SELL on the ask so it never crosses to taker; `snapQty` clears base_min + min_notional;
+  FLIP is one order through zero). `planIsBalanced` aborts on a skewed (directional) book.
+- `carrySign.mjs` — Orderly ed25519 signing + order/position/orderbook calls, **ported verbatim**
+  from the validated `nexus-agent-exec` (do not reinvent). Order-only key (cannot withdraw).
+- `carryLiveExec.mjs` (6 tests) — `runLive`: reconcile positions → cancel outstanding → target
+  book → `planIsBalanced` abort → plan + place POST_ONLY. Reconcile-and-requote: each tick cancels
+  and re-posts from ACTUAL fills, so partial fills shrink next tick and unfilled legs re-quote.
 
-⚠️ **NOT ARMED — deliberate.** The remaining wiring is the money-path switch and needs an
-explicit go + a tiny-capital validation before it touches real funds:
-1. Orderly ed25519 signing (port the validated helper from `nexus-agent-exec`), order-only key.
-2. One dedicated **Orderly sub-account** for isolation (the sub-account-per-strategy pattern).
-3. The live loop: place the `planOrders` specs, monitor fills, **re-quote unfilled legs** (the
-   one piece the paper sim can't prove — maker fills aren't guaranteed), reconcile vs exchange.
-4. Hard gate `CARRY_LIVE=true` + funded sub-account + a small starting capital; flip on ONLY
-   after the paper record holds. Never a silent default.
+**Guardrails (all verified disarmed):** `CARRY_LIVE!=="true"` → no-op · no key → no-op · KV
+`carry:kill` → no-op · `planIsBalanced` abort · per-order notional cap · order-only key.
+`GET /carry/live/status` reports `{armed, hasKey, killed, lastLive}` (currently all false/null).
+
+### ⚠️ ARMING RUNBOOK (owner-only — moves real money; do NOT arm casually)
+Claude built + deployed this DISARMED and will not arm it (can't produce your wallet signature,
+and won't move funds). To go live yourself, with a TINY starting capital, watched:
+1. **Dedicated Orderly account** (a fresh wallet = clean isolation, or a sub-account). Fund it
+   small — enough that `CARRY_LIVE_CAPITAL / 12 legs` clears each market's min_notional (≈$10),
+   so **≥ ~$150–200 notional**; at `CARRY_LEVERAGE=3` that's ~$50–70 margin.
+2. **Provision an ORDER-ONLY Orderly key** for that account (your wallet signs `AddOrderlyKey`).
+3. Set secrets: `wrangler secret put CARRY_TRADING_KEY` (bs58 ed25519 seed) and
+   `wrangler secret put CARRY_ACCOUNT_ID`. Set `CARRY_LIVE_CAPITAL` (e.g. "150") + `CARRY_LEVERAGE`.
+4. **Dry-run first:** `POST /carry/live/tick` (x-carry-token header) once and read the result +
+   `/carry/live/status` — confirm the orders look right BEFORE flipping the cron on.
+5. Arm: set `CARRY_LIVE=true` (wrangler.toml var or `wrangler deploy`). The hourly cron now trades.
+6. **Kill anytime:** `POST /carry/kill` (stops new orders instantly). `POST /carry/unkill` resumes.
+7. Watch the first 24h rebalance closely — maker fill quality is the one thing paper can't prove.

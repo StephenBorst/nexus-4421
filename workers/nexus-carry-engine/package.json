@@ -1,0 +1,14 @@
+{
+  "name": "nexus-carry-engine",
+  "version": "1.0.0",
+  "description": "Sector-neutral funding-carry basket — paper worker + gated live maker executor",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@noble/ed25519": "^3.1.0",
+    "bs58": "^6.0.0"
+  }
+}

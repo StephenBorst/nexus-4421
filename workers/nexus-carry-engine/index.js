@@ -9,6 +9,7 @@
 // is intentionally NOT in this file. Do not add order placement here.
 import { freshState, stepPaper, summarize } from "./carryPaper.mjs";
 import { snapshotFromFutures, coverage } from "./carryLive.mjs";
+import { runLive } from "./carryLiveExec.mjs";
 
 const ORDERLY = "https://api-evm.orderly.org";
 const STATE_KEY = "carry:state";
@@ -36,9 +37,9 @@ async function fetchSnapshot() {
   return snapshotFromFutures(d?.data?.rows || []);
 }
 
-async function runTick(env) {
+async function runTick(env, snap) {
   const state = await loadState(env);
-  const snap = await fetchSnapshot();
+  snap = snap || await fetchSnapshot();
   const cov = coverage(snap);
   // guard: don't rebalance on a thin/broken data pull (would churn the book wrongly)
   if (cov.tradableSectors < 2) return { skipped: "thin_snapshot", coverage: cov };
@@ -58,11 +59,21 @@ const authed = (req, env) => {
 
 export default {
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(
-      runTick(env)
-        .then((r) => { env.CARRY?.put("ops:carry:heartbeat", String(Date.now())); console.log("carry tick", JSON.stringify(r.tick || r.skipped)); })
-        .catch((e) => console.error("carry tick error", e && e.stack || e))
-    );
+    ctx.waitUntil((async () => {
+      try {
+        const snap = await fetchSnapshot();
+        const cov = coverage(snap);
+        if (cov.tradableSectors < 2) { console.log("carry skip thin", JSON.stringify(cov)); return; }
+        const paper = await runTick(env, snap);
+        env.CARRY?.put("ops:carry:heartbeat", String(Date.now()));
+        console.log("carry paper", JSON.stringify(paper.tick || paper.skipped));
+        // Live executor — shares the SAME snapshot as paper; no-ops unless CARRY_LIVE=true + key + not killed.
+        if (env.CARRY_LIVE === "true") {
+          const live = await runLive(env, snap);
+          console.log("carry live", JSON.stringify(live));
+        }
+      } catch (e) { console.error("carry tick error", e && e.stack || e); }
+    })());
   },
 
   async fetch(req, env) {
@@ -85,12 +96,33 @@ export default {
         if (!authed(req, env)) return json({ error: "unauthorized" }, 401);
         return json(await runTick(env));
       }
+      if (url.pathname === "/carry/live/status") {
+        const armed = env.CARRY_LIVE === "true";
+        const hasKey = !!(env.CARRY_TRADING_KEY && env.CARRY_ACCOUNT_ID);
+        const killed = !!(await env.CARRY.get("carry:kill"));
+        const raw = await env.CARRY.get("carry:live:state");
+        return json({ armed, hasKey, killed, liveCapital: Number(env.CARRY_LIVE_CAPITAL || env.CARRY_CAPITAL || 1000), lastLive: raw ? JSON.parse(raw) : null });
+      }
+      if (url.pathname === "/carry/live/tick" && req.method === "POST") {
+        if (!authed(req, env)) return json({ error: "unauthorized" }, 401);
+        return json(await runLive(env, await fetchSnapshot()));
+      }
+      if (url.pathname === "/carry/kill" && req.method === "POST") {
+        if (!authed(req, env)) return json({ error: "unauthorized" }, 401);
+        await env.CARRY.put("carry:kill", "1");
+        return json({ ok: true, killed: true });
+      }
+      if (url.pathname === "/carry/unkill" && req.method === "POST") {
+        if (!authed(req, env)) return json({ error: "unauthorized" }, 401);
+        await env.CARRY.delete("carry:kill");
+        return json({ ok: true, killed: false });
+      }
       if (url.pathname === "/carry/reset" && req.method === "POST") {
         if (!authed(req, env)) return json({ error: "unauthorized" }, 401);
         await saveState(env, freshState(defaultConfig(env)));
         return json({ ok: true, reset: true });
       }
-      return json({ error: "not_found", routes: ["/carry/health", "/carry/status", "/carry/record", "POST /carry/tick", "POST /carry/reset"] }, 404);
+      return json({ error: "not_found", routes: ["/carry/health", "/carry/status", "/carry/record", "/carry/live/status", "POST /carry/tick", "POST /carry/reset", "POST /carry/live/tick", "POST /carry/kill", "POST /carry/unkill"] }, 404);
     } catch (e) {
       return json({ error: String((e && e.message) || e) }, 500);
     }
