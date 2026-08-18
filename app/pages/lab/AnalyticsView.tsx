@@ -347,8 +347,12 @@ function TimingAndRisk({ orders }: { orders: ProcessedTrade[] }) {
     const variance = pnls.reduce((s, v) => s + (v - mean) ** 2, 0) / n;
     const std = Math.sqrt(variance);
     const downside = Math.sqrt(pnls.filter((v) => v < 0).reduce((s, v) => s + v * v, 0) / n);
-    const sharpe = std > 0 ? (mean / std) * Math.sqrt(n) : 0;
-    const sortino = downside > 0 ? (mean / downside) * Math.sqrt(n) : 0;
+    // TRUE per-trade risk-adjusted ratios (mean ÷ volatility). NOT × √n — that's a
+    // t-statistic, which grows with sample size and would show a 100-trade record ~3×
+    // the "Sharpe" of a 10-trade one at identical risk-adjusted returns (the vanity
+    // inflation this card exists to avoid). Sample confidence is the GATE, not the value.
+    const sharpe = std > 0 ? mean / std : 0;
+    const sortino = downside > 0 ? mean / downside : 0;
     return { current, bestWin, worstLoss, hours, peak, sharpe, sortino, expectancy: mean, n };
   }, [orders]);
 
