@@ -20,8 +20,8 @@ function CalendarView({ dayGroups, onDayClick, viewMonth, viewYear, onPrevMonth,
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", gap: isMobile ? 12 : 0, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <button style={navBtnStyle} onClick={onPrevMonth}>&#8592;</button>
           <button style={{ ...navBtnStyle, background: "#ededf0", color: "#0f0f11", border: "none", fontWeight: "bold" }}>TODAY</button>
           <button style={navBtnStyle} onClick={onNextMonth}>&#8594;</button>
