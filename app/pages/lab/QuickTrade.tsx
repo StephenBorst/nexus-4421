@@ -118,14 +118,26 @@ export function QuickTrade() {
   const levClamped = Math.min(lev, cap);
   const margin = notional / (levClamped || 1);
 
+  const minNotional = Number((symbolInfo as { min_notional?: number } | undefined)?.min_notional) || 0;
+
   const qty = useMemo(() => {
     if (!markPrice || !symbolInfo) return 0;
     const baseTick = Number((symbolInfo as { base_tick?: number }).base_tick) || 0;
     const baseMin = Number((symbolInfo as { base_min?: number }).base_min) || 0;
-    return snapQty(notional / markPrice, baseTick, baseMin);
-  }, [notional, markPrice, symbolInfo]);
+    let q = snapQty(notional / markPrice, baseTick, baseMin);
+    // Floor-snapping to base_tick can dip the order VALUE under min_notional (e.g. $10
+    // HYPE → 0.17 → $9.95 → Orderly "order value ≥ 10"). When the user's notional is
+    // itself ≥ min_notional, ceil the qty up to the smallest step that clears it (matches
+    // the mini app + agent snapQty). If the user asked for LESS than min_notional it's
+    // genuinely too small — left to the tooSmall gate, not silently upsized.
+    if (q > 0 && minNotional > 0 && baseTick > 0 && notional >= minNotional && q * markPrice < minNotional) {
+      const decimals = Math.max(0, Math.round(-Math.log10(baseTick)));
+      const stepsUp = Math.ceil((minNotional / markPrice) / baseTick);
+      q = parseFloat((stepsUp * baseTick).toFixed(decimals));
+    }
+    return q;
+  }, [notional, markPrice, symbolInfo, minNotional]);
 
-  const minNotional = Number((symbolInfo as { min_notional?: number } | undefined)?.min_notional) || 0;
   const tooSmall = qty <= 0 || (minNotional > 0 && notional < minNotional);
 
   async function place(side: "BUY" | "SELL") {
