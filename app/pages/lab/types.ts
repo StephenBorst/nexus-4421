@@ -108,6 +108,7 @@ export interface AgentConfig {
   tradeSessions?: ("ASIA" | "EUROPE" | "US")[]; // opt-in regime gate: only enter in these UTC sessions (unset = all)
   minVolAtrPct?: number; // opt-in regime gate: only enter when recent ATR% ≥ this (fades want high vol)
   maxVolAtrPct?: number; // opt-in regime gate: only enter when recent ATR% ≤ this (mean-rev wants calm)
+  maxSignalAgeSec?: number; // opt-in: skip a house signal older than this (fast edges revert — enter fresh or not at all). 0/unset = 10min hard cap only
   volScaledStops?: boolean; // opt-in: TP/SL scaled to each symbol's ATR instead of a flat %
   slAtrMult?: number;       // optional: stop = slAtrMult × ATR (default 1.0 in exec)
   // Multi-level take-profit ladder (scale-out). Unset = single 100% TP at tpPercent

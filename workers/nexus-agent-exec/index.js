@@ -642,7 +642,12 @@ async function processUser(address, env, cache) {
     const signalRaw = await env.NEXUS_AGENT.get(`agent:signal:${address}`);
     if (!signalRaw) return;
     signal = JSON.parse(signalRaw);
-    if (now - signal.timestamp > 10 * 60 * 1000) return; // < 10 min old
+    if (now - signal.timestamp > 10 * 60 * 1000) return; // hard cap: never act on a >10min-old signal
+    // Opt-in tighter freshness for FAST-reverting edges. Backtest finding (hunt6): the
+    // regime-gated invert reverts within a bar, so a signal even a few minutes stale is
+    // a LATE entry that loses — better to skip and wait for a fresh one. Off by default
+    // (existing agents keep the 10min cap); the fast presets set ~180s. House signal only.
+    if ((config.maxSignalAgeSec ?? 0) > 0 && now - signal.timestamp > config.maxSignalAgeSec * 1000) return;
     if (signal.direction === "NONE") return;
     if (signal.confidence < 50) return;
   }

@@ -29,6 +29,9 @@ export const STRATEGY_PRESETS: StrategyPreset[] = [
       minVolAtrPct: 0.7, tradeSessions: ["US", "EUROPE"],
       leverage: 5, capitalPerTrade: 50, tpPercent: 2, slPercent: 1, maxHoldHours: 4,
       maxTradesPerDay: 4, maxDailyLossUsdc: 5,
+      // This edge reverts fast (hunt6) — only enter on a FRESH signal (≤3min), never a
+      // stale one, so live execution latency doesn't turn a right call into a late one.
+      maxSignalAgeSec: 180,
     },
   },
   {
