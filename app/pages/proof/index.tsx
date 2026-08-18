@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { SectionHeader } from "@/pages/lab/components";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
+import CarrySleeve from "./CarrySleeve";
 
 const API = "https://og.nexustradinglabs.com";
 const MONO = "var(--nx-font-mono)";
@@ -185,6 +186,9 @@ export default function ProofPage() {
           )}
         </div>
       )}
+
+      {/* HOUSE CARRY SLEEVE — our own strategy, run in the open (transparency-as-product). */}
+      <CarrySleeve />
 
       {/* PROOF OF EDGE — resolved calls traced through the public record. The flagship
           trust artifact: not a leaderboard number, the actual calls behind it. */}
