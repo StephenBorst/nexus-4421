@@ -38,7 +38,19 @@ Run tests: `node --test workers/nexus-carry-engine/carryBasket.test.mjs` (and `c
 Hourly cron; rebalances only when `CARRY_REBAL_H` (24h) has elapsed. Tunables in
 `wrangler.toml [vars]`: capital, perSide, rebalance hours, maker bps, min funding spread.
 
-## Roadmap
-- **Phase 3b (money-path, separate + security-reviewed):** live maker executor — post-only
-  limit rebalancing across the 12 legs, fill monitoring + re-quote, one Orderly sub-account
-  for isolation. Reuses this exact engine. Flipped on only after the paper record holds.
+## Phase 3b — live maker executor (money-path)
+The **provably-correct core is built + tested** (`carryExec.mjs`, 10 tests): `planOrders`
+turns a `diffBook` diff into concrete **POST_ONLY** (maker) specs — correct side, price that
+rests on the book (BUY→bid, SELL→ask, so it never crosses and pays taker), `snapQty`
+step-snapped to clear base_min + min_notional, FLIP as a single order through zero.
+`planIsBalanced` is an abort guard: if a data glitch skews the target book directional, don't
+send. NO signing / NO network / NO order placement in this module.
+
+⚠️ **NOT ARMED — deliberate.** The remaining wiring is the money-path switch and needs an
+explicit go + a tiny-capital validation before it touches real funds:
+1. Orderly ed25519 signing (port the validated helper from `nexus-agent-exec`), order-only key.
+2. One dedicated **Orderly sub-account** for isolation (the sub-account-per-strategy pattern).
+3. The live loop: place the `planOrders` specs, monitor fills, **re-quote unfilled legs** (the
+   one piece the paper sim can't prove — maker fills aren't guaranteed), reconcile vs exchange.
+4. Hard gate `CARRY_LIVE=true` + funded sub-account + a small starting capital; flip on ONLY
+   after the paper record holds. Never a silent default.
