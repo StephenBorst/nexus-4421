@@ -97,9 +97,10 @@ export default function CarrySleeve() {
       </div>
 
       <div style={{ fontFamily: UI, fontSize: 12.5, color: FOG, lineHeight: 1.6, maxWidth: 620, marginBottom: 14 }}>
-        We hunted our own engine in public and found one real edge: long the most-negative-funding name and short the
-        most-positive <i>within each sector</i>, so market moves cancel and the funding carry survives. It runs live in
-        <b style={{ color: BRIGHT }}> paper</b> here — the equity curve is open, losers included, before a dollar of capital.
+        We hunted our own strategies in public — directional bets were a dead end. This is the most promising lead we
+        found: long the cheapest-funding perp and short the richest <i>within each sector</i>, so market moves cancel and
+        funding income is left. It runs live in <b style={{ color: BRIGHT }}>paper</b> — equity curve open, losers
+        included — while we test whether the edge actually holds, before a dollar of capital.
       </div>
 
       {curve.length >= 2 ? (
