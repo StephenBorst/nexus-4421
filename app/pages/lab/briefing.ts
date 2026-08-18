@@ -496,12 +496,13 @@ export function buildBriefing(input: BriefingInput): Insight[] {
     if (Math.abs(lw - sw) >= 15) {
       const strong = lw > sw ? "long" : "short";
       const weak = lw > sw ? "short" : "long";
+      const strongWr = Math.max(lw, sw), weakWr = Math.min(lw, sw);
       out.push({
         id: "edge-directional",
         priority: 70,
         tone: "info",
         title: `Your edge is on the ${strong} side`,
-        detail: `${lw}% win rate ${strong === "long" ? "long" : "short"} vs ${sw > lw ? sw : Math.min(lw, sw)}% ${weak}. Trade more ${strong}s; be far more selective on ${weak}s.`,
+        detail: `${strongWr}% win rate ${strong} vs ${weakWr}% ${weak}. Trade more ${strong}s; be far more selective on ${weak}s.`,
         action: { label: "Full breakdown", tab: "analytics" },
       });
     }
