@@ -105,6 +105,9 @@ export interface AgentConfig {
   respectRegime?: boolean; // opt-in: brain skips NEW entries that fight a strong market regime
   respectSmartMoney?: boolean; // opt-in: brain skips NEW entries that fight strong smart-money consensus
   invertSignal?: boolean; // opt-in: flip every entry to the OPPOSITE direction (fade a systematically-wrong signal)
+  tradeSessions?: ("ASIA" | "EUROPE" | "US")[]; // opt-in regime gate: only enter in these UTC sessions (unset = all)
+  minVolAtrPct?: number; // opt-in regime gate: only enter when recent ATR% ≥ this (fades want high vol)
+  maxVolAtrPct?: number; // opt-in regime gate: only enter when recent ATR% ≤ this (mean-rev wants calm)
   volScaledStops?: boolean; // opt-in: TP/SL scaled to each symbol's ATR instead of a flat %
   slAtrMult?: number;       // optional: stop = slAtrMult × ATR (default 1.0 in exec)
   // Multi-level take-profit ladder (scale-out). Unset = single 100% TP at tpPercent

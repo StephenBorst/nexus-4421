@@ -1107,6 +1107,59 @@ export function AgentView() {
             onToggle={() => setConfig({ ...config, respectSmartMoney: !config.respectSmartMoney })}
           />
 
+          {/* Opt-in REGIME CONDITIONING — the backtest-validated finding: the edge is in
+              WHEN a signal fires, not the signal. Session (skip the hours a signal bleeds)
+              + a volatility band. Gated in the brain's deriveSignal; never flips direction
+              or touches open positions. Off by default; validate on Test / Sweep first. */}
+          {(() => {
+            const sess = config.tradeSessions || [];
+            const chip = (active: boolean): React.CSSProperties => ({
+              flex: 1, cursor: "pointer", fontFamily: "var(--nx-font-mono)", fontSize: 10, borderRadius: 4, padding: "6px 0", textAlign: "center",
+              background: active ? "#ededf015" : "#0a0a0b", border: `1px solid ${active ? "#ededf0" : "#232327"}`, color: active ? "#ededf0" : "#71717a",
+            });
+            const lbl: React.CSSProperties = { ...agentLabelStyle, fontSize: 8.5, color: "#71717a", letterSpacing: "0.1em" };
+            const hint: React.CSSProperties = { fontFamily: "var(--nx-font-mono)", fontSize: 8, color: "#52525b", marginTop: 4, lineHeight: 1.4 };
+            const toggleSess = (s: "ASIA" | "EUROPE" | "US") => {
+              const next = sess.includes(s) ? sess.filter((x) => x !== s) : [...sess, s];
+              setConfig({ ...config, tradeSessions: next.length ? next : undefined });
+            };
+            return (
+              <div style={agentCardStyle}>
+                <div style={agentLabelStyle}>// REGIME CONDITIONING <span style={{ color: "#52525b", fontSize: 8 }}>— experimental, opt-in</span></div>
+                <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 6, color: "#71717a", letterSpacing: 0 }}>
+                  Only enter where a signal actually works. Backtest finding: inverted-confluence hits ~<b style={{ color: "#3ecf8e" }}>60%</b> in high volatility and bleeds in the Asia session. <b style={{ color: "#ededf0" }}>Prove it on Test / Sweep first.</b>
+                </div>
+
+                <div style={{ marginTop: 12 }}>
+                  <div style={lbl}>TRADING SESSIONS (UTC){!sess.length && <span style={{ color: "#3a3a40" }}> · all allowed</span>}</div>
+                  <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                    {(["ASIA", "EUROPE", "US"] as const).map((s) => (
+                      <button key={s} onClick={() => toggleSess(s)} style={chip(sess.includes(s))}>{s}</button>
+                    ))}
+                  </div>
+                  <div style={hint}>No selection = trade all. Select to restrict (the finding drops ASIA).</div>
+                </div>
+
+                <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div>
+                    <div style={lbl}>MIN VOL — ATR% /1h</div>
+                    <div style={{ marginTop: 5 }}>
+                      <NumberField value={config.minVolAtrPct ?? 0} onCommit={(v) => setConfig({ ...config, minVolAtrPct: v > 0 ? v : undefined })} min={0} max={5} step={0.1} />
+                    </div>
+                    <div style={hint}>0 = off. ~0.7 = fades only in dislocation.</div>
+                  </div>
+                  <div>
+                    <div style={lbl}>MAX VOL — ATR% /1h</div>
+                    <div style={{ marginTop: 5 }}>
+                      <NumberField value={config.maxVolAtrPct ?? 0} onCommit={(v) => setConfig({ ...config, maxVolAtrPct: v > 0 ? v : undefined })} min={0} max={5} step={0.1} />
+                    </div>
+                    <div style={hint}>0 = off. Set for mean-reversion (calm only).</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           <AgentToggleCard
             label="// VOLATILITY-SCALED STOPS"
             description={<>Sizes TP/SL to each symbol&apos;s recent ATR instead of a flat % — so a high-vol coin (SOL) isn&apos;t noise-stopped and a calm one isn&apos;t over-given. Keeps your R:R ratio. Test in PAPER first.</>}
