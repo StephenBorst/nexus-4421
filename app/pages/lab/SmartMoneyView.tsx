@@ -118,7 +118,8 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
   // from the board data we already have.
   const consensus = useMemo<SmConsensus[]>(() => {
     if (!board) return [];
-    const map = new Map<string, { sym: string; side: "LONG" | "SHORT"; traders: Set<string>; netUsd: number; refPrice: number; maxSz: number }>();
+    type Entry = { sym: string; side: "LONG" | "SHORT"; traders: Set<string>; netUsd: number; refPrice: number; maxSz: number };
+    const map = new Map<string, Entry>();
     for (const t of board) {
       for (const p of t.positions) {
         if (!p.tradeable || !p.sym) continue;
@@ -129,8 +130,24 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
         map.set(key, e);
       }
     }
-    return [...map.values()]
-      .filter((e) => e.traders.size >= 2)
+    // Collapse to ONE side per coin — the DOMINANT agreement. A coin with tracked
+    // traders on BOTH sides (e.g. 5 long + 5 short BTC) is a SPLIT, not consensus, so
+    // showing both entries under "coins traders agree on" is contradictory. Keep the
+    // side that clearly leads (more traders); drop the coin entirely on a tie.
+    const bySym = new Map<string, { LONG?: Entry; SHORT?: Entry }>();
+    for (const e of map.values()) {
+      if (e.traders.size < 2) continue;
+      const g = bySym.get(e.sym) || {};
+      g[e.side] = e; bySym.set(e.sym, g);
+    }
+    const dominant: Entry[] = [];
+    for (const g of bySym.values()) {
+      const sides = [g.LONG, g.SHORT].filter(Boolean) as Entry[];
+      if (sides.length === 1) { dominant.push(sides[0]); continue; }
+      sides.sort((a, b) => b.traders.size - a.traders.size);
+      if (sides[0].traders.size > sides[1].traders.size) dominant.push(sides[0]); // clear lead wins; even split dropped
+    }
+    return dominant
       .map((e) => ({ sym: e.sym, side: e.side, count: e.traders.size, netUsd: e.netUsd, refPrice: e.refPrice }))
       .sort((a, b) => b.count - a.count || b.netUsd - a.netUsd)
       .slice(0, 6);
