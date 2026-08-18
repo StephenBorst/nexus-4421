@@ -15,7 +15,7 @@
 //   Entry: BOTH rules must agree (confluence). Single signal = no trade.
 // ═══════════════════════════════════════════════════════════
 
-import { deriveSignal, computeRegime } from "./logic.mjs";
+import { deriveSignal, computeRegime, atrPct } from "./logic.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 
@@ -85,10 +85,12 @@ export default {
       // symbol is still fetched once but each user gets their own signal from it.
       // Only compute the funding percentile if some active user opted into the filter.
       const needFundingPct = Object.values(userConfigs).some(({ config }) => (config.fundingPercentileMin ?? 0) > 0);
+      // Only fetch candles for ATR when some active user opted into the volatility gate.
+      const needVol = Object.values(userConfigs).some(({ config }) => (config.minVolAtrPct ?? 0) > 0 || (config.maxVolAtrPct ?? 0) > 0);
       const rawBySymbol = {};
       for (const symbol of symbolSet) {
         try {
-          rawBySymbol[symbol] = await evaluateSymbol(symbol, env, needFundingPct);
+          rawBySymbol[symbol] = await evaluateSymbol(symbol, env, needFundingPct, needVol);
         } catch (e) {
           console.error(`[brain] ${symbol} eval error:`, e.message);
         }
@@ -155,13 +157,30 @@ export default {
 // Fetch one symbol's market data and compute RAW deltas vs last cycle.
 // No strategy interpretation here — deriveSignal() applies each user's mode +
 // thresholds. `market:prev:{symbol}` is stored so price/OI deltas are real.
-async function evaluateSymbol(symbol, env, computeFundingPct = false) {
+async function evaluateSymbol(symbol, env, computeFundingPct = false, computeVol = false) {
   const json = await orderlyPublicGet(`${ORDERLY_API}/v1/public/futures/${symbol}`);
   const d = json.data;
 
   const markPrice = parseFloat(d.mark_price);
   const fundingRate = parseFloat(d.last_funding_rate) || 0;
   const openInterest = parseFloat(d.open_interest) || 0;
+
+  // Recent ATR% for the opt-in volatility gate — one extra fetch, ONLY when a user
+  // needs it (mirrors the fundingPct gating). Uses the SAME atrPct formula as the
+  // backtest so the live gate matches the validated sim. Undefined on any failure →
+  // the gate fail-opens (matches every other opt-in gate).
+  let atrPctVal;
+  if (computeVol) {
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const th = await orderlyPublicGet(`${ORDERLY_API}/tv/history?symbol=${symbol}&resolution=60&from=${now - 24 * 3600}&to=${now}`);
+      if (th && th.s === "ok" && Array.isArray(th.t) && th.t.length >= 5) {
+        const candles = th.t.map((t, i) => ({ o: +th.o[i], h: +th.h[i], l: +th.l[i], c: +th.c[i] }));
+        const a = atrPct(candles);
+        if (Number.isFinite(a)) atrPctVal = a;
+      }
+    } catch { /* leave undefined → vol gate stays off for this tick */ }
+  }
 
   // Funding percentile vs Orderly's history — only when a user's config needs it
   // (the fundingPercentileMin filter). Skipped otherwise to avoid extra fetches.
@@ -194,7 +213,12 @@ async function evaluateSymbol(symbol, env, computeFundingPct = false) {
     price: markPrice, oi: openInterest, timestamp: Date.now(),
   }));
 
-  return { symbol, price: markPrice, oi: openInterest, fundingRate, priceChange, oiChange, hasPrev: !!prev, fundingPct };
+  return {
+    symbol, price: markPrice, oi: openInterest, fundingRate, priceChange, oiChange, hasPrev: !!prev, fundingPct,
+    // Regime-conditioning inputs for the opt-in session/vol gates in deriveSignal.
+    hourUtc: new Date().getUTCHours(),
+    ...(atrPctVal !== undefined ? { atrPct: atrPctVal } : {}),
+  };
 }
 
 // Snapshot hourly OI for a set of symbols, INDEPENDENT of the signal path (which

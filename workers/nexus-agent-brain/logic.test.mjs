@@ -254,3 +254,22 @@ test("regime gates apply BEFORE invert (suppress the faded entry too)", () => {
   // high vol → fires and inverts (funding LONG → SHORT)
   assert.equal(deriveSignal(raw({ fundingRate: -0.0002, atrPct: 1.0 }), cfg).direction, "SHORT");
 });
+
+// ── atrPct helper (shared with the live brain's vol gate) ───────────────────
+import { atrPct } from "./logic.mjs";
+test("atrPct: computes ATR as % of last close", () => {
+  // 5 flat-ish bars then a wide one; TR avg / last close.
+  const c = [
+    { o: 100, h: 101, l: 99, c: 100 },
+    { o: 100, h: 102, l: 99, c: 101 },
+    { o: 101, h: 103, l: 100, c: 102 },
+    { o: 102, h: 104, l: 101, c: 103 },
+    { o: 103, h: 110, l: 102, c: 108 }, // wide bar
+  ];
+  const a = atrPct(c);
+  assert.ok(a > 0 && a < 20, `atr% in a sane range: ${a}`);
+});
+test("atrPct: null on too little history", () => {
+  assert.equal(atrPct([{ o: 1, h: 1, l: 1, c: 1 }]), null);
+  assert.equal(atrPct(null), null);
+});

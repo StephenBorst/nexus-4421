@@ -39,6 +39,22 @@ export function computeRegime(rows) {
   return { score, label };
 }
 
+// ATR as a % of price over the most recent `periods` completed candles ({o,h,l,c}
+// ascending). This is the SAME formula the backtest's atrPctAt uses (TR = max of
+// range / gap-up / gap-down, averaged, ÷ last close) — kept here so the live vol gate
+// matches the validated sim exactly. Returns null when there isn't enough history.
+export function atrPct(candles, periods = 14) {
+  if (!Array.isArray(candles) || candles.length < 4) return null;
+  const c = candles.slice(-(periods + 1)); // `periods` TRs need one extra bar for prevClose
+  let trSum = 0, cnt = 0;
+  for (let k = 1; k < c.length; k++) {
+    const tr = Math.max(c[k].h - c[k].l, Math.abs(c[k].h - c[k - 1].c), Math.abs(c[k].l - c[k - 1].c));
+    if (Number.isFinite(tr)) { trSum += tr; cnt++; }
+  }
+  const lastClose = c[c.length - 1].c;
+  return cnt && lastClose > 0 ? (trSum / cnt / lastClose) * 100 : null;
+}
+
 export function deriveSignal(raw, config = {}, regime = null, smartConsensus = null) {
   const fundingRate = raw.fundingRate || 0;
   const priceChange = raw.priceChange || 0;
