@@ -64,13 +64,19 @@ export default {
         const snap = await fetchSnapshot();
         const cov = coverage(snap);
         if (cov.tradableSectors < 2) { console.log("carry skip thin", JSON.stringify(cov)); return; }
-        const paper = await runTick(env, snap);
-        env.CARRY?.put("ops:carry:heartbeat", String(Date.now()));
-        console.log("carry paper", JSON.stringify(paper.tick || paper.skipped));
-        // Live executor — shares the SAME snapshot as paper; no-ops unless CARRY_LIVE=true + key + not killed.
-        if (env.CARRY_LIVE === "true") {
-          const live = await runLive(env, snap);
-          console.log("carry live", JSON.stringify(live));
+        // Two crons, race-free: the hourly runs PAPER (the public record); the */5 runs the
+        // LIVE re-quote (chase maker fills). At :00 both fire as separate events — paper on
+        // the hour, live on the fives, never overlapping the live path.
+        if (event.cron === "*/5 * * * *") {
+          if (env.CARRY_LIVE === "true") {
+            const live = await runLive(env, snap);
+            if (live && !live.skipped) env.CARRY?.put("ops:carry:live:heartbeat", String(Date.now()));
+            console.log("carry live", JSON.stringify(live));
+          }
+        } else { // "0 * * * *" (or any fallback) → paper record
+          const paper = await runTick(env, snap);
+          env.CARRY?.put("ops:carry:heartbeat", String(Date.now()));
+          console.log("carry paper", JSON.stringify(paper.tick || paper.skipped));
         }
       } catch (e) { console.error("carry tick error", e && e.stack || e); }
     })());

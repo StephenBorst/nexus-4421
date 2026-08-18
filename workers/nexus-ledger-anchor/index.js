@@ -155,6 +155,23 @@ async function runMonitor(env) {
     }
   } catch (e) { console.error("[monitor] exec:", e.message); }
 
+  // 3c) Carry engine liveness — the sleeve's hourly PAPER cron drives the funding-carry
+  // record; a stall means it paused. If armed live, also surface a tripped kill switch or
+  // rejected maker orders. HTTP-based (the carry KV is a separate namespace).
+  try {
+    const base = env.CARRY_HEALTH_URL || "https://nexus-carry-engine.stephenpatrick24.workers.dev";
+    const h = await fetch(`${base}/carry/health`).then((r) => r.json()).catch(() => null);
+    if (h && h.lastTickAgeSec != null && h.lastTickAgeSec > 5400) {
+      issues.push({ key: "carry", msg: `◈ Carry sleeve stalled: last paper tick <b>${(h.lastTickAgeSec / 60).toFixed(0)} min</b> ago (hourly cron). Funding-carry record paused.` });
+    }
+    const ls = await fetch(`${base}/carry/live/status`).then((r) => r.json()).catch(() => null);
+    if (ls?.armed) {
+      if (ls.killed) issues.push({ key: "carry_kill", msg: `◈ Carry LIVE kill switch is ON — the maker executor is halted.` });
+      const errs = (ls.lastLive?.results || []).filter((r) => r && r.error);
+      if (errs.length) issues.push({ key: "carry_orders", msg: `◈ Carry live orders rejected (<b>${errs.length}</b>): <code>${String(errs[0].error || "").slice(0, 80)}</code>` });
+    }
+  } catch (e) { console.error("[monitor] carry:", e.message); }
+
   // Alert per-issue, debounced 3h so we don't spam an ongoing problem.
   for (const { key, msg } of issues) {
     if (await shouldAlert(env, key, 3 * HOUR)) await sendTg(env, `🚨 <b>Nexus ops alert</b>\n\n${msg}`);

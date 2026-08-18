@@ -64,17 +64,30 @@ export async function runLive(env, snapshot) {
   try { for (const o of openOrderIds(await getOpenOrders(keyData))) { try { await cancelOrder(keyData, o.symbol, o.orderId); } catch { /* best effort */ } } }
   catch { /* non-fatal */ }
 
-  // 3) target book from the live snapshot
-  const target = buildTargetBook(snapshot.funding, sectorMap(), { capital: cfg.capital, perSide: cfg.perSide, minFundingSpread: cfg.minFundingSpread });
-  if (!target.legs.length) return { aborted: "empty_target" };
+  // 3) target book — re-RANK only every CARRY_REBAL_H (matches paper); between rebalances
+  //    hold the SAME target and re-QUOTE toward it (chase fills). This is what lets the
+  //    */5 cron pick up maker fills without churning the book every 5 minutes.
+  const rebalMs = (Number(env.CARRY_REBAL_H) || 24) * 3600000;
+  let targetLegs, rebalanced = false;
+  const savedT = await env.CARRY.get("carry:live:target").then((r) => (r ? JSON.parse(r) : null)).catch(() => null);
+  if (!savedT || !savedT.legs?.length || (Date.now() - (savedT.ts || 0)) >= rebalMs) {
+    const built = buildTargetBook(snapshot.funding, sectorMap(), { capital: cfg.capital, perSide: cfg.perSide, minFundingSpread: cfg.minFundingSpread });
+    if (!built.legs.length) return { aborted: "empty_target" };
+    targetLegs = built.legs;
+    rebalanced = true;
+  } else {
+    targetLegs = savedT.legs;
+  }
 
   // 4) HARD SAFETY: never send a directional (unbalanced) book
-  const bal = planIsBalanced(target.legs);
+  const bal = planIsBalanced(targetLegs);
   if (!bal.balanced) return { aborted: "unbalanced_book", net: bal.net };
+  // persist a freshly-ranked target so the 24h clock is anchored to the decision
+  if (rebalanced) { try { await env.CARRY.put("carry:live:target", JSON.stringify({ ts: Date.now(), legs: targetLegs })); } catch { /* non-fatal */ } }
 
   // 5) what needs to change
-  const orders = diffBook(currentLegs, target.legs);
-  if (!orders.length) return { ok: true, placed: 0, note: "already aligned", legs: currentLegs.length };
+  const orders = diffBook(currentLegs, targetLegs);
+  if (!orders.length) return { ok: true, placed: 0, note: "already aligned", legs: currentLegs.length, rebalanced };
 
   // 6) market info (step size on /info; best bid/ask from the book)
   const marketInfo = {};
@@ -90,7 +103,7 @@ export async function runLive(env, snapshot) {
   try { await setLeverage(keyData, cfg.leverage); } catch { /* leverage call best-effort */ }
 
   // 8) plan POST_ONLY + place, with a per-order notional cap (no single order > the book)
-  const specs = planOrders(orders, currentLegs, target.legs, marketInfo);
+  const specs = planOrders(orders, currentLegs, targetLegs, marketInfo);
   const results = [];
   let placed = 0;
   for (const s of specs) {
@@ -101,7 +114,7 @@ export async function runLive(env, snapshot) {
     results.push(r.ok ? { symbol: s.symbol, side: s.side, qty: s.qty, price: s.price, orderId: r.orderId } : { symbol: s.symbol, side: s.side, error: r.message, code: r.code });
   }
 
-  const liveState = { ts: Date.now(), currentLegs, targetLegs: target.legs, planned: orders.length, placed, results };
+  const liveState = { ts: Date.now(), currentLegs, targetLegs, planned: orders.length, placed, rebalanced, results };
   try { await env.CARRY.put("carry:live:state", JSON.stringify(liveState)); } catch { /* non-fatal */ }
-  return { ok: true, placed, planned: orders.length, results };
+  return { ok: true, placed, planned: orders.length, rebalanced, results };
 }

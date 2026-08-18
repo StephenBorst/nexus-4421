@@ -78,3 +78,11 @@ jobs:
       - name: Deploy Worker (nexus-agent-brain)
         working-directory: workers/nexus-agent-brain
         run: npx wrangler@3 deploy
+
+      # Carry engine (sector-neutral funding-carry sleeve). Redeploys from source so a
+      # manual `wrangler deploy` can't drift. Stays DISARMED: CARRY_LIVE is not a
+      # wrangler.toml var, and `wrangler deploy` never touches secrets/vars — so this
+      # only ships code; the live executor stays off until the owner arms it out-of-band.
+      - name: Deploy Worker (nexus-carry-engine)
+        working-directory: workers/nexus-carry-engine
+        run: npm ci && npx wrangler@3 deploy

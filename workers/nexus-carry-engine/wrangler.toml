@@ -2,10 +2,11 @@ name = "nexus-carry-engine"
 main = "index.js"
 compatibility_date = "2024-09-23"
 
-# Hourly cron. The engine only rebalances when CARRY_REBAL_H (default 24h) has elapsed
-# since the last rebalance; the intervening ticks accrue funding + mark to market.
+# Two crons: hourly runs the PAPER record (accrues funding, marks, 24h rebalance); the
+# */5 runs the LIVE maker re-quote (chases fills) — a no-op unless CARRY_LIVE=true. Live
+# re-ranks the target only every CARRY_REBAL_H; the fast tick just chases fills toward it.
 [triggers]
-crons = ["0 * * * *"]
+crons = ["0 * * * *", "*/5 * * * *"]
 
 # KV namespace (created 2026-08-18). Reuse across deploys; state lives at key carry:state.
 [[kv_namespaces]]

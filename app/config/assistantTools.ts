@@ -15,6 +15,7 @@ import { buildOperatorProfile, profileNarrative } from "@/lib/operatorProfile.mj
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const AGENT_API = "https://og.nexustradinglabs.com";
+const CARRY_API = "https://nexus-carry-engine.stephenpatrick24.workers.dev";
 
 export interface ToolCtx {
   wallet: string | null;
@@ -248,6 +249,27 @@ export const TOOLS: ToolDef[] = [
       const d = await res.json();
       const rows = (d?.leaderboard ?? d?.agents ?? d ?? []).slice?.(0, 10) ?? [];
       return JSON.stringify({ count: rows.length, leaderboard: rows });
+    },
+  },
+  {
+    name: "get_carry_sleeve",
+    description:
+      "Get the HOUSE CARRY SLEEVE: Nexus's OWN market-neutral funding-carry strategy, run transparently in PAPER with a live equity curve on /proof. It longs the most-negative-funding perp and shorts the most-positive WITHIN each sector, so market moves cancel and funding income survives — the one +EV edge the team found after backtesting its own strategies in public (directional prediction was a dead end; we showed the receipts). Use for 'what is the carry sleeve', 'how is the house strategy doing', 'is the funding-carry edge real', or to tell the transparency story. Key field: carry share % = how much of the P&L is funding vs price — high means it's real carry, not price luck.",
+    input_schema: { type: "object", properties: {} },
+    run: async () => {
+      const res = await fetch(`${CARRY_API}/carry/status`);
+      if (!res.ok) return JSON.stringify({ error: `carry status failed (${res.status})` });
+      const d = await res.json();
+      const s = d?.summary ?? {};
+      return JSON.stringify({
+        mode: d?.mode ?? "paper",
+        netPnl: s.netPnl, carrySharePct: s.carrySharePct, cumFunding: s.cumFunding, cumPrice: s.cumPrice,
+        rebalances: s.rebalances, legs: s.legs,
+        book: (d?.book ?? []).map((l: { symbol: string; sector: string; side: number; funding: number }) => ({
+          symbol: l.symbol, sector: l.sector, side: l.side === 1 ? "LONG" : "SHORT", funding8h: l.funding,
+        })),
+        view: "https://trade.nexustradinglabs.com/proof",
+      });
     },
   },
   {
