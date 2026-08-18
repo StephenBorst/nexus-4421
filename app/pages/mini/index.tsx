@@ -19,7 +19,9 @@ import { STRATEGY_PRESETS } from "@/config/strategyPresets";
 
 // The flagship "Proven Edge" preset — single source of truth with the Lab, so the
 // mini-app one-tap deploy can never drift from the web preset.
-const PROVEN_EDGE = STRATEGY_PRESETS.find((p) => p.id === "proven-edge")?.config ?? {};
+// The one-tap deploy uses the FEATURED strategy — the regime-gated invert (the first
+// config to clear our cross-market walk-forward), not the disproven funding fade.
+const LEAD_STRATEGY = STRATEGY_PRESETS.find((p) => p.id === "regime-gated-invert")?.config ?? {};
 
 const bg = "#0a0a0b";
 // Color law (monochrome editorial rebrand): accent = bone #ededf0 (CTAs, interaction,
@@ -402,11 +404,11 @@ export default function MiniApp() {
       const s = await ensureSig();
       const r = await fetch(`${API}/agent/${s.addr.toLowerCase()}/bankr/activate`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "PAPER", config: PROVEN_EDGE, walletSig: s.sig }),
+        body: JSON.stringify({ mode: "PAPER", config: LEAD_STRATEGY, walletSig: s.sig }),
       });
       const d = await r.json();
       if (r.ok && d.ok) {
-        setAgentMsg({ ok: true, text: "✓ Deployed in PAPER — it now trades a simulated BTC funding-fade. Track it in the full terminal." });
+        setAgentMsg({ ok: true, text: "✓ Deployed in PAPER — it now paper-trades the regime-gated invert edge. Track its graded record in the full terminal." });
         await loadAgent(s.addr);
       } else {
         setAgentMsg({ ok: false, text: d.hint || d.error || "deploy failed" });
@@ -894,9 +896,9 @@ export default function MiniApp() {
             ) : (
               <>
                 <div style={{ fontSize: 11, color: "#a1a1aa", lineHeight: 1.5 }}>
-                  Try the <span style={{ color: "#fbbf24" }}>BTC Funding Fade</span> — a selective funding-fade with a breakeven risk-free stop. <span style={{ color: "#fff" }}>Experimental, PAPER only</span> (it doesn't yet pass our cross-market validation). No funds, no key.
+                  Try the <span style={{ color: profit }}>Regime-Gated Invert</span> — the first edge to clear our cross-market walk-forward (~60% win, +EV in backtest). It fades confluence only in high volatility, outside the Asia session. <span style={{ color: "#fff" }}>PAPER only</span> — watch it build a graded record. No funds, no key.
                 </div>
-                <button onClick={deployPaperAgent} disabled={agentBusy} style={{ background: "#2a1a00", color: "#fbbf24", border: "1px solid #4a3a00", borderRadius: 5, padding: "10px 0", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: agentBusy ? "wait" : "pointer", letterSpacing: "0.04em", opacity: agentBusy ? 0.6 : 1 }}>{agentBusy ? "DEPLOYING…" : "🧪 PAPER-TEST BTC FUNDING FADE"}</button>
+                <button onClick={deployPaperAgent} disabled={agentBusy} style={{ background: "#2a1a00", color: "#fbbf24", border: "1px solid #4a3a00", borderRadius: 5, padding: "10px 0", fontFamily: mono, fontSize: 11, fontWeight: "bold", cursor: agentBusy ? "wait" : "pointer", letterSpacing: "0.04em", opacity: agentBusy ? 0.6 : 1 }}>{agentBusy ? "DEPLOYING…" : "🧪 PAPER-TEST THE REGIME-GATED EDGE"}</button>
               </>
             )}
             {agentMsg && <div style={{ fontSize: 10, color: agentMsg.ok ? green : "#fbbf24", lineHeight: 1.5 }}>{agentMsg.text}</div>}

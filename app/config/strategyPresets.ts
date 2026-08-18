@@ -17,6 +17,21 @@ export interface StrategyPreset {
 
 export const STRATEGY_PRESETS: StrategyPreset[] = [
   {
+    id: "regime-gated-invert",
+    name: "Regime-Gated Invert",
+    tag: "VALIDATED LEAD",
+    accent: "#3ecf8e",
+    blurb: "The first config to clear our cross-market walk-forward. It FADES the confluence signal (funding + OI agree) — but only in the regimes where fading actually pays: high volatility (ATR% ≥ 0.7) and outside the Asia session, where these signals bleed. 60d backtest: ~60% win, positive expectancy, net-positive on 4 of 5 markets AND out-of-sample. Still a young sample (~20 trades) so we call it a validated LEAD, not proven — PAPER it and watch it build a graded record. This is the honest edge, not a marketed backtest.",
+    config: {
+      symbols: ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC", "PERP_HYPE_USDC"],
+      signalMode: "CONFLUENCE", invertSignal: true,
+      fundingThreshold: 0.01, oiChangeThreshold: 1,
+      minVolAtrPct: 0.7, tradeSessions: ["US", "EUROPE"],
+      leverage: 5, capitalPerTrade: 50, tpPercent: 2, slPercent: 1, maxHoldHours: 4,
+      maxTradesPerDay: 4, maxDailyLossUsdc: 5,
+    },
+  },
+  {
     id: "proven-edge",
     name: "BTC Funding Fade",
     tag: "EXPERIMENTAL",
