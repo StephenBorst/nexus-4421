@@ -6,8 +6,9 @@
 // the SAME behavioral truth (no drift), and so the profile stays pure composition
 // (it consumes these, it doesn't recompute them).
 //
-//  tiltRead     — do the trades you take right after a loss underperform? (revenge)
-//  sessionEdge  — which trading session (UTC) do you actually make money in?
+//  tiltRead        — do the trades you take right after a loss underperform? (revenge)
+//  sessionEdge     — which trading session (UTC) do you actually make money in?
+//  overtradingRead — do the trades AFTER your first couple each day bleed? (the "kept clicking" leak)
 //
 // A trade is { pnl:number, timestamp:number(ms) }. Break-even (pnl === 0) is
 // treated as neither a win nor a loss. Pure + tested: node --test app/lib/behavioral.test.mjs
@@ -67,4 +68,39 @@ export function sessionEdge(trades, { minPer = 4 } = {}) {
   const best = arr[0], worst = arr[arr.length - 1];
   if (best.name === worst.name || !(best.net > 0) || !(worst.net < 0)) return null;
   return { best, worst };
+}
+
+const utcDayKey = (ts) => { const d = new Date(ts); return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`; };
+
+/**
+ * The overtrading read: within each UTC day, do the trades taken AFTER the first
+ * `cutoff` underperform the disciplined early ones? The classic "I made my trade, then
+ * kept clicking" leak — boredom / revenge / FOMO after the plan is done. Only your
+ * sequenced, timestamped record reveals it.
+ *
+ * Fires only on a real excess sample (>= minExcess trades beyond the cutoff, and enough
+ * disciplined trades to compare against) AND a material win-rate gap — otherwise null
+ * (a trader who stops after their plan has no overtrading story, and we say nothing).
+ * @returns {{ firstWr, excessWr, gapPts, excessN, firstN, excessNet, cutoff } | null}
+ */
+export function overtradingRead(trades, { cutoff = 2, minExcess = 5, minFirst = 5, minGapPts = 12 } = {}) {
+  const list = (trades || []).filter((t) => t && Number.isFinite(t.pnl) && Number.isFinite(t.timestamp));
+  if (list.length < 10) return null;
+  const byDay = new Map();
+  for (const t of list) {
+    const k = utcDayKey(t.timestamp);
+    if (!byDay.has(k)) byDay.set(k, []);
+    byDay.get(k).push(t);
+  }
+  const first = [], excess = [];
+  for (const day of byDay.values()) {
+    day.sort((a, b) => a.timestamp - b.timestamp);
+    day.forEach((t, i) => (i < cutoff ? first : excess).push(t));
+  }
+  if (excess.length < minExcess || first.length < minFirst) return null;
+  const firstWr = wrOf(first), excessWr = wrOf(excess);
+  const gapPts = Math.round((firstWr - excessWr) * 10) / 10;
+  if (gapPts < minGapPts) return null;
+  const excessNet = Math.round(excess.reduce((s, t) => s + t.pnl, 0) * 100) / 100;
+  return { firstWr, excessWr, gapPts, excessN: excess.length, firstN: first.length, excessNet, cutoff };
 }

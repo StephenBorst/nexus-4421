@@ -16,7 +16,7 @@ import { computeEdge } from "@/config/edge";
 import { adherenceReport } from "@/lib/adherence.mjs";
 import { leakProfile } from "@/lib/postmortem.mjs";
 import { buildOperatorProfile, profileNarrative } from "@/lib/operatorProfile.mjs";
-import { tiltRead, sessionEdge } from "@/lib/behavioral.mjs";
+import { tiltRead, sessionEdge, overtradingRead } from "@/lib/behavioral.mjs";
 import { openIdentityShare } from "@/utils/shareIdentity";
 
 const AGENT_API = "https://og.nexustradinglabs.com";
@@ -71,7 +71,7 @@ export function OperatorProfileCard({ wallet, theses, orders }: {
       adherence: adherenceReport(theses || [], orders || []),
       leaks: leakProfile(theses || []),
       trades: orders || [],
-      behavioral: { tilt: tiltRead(bt), session: sessionEdge(bt) },
+      behavioral: { tilt: tiltRead(bt), session: sessionEdge(bt), overtrading: overtradingRead(bt) },
     }) as Profile;
   }, [loaded, process, theses, orders]);
 

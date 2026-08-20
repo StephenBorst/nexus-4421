@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { tiltRead, sessionEdge } from "./behavioral.mjs";
+import { tiltRead, sessionEdge, overtradingRead } from "./behavioral.mjs";
 
 const HOUR = 3600000, DAY = 86400000;
 const base = Date.UTC(2026, 7, 3, 3, 0, 0); // 03:00 UTC = Asia
@@ -50,4 +50,39 @@ test("sessionEdge null when no session is net-negative", () => {
   for (let i = 0; i < 5; i++) trades.push({ pnl: 60, timestamp: base + i * DAY });
   for (let i = 0; i < 5; i++) trades.push({ pnl: 30, timestamp: base + i * DAY + 15 * HOUR }); // US also positive
   assert.equal(sessionEdge(trades), null);
+});
+
+test("overtradingRead fires when trades after the first 2 each day bleed", () => {
+  // 6 days: first 2 trades/day are winners, then 3 excess trades/day are losers.
+  const trades = [];
+  for (let d = 0; d < 6; d++) {
+    const day = base + d * DAY;
+    trades.push({ pnl: 40, timestamp: day + 1 * HOUR });   // 1st — win
+    trades.push({ pnl: 40, timestamp: day + 2 * HOUR });   // 2nd — win
+    for (let e = 0; e < 3; e++) trades.push({ pnl: -30, timestamp: day + (3 + e) * HOUR }); // excess — losses
+  }
+  const r = overtradingRead(trades);
+  assert.ok(r, "expected an overtrading read");
+  assert.equal(r.cutoff, 2);
+  assert.equal(r.firstWr, 100, "first two each day all win");
+  assert.equal(r.excessWr, 0, "the excess trades all lose");
+  assert.equal(r.excessN, 18, "3 excess × 6 days");
+  assert.ok(r.excessNet < 0, "the excess costs money");
+  assert.ok(r.gapPts >= 12);
+});
+
+test("overtradingRead is null when the extra trades are just as good", () => {
+  const trades = [];
+  for (let d = 0; d < 6; d++) {
+    const day = base + d * DAY;
+    for (let i = 0; i < 5; i++) trades.push({ pnl: i % 2 === 0 ? 40 : -30, timestamp: day + i * HOUR });
+  }
+  assert.equal(overtradingRead(trades), null, "no discipline gap → nothing to say");
+});
+
+test("overtradingRead is null without enough excess trades", () => {
+  // one trade a day for 12 days — never more than the cutoff, so no excess sample
+  const trades = [];
+  for (let d = 0; d < 12; d++) trades.push({ pnl: d % 2 ? 40 : -30, timestamp: base + d * DAY });
+  assert.equal(overtradingRead(trades), null);
 });

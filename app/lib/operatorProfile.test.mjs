@@ -302,6 +302,20 @@ test("SESSION read composes in and shows signed nets", () => {
   assert.ok(/Asia \(−\$90/.test(s.text), s.text);
 });
 
+test("OVERTRADING read composes in as a high-severity private leak", () => {
+  const p = buildOperatorProfile({
+    process: { calls: 12 },
+    behavioral: { overtrading: { firstWr: 58, excessWr: 28, gapPts: 30, excessN: 14, firstN: 12, excessNet: -210, cutoff: 2 } },
+  });
+  const o = p.reads.find((r) => r.kind === "OVERTRADING");
+  assert.ok(o, "expected an OVERTRADING read");
+  assert.equal(o.severity, 3);
+  assert.equal(o.provenance, "private");
+  assert.ok(/overtrade/.test(o.text), o.text);
+  assert.ok(/\$210/.test(o.text), "surfaces the excess leak in dollars");
+  assert.ok(!PUBLIC_READS.has("OVERTRADING"), "overtrading is private, never public");
+});
+
 test("no behavioral input → no tilt/session reads (fail-soft)", () => {
   const p = buildOperatorProfile({ process: { calls: 12 } });
   assert.equal(p.reads.find((r) => r.kind === "TILT"), undefined);

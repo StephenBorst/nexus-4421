@@ -13,7 +13,7 @@ import type { TabId, ProcessedTrade } from "./types";
 import { buildBriefing, buildMarketRead, buildFusion, buildForecastRead, computeTape, type BriefingTrade, type Insight, type MarketSignal, type ForecastRead } from "./briefing";
 import { recordFlag, coachingInsight } from "@/lib/coaching.mjs";
 import { buildOperatorProfile, profileNarrative } from "@/lib/operatorProfile.mjs";
-import { tiltRead, sessionEdge } from "@/lib/behavioral.mjs";
+import { tiltRead, sessionEdge, overtradingRead } from "@/lib/behavioral.mjs";
 import { computeEdge } from "@/config/edge";
 
 const FLAGS_KEY = "nexus_flagged_setups";
@@ -141,7 +141,7 @@ export function NexusBriefing({
     const p = buildOperatorProfile({
       process,
       edge: computeEdge(trades.map((t) => ({ symbol: t.symbol, pnl: t.pnl, side: t.side || t.direction }))),
-      behavioral: { tilt: tiltRead(bt), session: sessionEdge(bt) },
+      behavioral: { tilt: tiltRead(bt), session: sessionEdge(bt), overtrading: overtradingRead(bt) },
       trades,
     });
     if (!p || p.tier === "UNKNOWN" || (!p.archetype && !p.reads.length)) return null;

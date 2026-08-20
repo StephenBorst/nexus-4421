@@ -94,7 +94,7 @@ export function deriveArchetype({ regimeEdges, expectancy, holdHours, gradedCall
 // Severity-ordered so the narrative opens with the thing that costs the most money.
 // `provenance: "graded"` = derived from public price and safe to show publicly;
 // "private" = the user's own fills or self-reported tags — coaching only.
-export const READ_ORDER = ["MONEY_LEAK", "TILT", "REGIME", "PAYOFF", "DISCIPLINE", "CALIBRATION", "SESSION", "SYMBOL"];
+export const READ_ORDER = ["MONEY_LEAK", "TILT", "OVERTRADING", "REGIME", "PAYOFF", "DISCIPLINE", "CALIBRATION", "SESSION", "SYMBOL"];
 export const PUBLIC_READS = new Set(["REGIME", "PAYOFF", "DISCIPLINE", "CALIBRATION"]);
 
 const BUCKET_WORD = {
@@ -155,6 +155,18 @@ export function buildOperatorProfile({ process, edge, adherence, leaks, trades, 
       kind: "TILT", provenance: "private", severity: 3,
       afterLossWr: t.afterLossWr, baselineWr: t.baselineWr, gapPts: t.gapPts, count: t.n, netUsd: t.netUsd,
       text: `you trade worse right after a loss — ${t.afterLossWr}% win on the ${t.n} trades after a red close vs ${t.baselineWr}% overall, so step back before pressing`,
+    });
+  }
+
+  // 1c. OVERTRADING — the behavioral leak the tape can't tag either: after your first
+  // couple of trades each day, discipline breaks and the extra clicks bleed. Ranks with
+  // the money leaks because that's what it is — the cost of not walking away.
+  if (behavioral?.overtrading) {
+    const o = behavioral.overtrading;
+    reads.push({
+      kind: "OVERTRADING", provenance: "private", severity: 3,
+      firstWr: o.firstWr, excessWr: o.excessWr, gapPts: o.gapPts, count: o.excessN, netUsd: o.excessNet, cutoff: o.cutoff,
+      text: `you overtrade — after your first ${o.cutoff} trades each day the extra ${o.excessN} win just ${o.excessWr}% (vs ${o.firstWr}%)${o.excessNet < 0 ? `, ${money(o.excessNet)} of leak` : ""}, so cap the day once your plan is done`,
     });
   }
 
