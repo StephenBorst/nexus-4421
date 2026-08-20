@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { tiltRead, sessionEdge, overtradingRead } from "./behavioral.mjs";
+import { tiltRead, sessionEdge, overtradingRead, sizingRead } from "./behavioral.mjs";
 
 const HOUR = 3600000, DAY = 86400000;
 const base = Date.UTC(2026, 7, 3, 3, 0, 0); // 03:00 UTC = Asia
@@ -85,4 +85,44 @@ test("overtradingRead is null without enough excess trades", () => {
   const trades = [];
   for (let d = 0; d < 12; d++) trades.push({ pnl: d % 2 ? 40 : -30, timestamp: base + d * DAY });
   assert.equal(overtradingRead(trades), null);
+});
+
+test("sizingRead flags revenge sizing — bigger bets after a loss", () => {
+  // even index = win, odd = loss; after a loss the next bet is 2× as big.
+  const trades = [];
+  for (let i = 0; i < 20; i++) {
+    const prevLoss = i > 0 && (i - 1) % 2 === 1;
+    trades.push({ pnl: i % 2 === 0 ? 40 : -30, timestamp: base + i * HOUR, size: i === 0 ? 100 : prevLoss ? 200 : 100 });
+  }
+  const r = sizingRead(trades);
+  assert.ok(r, "expected a sizing read");
+  assert.equal(r.mode, "revenge");
+  assert.equal(r.afterLossSize, 200);
+  assert.equal(r.afterWinSize, 100);
+  assert.equal(r.ratio, 2);
+  assert.ok(r.afterLossN >= 5 && r.afterWinN >= 5);
+});
+
+test("sizingRead flags pressing — bigger bets after a win", () => {
+  const trades = [];
+  for (let i = 0; i < 20; i++) {
+    const prevWin = i > 0 && (i - 1) % 2 === 0;
+    trades.push({ pnl: i % 2 === 0 ? 40 : -30, timestamp: base + i * HOUR, size: i === 0 ? 100 : prevWin ? 200 : 100 });
+  }
+  const r = sizingRead(trades);
+  assert.ok(r, "expected a sizing read");
+  assert.equal(r.mode, "pressing");
+  assert.equal(r.ratio, 2);
+});
+
+test("sizingRead is null when size doesn't react to results", () => {
+  const trades = [];
+  for (let i = 0; i < 20; i++) trades.push({ pnl: i % 2 === 0 ? 40 : -30, timestamp: base + i * HOUR, size: 100 });
+  assert.equal(sizingRead(trades), null);
+});
+
+test("sizingRead is null without a size field", () => {
+  const trades = [];
+  for (let i = 0; i < 20; i++) trades.push({ pnl: i % 2 === 0 ? 40 : -30, timestamp: base + i * HOUR });
+  assert.equal(sizingRead(trades), null);
 });

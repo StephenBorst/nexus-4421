@@ -94,7 +94,7 @@ export function deriveArchetype({ regimeEdges, expectancy, holdHours, gradedCall
 // Severity-ordered so the narrative opens with the thing that costs the most money.
 // `provenance: "graded"` = derived from public price and safe to show publicly;
 // "private" = the user's own fills or self-reported tags — coaching only.
-export const READ_ORDER = ["MONEY_LEAK", "TILT", "OVERTRADING", "REGIME", "PAYOFF", "DISCIPLINE", "CALIBRATION", "SESSION", "SYMBOL"];
+export const READ_ORDER = ["MONEY_LEAK", "TILT", "OVERTRADING", "SIZING", "REGIME", "PAYOFF", "DISCIPLINE", "CALIBRATION", "SESSION", "SYMBOL"];
 export const PUBLIC_READS = new Set(["REGIME", "PAYOFF", "DISCIPLINE", "CALIBRATION"]);
 
 const BUCKET_WORD = {
@@ -168,6 +168,25 @@ export function buildOperatorProfile({ process, edge, adherence, leaks, trades, 
       firstWr: o.firstWr, excessWr: o.excessWr, gapPts: o.gapPts, count: o.excessN, netUsd: o.excessNet, cutoff: o.cutoff,
       text: `you overtrade — after your first ${o.cutoff} trades each day the extra ${o.excessN} win just ${o.excessWr}% (vs ${o.firstWr}%)${o.excessNet < 0 ? `, ${money(o.excessNet)} of leak` : ""}, so cap the day once your plan is done`,
     });
+  }
+
+  // 1d. SIZING — does your bet SIZE react to your last result? Revenge (bigger after a
+  // loss) is a money-leak-grade tell and ranks with them; pressing (bigger after a win)
+  // is a lower-severity heads-up. Distinct from CALIBRATION (conviction vs outcome) — this
+  // is the emotional reaction the graded calls can't see.
+  if (behavioral?.sizing) {
+    const z = behavioral.sizing;
+    reads.push(z.mode === "revenge"
+      ? {
+          kind: "SIZING", provenance: "private", severity: 3, mode: "revenge",
+          ratio: z.ratio, afterLossSize: z.afterLossSize, afterWinSize: z.afterWinSize, count: z.afterLossN, netUsd: z.cohortNet,
+          text: `you size up when you're losing — bets after a loss average ${money(z.afterLossSize)} vs ${money(z.afterWinSize)} after a win (${z.ratio}× bigger)${z.cohortNet < 0 ? `, ${money(z.cohortNet)} on those trades` : ""}; that's revenge, not conviction — keep your size flat`,
+        }
+      : {
+          kind: "SIZING", provenance: "private", severity: 1, mode: "pressing",
+          ratio: z.ratio, afterLossSize: z.afterLossSize, afterWinSize: z.afterWinSize, count: z.afterWinN,
+          text: `you press your size after a win — ${money(z.afterWinSize)} vs ${money(z.afterLossSize)} after a loss (${z.ratio}× bigger); riding a hot hand works until the give-back`,
+        });
   }
 
   // 2. REGIME — where the edge lives and dies. The most actionable filter available.

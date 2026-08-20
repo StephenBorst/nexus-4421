@@ -9,6 +9,7 @@
 //  tiltRead        — do the trades you take right after a loss underperform? (revenge)
 //  sessionEdge     — which trading session (UTC) do you actually make money in?
 //  overtradingRead — do the trades AFTER your first couple each day bleed? (the "kept clicking" leak)
+//  sizingRead      — does your POSITION SIZE react to your last result? (revenge / pressing)
 //
 // A trade is { pnl:number, timestamp:number(ms) }. Break-even (pnl === 0) is
 // treated as neither a win nor a loss. Pure + tested: node --test app/lib/behavioral.test.mjs
@@ -103,4 +104,44 @@ export function overtradingRead(trades, { cutoff = 2, minExcess = 5, minFirst = 
   if (gapPts < minGapPts) return null;
   const excessNet = Math.round(excess.reduce((s, t) => s + t.pnl, 0) * 100) / 100;
   return { firstWr, excessWr, gapPts, excessN: excess.length, firstN: first.length, excessNet, cutoff };
+}
+
+/**
+ * The sizing-discipline read: does your POSITION SIZE react to your last result? Betting
+ * bigger after a LOSS (revenge / martingale — chasing it back) or after a WIN (pressing —
+ * riding a hot hand) is an emotional tell distinct from tilt: tilt is about win RATE after
+ * a loss, this is about SIZE. Compares average size on trades following a loss vs a win.
+ *
+ * `size` is any positive per-trade magnitude — dollar notional (qty × price) recommended so
+ * it's comparable across symbols. Fires only on a real sample on BOTH sides AND a material
+ * skew (>= minRatio); null when sizing is steady (the disciplined default has no story).
+ * @returns {{ mode:"revenge"|"pressing", afterLossSize, afterWinSize, ratio, afterLossN, afterWinN, cohortNet, cohortWr } | null}
+ */
+export function sizingRead(trades, { minPer = 5, minRatio = 1.25 } = {}) {
+  const list = (trades || []).filter((t) => t && Number.isFinite(t.pnl) && Number.isFinite(t.timestamp) && Number.isFinite(t.size) && t.size > 0);
+  if (list.length < 10) return null;
+  const asc = [...list].sort((a, b) => a.timestamp - b.timestamp);
+  const afterLoss = [], afterWin = [];
+  for (let i = 1; i < asc.length; i++) {
+    const prev = asc[i - 1].pnl;
+    if (prev < 0) afterLoss.push(asc[i]);
+    else if (prev > 0) afterWin.push(asc[i]);
+  }
+  if (afterLoss.length < minPer || afterWin.length < minPer) return null;
+  const avg = (rows) => rows.reduce((s, t) => s + t.size, 0) / rows.length;
+  const lossSize = avg(afterLoss), winSize = avg(afterWin);
+  if (!(lossSize > 0) || !(winSize > 0)) return null;
+  const raw = lossSize / winSize;
+  let mode, ratio, cohort;
+  if (raw >= minRatio) { mode = "revenge"; ratio = raw; cohort = afterLoss; }
+  else if (1 / raw >= minRatio) { mode = "pressing"; ratio = 1 / raw; cohort = afterWin; }
+  else return null;
+  return {
+    mode,
+    afterLossSize: Math.round(lossSize), afterWinSize: Math.round(winSize),
+    ratio: Math.round(ratio * 100) / 100,
+    afterLossN: afterLoss.length, afterWinN: afterWin.length,
+    cohortNet: Math.round(cohort.reduce((s, t) => s + t.pnl, 0) * 100) / 100,
+    cohortWr: wrOf(cohort),
+  };
 }

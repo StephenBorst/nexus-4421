@@ -316,6 +316,31 @@ test("OVERTRADING read composes in as a high-severity private leak", () => {
   assert.ok(!PUBLIC_READS.has("OVERTRADING"), "overtrading is private, never public");
 });
 
+test("SIZING revenge composes in as a high-severity private leak", () => {
+  const p = buildOperatorProfile({
+    process: { calls: 12 },
+    behavioral: { sizing: { mode: "revenge", afterLossSize: 220, afterWinSize: 100, ratio: 2.2, afterLossN: 11, afterWinN: 12, cohortNet: -180, cohortWr: 30 } },
+  });
+  const z = p.reads.find((r) => r.kind === "SIZING");
+  assert.ok(z, "expected a SIZING read");
+  assert.equal(z.severity, 3);
+  assert.equal(z.provenance, "private");
+  assert.ok(/size up when you're losing/.test(z.text), z.text);
+  assert.ok(/\$180/.test(z.text), "surfaces the revenge-cohort cost");
+  assert.ok(!PUBLIC_READS.has("SIZING"), "sizing is private, never public");
+});
+
+test("SIZING pressing is a low-severity heads-up, not a leak", () => {
+  const p = buildOperatorProfile({
+    process: { calls: 12 },
+    behavioral: { sizing: { mode: "pressing", afterLossSize: 100, afterWinSize: 240, ratio: 2.4, afterLossN: 10, afterWinN: 12, cohortNet: 300, cohortWr: 62 } },
+  });
+  const z = p.reads.find((r) => r.kind === "SIZING");
+  assert.ok(z, "expected a SIZING read");
+  assert.equal(z.severity, 1);
+  assert.ok(/press your size after a win/.test(z.text), z.text);
+});
+
 test("no behavioral input → no tilt/session reads (fail-soft)", () => {
   const p = buildOperatorProfile({ process: { calls: 12 } });
   assert.equal(p.reads.find((r) => r.kind === "TILT"), undefined);
