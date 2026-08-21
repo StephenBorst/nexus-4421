@@ -12,6 +12,7 @@ import { deployDirectiveFromThesis } from "@/utils/agentPrefill";
 // Same synthesis the Lab renders — the copilot must speak with ONE point of view,
 // not answer from an older, narrower readout while the terminal shows another.
 import { buildOperatorProfile, profileNarrative, PUBLIC_READS } from "@/lib/operatorProfile.mjs";
+import { bookConcentration } from "@/lib/bookRisk.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const AGENT_API = "https://og.nexustradinglabs.com";
@@ -226,6 +227,29 @@ export const TOOLS: ToolDef[] = [
           .map((r: { kind: string; text: string; provenance?: string }) => ({ kind: r.kind, text: r.text, provenance: r.provenance })),
         narrative: profileNarrative(profile, { publicOnly: !isSelf, voice: args.wallet ? "third" : "second" }),
         unlocks: profile.unlocks,
+      });
+    },
+  },
+  {
+    name: "get_book_risk",
+    description:
+      "Read the RISK in the user's OPEN book right now — is what they're holding secretly ONE bet? Detects hidden concentration: a book that looks diversified (several tickers) but is really one directional or one-SECTOR bet at multiplied size (e.g. long BTC + ETH + SOL is not three positions, it's one L1-beta bet at 3× — a single L1 selloff hits all of it). Weighted by position notional. Use for 'how's my book', 'am I too exposed', 'is my portfolio risky', or proactively when the user is about to add a position that stacks the same way. Returns null-safe: if the book is small or genuinely hedged/mixed, say it's balanced rather than inventing a risk. Analysis only — never a 'close this' instruction; surface the concentration and let them decide.",
+    input_schema: { type: "object", properties: {} },
+    run: async (_args, ctx) => {
+      const pos = (ctx.openPositions || []).map((p) => ({ symbol: p.symbol, side: p.qty >= 0 ? 1 : -1, notional: Math.abs(p.qty) * (p.mark || 0) }));
+      if (pos.length === 0) return JSON.stringify({ open_positions: 0, note: "No open positions to assess." });
+      const risk = bookConcentration(pos);
+      if (!risk) return JSON.stringify({ open_positions: pos.length, concentrated: false, note: "The open book is balanced — no single sector or direction dominates it." });
+      return JSON.stringify({
+        open_positions: risk.positions,
+        concentrated: true,
+        kind: risk.kind,
+        net_side: risk.netSide,
+        net_pct: risk.netPct,
+        top_sector: risk.topSector,
+        read: risk.kind === "sector" && risk.topSector
+          ? `${risk.topSector.count} positions are ${risk.topSector.pct}% ${risk.topSector.side} ${risk.topSector.name} — effectively one ${risk.topSector.name} bet, not diversified. One ${risk.topSector.name} move hits all of it.`
+          : `The book is ${risk.netPct}% net ${risk.netSide} across ${risk.positions} positions — one directional bet, not hedged.`,
       });
     },
   },

@@ -9,6 +9,7 @@
 // Design law: green = genuinely positive (profit-adjacent), amber = caution, bone =
 // neutral info. Red is reserved for realized loss elsewhere — a risk *warning* is
 // amber, not red.
+import { bookConcentration } from "@/lib/bookRisk.mjs";
 
 export type InsightTone = "positive" | "caution" | "info";
 
@@ -458,6 +459,25 @@ export function buildBriefing(input: BriefingInput): Insight[] {
         });
       }
     }
+  }
+
+  // 1b — Hidden concentration: is the open book secretly one bet? (live risk, so it ranks
+  // just under a direct tape conflict). Count-weighted here — the Briefing only has
+  // symbol+direction; the copilot's get_book_risk weights the same read by notional.
+  const conc = bookConcentration(openPositions);
+  if (conc) {
+    out.push({
+      id: "book-concentration",
+      priority: 88,
+      tone: "caution",
+      title: conc.kind === "sector" && conc.topSector
+        ? `${conc.topSector.count} of your positions are ${conc.topSector.side} ${conc.topSector.name} — that's one bet`
+        : `Your open book is ${conc.netPct}% net ${conc.netSide} — one directional bet`,
+      detail: conc.kind === "sector" && conc.topSector
+        ? `${conc.topSector.name} names move together, so this book is really one ${conc.topSector.name} position at ${conc.topSector.count}× size — a single ${conc.topSector.name} move hits all of it. Size it like the one bet it is.`
+        : `Across ${conc.positions} positions you're almost entirely one way — there's no hedge here, just leverage on one direction. Make sure that's intentional.`,
+      action: { label: "Review positions", tab: "quicktrade" },
+    });
   }
 
   // 2 — Recent streak (behavioral; acts on the last few closes). Count the ACTUAL
