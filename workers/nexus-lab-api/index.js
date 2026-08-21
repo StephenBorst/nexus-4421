@@ -2138,7 +2138,7 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
     // relationship is textbook. Never a fair-value oracle — a prompt to stake a GRADED
     // thesis and execute it on Nexus. Public, fail-soft, KV-cached 5 min.
     if (parts[0] === "intel" && parts[1] === "events" && request.method === "GET") {
-      const CACHE_KEY = "intel:events:v3", TTL_MS = 300 * 1000;
+      const CACHE_KEY = "intel:events:v4", TTL_MS = 300 * 1000;
       const respond = (payload) => new Response(JSON.stringify(payload), {
         headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=180", ...cors(request) },
       });

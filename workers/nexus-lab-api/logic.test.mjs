@@ -1703,6 +1703,11 @@ test("classifyMacro categorizes events and attaches a lens only where textbook",
   assert.deepEqual(classifyMacro("Who will win the 2028 presidential election?"), { category: "ELECTION", riskLens: null });
   // off-topic (sports/pop) is not a macro event at all
   assert.equal(classifyMacro("Will the Chiefs win the Super Bowl?"), null);
+  // CRYPTO_POLICY requires policy context — a bare crypto/ETF mention is NOT a macro event
+  assert.equal(classifyMacro("ETF flows look strong, breakout incoming"), null);
+  assert.equal(classifyMacro("crypto rally continues"), null);
+  assert.deepEqual(classifyMacro("Will the SEC approve a Solana ETF?"), { category: "CRYPTO_POLICY", riskLens: "RISK_ON" });
+  assert.equal(classifyMacro("Will Congress pass a stablecoin bill?").category, "CRYPTO_POLICY");
 });
 
 test("macroEvents builds a volume-ranked board, gating low volume + non-macro", () => {

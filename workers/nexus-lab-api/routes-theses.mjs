@@ -117,6 +117,57 @@ export async function handleTheses(parts, request, env) {
     }, request);
   }
 
+  // ── /theses/macro-leaderboard — TRUSTLESS MACRO-CALLER ranking ──
+  // The same objective first-touch grade, but ONLY over event-driven calls (a macro
+  // catalyst — Fed, geopolitics, policy). This is the thing that doesn't exist anywhere:
+  // a VERIFIABLE macro/event track record. Macro is a subset of a trader's calls, so the
+  // sample bar is lower (3), but the grading + scoring are identical to the main board.
+  if (parts[0] === "theses" && parts[1] === "macro-leaderboard") {
+    if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+    const MIN_MACRO = 3, TOP_N = 25, MAX_HORIZON_S = 30 * 86400;
+    const byWallet = await computeCallerStats(env, MAX_HORIZON_S); // no contrarian join needed
+
+    const eligible = [];
+    const emerging = [];
+    for (const [wallet, a] of Object.entries(byWallet)) {
+      const m = a.macro;
+      if (!m || m.calls < 1) continue;
+      if (m.calls < MIN_MACRO) {
+        emerging.push({ wallet, calls: m.calls, hitRate: Math.round((m.wins / m.calls) * 1000) / 10, avgR: Math.round((m.rSum / m.calls) * 100) / 100, totalR: m.rSum, callsToQualify: MIN_MACRO - m.calls, categories: m.categories });
+        continue;
+      }
+      const avgR = m.rSum / m.calls;
+      if (avgR <= 0) continue; // ranked board = net-positive by R
+      eligible.push({
+        wallet, calls: m.calls,
+        hitRate: Math.round((m.wins / m.calls) * 1000) / 10,
+        avgR: Math.round(avgR * 100) / 100,
+        totalR: m.rSum,
+        score: callerScore({ ...m.expectancy, calls: m.calls }),
+        expectancy: m.expectancy,
+        categories: m.categories,
+        meritRank: rankCaller(a), // their overall earned identity rank, shown for context
+      });
+    }
+    eligible.sort((x, y) => y.score - x.score || (y.expectancy?.profitFactor ?? 0) - (x.expectancy?.profitFactor ?? 0) || y.calls - x.calls);
+    emerging.sort((x, y) => y.calls - x.calls || y.avgR - x.avgR);
+    const enrich = async (e, i) => {
+      const profileRaw = await env.LAB_STORE.get(`profile:${e.wallet}`);
+      const p = profileRaw ? JSON.parse(profileRaw) : {};
+      return { ...(i != null ? { rank: i + 1 } : {}), displayName: p.displayName || null, pfp: p.pfp || null, ...e };
+    };
+    const leaderboard = await Promise.all(eligible.slice(0, TOP_N).map((e, i) => enrich(e, i)));
+    const emergingEnriched = await Promise.all(emerging.slice(0, 15).map((e) => enrich(e, null)));
+    return json({
+      leaderboard, emerging: emergingEnriched,
+      criteria: {
+        minCalls: MIN_MACRO,
+        macro: "A call is MACRO when its catalyst classifies as a macro/geopolitical event (Fed, recession, war, ceasefire, elections, crypto policy) — the same classifier as the Macro & Events board. Draft one from that board.",
+        grading: "Identical to the main leaderboard: objective first-touch vs public Orderly OHLC (/tv/history, 1h). TP1-first = WIN (+planned R), SL-first = LOSS (-1R). Anyone can recompute. Nobody types in whether they were right about the Fed.",
+      },
+    }, request);
+  }
+
   // ── /theses/process/:wallet — the PROCESS x-ray for one caller ──
   // The leaderboard says whether someone was right. This says HOW, and it's the
   // one readout that can change behavior: which regime their edge actually lives

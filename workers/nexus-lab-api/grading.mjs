@@ -15,8 +15,14 @@ import {
   gradeCall, REGIME, classifyRegime, callAlignment, regimeBucketsOf, regimeBuckets,
   regimeEdge, planQuality, planSummary, expectancyStats, convictionCalibration, rankCaller,
   consensusBySymbol, stanceAtPost, classifyContrarian, aggregateSideRecord, contrarianEdgeScore,
-  normalizeSymbol,
+  normalizeSymbol, classifyMacro,
 } from "./logic.mjs";
+
+// A call is MACRO/event-driven when its catalyst (the "why now") classifies as a macro or
+// geopolitical event — the same classifier the Macro & Events board uses. No thesis-schema
+// change: the macro-events "draft thesis" sets the catalyst to the event, so it's captured
+// by intent. Falls back to the notes for a macro-drafted call (notes carry the full event).
+export const isMacroCall = (t) => !!(classifyMacro(t?.catalyst || "") || (t?.catalyst ? null : classifyMacro(t?.notes || "")));
 
 // ── Historical stance snapshots (contrarian grading) ─────────────────────────
 // Persist the merit-weighted consensus lean per symbol over time so a call can later
@@ -223,7 +229,7 @@ export async function computeCallerStats(env, maxHorizonS = 30 * 86400, opts = {
     const cd = history[t.symbol];
     const g = gradeCall(t, cd);
     if (g.outcome === "PENDING" || g.outcome === "INVALID") continue;
-    const a = byWallet[wallet] || (byWallet[wallet] = { calls: 0, wins: 0, rSum: 0, resolved: [], regimeRows: [], planScored: [], expRows: [], _contra: { calls: 0, wins: 0, rSum: 0 }, _crowd: { calls: 0, wins: 0, rSum: 0 } });
+    const a = byWallet[wallet] || (byWallet[wallet] = { calls: 0, wins: 0, rSum: 0, resolved: [], regimeRows: [], planScored: [], expRows: [], _macro: [], _contra: { calls: 0, wins: 0, rSum: 0 }, _crowd: { calls: 0, wins: 0, rSum: 0 } });
     a.calls += 1; if (g.outcome === "WIN") a.wins += 1; a.rSum += g.r;
     // Track (time, R) so the leaderboard can emit a cumulative-R equity curve —
     // the same trustless grade, just as a series instead of an aggregate.
@@ -234,6 +240,9 @@ export async function computeCallerStats(env, maxHorizonS = 30 * 86400, opts = {
     const conviction = Number(t.riskPercent) > 0 ? Number(t.riskPercent)
       : (Number(t.riskReward) > 0 ? Number(t.riskReward) : NaN);
     a.expRows.push({ r: g.r, win: g.outcome === "WIN", conviction });
+    // MACRO sub-record: the SAME graded R, but only for event-driven calls (macro catalyst).
+    // Powers the macro-caller leaderboard — verifiable macro track records, graded like any call.
+    if (isMacroCall(t)) a._macro.push({ r: g.r, win: g.outcome === "WIN", conviction, category: (classifyMacro(t.catalyst || t.notes || "") || {}).category || null });
 
     // Attribute the SAME graded R to the regime the call was posted into. Same
     // candles, same first-touch outcome — this only asks "in which market?".
@@ -269,12 +278,20 @@ export async function computeCallerStats(env, maxHorizonS = 30 * 86400, opts = {
     // Expectancy-forward ranking + the conviction-calibration read.
     a.expectancy = expectancyStats(a.expRows);
     a.calibration = convictionCalibration(a.expRows);
+    // Aggregate the macro record (null when the wallet has posted no event-driven calls).
+    a.macro = a._macro.length ? {
+      calls: a._macro.length,
+      wins: a._macro.filter((x) => x.win).length,
+      rSum: Math.round(a._macro.reduce((s, x) => s + x.r, 0) * 100) / 100,
+      expectancy: expectancyStats(a._macro),
+      categories: [...new Set(a._macro.map((x) => x.category).filter(Boolean))],
+    } : null;
     if (wantContrarian) {
       a.contrarianRecord = aggregateSideRecord([a._contra]);
       a.withCrowdRecord = aggregateSideRecord([a._crowd]);
       a.contrarian = contrarianEdgeScore(a.contrarianRecord, a.withCrowdRecord); // ranked score or null
     }
-    delete a.resolved; delete a.regimeRows; delete a.planScored; delete a.expRows; delete a._contra; delete a._crowd; // internal only
+    delete a.resolved; delete a.regimeRows; delete a.planScored; delete a.expRows; delete a._macro; delete a._contra; delete a._crowd; // internal only
   }
   return byWallet;
 }

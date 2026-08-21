@@ -1648,8 +1648,10 @@ const MACRO_CATEGORIES = [
     lens: (q) => /\b(recession|shutdown|default|stagflation|crash)\b/i.test(q) ? "RISK_OFF" : /\b(soft landing|cools|falls|eases)\b/i.test(q) ? "RISK_ON" : null },
   { cat: "GEOPOLITICS", rx: /\b(war|invade|invasion|missile|ceasefire|nuclear|iran|russia|ukraine|israel|gaza|taiwan|north korea|venezuela|conflict|troops|military strike|airstrike)\b/i,
     lens: (q) => /\b(ceasefire|peace|deal|truce|withdraw)\b/i.test(q) ? "RISK_ON" : /\b(war|invade|invasion|missile|nuclear|airstrike|attack|escalat|strike)\b/i.test(q) ? "RISK_OFF" : null },
-  { cat: "CRYPTO_POLICY", rx: /\b(bitcoin reserve|strategic (bitcoin|crypto) reserve|crypto|\bsec\b|\betf\b|stablecoin|regulat|\bcbdc\b)\b/i,
-    lens: (q) => /\b(reserve|etf approv|approve|approved|legal|adopt|passes)\b/i.test(q) ? "RISK_ON" : /\b(ban|reject|rejected|crackdown|lawsuit)\b/i.test(q) ? "RISK_OFF" : null },
+  // Requires a POLICY/regulatory context, not a bare "crypto"/"etf" mention — otherwise a
+  // normal call whose catalyst says "ETF flows" would be miscounted as a macro/event call.
+  { cat: "CRYPTO_POLICY", rx: /\b((bitcoin|crypto) reserve|(sec|etf) (approv|decision|reject|lawsuit|ruling|case)|stablecoin (bill|law|act|regulat)|crypto (regulat|ban|bill|law|policy|executive order)|cbdc|regulat\w* (crypto|bitcoin|stablecoin))/i,
+    lens: (q) => /\b(reserve|approv|legal|adopt|pass)/i.test(q) ? "RISK_ON" : /\b(ban|reject|crackdown|lawsuit)/i.test(q) ? "RISK_OFF" : null },
   { cat: "ELECTION", rx: /\b(election|president|senate|congress|governor|primary|nominee|\bvote\b|ballot|prime minister|parliament)\b/i, lens: () => null },
 ];
 
