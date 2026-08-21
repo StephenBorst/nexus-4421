@@ -284,7 +284,10 @@ export default function TheLabPage() {
         {activeTab === "thesis" && (
           <>
             <ThesisView realizedTrades={connected ? processedTrades : undefined} wallet={rootWalletAddress} />
-            <ThesisAnalyticsView />
+            {/* Lead with the call form + THE READ; the thesis analytics collapse below. */}
+            <Collapsible title="◇ THESIS ANALYTICS" subtitle="how your calls have performed" storageKey="nx_thesis_analytics_open">
+              <ThesisAnalyticsView />
+            </Collapsible>
           </>
         )}
         {activeTab === "copies" && <CopiesView />}
@@ -309,9 +312,17 @@ export default function TheLabPage() {
           // Briefing and the deep Market Intel — scan the whole book at a glance. Shown
           // to everyone; it's market-level, no wallet needed.
           const board = <DecisionBoard onSelectTab={setActiveTab} trades={connected ? processedTrades : undefined} wallet={rootWalletAddress} />;
+          // Lead with the synthesis (Briefing narrative → the Board's one-line-per-market
+          // read); the deep Market Intel (news, movers, OI, long/short) collapses so the
+          // tab opens as a read, not a wall of rows.
+          const deep = (
+            <Collapsible title="◇ MARKET INTEL · DEEP DETAIL" subtitle="news, movers, OI, long/short, per-market" storageKey="nx_intel_deep_open">
+              <MarketIntelView />
+            </Collapsible>
+          );
           return connected
-            ? <>{briefing}{board}<MarketIntelView /></>
-            : <><LabWelcome />{briefing}{board}</>;
+            ? <>{briefing}{board}{deep}</>
+            : <><LabWelcome />{briefing}{board}{deep}</>;
         })()}
         {activeTab === "smart" && (
           <>

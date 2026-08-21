@@ -8,6 +8,7 @@ import { OperatorProfileCard } from "./OperatorProfile";
 import { TrackedRecordCard } from "@/components/TrackedRecordCard";
 import { formatPnl } from "./helpers";
 import { PnlChart, PnlBars, EmptyState, CountUp, SectionHeader } from "./components";
+import { Collapsible } from "./Collapsible";
 import { useIsMobile } from "./useIsMobile";
 import { computeEdge } from "@/config/edge";
 
@@ -675,14 +676,19 @@ export function AnalyticsView({ orders, totalPnl, winRate, collateral, theses = 
         </div>
       )}
 
-      <TradingScoreSection orders={orders} winRate={winRate} />
-      <BreakdownRow orders={orders} />
-      <TimingAndRisk orders={orders} />
-      <PerformanceAnalysis orders={orders} />
-      <TopAssets orders={orders} />
-
-      {/* PROCESS — outcome analytics say how you did; these say how to get better. */}
-      <ProcessSection wallet={wallet} theses={theses} orders={orders} />
+      {/* Core analytics (operator read, key stats, equity curve) stay up top; the deeper
+          drill-downs collapse so the tab reads as a synthesis, not an instrument dump. */}
+      {orders.length > 0 && (
+        <Collapsible title="◇ DEEPER BREAKDOWNS" subtitle="score, timing, per-symbol & per-regime, top assets, process coaching" storageKey="nx_analytics_deep_open">
+          <TradingScoreSection orders={orders} winRate={winRate} />
+          <BreakdownRow orders={orders} />
+          <TimingAndRisk orders={orders} />
+          <PerformanceAnalysis orders={orders} />
+          <TopAssets orders={orders} />
+          {/* PROCESS — outcome analytics say how you did; these say how to get better. */}
+          <ProcessSection wallet={wallet} theses={theses} orders={orders} />
+        </Collapsible>
+      )}
 
       {orders.length === 0 && <EmptyState message="no closed trades found" unlock="Connect the wallet you trade with — the Lab reads your Orderly history directly, nothing to import." />}
     </div>

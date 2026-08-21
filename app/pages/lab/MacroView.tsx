@@ -2,6 +2,7 @@ import { SectionHeader } from "./components";
 import { MacroEvents } from "./MacroEvents";
 import { ForecastDivergence } from "./ForecastDivergence";
 import { MacroCallers } from "./MacroCallers";
+import { Collapsible } from "./Collapsible";
 import { C } from "@/config/theme";
 
 // ── MACRO tab — "what the world is pricing" ──────────────────────────────────
@@ -29,15 +30,15 @@ export function MacroView() {
       {/* the macro/geopolitical events board — the hero + the Quotient corner */}
       <MacroEvents />
 
-      {/* the crypto price-target prediction lens (forecasters vs the leveraged tape) */}
-      <div style={{ marginTop: 28, paddingTop: 4, borderTop: `1px solid ${C.border}` }}>
-        <ForecastDivergence />
-      </div>
-
-      {/* trustless proof — who actually calls these right */}
+      {/* trustless proof — who actually calls these right (kept visible; the differentiator) */}
       <div style={{ marginTop: 28, paddingTop: 4, borderTop: `1px solid ${C.border}` }}>
         <MacroCallers />
       </div>
+
+      {/* the crypto price-target prediction lens — secondary, collapses under the events + proof */}
+      <Collapsible title="◇ FORECAST DIVERGENCE" subtitle="crypto price-target markets — forecasters vs the leveraged tape" storageKey="nx_forecast_open">
+        <ForecastDivergence />
+      </Collapsible>
     </div>
   );
 }
