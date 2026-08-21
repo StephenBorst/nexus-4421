@@ -22,6 +22,7 @@ import { SmartMoneyView } from "./SmartMoneyView";
 import { MispricedBoard } from "./MispricedBoard";
 import { MacroView } from "./MacroView";
 import { PositioningBoard } from "./PositioningBoard";
+import { Collapsible } from "./Collapsible";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
 import { LabStanding } from "./LabStanding";
 import { CommandPalette } from "./CommandPalette";
@@ -314,16 +315,17 @@ export default function TheLabPage() {
         })()}
         {activeTab === "smart" && (
           <>
-            {/* Phase 2 — the fused read leads: crowd (funding) vs smart money (wallets),
-                confluence = high conviction, split = the debate. Deep boards below. */}
-            <PositioningBoard />
-            <SmartMoneyView myPositions={openPositions} />
-            {/* Fade-the-crowd funding board, folded in from the old MISPRICED tab (Phase 1
-                re-slice): Smart Money = follow the sharp; the funding board = fade the crowd.
-                Two sides of positioning, one tab. */}
-            <div style={{ marginTop: 32, paddingTop: 4, borderTop: "1px solid #232327" }}>
+            {/* Lead with the SYNTHESIS — the fused crowd-vs-smart read, filtered to YOUR edge.
+                The deep boards (full smart-money surface + every funding edge) live behind
+                collapses so the tab is one screen by default, not twenty. The engine surfaces
+                what matters; the raw data is one click away. */}
+            <PositioningBoard trades={connected ? processedTrades : undefined} />
+            <Collapsible title="◇ SMART MONEY · FULL BOARD" subtitle="every tracked wallet, consensus, you-vs-smart, watchlist" storageKey="nx_smart_board_open">
+              <SmartMoneyView myPositions={openPositions} />
+            </Collapsible>
+            <Collapsible title="◇ FUNDING EDGES · ALL MARKETS" subtitle="every mispriced perp + the reversion chart" storageKey="nx_funding_board_open">
               <MispricedBoard />
-            </div>
+            </Collapsible>
           </>
         )}
         {activeTab === "macro" && <MacroView />}
