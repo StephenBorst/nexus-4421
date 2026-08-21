@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -2128,6 +2128,47 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       } catch (e) {
         // Fail-soft: 200 empty board so the Lab renders "no linked forecasts", not an error.
         return json({ asOf: new Date().toISOString(), scanned: 0, divergentCount: 0, markets: [], error: String(e) }, request);
+      }
+    }
+
+    // ── /intel/events — the MACRO/EVENTS intelligence corner ─────────────────
+    // The execution-layer seam for event traders (the Quotient overlap): pulls the most
+    // liquid Polymarket markets, classifies the MACRO/geopolitical ones (Fed, recession,
+    // war, elections, crypto policy), and attaches a directional RISK LENS only where the
+    // relationship is textbook. Never a fair-value oracle — a prompt to stake a GRADED
+    // thesis and execute it on Nexus. Public, fail-soft, KV-cached 5 min.
+    if (parts[0] === "intel" && parts[1] === "events" && request.method === "GET") {
+      const CACHE_KEY = "intel:events:v3", TTL_MS = 300 * 1000;
+      const respond = (payload) => new Response(JSON.stringify(payload), {
+        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=180", ...cors(request) },
+      });
+      try {
+        const cached = await env.LAB_STORE.get(CACHE_KEY);
+        if (cached) {
+          const c = JSON.parse(cached);
+          if (c && (Date.now() - (c.asOfMs || 0)) < TTL_MS) return respond(c);
+        }
+      } catch { /* cache miss → recompute */ }
+      try {
+        const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+        // The gamma API caps limit at 100, so PAGINATE by offset to reach the near-term
+        // Fed/CPI/recession markets that aren't in the top-100 by lifetime volume. No tag
+        // filter — the classifier is the real filter (a tag drift can't break it).
+        const pages = await Promise.all([0, 100, 200, 300].map((off) =>
+          fetch(`https://gamma-api.polymarket.com/markets?closed=false&active=true&limit=100&offset=${off}&order=volumeNum&ascending=false`, {
+            headers: { "User-Agent": UA, "Accept": "application/json" },
+          }).then((r) => r.json()).catch(() => [])
+        ));
+        const rows = pages.flatMap((pm) => (Array.isArray(pm) ? pm : (pm?.data || [])));
+        const board = macroEvents(rows);
+        const payload = {
+          asOf: new Date().toISOString(), asOfMs: Date.now(), ...board,
+          criteria: { note: "Liquid Polymarket macro/geopolitical markets, classified by category with a directional RISK LENS only where the macro relationship is textbook (rate cut → risk-on, war → risk-off). NOT a fair-value oracle and NOT advice — the crowd probability + lens are a starting point to stake a GRADED thesis and execute it on Nexus." },
+        };
+        try { await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 900 }); } catch { /* best-effort */ }
+        return respond(payload);
+      } catch (e) {
+        return json({ asOf: new Date().toISOString(), scanned: 0, count: 0, events: [], error: String(e) }, request);
       }
     }
 

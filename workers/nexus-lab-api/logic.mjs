@@ -1630,3 +1630,80 @@ export function forecastDivergence(polyMarkets, futuresRows, cfg = FORECAST, opt
     markets: out.slice(0, cfg.maxMarkets),
   };
 }
+
+// ── MACRO EVENTS — the intelligence corner for event traders ──────────────────
+// Sibling of forecastDivergence, but for MACRO/geopolitical events (Fed, recession,
+// war, elections, crypto policy) rather than asset price-target markets. Classifies a
+// liquid Polymarket market into a macro category and, ONLY where the relationship is
+// textbook, attaches a directional RISK LENS (rate cut → risk-on, war → risk-off). We
+// never invent a fair probability or a crypto target — the lens is a starting point for
+// a GRADED thesis the trader stakes and executes on Nexus, not advice. This is the
+// execution-layer seam an intelligence partner (macro/event discovery) plugs into.
+export const MACRO = { minVolumeUsd: 25000, limit: 40 };
+
+const MACRO_CATEGORIES = [
+  { cat: "RATES", rx: /\b(fed|fomc|interest rate|rate (cut|hike|decision)|powell|basis points|\bbps\b|jerome|monetary policy)\b/i,
+    lens: (q) => /\b(cut|lower|dovish|reduce|pause|ease)\b/i.test(q) ? "RISK_ON" : /\b(hike|raise|hawkish|increase)\b/i.test(q) ? "RISK_OFF" : null },
+  { cat: "ECONOMY", rx: /\b(recession|inflation|\bcpi\b|\bgdp\b|unemployment|jobs report|debt ceiling|shutdown|soft landing|stagflation)\b/i,
+    lens: (q) => /\b(recession|shutdown|default|stagflation|crash)\b/i.test(q) ? "RISK_OFF" : /\b(soft landing|cools|falls|eases)\b/i.test(q) ? "RISK_ON" : null },
+  { cat: "GEOPOLITICS", rx: /\b(war|invade|invasion|missile|ceasefire|nuclear|iran|russia|ukraine|israel|gaza|taiwan|north korea|venezuela|conflict|troops|military strike|airstrike)\b/i,
+    lens: (q) => /\b(ceasefire|peace|deal|truce|withdraw)\b/i.test(q) ? "RISK_ON" : /\b(war|invade|invasion|missile|nuclear|airstrike|attack|escalat|strike)\b/i.test(q) ? "RISK_OFF" : null },
+  { cat: "CRYPTO_POLICY", rx: /\b(bitcoin reserve|strategic (bitcoin|crypto) reserve|crypto|\bsec\b|\betf\b|stablecoin|regulat|\bcbdc\b)\b/i,
+    lens: (q) => /\b(reserve|etf approv|approve|approved|legal|adopt|passes)\b/i.test(q) ? "RISK_ON" : /\b(ban|reject|rejected|crackdown|lawsuit)\b/i.test(q) ? "RISK_OFF" : null },
+  { cat: "ELECTION", rx: /\b(election|president|senate|congress|governor|primary|nominee|\bvote\b|ballot|prime minister|parliament)\b/i, lens: () => null },
+];
+
+export function classifyMacro(question) {
+  const c = MACRO_CATEGORIES.find((x) => x.rx.test(String(question || "")));
+  return c ? { category: c.cat, riskLens: c.lens(String(question)) || null } : null;
+}
+
+export function macroEvents(polyMarkets, cfg = MACRO) {
+  const out = [];
+  for (const pm of polyMarkets || []) {
+    if (pm && (pm.closed === true || pm.active === false)) continue;
+    const q = pm && pm.question;
+    if (!q) continue;
+    const klass = classifyMacro(q);
+    if (!klass) continue;
+    const volume = Number(pm.volumeNum ?? pm.volume ?? 0) || 0;
+    if (volume < cfg.minVolumeUsd) continue;
+    const outcomes = parseJsonArray(pm.outcomes).map((x) => String(x).toLowerCase());
+    const prices = parseJsonArray(pm.outcomePrices).map(Number);
+    let yesProb = null;
+    const yi = outcomes.indexOf("yes");
+    if (yi >= 0 && Number.isFinite(prices[yi])) yesProb = prices[yi];
+    else if (prices.length && Number.isFinite(prices[0])) yesProb = prices[0];
+    if (yesProb == null || !Number.isFinite(yesProb)) continue;
+    const yesProbPct = round(yesProb * 100, 1);
+    // Drop long-shot individual-candidate election markets ("Will <person> win 2028", 0.2%)
+    // — huge lifetime volume, zero intelligence. Keep only competitive election markets.
+    if (klass.category === "ELECTION" && yesProbPct < 20) continue;
+    // Actionable = a textbook lens AND a LIVE probability (not a near-resolved 0.4% longshot
+    // or a 99% foregone conclusion) — i.e. a directional read a trader can actually express.
+    const actionable = !!klass.riskLens && yesProbPct >= 3 && yesProbPct <= 97;
+    out.push({
+      id: pm.id ?? pm.conditionId ?? null,
+      question: q,
+      category: klass.category,
+      riskLens: klass.riskLens,               // RISK_ON | RISK_OFF | null (only where textbook)
+      actionable,
+      yesProbPct,                             // the crowd's probability of YES
+      volumeUsd: Math.round(volume),
+      liquidityUsd: Math.round(Number(pm.liquidity ?? 0) || 0),
+      endDate: pm.endDate ?? null,
+      slug: pm.slug ?? null,
+    });
+  }
+  // Dedupe by id (pagination can overlap), then rank: ACTIONABLE (lensed + live-probability)
+  // events first, then by volume. Non-actionable macro stays as context below.
+  const seen = new Set();
+  const uniq = out.filter((e) => (e.id == null ? true : (seen.has(e.id) ? false : seen.add(e.id))));
+  uniq.sort((a, b) => (b.actionable ? 1 : 0) - (a.actionable ? 1 : 0) || b.volumeUsd - a.volumeUsd);
+  return {
+    scanned: (polyMarkets || []).length,
+    count: uniq.length,
+    actionableCount: uniq.filter((e) => e.actionable).length,
+    events: uniq.slice(0, cfg.limit),
+  };
+}

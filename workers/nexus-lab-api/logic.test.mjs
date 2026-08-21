@@ -12,6 +12,7 @@ import {
   LOSS_REASONS, isLossReason, postmortemSummary,
   validateArenaRegistration, arenaAgentConfig,
   parsePriceTarget, forecastDivergence, FORECAST,
+  classifyMacro, macroEvents,
 } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
@@ -1690,6 +1691,33 @@ test("forecastDivergence: a coin-flip forecast is not a divergence (conviction g
   assert.equal(r.markets[0].nearMoney, true);
   assert.equal(r.markets[0].alignment, "DIVERGENT"); // direction disagrees…
   assert.equal(r.markets[0].divergence, false);       // …but 52% is a coin-flip ⇒ not flagged
+});
+
+test("classifyMacro categorizes events and attaches a lens only where textbook", () => {
+  assert.deepEqual(classifyMacro("Will the Fed cut rates in December?"), { category: "RATES", riskLens: "RISK_ON" });
+  assert.deepEqual(classifyMacro("Will the Fed hike rates in Q1?"), { category: "RATES", riskLens: "RISK_OFF" });
+  assert.deepEqual(classifyMacro("US recession in 2026?"), { category: "ECONOMY", riskLens: "RISK_OFF" });
+  assert.equal(classifyMacro("Will Iran and Israel reach a ceasefire?").riskLens, "RISK_ON");
+  assert.equal(classifyMacro("Will Russia launch a new missile strike on Kyiv?").riskLens, "RISK_OFF");
+  // an election has a category but NO confident directional lens
+  assert.deepEqual(classifyMacro("Who will win the 2028 presidential election?"), { category: "ELECTION", riskLens: null });
+  // off-topic (sports/pop) is not a macro event at all
+  assert.equal(classifyMacro("Will the Chiefs win the Super Bowl?"), null);
+});
+
+test("macroEvents builds a volume-ranked board, gating low volume + non-macro", () => {
+  const poly = [
+    { id: "a", question: "Will the Fed cut rates in December?", outcomes: '["Yes","No"]', outcomePrices: '["0.7","0.3"]', volumeNum: 500000, liquidity: 40000, endDate: "2026-12-18" },
+    { id: "b", question: "US recession in 2026?", outcomes: '["Yes","No"]', outcomePrices: '["0.35","0.65"]', volumeNum: 900000 },
+    { id: "c", question: "Will BTC hit $200k?", outcomes: '["Yes","No"]', outcomePrices: '["0.2","0.8"]', volumeNum: 300000 }, // price-target, not macro-classified here
+    { id: "d", question: "Will the Fed cut rates in March?", outcomes: '["Yes","No"]', outcomePrices: '["0.5","0.5"]', volumeNum: 100 }, // below min volume
+  ];
+  const r = macroEvents(poly);
+  assert.equal(r.events.length, 2, "only the two liquid macro events");
+  assert.equal(r.events[0].id, "b", "highest volume first");
+  assert.equal(r.events[0].yesProbPct, 35);
+  assert.equal(r.events[0].riskLens, "RISK_OFF");
+  assert.equal(r.events[1].category, "RATES");
 });
 
 test("forecastDivergence: filters dust volume, closed markets, and unlisted assets", () => {
