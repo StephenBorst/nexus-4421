@@ -21,6 +21,7 @@ import { MarketTape } from "./MarketTape";
 import { SmartMoneyView } from "./SmartMoneyView";
 import { MispricedBoard } from "./MispricedBoard";
 import { MacroView } from "./MacroView";
+import { PositioningBoard } from "./PositioningBoard";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
 import { LabStanding } from "./LabStanding";
 import { CommandPalette } from "./CommandPalette";
@@ -134,8 +135,8 @@ export default function TheLabPage() {
   // and pretending otherwise would be the same dishonesty in the other direction.)
   const tabs: { id: TabId; label: string; short: string; phase: string }[] = [
     { id: "intel",          label: "[ MARKET INTEL ]",       short: "INTEL", phase: "OBSERVE" },
-    { id: "smart",          label: "[ SMART MONEY ]",        short: "SMART", phase: "OBSERVE" },
     { id: "macro",          label: "[ MACRO ]",              short: "MACRO", phase: "OBSERVE" },
+    { id: "smart",          label: "[ SMART MONEY ]",        short: "SMART", phase: "OBSERVE" },
     { id: "thesis",         label: "[ NEXUS THESIS ENGINE ]", short: "LAB",  phase: "PLAN"    },
     { id: "agent",          label: "[ TRADING AGENT ]",      short: "AGENT", phase: "EXECUTE" },
     { id: "quicktrade",     label: "[ QUICK TRADE ]",        short: "TRADE", phase: "EXECUTE" },
@@ -313,6 +314,9 @@ export default function TheLabPage() {
         })()}
         {activeTab === "smart" && (
           <>
+            {/* Phase 2 — the fused read leads: crowd (funding) vs smart money (wallets),
+                confluence = high conviction, split = the debate. Deep boards below. */}
+            <PositioningBoard />
             <SmartMoneyView myPositions={openPositions} />
             {/* Fade-the-crowd funding board, folded in from the old MISPRICED tab (Phase 1
                 re-slice): Smart Money = follow the sharp; the funding board = fade the crowd.

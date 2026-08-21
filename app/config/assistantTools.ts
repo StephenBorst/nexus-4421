@@ -13,6 +13,7 @@ import { deployDirectiveFromThesis } from "@/utils/agentPrefill";
 // not answer from an older, narrower readout while the terminal shows another.
 import { buildOperatorProfile, profileNarrative, PUBLIC_READS } from "@/lib/operatorProfile.mjs";
 import { bookConcentration } from "@/lib/bookRisk.mjs";
+import { fusePositioning, positioningRead } from "@/lib/positioning.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const AGENT_API = "https://og.nexustradinglabs.com";
@@ -385,6 +386,25 @@ export const TOOLS: ToolDef[] = [
       }));
       const recentMoves = (e?.events ?? []).slice(0, 8).map((ev: { sym: string; side: string; type: string; szUsd: number; source?: string }) => ({ coin: ev.sym, side: ev.side, type: ev.type, szUsd: ev.szUsd, source: ev.source ?? "hl" }));
       return JSON.stringify({ note: "Smart money is context, often early AND often wrong — not a signal.", consensus: consensus.slice(0, 8), topTraders, recentMoves });
+    },
+  },
+  {
+    name: "get_positioning",
+    description:
+      "Get the POSITIONING read — the CROWD (funding) fused with the SMART MONEY (sharp wallets) per coin, the lead of the Smart Money tab. CONFLUENCE = the funding-fade and the smart money point the SAME way (both sides of positioning agree — high conviction); SPLIT = the smart money is WITH the crowd, against the fade (the fade is contested — the interesting debate). Use for 'where do the crowd and smart money agree', 'what's the highest-conviction fade', 'is the fade contested', or as the best single 'what should I be looking at' positioning answer. This is a read on positioning, NOT advice — confluence tightens the odds, it doesn't guarantee them; a stretched market can stay stretched. Offer to draft a thesis on a CONFLUENCE (draft_thesis, side = the fade direction).",
+    input_schema: { type: "object", properties: {} },
+    run: async () => {
+      const [mp, sb] = await Promise.all([
+        fetch(`${AGENT_API}/intel/mispriced`).then((r) => r.json()).catch(() => null),
+        fetch(`${AGENT_API}/smart/board`).then((r) => r.json()).catch(() => null),
+      ]);
+      const rows = fusePositioning(mp?.markets ?? [], sb?.traders ?? []) as { coin: string; verdict: string; crowdFade: string | null; smartSide: string | null; fundingAnnualPct: number | null; smartTraders: number }[];
+      const both = rows.filter((r) => r.verdict === "CONFLUENCE" || r.verdict === "SPLIT");
+      return JSON.stringify({
+        confluence: rows.filter((r) => r.verdict === "CONFLUENCE").length,
+        reads: both.slice(0, 10).map((r) => ({ coin: r.coin, verdict: r.verdict, crowd_fade: r.crowdFade, smart_side: r.smartSide, funding_annual_pct: r.fundingAnnualPct, smart_traders: r.smartTraders, read: positioningRead(r) })),
+        note: "CONFLUENCE = funding-fade and smart money agree (high conviction); SPLIT = smart money is with the crowd (contested). Sparse at cold-start (needs both a funding extreme AND ≥2 clustered sharp wallets on a coin). A positioning read, not advice.",
+      });
     },
   },
   {
