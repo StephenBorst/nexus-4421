@@ -1584,6 +1584,7 @@ export function forecastDivergence(polyMarkets, futuresRows, cfg = FORECAST, opt
       question: q,
       slug: pm.slug ?? null,
       forecastProbPct: yesProb,               // the crowd's probability of YES
+      clobTokenId: (() => { const ids = parseJsonArray(pm.clobTokenIds).map(String); return (yi >= 0 && ids[yi]) ? ids[yi] : (ids[0] || null); })(), // YES-token id → /intel/events/history
       volumeUsd: Math.round(volume),
       liquidityUsd: Math.round(Number(pm.liquidity ?? 0) || 0),
       endDate: pm.endDate ?? null,

@@ -21,6 +21,7 @@ interface ForecastMarket {
   question: string;
   slug: string | null;
   forecastProbPct: number;
+  clobTokenId: string | null;
   volumeUsd: number;
   liquidityUsd: number;
   endDate: string | null;
@@ -129,6 +130,69 @@ function ForecastChart({ coin, markPrice, target, forecastLean, forecastProbPct 
   );
 }
 
+// ── FORECAST-PROBABILITY LINE — the crowd's conviction over time ──────────────
+// Polymarket's YES probability plotted as a line (via /intel/events/history), paired
+// under the price+target chart so you see BOTH the market and how belief is trending.
+// 50% coin-flip midline, right-edge current-% box, date ticks, colored by the lean.
+// Fail-soft: renders nothing while loading or if history is unavailable.
+function ForecastProbLine({ token, lean, question }: { token: string | null; lean: string | null; question: string }) {
+  const [hist, setHist] = useState<{ t: number; p: number }[] | null>(null);
+  useEffect(() => {
+    if (!token) { setHist([]); return; }
+    let live = true; setHist(null);
+    fetch(`${AGENT_API}/intel/events/history?token=${encodeURIComponent(token)}`)
+      .then((r) => r.json())
+      .then((d) => { if (live) setHist(Array.isArray(d?.history) ? d.history.filter((x: { p: number }) => Number.isFinite(x.p)) : []); })
+      .catch(() => { if (live) setHist([]); });
+    return () => { live = false; };
+  }, [token]);
+
+  const h = (hist || []).filter((x) => Number.isFinite(x.p) && Number.isFinite(x.t));
+  if (h.length < 4) return null; // loading or no series → the price chart already carries the card
+
+  const c = leanColor(lean);
+  const VB_W = 440, padL = 3, gutterR = 44, plotW = VB_W - padL - gutterR;
+  const top = 12, H = 96, plotBot = H - 17;
+  const ps = h.map((x) => x.p * 100);
+  const lo = Math.max(0, Math.min(...ps) - 6), hi = Math.min(100, Math.max(...ps) + 6), sp = (hi - lo) || 1;
+  const py = (v: number) => plotBot - ((v - lo) / sp) * (plotBot - top);
+  const t0 = h[0].t, t1 = h[h.length - 1].t, tspan = (t1 - t0) || 1;
+  const X = (t: number) => padL + ((t - t0) / tspan) * plotW;
+  const line = h.map((x) => `${X(x.t).toFixed(1)},${py(x.p * 100).toFixed(1)}`).join(" ");
+  const area = `${line} L${X(t1).toFixed(1)},${plotBot} L${X(t0).toFixed(1)},${plotBot} Z`;
+  const lastPct = ps[ps.length - 1], lastY = py(lastPct);
+  const mid = lo <= 50 && hi >= 50 ? py(50) : null;
+  const chg = Math.round((lastPct - ps[0]) * 10) / 10;
+  const ticks = [0, 1, 2].map((i) => {
+    const tt = t0 + (tspan * i) / 2;
+    const anchor: "start" | "middle" | "end" = i === 0 ? "start" : i === 2 ? "end" : "middle";
+    return { x: X(tt), label: new Date(tt).toLocaleDateString(undefined, { month: "short", day: "numeric" }), anchor };
+  });
+  const MF = "var(--nx-font-mono)";
+  return (
+    <div style={{ margin: "0 0 8px" }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 1 }}>
+        <span style={{ color: FAINT, fontFamily: MF, fontSize: 8.5, letterSpacing: "0.12em" }}>FORECAST PROBABILITY · YES</span>
+        <span style={{ color: chg >= 0 ? POS : NEG, fontFamily: MF, fontSize: 8.5 }}>{chg >= 0 ? "+" : ""}{chg}pt · 30d</span>
+      </div>
+      <svg viewBox={`0 0 ${VB_W} ${H}`} style={{ display: "block", width: "100%", height: "auto" }} role="img" aria-label={`YES probability over time for: ${question}`}>
+        {mid != null && <>
+          <line x1={padL} y1={mid} x2={plotW} y2={mid} stroke="#3a3a42" strokeWidth="0.75" strokeDasharray="3 4" />
+          <text x={padL + 2} y={mid - 3} fill={FAINT} fontFamily={MF} fontSize="6.5" letterSpacing="0.5">50% · COIN-FLIP</text>
+        </>}
+        <path d={area} fill={c} opacity="0.07" />
+        <polyline points={line} fill="none" stroke={c} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" opacity="0.92" />
+        <circle cx={X(t1)} cy={lastY} r="2.5" fill={c} />
+        <line x1={X(t1)} y1={lastY} x2={VB_W - gutterR} y2={lastY} stroke="#33333a" strokeWidth="0.5" strokeDasharray="2 2" />
+        <rect x={VB_W - gutterR} y={lastY - 8} width={gutterR - 6} height={16} rx="2" fill="#141416" stroke={c + "88"} />
+        <text x={VB_W - gutterR + 4} y={lastY + 3.4} fill={c} fontFamily={MF} fontSize="8.5" fontWeight="700">{Math.round(lastPct)}%</text>
+        <line x1={padL} y1={plotBot + 4} x2={plotW} y2={plotBot + 4} stroke="rgba(255,255,255,0.08)" strokeWidth="0.75" />
+        {ticks.map((tk, i) => <text key={i} x={Math.max(padL, Math.min(plotW, tk.x))} y={plotBot + 13} textAnchor={tk.anchor} fill={FAINT} fontFamily={MF} fontSize="7.5">{tk.label}</text>)}
+      </svg>
+    </div>
+  );
+}
+
 // One divergent market — the flagged signal, now with the premium price+target chart.
 function DivergentCard({ m, onDraft }: { m: ForecastMarket; onDraft: (m: ForecastMarket) => void }) {
   return (
@@ -141,6 +205,7 @@ function DivergentCard({ m, onDraft }: { m: ForecastMarket; onDraft: (m: Forecas
       </div>
       <div style={{ color: "#c4c4cc", fontSize: 12, lineHeight: 1.45, marginBottom: 8 }}>{m.question}</div>
       <ForecastChart coin={m.coin} markPrice={m.markPrice} target={m.target} forecastLean={m.forecastLean} forecastProbPct={m.forecastProbPct} />
+      <ForecastProbLine token={m.clobTokenId} lean={m.forecastLean} question={m.question} />
       <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
         <span style={{ color: DIM }}>forecast <b style={{ color: BONE }}>{m.forecastProbPct}%</b> → lean <b style={{ color: leanColor(m.forecastLean) }}>{m.forecastLean}</b></span>
         <span style={{ color: DIM }}>tape (funding) <b style={{ color: leanColor(m.fundingLean) }}>{m.fundingLean}</b></span>
