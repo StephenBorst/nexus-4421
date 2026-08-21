@@ -1641,18 +1641,27 @@ export function forecastDivergence(polyMarkets, futuresRows, cfg = FORECAST, opt
 // execution-layer seam an intelligence partner (macro/event discovery) plugs into.
 export const MACRO = { minVolumeUsd: 25000, limit: 40 };
 
+// ⚠️ REGEX HARDENING: stems that take suffixes use `\w*` (or explicit suffix groups) INSIDE
+// the `\b…\b` wrapper — a bare `\b(cut)\b` fails to match "cuts"/"cutting" because the char
+// after "cut" is still a word char (the trailing \b can't fire). `\b(cut\w*)\b` consumes the
+// whole word and matches all forms. Short ambiguous words (war, ban) use explicit suffix
+// groups so they don't match "warm"/"bank". Every form below is covered by a test.
 const MACRO_CATEGORIES = [
-  { cat: "RATES", rx: /\b(fed|fomc|interest rate|rate (cut|hike|decision)|powell|basis points|\bbps\b|jerome|monetary policy)\b/i,
-    lens: (q) => /\b(cut|lower|dovish|reduce|pause|ease)\b/i.test(q) ? "RISK_ON" : /\b(hike|raise|hawkish|increase)\b/i.test(q) ? "RISK_OFF" : null },
-  { cat: "ECONOMY", rx: /\b(recession|inflation|\bcpi\b|\bgdp\b|unemployment|jobs report|debt ceiling|shutdown|soft landing|stagflation)\b/i,
-    lens: (q) => /\b(recession|shutdown|default|stagflation|crash)\b/i.test(q) ? "RISK_OFF" : /\b(soft landing|cools|falls|eases)\b/i.test(q) ? "RISK_ON" : null },
-  { cat: "GEOPOLITICS", rx: /\b(war|invade|invasion|missile|ceasefire|nuclear|iran|russia|ukraine|israel|gaza|taiwan|north korea|venezuela|conflict|troops|military strike|airstrike)\b/i,
-    lens: (q) => /\b(ceasefire|peace|deal|truce|withdraw)\b/i.test(q) ? "RISK_ON" : /\b(war|invade|invasion|missile|nuclear|airstrike|attack|escalat|strike)\b/i.test(q) ? "RISK_OFF" : null },
+  { cat: "RATES", rx: /\b(fed|fomc|interest rate\w*|rate (cut|hike|decision|change)\w*|powell|basis points|bps|jerome|monetary policy)\b/i,
+    lens: (q) => /\b(cut\w*|lower\w*|dovish|reduc\w*|pause\w*|eas(e|es|ed|ing))\b/i.test(q) ? "RISK_ON"
+      : /\b(hik\w*|raise\w*|hawkish|increase\w*|higher)\b/i.test(q) ? "RISK_OFF" : null },
+  { cat: "ECONOMY", rx: /\b(recession\w*|inflation|cpi|gdp|unemployment|jobs report|debt ceiling|shutdown\w*|soft landing|hard landing|stagflation)\b/i,
+    lens: (q) => /\b(recession\w*|shutdown\w*|default\w*|stagflation|crash\w*|hard landing)\b/i.test(q) ? "RISK_OFF"
+      : /\b(soft landing|cool\w*|fall\w*|eas(e|es|ed|ing))\b/i.test(q) ? "RISK_ON" : null },
+  { cat: "GEOPOLITICS", rx: /\b(war(s|fare)?|invad\w*|invasion|missile\w*|ceasefire|nuclear|iran|russia|ukraine|israel|gaza|taiwan|north korea|venezuela|conflict\w*|troops|airstrike\w*|military)\b/i,
+    lens: (q) => /\b(ceasefire|peace\w*|deal\w*|truce|withdraw\w*)\b/i.test(q) ? "RISK_ON"
+      : /\b(war(s|fare)?|invad\w*|invasion|missile\w*|nuclear|airstrike\w*|attack\w*|escalat\w*|strike\w*)\b/i.test(q) ? "RISK_OFF" : null },
   // Requires a POLICY/regulatory context, not a bare "crypto"/"etf" mention — otherwise a
   // normal call whose catalyst says "ETF flows" would be miscounted as a macro/event call.
-  { cat: "CRYPTO_POLICY", rx: /\b((bitcoin|crypto) reserve|(sec|etf) (approv|decision|reject|lawsuit|ruling|case)|stablecoin (bill|law|act|regulat)|crypto (regulat|ban|bill|law|policy|executive order)|cbdc|regulat\w* (crypto|bitcoin|stablecoin))/i,
-    lens: (q) => /\b(reserve|approv|legal|adopt|pass)/i.test(q) ? "RISK_ON" : /\b(ban|reject|crackdown|lawsuit)/i.test(q) ? "RISK_OFF" : null },
-  { cat: "ELECTION", rx: /\b(election|president|senate|congress|governor|primary|nominee|\bvote\b|ballot|prime minister|parliament)\b/i, lens: () => null },
+  { cat: "CRYPTO_POLICY", rx: /\b((bitcoin|crypto) reserve|(sec|etf) (approv\w*|decision|reject\w*|lawsuit|ruling|case)|stablecoin (bill|law|act|regulat\w*)|crypto (regulat\w*|ban|bill|law|policy|executive order)|ban\w* (crypto|bitcoin|stablecoin)|cbdc|regulat\w* (crypto|bitcoin|stablecoin))/i,
+    lens: (q) => /\b(reserve|approv\w*|legal|adopt\w*|pass(es|ed|ing)?)\b/i.test(q) ? "RISK_ON"
+      : /\b(ban(s|ned|ning)?|reject\w*|crackdown|lawsuit\w*)\b/i.test(q) ? "RISK_OFF" : null },
+  { cat: "ELECTION", rx: /\b(election|president|senate|congress|governor|primary|nominee|vote|ballot|prime minister|parliament)\b/i, lens: () => null },
 ];
 
 export function classifyMacro(question) {

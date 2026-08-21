@@ -1710,6 +1710,27 @@ test("classifyMacro categorizes events and attaches a lens only where textbook",
   assert.equal(classifyMacro("Will Congress pass a stablecoin bill?").category, "CRYPTO_POLICY");
 });
 
+test("classifyMacro lens is robust to word SUFFIXES (the trailing-\\b bug class)", () => {
+  // RATES — plural/gerund forms that a bare \b would have dropped
+  assert.equal(classifyMacro("Fed cuts rates in March?").riskLens, "RISK_ON");
+  assert.equal(classifyMacro("Will the Fed keep hiking rates?").riskLens, "RISK_OFF");
+  assert.equal(classifyMacro("Fed raises rates 25bps?").riskLens, "RISK_OFF");
+  assert.equal(classifyMacro("Fed pauses rate decisions?").riskLens, "RISK_ON");
+  // ECONOMY
+  assert.equal(classifyMacro("Will inflation cool by year-end?").riskLens, "RISK_ON"); // "cool"
+  assert.equal(classifyMacro("US recession fears grow?").riskLens, "RISK_OFF");        // "recession"
+  // GEOPOLITICS — escalates/strikes/wars
+  assert.equal(classifyMacro("Will the conflict escalate further?").riskLens, "RISK_OFF");
+  assert.equal(classifyMacro("Will Israel strike Iran again?").riskLens, "RISK_OFF");
+  assert.equal(classifyMacro("Will the ceasefire hold?").riskLens, "RISK_ON");
+  // CRYPTO_POLICY — approves/rejects/bans
+  assert.equal(classifyMacro("Will the SEC reject the ETF?").riskLens, "RISK_OFF");
+  assert.equal(classifyMacro("Will China ban crypto again?").riskLens, "RISK_OFF");
+  // guard against short-word false positives from the \w* stems
+  assert.equal(classifyMacro("Will the weather stay warm in Iran?").riskLens, null, "'warm' must NOT match the 'war' risk-off lens");
+  assert.equal(classifyMacro("Bank earnings beat?"), null, "'bank' must not trip a macro category");
+});
+
 test("macroEvents builds a volume-ranked board, gating low volume + non-macro", () => {
   const poly = [
     { id: "a", question: "Will the Fed cut rates in December?", outcomes: '["Yes","No"]', outcomePrices: '["0.7","0.3"]', volumeNum: 500000, liquidity: 40000, endDate: "2026-12-18" },
