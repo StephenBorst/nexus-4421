@@ -87,36 +87,79 @@ function PositionBar({ m, maxEdge, big }: { m: Market; maxEdge: number; big?: bo
 }
 
 // The funding-history STORY-LINE (tier 2) — the crowd's positioning over time, plotted
-// between the two fade poles (balanced = center). The end dot is now. This is the
-// Quotient "narrative between two poles" idea, honest to our data: it only renders when
-// the brain has actually recorded enough hourly funding history for the market.
-function FundingStory({ points, direction }: { points: { t: number; f: number }[]; direction: string }) {
-  const W = 300, H = 140, cy = H / 2;
-  // FIXED reference so height is HONEST + comparable across markets: ~0.04%/8h
-  // (≈44%/yr) reaches a pole. A mild-but-stable market sits gently off-center instead
-  // of being pinned to the top just because it never varies (window-max scaling did that).
+// between the two fade poles (balanced = center), NOW joined to what PRICE actually did.
+// Top panel: funding between poles, with the stretched zones shaded + an area fill toward
+// the crowded side + a live %/yr readout at the dot. Bottom strip: price over the SAME
+// window, index-aligned, so the fade thesis is visible — funding piled in, did price
+// revert? Honest to our data: renders only once the brain has recorded enough history.
+function FundingStory({ points, price, direction }: { points: { t: number; f: number }[]; price?: { t: number; c: number }[]; direction: string }) {
+  const W = 300, Hf = 108, cy = Hf / 2, Hp = 46, pad = 6;
+  // FIXED reference so height is HONEST + comparable across markets: ~0.04%/8h (≈44%/yr)
+  // reaches a pole. A mild-but-stable market sits gently off-center rather than pinned.
   const REF = 0.0004;
   const clamp = (v: number) => Math.max(-1, Math.min(1, v));
   const n = points.length;
-  const coords = points.map((p, i) => {
-    const x = n === 1 ? W : (i / (n - 1)) * W;
-    const y = cy - clamp(p.f / REF) * (cy * 0.86);
-    return [x, y] as const;
-  });
+  const fx = (i: number) => (n === 1 ? W : (i / (n - 1)) * W);
+  const fy = (f: number) => cy - clamp(f / REF) * (cy * 0.86);
+  const coords = points.map((p, i) => [fx(i), fy(p.f)] as const);
   const [ex, ey] = coords[coords.length - 1];
+  const nowAnnual = Math.round(points[points.length - 1].f * 1095 * 1000) / 10; // f/8h → %/yr
+  const crowdLong = direction === "SHORT"; // paying to be long → the extreme is at the TOP
+  const line = coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  // area fill from the balanced line out to the funding line (weight on the crowded side)
+  const area = `${line} L${W},${cy} L0,${cy} Z`;
+
+  // price strip — normalize the close series to its own [min,max] over the window
+  const pr = (price || []).filter((p) => Number.isFinite(p.c) && p.c > 0);
+  const pc = pr.length >= 4 ? pr.map((p) => p.c) : null;
+  let priceLine = "", priceArea = "", priceChangePct: number | null = null, priceUp = false;
+  if (pc) {
+    const lo = Math.min(...pc), hi = Math.max(...pc), span = hi - lo || 1;
+    const py = (c: number) => Hp - pad - ((c - lo) / span) * (Hp - pad * 2);
+    const pts = pc.map((c, i) => [pc.length === 1 ? W : (i / (pc.length - 1)) * W, py(c)] as const);
+    priceLine = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+    priceArea = `${priceLine} L${W},${Hp} L0,${Hp} Z`;
+    priceChangePct = Math.round(((pc[pc.length - 1] - pc[0]) / pc[0]) * 1000) / 10;
+    priceUp = priceChangePct >= 0;
+  }
+
   const pole: React.CSSProperties = { fontFamily: MONO, fontSize: 9, letterSpacing: "0.05em" };
   return (
     <div>
-      <div style={{ ...pole, color: direction === "SHORT" ? C.text.bright : C.text.faint, marginBottom: 5 }}>▲ FADE SHORT · crowd piled long</div>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ display: "block", width: "100%", height: 128 }} aria-label="Funding over time — how stretched the crowd has been; the dot is now.">
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 5 }}>
+        <span style={{ ...pole, color: direction === "SHORT" ? C.text.bright : C.text.faint }}>▲ FADE SHORT · crowd piled long</span>
+        <span style={{ fontFamily: MONO, fontSize: 9, color: C.text.faint }}>now <b style={{ color: C.text.bright }}>{nowAnnual >= 0 ? "+" : ""}{nowAnnual}%/yr</b></span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${Hf}`} preserveAspectRatio="none" style={{ display: "block", width: "100%", height: 108 }} aria-label="Funding over time between the two fade poles; the dot is now.">
+        {/* stretched zones — the outer ~26% at each pole is 'crowded' territory */}
+        <rect x="0" y="0" width={W} height={Hf * 0.26} fill={C.accent} opacity="0.05" />
+        <rect x="0" y={Hf * 0.74} width={W} height={Hf * 0.26} fill={C.accent} opacity="0.05" />
         <line x1="0" y1={cy} x2={W} y2={cy} stroke={C.borderStrong} strokeWidth="1" strokeDasharray="3 4" />
         <text x="4" y={cy - 5} fill={C.text.faint} fontFamily="ui-monospace,monospace" fontSize="8" letterSpacing="1">BALANCED</text>
-        <polyline points={coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ")}
-          fill="none" stroke={C.text.bright} strokeWidth="2.2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+        <path d={area} fill={C.accent} opacity="0.09" />
+        <polyline points={line} fill="none" stroke={C.text.bright} strokeWidth="2.2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
         <circle cx={ex} cy={ey} r="7" fill={C.accent} opacity="0.12" />
         <circle cx={ex} cy={ey} r="3.2" fill={C.accent} />
       </svg>
       <div style={{ ...pole, color: direction === "LONG" ? C.text.bright : C.text.faint, marginTop: 5 }}>▼ FADE LONG · crowd piled short</div>
+
+      {/* price over the same window — did the crowd's side pay off, or revert? */}
+      {pc && (
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.12em", color: C.text.faint }}>PRICE · SAME WINDOW</span>
+            {priceChangePct != null && <span style={{ fontFamily: MONO, fontSize: 9, color: priceUp ? C.pos : C.neg }}>{priceUp ? "+" : ""}{priceChangePct}%</span>}
+          </div>
+          <svg viewBox={`0 0 ${W} ${Hp}`} preserveAspectRatio="none" style={{ display: "block", width: "100%", height: 46 }} aria-label="Price over the same window.">
+            <path d={priceArea} fill={priceUp ? C.pos : C.neg} opacity="0.06" />
+            <polyline points={priceLine} fill="none" stroke={priceUp ? C.pos : C.neg} strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" opacity="0.85" />
+          </svg>
+        </div>
+      )}
+      {/* the read the chart is making, one line */}
+      <div style={{ fontFamily: MONO, fontSize: 8.5, color: C.text.faint, marginTop: 8, lineHeight: 1.5 }}>
+        {crowdLong ? "Line pushed UP = crowd piled long. Watch whether price gave it back below." : "Line pushed DOWN = crowd piled short. Watch whether price gave it back above."}
+      </div>
     </div>
   );
 }
@@ -174,14 +217,28 @@ export function MispricedBoard() {
   const [err, setErr] = useState(false);
   const [openCoin, setOpenCoin] = useState<string | null>(null);
   const [pos, setPos] = useState<PosResp | null>(null);
+  const [price, setPrice] = useState<{ t: number; c: number }[] | null>(null);
 
-  // Tier 2: on opening a market, pull its funding history (story-line) + reversion stat.
-  // Fail-soft; a market with no recorded history just falls back to the static gauge.
+  // Tier 2: on opening a market, pull its funding history (story-line) + reversion stat,
+  // AND the price over the same window so the chart shows the fade thesis (funding piled
+  // in — did price revert?). Fail-soft; no history falls back to the static gauge.
   useEffect(() => {
-    if (!openCoin) { setPos(null); return; }
-    let live = true; setPos(null);
+    if (!openCoin) { setPos(null); setPrice(null); return; }
+    let live = true; setPos(null); setPrice(null);
     fetch(`${AGENT_API}/intel/positioning/${openCoin}`).then((r) => r.json())
-      .then((d: PosResp) => { if (live) setPos(d); })
+      .then(async (d: PosResp) => {
+        if (!live) return;
+        setPos(d);
+        if (d?.points && d.points.length >= 8) {
+          const toSec = (t: number) => (t > 1e12 ? Math.floor(t / 1000) : Math.floor(t));
+          const from = toSec(d.points[0].t), to = toSec(d.points[d.points.length - 1].t);
+          const pr = await fetch(`https://api-evm.orderly.org/tv/history?symbol=PERP_${openCoin}_USDC&resolution=60&from=${from}&to=${to}`)
+            .then((r) => r.json()).catch(() => null);
+          if (live && pr && pr.s === "ok" && Array.isArray(pr.t) && Array.isArray(pr.c)) {
+            setPrice(pr.t.map((t: number, i: number) => ({ t: t * 1000, c: Number(pr.c[i]) })).filter((p: { c: number }) => p.c > 0));
+          }
+        }
+      })
       .catch(() => { if (live) setPos({ coin: openCoin, points: [], reversion: null }); });
     return () => { live = false; };
   }, [openCoin]);
@@ -270,7 +327,7 @@ export function MispricedBoard() {
                 </span>
               </div>
               {pos && pos.points.length >= 8
-                ? <FundingStory points={pos.points} direction={m.direction} />
+                ? <FundingStory points={pos.points} price={price ?? undefined} direction={m.direction} />
                 : <PositionBar m={m} maxEdge={maxEdge} big />}
             </div>
 
