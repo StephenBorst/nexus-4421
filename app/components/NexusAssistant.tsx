@@ -13,6 +13,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAccount, usePrivateQuery, usePositionStream } from "@orderly.network/hooks";
 import { useLabStorage } from "@/hooks/useLabStorage";
 import { computeEdge } from "@/config/edge";
+import { tiltRead, sessionEdge, overtradingRead, sizingRead } from "@/lib/behavioral.mjs";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { useSubscription } from "@/hooks/useSubscription";
 import {
@@ -151,6 +152,23 @@ export default function NexusAssistant() {
       // Personalized edge readout (per-symbol win rate + long/short) for get_my_edge.
       edge: computeEdge(trades),
     };
+  }, [histData]);
+
+  // The behavioral half — tilt/session/overtrading/sizing from the user's own sequenced
+  // fills, computed here (the assistant holds the history) so get_operator_profile can
+  // hand the AI the SAME reads the Lab's Operator Profile + Briefing show. Field mapping
+  // mirrors the Lab's processedTrades (close_timestamp, abs(closed_position_qty × avg_close_price)).
+  const behavioral = useMemo(() => {
+    const rows = Array.isArray(histData) ? histData : ((histData as { rows?: unknown[] })?.rows ?? []);
+    const closed = (rows as Record<string, unknown>[]).filter((o) => o.position_status === "closed");
+    if (!closed.length) return null;
+    const seq = closed.map((o) => ({ pnl: parseFloat(String(o.realized_pnl ?? 0)), timestamp: Number(o.close_timestamp ?? 0) }));
+    const sized = closed.map((o) => ({
+      pnl: parseFloat(String(o.realized_pnl ?? 0)),
+      timestamp: Number(o.close_timestamp ?? 0),
+      size: Math.abs(parseFloat(String(o.closed_position_qty ?? 0))) * Math.abs(parseFloat(String(o.avg_close_price ?? 0))),
+    }));
+    return { tilt: tiltRead(seq), session: sessionEdge(seq), overtrading: overtradingRead(seq), sizing: sizingRead(sized) };
   }, [histData]);
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -436,6 +454,7 @@ export default function NexusAssistant() {
             }))
             .filter((p) => Math.abs(p.qty) > 0),
           performance,
+          behavioral,
         },
         onDelta: (chunk) => appendToLast((last) => ({ ...last, content: last.content + chunk })),
       });

@@ -11,7 +11,7 @@
 import { deployDirectiveFromThesis } from "@/utils/agentPrefill";
 // Same synthesis the Lab renders — the copilot must speak with ONE point of view,
 // not answer from an older, narrower readout while the terminal shows another.
-import { buildOperatorProfile, profileNarrative } from "@/lib/operatorProfile.mjs";
+import { buildOperatorProfile, profileNarrative, PUBLIC_READS } from "@/lib/operatorProfile.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const AGENT_API = "https://og.nexustradinglabs.com";
@@ -27,6 +27,11 @@ export interface ToolCtx {
   openPositions?: { symbol: string; qty: number; entry: number; mark: number; pnl: number }[];
   // Pre-computed realized-performance summary (from /v1/position_history).
   performance?: Record<string, unknown> | null;
+  // Pre-computed behavioral reads (tilt/session/overtrading/sizing) from the user's own
+  // sequenced fills — the PRIVATE, emotional half of the operator profile. Computed in the
+  // assistant component (which holds the trade history) so get_operator_profile can compose
+  // the SAME full read the Lab shows, keeping the AI congruent with the intelligence layer.
+  behavioral?: { tilt: unknown; session: unknown; overtrading: unknown; sizing: unknown } | null;
 }
 
 export const THESIS_DRAFT_KEY = "nexus_thesis_draft";
@@ -188,7 +193,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "get_operator_profile",
     description:
-      "Get the OPERATOR PROFILE — the Lab's single synthesized read of a trader, and the RIGHT starting point for any 'how am I doing', 'what kind of trader am I', 'what should I work on' question. Composes the graded-call record into: an archetype (e.g. 'Fat-tail trend-follower'), expectancy + profit factor, WHICH MARKET REGIME their edge lives and dies in, plan quality (were the calls well-formed when posted), and conviction calibration (do they size up on their best ideas). Omit `wallet` for the connected user; pass a wallet to read any public profile. PREFER THIS OVER get_my_edge for overall assessment — get_my_edge is only the per-symbol/per-side realized P&L slice. Everything here is graded from public price, so it is verifiable, not self-reported. Respect the `tier` field: FORMING means small sample — say so rather than stating conclusions.",
+      "Get the OPERATOR PROFILE — the Lab's single synthesized read of a trader, and the RIGHT starting point for any 'how am I doing', 'what kind of trader am I', 'what should I work on' question. Composes the graded-call record into: an archetype (e.g. 'Fat-tail trend-follower'), expectancy + profit factor, WHICH MARKET REGIME their edge lives and dies in, plan quality (were the calls well-formed when posted), and conviction calibration (do they size up on their best ideas). FOR THE CONNECTED USER it ALSO includes the BEHAVIORAL/EMOTIONAL reads from their own fills — TILT (trading worse right after a loss), OVERTRADING (the extra trades after your first couple each day bleeding), SIZING (betting bigger after a loss = revenge, or after a win = pressing), and SESSION (which UTC hours pay) — the private half competitors can't grade, and usually where the real money leaks are. These are the SAME reads the Lab's Operator Profile and Briefing show, so your coaching stays congruent with the app. Omit `wallet` for the connected user (full read); pass a wallet to read any public profile (graded-only). PREFER THIS OVER get_my_edge for overall assessment. Graded reads are verifiable from public price; behavioral reads are private and for coaching only — never state them about anyone but the connected user. Respect the `tier` field: FORMING means small sample — say so rather than stating conclusions.",
     input_schema: { type: "object", properties: { wallet: { type: "string", description: "Optional wallet address; defaults to the connected user." } } },
     run: async (args, ctx) => {
       const addr = String(args.wallet || ctx.wallet || "").trim();
@@ -202,14 +207,24 @@ export const TOOLS: ToolDef[] = [
           note: "No resolved public calls yet, so there is no graded record to read. A profile needs calls posted PUBLIC that have since resolved against real price. Say this plainly instead of inferring a profile from nothing.",
         });
       }
-      const profile = buildOperatorProfile({ process });
+      // Connected user (no explicit wallet): compose the FULL private profile — graded reads
+      // PLUS the behavioral leaks from their own fills — so the AI coaches on the same thing
+      // the Lab shows. Another wallet: graded/public only (we don't hold their private fills).
+      const isSelf = !args.wallet;
+      const profile = buildOperatorProfile(
+        isSelf
+          ? { process, behavioral: ctx.behavioral || undefined, edge: (ctx.performance as { edge?: unknown } | null)?.edge || undefined }
+          : { process }
+      );
       return JSON.stringify({
         tier: profile.tier,
         gradedCalls: profile.gradedCalls,
         archetype: profile.archetype?.label ?? null,
         headline: profile.headline,
-        reads: profile.reads.map((r: { kind: string; text: string }) => ({ kind: r.kind, text: r.text })),
-        narrative: profileNarrative(profile, { publicOnly: true, voice: args.wallet ? "third" : "second" }),
+        reads: profile.reads
+          .filter((r: { kind: string }) => isSelf || PUBLIC_READS.has(r.kind))
+          .map((r: { kind: string; text: string; provenance?: string }) => ({ kind: r.kind, text: r.text, provenance: r.provenance })),
+        narrative: profileNarrative(profile, { publicOnly: !isSelf, voice: args.wallet ? "third" : "second" }),
         unlocks: profile.unlocks,
       });
     },
