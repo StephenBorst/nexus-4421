@@ -640,6 +640,24 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "get_macro_callers",
+    description:
+      "Get the MACRO-CALLER leaderboard — traders ranked on their TRUSTLESS record over EVENT-DRIVEN calls only (macro/geopolitical catalysts: Fed, recession, war, policy). Graded from public price exactly like the main caller board (first-touch TP vs SL), never self-reported — a verifiable macro/event track record, the thing that doesn't exist elsewhere. Use for 'who's actually good at macro', 'who called the Fed / the war right', 'is anyone proven on events', or to show that macro conviction can be graded, not just claimed. Sparse at cold-start by design (needs 3+ resolved event-driven calls to rank); `emerging` shows who's building one. To create a macro call, draft a thesis from the Macro & Events board.",
+    input_schema: { type: "object", properties: {} },
+    run: async () => {
+      const res = await fetch(`${AGENT_API}/theses/macro-leaderboard`);
+      if (!res.ok) return JSON.stringify({ error: `macro leaderboard failed (${res.status})` });
+      const d = await res.json();
+      type M = { rank?: number; wallet: string; displayName?: string | null; calls: number; hitRate: number; avgR: number; totalR: number; categories?: string[]; callsToQualify?: number };
+      const fmt = (e: M) => ({ rank: e.rank, name: e.displayName || `${e.wallet.slice(0, 6)}…${e.wallet.slice(-4)}`, macro_calls: e.calls, hit_rate_pct: e.hitRate, avg_r: e.avgR, total_r: e.totalR, categories: e.categories, needs_more: e.callsToQualify });
+      return JSON.stringify({
+        ranked: ((d?.leaderboard ?? []) as M[]).slice(0, 15).map(fmt),
+        emerging: ((d?.emerging ?? []) as M[]).slice(0, 10).map(fmt),
+        note: "Ranked = 3+ resolved event-driven calls, net-positive by R, scored by the same expectancy as the main board. Graded from public price — nobody types in whether they were right about the Fed. Empty/sparse at cold-start is by design.",
+      });
+    },
+  },
+  {
     name: "get_defi",
     description:
       "Get DeFi macro context from DeFiLlama: total DeFi TVL, the top chains by TVL, and (if a chain is named) that chain's TVL + rank. Use for 'how's DeFi TVL', 'which chains are growing', 'where's the liquidity', or to frame an asset's chain in macro terms. Read-only, free public data.",

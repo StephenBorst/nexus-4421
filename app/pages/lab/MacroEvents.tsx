@@ -163,6 +163,10 @@ export function MacroEvents() {
             <div style={{ marginTop: 12, color: FAINT, fontSize: 9, fontFamily: "var(--nx-font-mono)", lineHeight: 1.6 }}>
               Macro & geopolitical markets from Polymarket. The RISK-ON / RISK-OFF lens is a textbook directional read
               (risk-on = crypto-supportive), not a fair value and not advice — a prompt to stake a graded thesis. You pick the expression.
+              {" "}
+              <span onClick={() => navigate("/proof")} style={{ color: DIM, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2 }}>
+                See who calls these right →
+              </span>
             </div>
           </>
         )}
