@@ -2181,6 +2181,38 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
     // war, elections, crypto policy), and attaches a directional RISK LENS only where the
     // relationship is textbook. Never a fair-value oracle — a prompt to stake a GRADED
     // thesis and execute it on Nexus. Public, fail-soft, KV-cached 5 min.
+    // ── /intel/events/history?token= — YES-probability over time (the macro line) ──
+    // Proxies Polymarket's public CLOB prices-history for one YES token (probability
+    // 0..1 over ~1 month), so Macro Events can draw the crowd's belief as a LINE, not
+    // just a snapshot. Server-side (the Worker already reaches Polymarket; avoids any
+    // browser CORS question) + KV-cached 5 min. Fail-soft: empty history on any error.
+    if (parts[0] === "intel" && parts[1] === "events" && parts[2] === "history" && request.method === "GET") {
+      const token = (new URL(request.url).searchParams.get("token") || "").trim();
+      const respondH = (payload) => new Response(JSON.stringify(payload), {
+        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=240", ...cors(request) },
+      });
+      if (!/^[0-9]{1,80}$/.test(token)) return respondH({ token: null, history: [] });
+      const CK = `intel:evhist:${token}`;
+      try {
+        const cached = await env.LAB_STORE.get(CK);
+        if (cached) { const c = JSON.parse(cached); if (c && (Date.now() - (c.asOfMs || 0)) < 300 * 1000) return respondH(c); }
+      } catch { /* recompute */ }
+      try {
+        const r = await fetch(`https://clob.polymarket.com/prices-history?market=${token}&interval=1m&fidelity=360`, {
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36", "Accept": "application/json" },
+        });
+        const j = await r.json();
+        const history = (Array.isArray(j?.history) ? j.history : [])
+          .map((h) => ({ t: Number(h.t) * 1000, p: Number(h.p) }))
+          .filter((h) => Number.isFinite(h.t) && Number.isFinite(h.p));
+        const payload = { token, history, asOfMs: Date.now() };
+        try { await env.LAB_STORE.put(CK, JSON.stringify(payload), { expirationTtl: 900 }); } catch { /* best-effort */ }
+        return respondH(payload);
+      } catch (e) {
+        return respondH({ token, history: [], error: String(e) });
+      }
+    }
+
     if (parts[0] === "intel" && parts[1] === "events" && request.method === "GET") {
       const CACHE_KEY = "intel:events:v5", TTL_MS = 300 * 1000;
       const respond = (payload) => new Response(JSON.stringify(payload), {

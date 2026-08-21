@@ -1693,6 +1693,10 @@ export function macroEvents(polyMarkets, cfg = MACRO) {
     // Actionable = a textbook lens AND a LIVE probability (not a near-resolved 0.4% longshot
     // or a 99% foregone conclusion) — i.e. a directional read a trader can actually express.
     const actionable = !!klass.riskLens && yesProbPct >= 3 && yesProbPct <= 97;
+    // The CLOB token id for the YES outcome — the key to fetch the probability-over-time
+    // series (Polymarket prices-history is keyed by token). Same index as "yes" in outcomes.
+    const clobIds = parseJsonArray(pm.clobTokenIds).map(String);
+    const clobTokenId = (yi >= 0 && clobIds[yi]) ? clobIds[yi] : (clobIds[0] || null);
     out.push({
       id: pm.id ?? pm.conditionId ?? null,
       question: q,
@@ -1700,6 +1704,7 @@ export function macroEvents(polyMarkets, cfg = MACRO) {
       riskLens: klass.riskLens,               // RISK_ON | RISK_OFF | null (only where textbook)
       actionable,
       yesProbPct,                             // the crowd's probability of YES
+      clobTokenId,                            // YES-token id → /intel/events/history
       volumeUsd: Math.round(volume),
       liquidityUsd: Math.round(Number(pm.liquidity ?? 0) || 0),
       endDate: pm.endDate ?? null,
