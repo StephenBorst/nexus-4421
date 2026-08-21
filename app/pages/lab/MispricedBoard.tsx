@@ -24,6 +24,10 @@ import { useIsMobile } from "./useIsMobile";
 import { SectionHeader } from "./components";
 
 type EdgeQuality = { tier: "PROVEN" | "TRAP" | "MIXED" | "UNPROVEN"; revertedPct: number | null; samples: number };
+// The SYNTHESIS input — where the graded top Orderly traders (the sharp capital) actually
+// sit on this market, + the long/short split. Funding = the crowd (fade it); smartMoney =
+// the real money (ride with it). When they disagree, that tension is the read.
+type SmartMoney = { side: "LONG" | "SHORT"; count: number; long: number | null; short: number | null };
 type Market = {
   symbol: string; coin: string; markPrice: number;
   funding8hPct: number; fundingAnnualPct: number; oiUsd: number;
@@ -31,6 +35,7 @@ type Market = {
   edge: number; status: "MISPRICED" | "PRICED_FAIR";
   reversion?: { revertedPct: number; avgReversionPct: number; samples: number; horizonDays: number } | null;
   edgeQuality?: EdgeQuality; // flagged markets: has fading this HISTORICALLY paid?
+  smartMoney?: SmartMoney | null; // sharp-capital consensus (merged server-side into the board)
 };
 type BoardResp = { asOf?: string; scanned?: number; mispricedCount?: number; markets?: Market[] };
 type Lean = { side: "LONG" | "SHORT" | "SPLIT"; lean: number; longCount: number; shortCount: number; participants: number };
@@ -86,82 +91,145 @@ function PositionBar({ m, maxEdge, big }: { m: Market; maxEdge: number; big?: bo
   );
 }
 
-// The funding-history STORY-LINE (tier 2) — the crowd's positioning over time, plotted
-// between the two fade poles (balanced = center), NOW joined to what PRICE actually did.
-// Top panel: funding between poles, with the stretched zones shaded + an area fill toward
-// the crowded side + a live %/yr readout at the dot. Bottom strip: price over the SAME
-// window, index-aligned, so the fade thesis is visible — funding piled in, did price
-// revert? Honest to our data: renders only once the brain has recorded enough history.
-function FundingStory({ points, price, direction }: { points: { t: number; f: number }[]; price?: { t: number; c: number }[]; direction: string }) {
-  const W = 300, Hf = 108, cy = Hf / 2, Hp = 46, pad = 6;
-  // FIXED reference so height is HONEST + comparable across markets: ~0.04%/8h (≈44%/yr)
-  // reaches a pole. A mild-but-stable market sits gently off-center rather than pinned.
-  const REF = 0.0004;
-  const clamp = (v: number) => Math.max(-1, Math.min(1, v));
-  const n = points.length;
-  const fx = (i: number) => (n === 1 ? W : (i / (n - 1)) * W);
-  const fy = (f: number) => cy - clamp(f / REF) * (cy * 0.86);
-  const coords = points.map((p, i) => [fx(i), fy(p.f)] as const);
-  const [ex, ey] = coords[coords.length - 1];
-  const nowAnnual = Math.round(points[points.length - 1].f * 1095 * 1000) / 10; // f/8h → %/yr
-  const crowdLong = direction === "SHORT"; // paying to be long → the extreme is at the TOP
-  const line = coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-  // area fill from the balanced line out to the funding line (weight on the crowded side)
-  const area = `${line} L${W},${cy} L0,${cy} Z`;
+// ── THE SYNTH CHART — one premium, time-aligned frame ─────────────────────────
+// PRICE (top) over FUNDING (bottom), sharing an x-axis + real date ticks, with
+// Quotient-style right-edge value boxes and the SMART-MONEY marker riding the live
+// price. The funding band is ADAPTIVE — the window's own typical range (p25–p75) — so
+// the current reading visibly PIERCES OUT of "typical" and the panel is never the dead
+// gray space it used to be. Renders on EVERY market: price is the always-available spine
+// (Orderly candles), funding layers in from recorded OR public history. Uniform scaling
+// (no preserveAspectRatio distortion) keeps labels crisp; fail-soft to the two-pole gauge
+// only if there is truly no price AND no funding.
+function SynthChart({ points, price, direction, smartMoney, markPrice, fundingAnnualPct, maxEdge, m }: {
+  points: { t: number; f: number }[]; price: { t: number; c: number }[]; direction: string;
+  smartMoney?: SmartMoney | null; markPrice: number; fundingAnnualPct: number; maxEdge: number; m: Market;
+}) {
+  const pc = (price || []).filter((p) => Number.isFinite(p.c) && p.c > 0);
+  const fpts = (points || []).filter((p) => Number.isFinite(p.f) && Number.isFinite(p.t));
+  const hasPrice = pc.length >= 2, hasFunding = fpts.length >= 2;
+  if (!hasPrice && !hasFunding) return <PositionBar m={m} maxEdge={maxEdge} big />;
 
-  // price strip — normalize the close series to its own [min,max] over the window
-  const pr = (price || []).filter((p) => Number.isFinite(p.c) && p.c > 0);
-  const pc = pr.length >= 4 ? pr.map((p) => p.c) : null;
-  let priceLine = "", priceArea = "", priceChangePct: number | null = null, priceUp = false;
-  if (pc) {
-    const lo = Math.min(...pc), hi = Math.max(...pc), span = hi - lo || 1;
-    const py = (c: number) => Hp - pad - ((c - lo) / span) * (Hp - pad * 2);
-    const pts = pc.map((c, i) => [pc.length === 1 ? W : (i / (pc.length - 1)) * W, py(c)] as const);
+  const VB_W = 440, padL = 3, gutterR = 66, plotW = VB_W - padL - gutterR;
+  const priceTop = 13, priceH = 116, priceBot = priceTop + priceH;
+  const dateY = priceBot + 15;
+  const fundTop = priceBot + 32, fundH = 62, fundBot = fundTop + fundH, fundMid = fundTop + fundH / 2;
+  const VB_H = hasFunding ? fundBot + 6 : priceBot + 20;
+
+  // shared time domain across both series (true time alignment, not index)
+  const times: number[] = [];
+  if (hasPrice) times.push(pc[0].t, pc[pc.length - 1].t);
+  if (hasFunding) times.push(fpts[0].t, fpts[fpts.length - 1].t);
+  const t0 = Math.min(...times), t1 = Math.max(...times), tspan = (t1 - t0) || 1;
+  const X = (t: number) => padL + ((t - t0) / tspan) * plotW;
+
+  const gx = VB_W - gutterR + 5, boxW = gutterR - 8;
+
+  // PRICE geometry
+  let priceLine = "", priceArea = "", priceUp = false, changePct: number | null = null, lastPx = markPrice, lastPy = 0, lastPxX = plotW;
+  if (hasPrice) {
+    const cs = pc.map((p) => p.c);
+    const lo = Math.min(...cs), hi = Math.max(...cs), sp = (hi - lo) || 1;
+    const py = (c: number) => priceBot - 8 - ((c - lo) / sp) * (priceH - 16);
+    const pts = pc.map((p) => [X(p.t), py(p.c)] as const);
     priceLine = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-    priceArea = `${priceLine} L${W},${Hp} L0,${Hp} Z`;
-    priceChangePct = Math.round(((pc[pc.length - 1] - pc[0]) / pc[0]) * 1000) / 10;
-    priceUp = priceChangePct >= 0;
+    priceArea = `${priceLine} L${pts[pts.length - 1][0].toFixed(1)},${priceBot} L${pts[0][0].toFixed(1)},${priceBot} Z`;
+    changePct = Math.round(((cs[cs.length - 1] - cs[0]) / cs[0]) * 1000) / 10;
+    priceUp = changePct >= 0;
+    lastPx = pc[pc.length - 1].c; lastPy = py(lastPx); lastPxX = pts[pts.length - 1][0];
   }
 
-  const pole: React.CSSProperties = { fontFamily: MONO, fontSize: 9, letterSpacing: "0.05em" };
+  // FUNDING geometry — adaptive band = the window's own p25–p75
+  let fundLine = "", bandTop = fundMid, bandH = 0, zeroY = fundMid, lastFx = plotW, lastFy = fundMid, pierced = false;
+  if (hasFunding) {
+    const fs = fpts.map((p) => p.f);
+    const srt = [...fs].sort((a, b) => a - b);
+    const q = (p: number) => srt[Math.min(srt.length - 1, Math.max(0, Math.round(p * (srt.length - 1))))];
+    const p25 = q(0.25), p75 = q(0.75);
+    const refF = Math.max(Math.abs(Math.min(...fs)), Math.abs(Math.max(...fs)), 1e-9) * 1.08;
+    const fy = (f: number) => fundMid - Math.max(-1, Math.min(1, f / refF)) * (fundH / 2 - 8);
+    const xy = fpts.map((p) => [X(p.t), fy(p.f)] as const);
+    fundLine = xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+    const b0 = fy(p75), b1 = fy(p25);
+    bandTop = Math.min(b0, b1); bandH = Math.abs(b1 - b0) || 1; zeroY = fy(0);
+    lastFx = xy[xy.length - 1][0]; lastFy = xy[xy.length - 1][1];
+    const lf = fs[fs.length - 1]; pierced = lf > p75 || lf < p25;
+  }
+
+  // date ticks (~4, evenly spaced across the shared window)
+  const NT = 4;
+  const ticks = Array.from({ length: NT }, (_, i) => {
+    const tt = t0 + (tspan * i) / (NT - 1);
+    const anchor: "start" | "middle" | "end" = i === 0 ? "start" : i === NT - 1 ? "end" : "middle";
+    return { x: X(tt), label: new Date(tt).toLocaleDateString(undefined, { month: "short", day: "numeric" }), anchor };
+  });
+
+  const smSide = smartMoney?.side;
+  const MF = "ui-monospace,monospace";
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 5 }}>
-        <span style={{ ...pole, color: direction === "SHORT" ? C.text.bright : C.text.faint }}>▲ FADE SHORT · crowd piled long</span>
-        <span style={{ fontFamily: MONO, fontSize: 9, color: C.text.faint }}>now <b style={{ color: C.text.bright }}>{nowAnnual >= 0 ? "+" : ""}{nowAnnual}%/yr</b></span>
-      </div>
-      <svg viewBox={`0 0 ${W} ${Hf}`} preserveAspectRatio="none" style={{ display: "block", width: "100%", height: 108 }} aria-label="Funding over time between the two fade poles; the dot is now.">
-        {/* stretched zones — the outer ~26% at each pole is 'crowded' territory */}
-        <rect x="0" y="0" width={W} height={Hf * 0.26} fill={C.accent} opacity="0.05" />
-        <rect x="0" y={Hf * 0.74} width={W} height={Hf * 0.26} fill={C.accent} opacity="0.05" />
-        <line x1="0" y1={cy} x2={W} y2={cy} stroke={C.borderStrong} strokeWidth="1" strokeDasharray="3 4" />
-        <text x="4" y={cy - 5} fill={C.text.faint} fontFamily="ui-monospace,monospace" fontSize="8" letterSpacing="1">BALANCED</text>
-        <path d={area} fill={C.accent} opacity="0.09" />
-        <polyline points={line} fill="none" stroke={C.text.bright} strokeWidth="2.2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
-        <circle cx={ex} cy={ey} r="7" fill={C.accent} opacity="0.12" />
-        <circle cx={ex} cy={ey} r="3.2" fill={C.accent} />
-      </svg>
-      <div style={{ ...pole, color: direction === "LONG" ? C.text.bright : C.text.faint, marginTop: 5 }}>▼ FADE LONG · crowd piled short</div>
+      <svg viewBox={`0 0 ${VB_W} ${VB_H}`} style={{ display: "block", width: "100%", height: "auto" }} role="img" aria-label="Price over funding, time-aligned, with the smart-money marker on the live price.">
+        {/* ── PRICE PANEL ── */}
+        {hasPrice && <>
+          <text x={padL} y={priceTop - 3} fill={C.text.faint} fontFamily={MF} fontSize="7.5" letterSpacing="1.4">PRICE</text>
+          {changePct != null && <text x={padL + 34} y={priceTop - 3} fill={priceUp ? C.pos : C.neg} fontFamily={MF} fontSize="7.5">{priceUp ? "+" : ""}{changePct}%</text>}
+          <path d={priceArea} fill={priceUp ? C.pos : C.neg} opacity="0.07" />
+          <polyline points={priceLine} fill="none" stroke={priceUp ? C.pos : C.neg} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" opacity="0.92" />
+          {/* current price value box (Quotient-style right rail) */}
+          <line x1={lastPxX} y1={lastPy} x2={VB_W - gutterR} y2={lastPy} stroke={C.borderStrong} strokeWidth="0.5" strokeDasharray="2 2" />
+          <rect x={VB_W - gutterR} y={lastPy - 8} width={boxW} height={16} rx="2" fill={C.surface} stroke={C.borderStrong} />
+          <text x={gx} y={lastPy + 3.4} fill={C.text.bright} fontFamily={MF} fontSize="9" fontWeight="700">${fmtPrice(lastPx)}</text>
+          {/* SMART-MONEY marker on the live price — positioning, so monochrome accent (not P&L color) */}
+          {smSide && <>
+            <circle cx={lastPxX} cy={lastPy} r="5.6" fill="none" stroke={C.accent} strokeWidth="1.4" />
+            <circle cx={lastPxX} cy={lastPy} r="2.1" fill={C.accent} />
+            <text x={Math.max(padL + 2, lastPxX - 9)} y={lastPy - 9} textAnchor="end" fill={C.accent} fontFamily={MF} fontSize="7.5" fontWeight="700">SMART $ {smSide === "LONG" ? "▲" : "▼"}</text>
+          </>}
+        </>}
 
-      {/* price over the same window — did the crowd's side pay off, or revert? */}
-      {pc && (
-        <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
-            <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.12em", color: C.text.faint }}>PRICE · SAME WINDOW</span>
-            {priceChangePct != null && <span style={{ fontFamily: MONO, fontSize: 9, color: priceUp ? C.pos : C.neg }}>{priceUp ? "+" : ""}{priceChangePct}%</span>}
-          </div>
-          <svg viewBox={`0 0 ${W} ${Hp}`} preserveAspectRatio="none" style={{ display: "block", width: "100%", height: 46 }} aria-label="Price over the same window.">
-            <path d={priceArea} fill={priceUp ? C.pos : C.neg} opacity="0.06" />
-            <polyline points={priceLine} fill="none" stroke={priceUp ? C.pos : C.neg} strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" opacity="0.85" />
-          </svg>
-        </div>
-      )}
+        {/* ── DATE AXIS (shared) ── */}
+        <line x1={padL} y1={dateY - 9} x2={plotW} y2={dateY - 9} stroke={C.border} strokeWidth="0.75" />
+        {ticks.map((tk, i) => (
+          <text key={i} x={Math.max(padL, Math.min(plotW, tk.x))} y={dateY} textAnchor={tk.anchor} fill={C.text.faint} fontFamily={MF} fontSize="7.5">{tk.label}</text>
+        ))}
+
+        {/* ── FUNDING PANEL ── */}
+        {hasFunding && <>
+          <text x={padL} y={fundTop - 4} fill={C.text.faint} fontFamily={MF} fontSize="7.5" letterSpacing="1.4">FUNDING</text>
+          <text x={padL + 48} y={fundTop - 4} fill={direction === "SHORT" ? C.text.muted : C.text.faint} fontFamily={MF} fontSize="7">▲ fade short · crowd long</text>
+          {/* adaptive TYPICAL band (p25–p75) — the current reading pierces out of it */}
+          <rect x={padL} y={bandTop} width={plotW} height={bandH} fill={C.text.bright} opacity="0.05" />
+          <text x={plotW - 2} y={bandTop - 2} textAnchor="end" fill={C.text.faint} fontFamily={MF} fontSize="6.5" letterSpacing="0.5">TYPICAL</text>
+          <line x1={padL} y1={zeroY} x2={plotW} y2={zeroY} stroke={C.borderStrong} strokeWidth="0.75" strokeDasharray="3 4" />
+          <text x={padL + 2} y={zeroY - 3} fill={C.text.faint} fontFamily={MF} fontSize="6.5" letterSpacing="0.5">BALANCED</text>
+          <polyline points={fundLine} fill="none" stroke={C.text.bright} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
+          <circle cx={lastFx} cy={lastFy} r="5.6" fill={C.accent} opacity="0.14" />
+          <circle cx={lastFx} cy={lastFy} r="2.6" fill={C.accent} />
+          {/* current funding value box — highlighted when pierced (stretched) */}
+          <line x1={lastFx} y1={lastFy} x2={VB_W - gutterR} y2={lastFy} stroke={pierced ? C.accent : C.borderStrong} strokeWidth="0.5" strokeDasharray="2 2" />
+          <rect x={VB_W - gutterR} y={lastFy - 8} width={boxW} height={16} rx="2" fill={C.surface} stroke={pierced ? C.accent : C.borderStrong} />
+          <text x={gx} y={lastFy + 3.4} fill={pierced ? C.accent : C.text.bright} fontFamily={MF} fontSize="8.5" fontWeight="700">{fundingAnnualPct >= 0 ? "+" : ""}{fundingAnnualPct}%</text>
+          <text x={padL + 48} y={fundBot - 1} fill={direction === "LONG" ? C.text.muted : C.text.faint} fontFamily={MF} fontSize="7">▼ fade long · crowd short</text>
+        </>}
+      </svg>
       {/* the read the chart is making, one line */}
       <div style={{ fontFamily: MONO, fontSize: 8.5, color: C.text.faint, marginTop: 8, lineHeight: 1.5 }}>
-        {crowdLong ? "Line pushed UP = crowd piled long. Watch whether price gave it back below." : "Line pushed DOWN = crowd piled short. Watch whether price gave it back above."}
+        {hasFunding
+          ? (pierced ? "Funding has pierced its typical range — the crowd is stretched. Watch whether price gives it back." : "Funding is within its typical range — no crowd extreme to fade right now.")
+          : "Price over the window. Funding history is still accumulating for this market."}
       </div>
     </div>
   );
+}
+
+// The fused verdict — funding (crowd) vs smart money (real capital), stated plainly and
+// EXPLAINABLY (never a black-box score). Aligned = the sharp money is fading with you;
+// divergence = it's riding with the crowd, so the fade isn't clean.
+function synthVerdict(m: Market): { tone: "aligned" | "conflict"; text: string } | null {
+  const sm = m.smartMoney;
+  if (m.direction === "NONE" || !sm || !sm.side) return null;
+  if (sm.side === m.direction)
+    return { tone: "aligned", text: `The crowd is offside and the sharp money is already positioned ${sm.side.toLowerCase()} — the smart money is fading it with you. Higher-conviction fade.` };
+  return { tone: "conflict", text: `The crowd is offside, but the sharp money is riding ${sm.side.toLowerCase()} WITH them. Not a clean fade — the real money is on the crowd's side here.` };
 }
 
 // The reversion proof stat (tier 2), phrased plainly — and HONESTLY when the fade
@@ -210,6 +278,67 @@ function Callers({ m, lean }: { m: Market; lean?: Lean }) {
   );
 }
 
+// Compact board-card synthesis hint: does the sharp money side WITH the fade or against?
+// The one-glance version of THE READ, so the scan itself surfaces the synthesis.
+function SmartMoneyChip({ m }: { m: Market }) {
+  const sm = m.smartMoney;
+  if (!sm?.side || m.direction === "NONE") return null;
+  const aligned = sm.side === m.direction;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.03em", color: aligned ? C.accent : C.warn }}>
+      {aligned ? "◆ Smart money is fading with you" : "⚡ Smart money is riding with the crowd"}
+      <span style={{ color: C.text.faint, fontWeight: 400 }}>· {sm.count} {sm.side}</span>
+    </div>
+  );
+}
+
+// One row of THE READ — a lens (crowd / smart $ / callers), its value, and whether it
+// sides WITH the fade or AGAINST it. Kept monochrome+amber per the design law (the tag
+// is emphasis/caution, not P&L).
+function LensRow({ label, value, tag, tagTone, first }: { label: string; value: React.ReactNode; tag?: string; tagTone?: string; first?: boolean }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: first ? "none" : `1px solid ${C.border}`, fontFamily: MONO, fontSize: 11 }}>
+      <span style={{ width: 58, flexShrink: 0, color: C.text.faint, fontSize: 8.5, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
+      <span style={{ color: C.text.bright, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</span>
+      {tag && <span style={{ marginLeft: "auto", flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", color: tagTone || C.text.muted }}>{tag}</span>}
+    </div>
+  );
+}
+
+// THE READ — the complete synthesis, three independent lenses answering one question:
+// CROWD (funding, fade it) · SMART $ (sharp capital, ride it) · CALLERS (graded second
+// opinion). Each shows which side it takes vs the fade; the verdict fuses crowd + smart
+// money. Explainable end to end — the inputs stay visible, the verdict just reads them.
+function SynthesisRead({ m, lean }: { m: Market; lean?: Lean }) {
+  if (m.direction === "NONE") return null;
+  const fadeDir = m.direction; // the fade side (opposite the crowd)
+  const crowdSide = fadeDir === "SHORT" ? "long" : "short";
+  const sm = m.smartMoney;
+  const v = synthVerdict(m);
+  const withTag = "✓ WITH THE FADE", againstTag = "⚡ AGAINST";
+  const callerSides = lean && lean.side !== "SPLIT";
+  return (
+    <div style={{ marginTop: 14, border: `1px solid ${C.border}`, borderRadius: RADIUS.md, padding: "9px 13px 11px", background: C.surfaceAlt }}>
+      <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: C.text.muted, marginBottom: 1 }}>◆ The read · three lenses</div>
+      <LensRow first label="Crowd" value={<>{m.fundingAnnualPct >= 0 ? "+" : ""}{m.fundingAnnualPct}%/yr · paying to be {crowdSide}</>} tag={`FADE ${fadeDir}`} tagTone={C.text.bright} />
+      <LensRow label="Smart $"
+        value={sm?.side ? `${sm.count} sharp${sm.count === 1 ? "" : "s"} ${sm.side}${sm.long != null && sm.short != null ? ` · ${sm.long}L/${sm.short}S` : ""}` : "no read yet"}
+        tag={sm?.side ? (sm.side === fadeDir ? withTag : againstTag) : undefined}
+        tagTone={sm?.side ? (sm.side === fadeDir ? C.accent : C.warn) : undefined} />
+      <LensRow label="Callers"
+        value={callerSides ? `betting ${lean!.side} · ${lean!.participants}` : lean ? `split · ${lean.participants}` : "no one's called it"}
+        tag={callerSides ? (lean!.side === fadeDir ? withTag : againstTag) : undefined}
+        tagTone={callerSides ? (lean!.side === fadeDir ? C.accent : C.warn) : undefined} />
+      {v && (
+        <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, alignItems: "flex-start" }}>
+          <span style={{ flexShrink: 0, fontFamily: MONO, fontSize: 12, lineHeight: 1.2, color: v.tone === "aligned" ? C.accent : C.warn }}>{v.tone === "aligned" ? "◆" : "⚠"}</span>
+          <span style={{ fontFamily: UI, fontSize: 12.5, lineHeight: 1.5, color: v.tone === "aligned" ? C.text.bright : C.text.fog }}>{v.text}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function MispricedBoard() {
   const isMobile = useIsMobile();
   const [board, setBoard] = useState<BoardResp | null>(null);
@@ -219,9 +348,10 @@ export function MispricedBoard() {
   const [pos, setPos] = useState<PosResp | null>(null);
   const [price, setPrice] = useState<{ t: number; c: number }[] | null>(null);
 
-  // Tier 2: on opening a market, pull its funding history (story-line) + reversion stat,
-  // AND the price over the same window so the chart shows the fade thesis (funding piled
-  // in — did price revert?). Fail-soft; no history falls back to the static gauge.
+  // On opening a market, pull its funding history (story-line) + reversion stat, AND the
+  // price over the same window — so the SynthChart shows the fade thesis on EVERY market.
+  // Price is the always-available spine (fetched even when funding history is sparse, over
+  // the funding window if present else the trailing 30d). Fail-soft throughout.
   useEffect(() => {
     if (!openCoin) { setPos(null); setPrice(null); return; }
     let live = true; setPos(null); setPrice(null);
@@ -229,14 +359,14 @@ export function MispricedBoard() {
       .then(async (d: PosResp) => {
         if (!live) return;
         setPos(d);
-        if (d?.points && d.points.length >= 8) {
-          const toSec = (t: number) => (t > 1e12 ? Math.floor(t / 1000) : Math.floor(t));
-          const from = toSec(d.points[0].t), to = toSec(d.points[d.points.length - 1].t);
-          const pr = await fetch(`https://api-evm.orderly.org/tv/history?symbol=PERP_${openCoin}_USDC&resolution=60&from=${from}&to=${to}`)
-            .then((r) => r.json()).catch(() => null);
-          if (live && pr && pr.s === "ok" && Array.isArray(pr.t) && Array.isArray(pr.c)) {
-            setPrice(pr.t.map((t: number, i: number) => ({ t: t * 1000, c: Number(pr.c[i]) })).filter((p: { c: number }) => p.c > 0));
-          }
+        const toSec = (t: number) => (t > 1e12 ? Math.floor(t / 1000) : Math.floor(t));
+        let from: number, to: number;
+        if (d?.points && d.points.length >= 2) { from = toSec(d.points[0].t); to = toSec(d.points[d.points.length - 1].t); }
+        else { to = Math.floor(Date.now() / 1000); from = to - 30 * 86400; }
+        const pr = await fetch(`https://api-evm.orderly.org/tv/history?symbol=PERP_${openCoin}_USDC&resolution=60&from=${from}&to=${to}`)
+          .then((r) => r.json()).catch(() => null);
+        if (live && pr && pr.s === "ok" && Array.isArray(pr.t) && Array.isArray(pr.c)) {
+          setPrice(pr.t.map((t: number, i: number) => ({ t: t * 1000, c: Number(pr.c[i]) })).filter((p: { c: number }) => p.c > 0));
         }
       })
       .catch(() => { if (live) setPos({ coin: openCoin, points: [], reversion: null }); });
@@ -326,9 +456,8 @@ export function MispricedBoard() {
                   {m.fundingAnnualPct >= 0 ? "+" : ""}{m.fundingAnnualPct}%<span title="Annualized — what the funding rate adds up to over a year if today's rate held. 'yr' = per year." style={{ fontSize: 11, color: C.text.faint, marginLeft: 3 }}>/yr</span>
                 </span>
               </div>
-              {pos && pos.points.length >= 8
-                ? <FundingStory points={pos.points} price={price ?? undefined} direction={m.direction} />
-                : <PositionBar m={m} maxEdge={maxEdge} big />}
+              <SynthChart points={pos?.points ?? []} price={price ?? []} direction={m.direction}
+                smartMoney={m.smartMoney} markPrice={m.markPrice} fundingAnnualPct={m.fundingAnnualPct} maxEdge={maxEdge} m={m} />
             </div>
 
             <p style={{ fontFamily: UI, fontSize: 13, lineHeight: 1.55, color: C.text.fog, marginTop: 14, padding: "11px 12px", background: "rgba(237,237,240,0.03)", border: `1px solid ${C.border}`, borderRadius: RADIUS.md }}>
@@ -343,13 +472,18 @@ export function MispricedBoard() {
               </p>
             )}
 
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, fontFamily: MONO, fontSize: 10 }}>
-              <span style={{ color: C.text.faint, textTransform: "uppercase", letterSpacing: "0.12em", fontSize: 8.5 }}>Second opinion</span>
-              <Callers m={m} lean={l} />
-            </div>
+            {/* THE READ — three-lens synthesis (crowd · smart $ · callers) + the fused verdict */}
+            {m.direction !== "NONE"
+              ? <SynthesisRead m={m} lean={l} />
+              : (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, fontFamily: MONO, fontSize: 10 }}>
+                  <span style={{ color: C.text.faint, textTransform: "uppercase", letterSpacing: "0.12em", fontSize: 8.5 }}>Second opinion</span>
+                  <Callers m={m} lean={l} />
+                </div>
+              )}
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
-              <span style={{ fontFamily: MONO, fontSize: 9.5, color: C.text.faint }}>Live read · funding + open interest</span>
+              <span style={{ fontFamily: MONO, fontSize: 9.5, color: C.text.faint }}>Live read · funding + smart money</span>
               <button onClick={() => draftFade(m)} className="nx-card-interactive" style={{
                 marginLeft: "auto", fontFamily: MONO, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em",
                 color: C.accent, background: "none", border: `1px solid ${C.borderStrong}`, borderRadius: RADIUS.md, padding: "9px 15px", cursor: "pointer",
@@ -445,6 +579,7 @@ export function MispricedBoard() {
                         </div>
                       </div>
                       <EdgeQualityChip q={m.edgeQuality} />
+                      <SmartMoneyChip m={m} />
                       <div style={{ margin: "11px 0 2px" }}><PositionBar m={m} maxEdge={maxEdge} /></div>
                       <p style={{ fontFamily: UI, fontSize: 12.5, lineHeight: 1.5, color: C.text.fog, marginTop: 10, marginBottom: 0, padding: "8px 10px", background: "rgba(237,237,240,0.03)", border: `1px solid ${C.border}`, borderRadius: RADIUS.md }}>
                         {plainRead(m)}

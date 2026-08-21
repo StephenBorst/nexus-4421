@@ -2043,6 +2043,21 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         flagged.sort((a, b) => (EDGE_QUALITY_RANK[a.edgeQuality.tier] - EDGE_QUALITY_RANK[b.edgeQuality.tier]) || (b.edge - a.edge));
         board.markets = [...flagged, ...board.markets.filter((m) => m.status !== "MISPRICED")];
 
+        // Smart-money lens: attach each market's sharp-capital consensus (which side the
+        // graded top Orderly traders actually sit, + the long/short split) from the KV the
+        // /smart/board build maintains. This is the SYNTHESIS input — funding = the crowd
+        // (fade it), smartMoney = the real money (ride with it); when they disagree, that
+        // tension is the read. One cheap KV get; fail-soft null so the row simply hides when
+        // we have no read. Rides the board's 180s cache.
+        try {
+          const smRaw = await (env.NEXUS_AGENT || env.LAB_STORE).get("sm:consensus");
+          const sm = smRaw ? JSON.parse(smRaw) : {};
+          for (const m of board.markets) {
+            const s = sm[m.coin];
+            if (s && s.side) m.smartMoney = { side: s.side, count: s.count || 0, long: s.long ?? null, short: s.short ?? null };
+          }
+        } catch { /* no smart-money read → markets carry no smartMoney (row hides) */ }
+
         const payload = {
           asOf: new Date().toISOString(), asOfMs: Date.now(), ...board,
           criteria: { note: "Funding annualized (per-8h × 1095) = the crowd's mispricing. Positive funding ⇒ book lopsided LONG ⇒ fade edge is SHORT (and vice-versa). |edge| ≥ 12%/yr on ≥ $50k OI ⇒ MISPRICED · WATCHING. Flagged markets carry an edgeQuality from whether fading them has HISTORICALLY reverted (PROVEN ≥55% / TRAP ≤42% / MIXED / UNPROVEN=no recorded history); ranked proven-first, traps last. Not advice — a mean-reversion lens that says when the fade has paid and when it hasn't." },
@@ -2070,12 +2085,41 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       let hist = [];
       try { const raw = await AGENT_KV.get(`oi:hist:${symbol}`); hist = raw ? JSON.parse(raw) : []; } catch { /* absent → empty */ }
       // story-line: last ~180 hourly points, minimal payload ({t, f}).
-      const points = hist.slice(-180)
+      let points = hist.slice(-180)
         .map((p) => ({ t: p.t, f: Number(p.funding) }))
         .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.f));
+      let reversion = fundingReversion(hist);
+      let source = "recorded";
+
+      // Universal fallback so the premium chart renders on EVERY market, not just the
+      // core symbols we record oi:hist for. Orderly exposes PUBLIC funding-rate history
+      // (all markets) even though it has no OI history — build the funding story-line
+      // from it, and rebuild the reversion proof by merging that funding with public 1h
+      // candles (same method as the mispriced board's enrichment). Best-effort: any
+      // failure just leaves the recorded (possibly empty) series untouched.
+      if (points.length < 12) {
+        try {
+          const nowS = Math.floor(Date.now() / 1000), fromS = nowS - 45 * 86400;
+          const [fh, ph] = await Promise.all([
+            fetch(`https://api-evm.orderly.org/v1/public/funding_rate_history?symbol=${symbol}&page=1&size=100`, { headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" } }).then((r) => r.json()),
+            fetch(`https://api-evm.orderly.org/tv/history?symbol=${symbol}&resolution=60&from=${fromS}&to=${nowS}`).then((r) => r.json()),
+          ]);
+          const rows = fh?.data?.rows || [];
+          const fpts = rows
+            .map((r) => ({ t: Number(r.funding_rate_timestamp), f: Number(r.funding_rate) }))
+            .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.f))
+            .sort((a, b) => a.t - b.t);
+          if (fpts.length >= 8) {
+            points = fpts.slice(-180);
+            source = "orderly-public";
+            const rev = fundingReversion(mergeFundingPrice(rows, (ph && ph.s === "ok" && Array.isArray(ph.t)) ? { t: ph.t, c: ph.c } : null));
+            if (rev) reversion = rev;
+          }
+        } catch { /* keep recorded (possibly empty) series */ }
+      }
       return new Response(JSON.stringify({
-        coin, symbol, points, reversion: fundingReversion(hist),
-        note: "Funding recorded hourly by Nexus (Orderly has no funding/OI history endpoint). Reversion = how price moved AGAINST the crowd over the next ~3 days the last times funding was this extreme.",
+        coin, symbol, points, reversion, source,
+        note: "Funding story-line from recorded hourly history (core symbols) or Orderly public funding-rate history (all markets). Reversion = how price moved AGAINST the crowd over the next ~3 days the last times funding was this extreme.",
       }), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300", ...cors(request) } });
     }
 

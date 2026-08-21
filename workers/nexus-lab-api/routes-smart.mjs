@@ -291,7 +291,7 @@ async function storeConsensus(env, traders) {
     for (const coin in byCoin) {
       const l = byCoin[coin].long.size, s = byCoin[coin].short.size;
       const count = Math.max(l, s);
-      if (count >= 2) out[coin] = { side: l >= s ? "LONG" : "SHORT", count };
+      if (count >= 2) out[coin] = { side: l >= s ? "LONG" : "SHORT", count, long: l, short: s };
     }
     await env.NEXUS_AGENT.put("sm:consensus", JSON.stringify(out), { expirationTtl: 3600 });
   } catch { /* non-fatal */ }
