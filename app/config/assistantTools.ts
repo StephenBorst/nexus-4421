@@ -792,12 +792,23 @@ TOOLS.push(
   {
     name: "open_mispriced",
     description:
-      "Open the MISPRICED BOARD in the Lab — the funding-edge lens, markets ranked by how stretched positioning is, with the sharp-callers' merit-weighted lean beside each. Use when the user wants to browse what's mispriced / where funding is extreme. Read-only view; places no order.",
+      "Open the MISPRICED / funding-edge board — markets ranked by how stretched positioning is, with the sharp-callers' merit-weighted lean beside each (it now lives in the SMART MONEY tab: fade the crowd + follow the sharp, one place). Use when the user wants to browse what's mispriced / where funding is extreme. Read-only; places no order.",
     input_schema: { type: "object", properties: {} },
     run: async (_args, ctx) => {
-      ctx.navigate?.(`/lab?tab=mispriced`);
-      try { window.dispatchEvent(new CustomEvent("nexus:lab-tab", { detail: { tab: "mispriced" } })); } catch { /* deep-link handles it */ }
-      return JSON.stringify({ navigated: "/lab?tab=mispriced", note: "Opened the Mispriced Board. Each row can be drafted into a thesis." });
+      ctx.navigate?.(`/lab?tab=smart`);
+      try { window.dispatchEvent(new CustomEvent("nexus:lab-tab", { detail: { tab: "smart" } })); } catch { /* deep-link handles it */ }
+      return JSON.stringify({ navigated: "/lab?tab=smart", note: "Opened Smart Money — smart-wallet follow up top, the funding-edge fade board below. Rows can be drafted into a thesis." });
+    },
+  },
+  {
+    name: "open_macro",
+    description:
+      "Open the MACRO & EVENTS tab in the Lab — the prediction-market / event lens (Fed decisions, geopolitics, policy from Polymarket with a risk-on/risk-off read), the forecast-divergence board, and the trustless MACRO CALLERS leaderboard. Use when the user wants to browse macro events, what could move crypto, or who's proven on macro. Read-only; places no order.",
+    input_schema: { type: "object", properties: {} },
+    run: async (_args, ctx) => {
+      ctx.navigate?.(`/lab?tab=macro`);
+      try { window.dispatchEvent(new CustomEvent("nexus:lab-tab", { detail: { tab: "macro" } })); } catch { /* deep-link handles it */ }
+      return JSON.stringify({ navigated: "/lab?tab=macro", note: "Opened Macro & Events. An event with a risk lens can be drafted into a graded thesis." });
     },
   },
   {

@@ -20,6 +20,7 @@ import { MarketIntelView } from "./MarketIntel";
 import { MarketTape } from "./MarketTape";
 import { SmartMoneyView } from "./SmartMoneyView";
 import { MispricedBoard } from "./MispricedBoard";
+import { MacroView } from "./MacroView";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
 import { LabStanding } from "./LabStanding";
 import { CommandPalette } from "./CommandPalette";
@@ -27,12 +28,17 @@ import { NexusBriefing } from "./NexusBriefing";
 import { DecisionBoard } from "./DecisionBoard";
 import { CountUp } from "./components";
 
+// Legacy alias: the old MISPRICED/GAPS tab was folded into SMART MONEY (Phase 1 re-slice),
+// so any ?tab=mispriced deep-link, shared OG link, or copilot nav resolves to smart.
+const normTab = (t: string | null | undefined): TabId | null =>
+  !t ? null : (t === "mispriced" || t === "gaps") ? "smart" : (t as TabId);
+
 export default function TheLabPage() {
   const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<TabId>(() => (searchParams.get("tab") as TabId) || "intel");
+  const [activeTab, setActiveTab] = useState<TabId>(() => normTab(searchParams.get("tab")) || "intel");
   // Honor ?tab= deep-links (e.g. the AI assistant's draft_thesis → /lab?tab=thesis).
   useEffect(() => {
-    const t = searchParams.get("tab") as TabId | null;
+    const t = normTab(searchParams.get("tab"));
     if (t) setActiveTab(t);
   }, [searchParams]);
   // Programmatic tab switches (deployToAgent / deployDirectiveFromThesis) fire this
@@ -40,7 +46,7 @@ export default function TheLabPage() {
   // state, not the URL) — a plain navigate would no-op in that case.
   useEffect(() => {
     const onTab = (e: Event) => {
-      const t = (e as CustomEvent).detail?.tab as TabId | undefined;
+      const t = normTab((e as CustomEvent).detail?.tab);
       if (t) setActiveTab(t);
     };
     window.addEventListener("nexus:lab-tab", onTab);
@@ -128,8 +134,8 @@ export default function TheLabPage() {
   // and pretending otherwise would be the same dishonesty in the other direction.)
   const tabs: { id: TabId; label: string; short: string; phase: string }[] = [
     { id: "intel",          label: "[ MARKET INTEL ]",       short: "INTEL", phase: "OBSERVE" },
-    { id: "mispriced",      label: "[ MISPRICED ]",          short: "GAPS",  phase: "OBSERVE" },
     { id: "smart",          label: "[ SMART MONEY ]",        short: "SMART", phase: "OBSERVE" },
+    { id: "macro",          label: "[ MACRO ]",              short: "MACRO", phase: "OBSERVE" },
     { id: "thesis",         label: "[ NEXUS THESIS ENGINE ]", short: "LAB",  phase: "PLAN"    },
     { id: "agent",          label: "[ TRADING AGENT ]",      short: "AGENT", phase: "EXECUTE" },
     { id: "quicktrade",     label: "[ QUICK TRADE ]",        short: "TRADE", phase: "EXECUTE" },
@@ -305,8 +311,18 @@ export default function TheLabPage() {
             ? <>{briefing}{board}<MarketIntelView /></>
             : <><LabWelcome />{briefing}{board}</>;
         })()}
-        {activeTab === "mispriced" && <MispricedBoard />}
-        {activeTab === "smart" && <SmartMoneyView myPositions={openPositions} />}
+        {activeTab === "smart" && (
+          <>
+            <SmartMoneyView myPositions={openPositions} />
+            {/* Fade-the-crowd funding board, folded in from the old MISPRICED tab (Phase 1
+                re-slice): Smart Money = follow the sharp; the funding board = fade the crowd.
+                Two sides of positioning, one tab. */}
+            <div style={{ marginTop: 32, paddingTop: 4, borderTop: "1px solid #232327" }}>
+              <MispricedBoard />
+            </div>
+          </>
+        )}
+        {activeTab === "macro" && <MacroView />}
         {activeTab === "agent" && <AgentView />}
         {activeTab === "holders" && <HoldersRoom walletAddress={rootWalletAddress} />}
         {activeTab === "quicktrade" && <QuickTrade />}

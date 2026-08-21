@@ -372,11 +372,11 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
           the two funding surfaces read as one system, not two overlapping tabs. */}
       {signals && signals.length > 0 && onSelectTab && (
         <button
-          onClick={() => onSelectTab("mispriced")}
+          onClick={() => onSelectTab("smart")}
           style={{ marginTop: 14, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left",
             fontFamily: UI, fontSize: 11, lineHeight: 1.5, color: C.text.muted }}
         >
-          Want the deep read? Which of these fades are <b style={{ color: C.text.bright }}>PROVEN vs a TRAP</b> — see the reversion proof in <span style={{ fontFamily: MONO, color: C.accent }}>[ GAPS ] →</span>
+          Want the deep read? Which of these fades are <b style={{ color: C.text.bright }}>PROVEN vs a TRAP</b> — see the reversion proof in <span style={{ fontFamily: MONO, color: C.accent }}>[ SMART MONEY ] →</span>
         </button>
       )}
     </div>
