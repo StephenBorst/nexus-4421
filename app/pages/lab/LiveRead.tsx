@@ -21,11 +21,33 @@ const bare = (s: string) => String(s || "").toUpperCase().replace(/^PERP_/, "").
 const dirColor = (d: string | null) => (d === "LONG" ? POS : d === "SHORT" ? NEG : MUTED);
 
 type Fused = { coin: string; verdict: "CONFLUENCE" | "SPLIT" | "CROWD" | "SMART"; crowdFade: "LONG" | "SHORT" | null; smartSide: "LONG" | "SHORT" | null; fundingAnnualPct: number | null; smartTraders: number };
+type Regime = { trend?: string; vol?: string; atrPct?: number };
+type Warning = { text: string; severity?: string; kind?: string };
+type Advice = { regime: Regime | null; alignment: string | null; warnings: Warning[]; plan: { flags?: string[] } | null; yourRecord: { trend?: { avgR: number; calls: number } | null; vol?: { avgR: number; calls: number } | null } | null } | null;
+type Levels = { entryPrice: number; stopLoss: number; takeProfit1: number };
 
-export function LiveRead({ symbol, direction, trades }: { symbol: string; direction: "LONG" | "SHORT"; trades?: ProcessedTrade[] }) {
+const TREND_WORD: Record<string, string> = { TREND_UP: "uptrend", TREND_DOWN: "downtrend", CHOP: "chop" };
+const VOL_WORD: Record<string, string> = { CALM: "calm", NORMAL: "normal vol", VOLATILE: "volatile" };
+
+export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol: string; direction: "LONG" | "SHORT"; trades?: ProcessedTrade[]; levels?: Levels; wallet?: string | null }) {
   const coin = bare(symbol);
   const [fused, setFused] = useState<Fused | null | undefined>(undefined); // undefined=loading, null=no read
   const [callers, setCallers] = useState<{ side: "LONG" | "SHORT"; participants: number } | null>(null);
+  const [advice, setAdvice] = useState<Advice>(null);
+
+  // Once the LEVELS are set, run the SAME grading the call will get later (/theses/advice):
+  // the market regime, any plan defects (late entry, stop in noise, R:R mismatch…), and your
+  // record IN that regime. The warnings match how it will actually be judged.
+  const lv = levels && levels.entryPrice > 0 && levels.stopLoss > 0 && levels.takeProfit1 > 0 ? levels : null;
+  useEffect(() => {
+    if (!coin || !lv) { setAdvice(null); return; }
+    let off = false;
+    fetch(`${AGENT_API}/theses/advice`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ wallet: wallet || undefined, symbol: coin, direction, entryPrice: lv.entryPrice, stopLoss: lv.stopLoss, takeProfit1: lv.takeProfit1 }),
+    }).then((r) => r.json()).then((d) => { if (!off) setAdvice(d && !d.error ? d : null); }).catch(() => { if (!off) setAdvice(null); });
+    return () => { off = true; };
+  }, [coin, direction, lv?.entryPrice, lv?.stopLoss, lv?.takeProfit1, wallet]);
 
   useEffect(() => {
     if (!coin) { setFused(undefined); setCallers(null); return; }
@@ -68,7 +90,7 @@ export function LiveRead({ symbol, direction, trades }: { symbol: string; direct
   const against = boardLean != null && direction !== boardLean;
 
   const loading = fused === undefined;
-  const nothing = fused === null && !callers && !record;
+  const nothing = fused === null && !callers && !record && !advice;
 
   // one honest synthesis line, reacting to what the user is drafting
   const synth = (() => {
@@ -117,6 +139,31 @@ export function LiveRead({ symbol, direction, trades }: { symbol: string; direct
             {record && chip(`Your ${coin}`, <span style={{ color: record.net >= 0 ? POS : NEG }}>{record.net >= 0 ? "+" : "-"}${Math.abs(record.net)}<span style={{ color: FAINT, fontWeight: 400 }}> · {record.n}t · {record.wr}%</span></span>)}
           </div>
           {synth && <div style={{ fontFamily: UI, fontSize: 12.5, color: tone === POS ? "#8fdcb8" : tone, lineHeight: 1.55 }}>{synth}</div>}
+
+          {/* GRADING PREVIEW — once levels are set, the SAME grading the call will get:
+              regime it's posted into, your record there, and any plan defect. */}
+          {advice && (advice.regime || (advice.warnings && advice.warnings.length > 0)) && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${BORDER}` }}>
+              <div style={{ fontFamily: MONO, fontSize: 8, letterSpacing: "0.12em", color: MUTED, marginBottom: 6 }}>GRADING PREVIEW · how this call will be judged</div>
+              {advice.regime && (
+                <div style={{ fontFamily: UI, fontSize: 12, color: FOG, lineHeight: 1.5 }}>
+                  {coin} is in a {TREND_WORD[advice.regime.trend || ""] || (advice.regime.trend || "").toLowerCase()} · {VOL_WORD[advice.regime.vol || ""] || (advice.regime.vol || "").toLowerCase()} tape
+                  {advice.alignment === "AGAINST_TREND" ? <span style={{ color: WARN }}> — you're fighting the trend</span> : advice.alignment === "WITH_TREND" ? <span style={{ color: POS }}> — with the trend</span> : null}
+                  {advice.yourRecord?.trend && advice.regime.trend ? <span style={{ color: FAINT }}> · your {TREND_WORD[advice.regime.trend] || ""} record {advice.yourRecord.trend.avgR >= 0 ? "+" : ""}{advice.yourRecord.trend.avgR}R/{advice.yourRecord.trend.calls}</span> : null}
+                </div>
+              )}
+              {advice.warnings && advice.warnings.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 7 }}>
+                  {advice.warnings.slice(0, 3).map((w, i) => (
+                    <div key={i} style={{ fontFamily: UI, fontSize: 11.5, color: w.severity === "high" ? NEG : WARN, lineHeight: 1.45, display: "flex", gap: 6 }}><span>⚠</span><span>{w.text}</span></div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontFamily: MONO, fontSize: 10.5, color: POS, marginTop: 7 }}>✓ plan reads clean — grades on first touch of target vs stop.</div>
+              )}
+            </div>
+          )}
+
           <div style={{ fontFamily: MONO, fontSize: 8, color: FAINT, marginTop: 8, lineHeight: 1.5 }}>A read, not a green light — it tightens the odds, it doesn't guarantee them.</div>
         </>
       )}

@@ -803,7 +803,6 @@ export function ThesisAnalyticsView() {
 
 // ─── Thesis View ──────────────────────────────────────────
 export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: ProcessedTrade[]; wallet?: string | null } = {}) {
-  void wallet; // reserved for future per-wallet reads; LiveRead uses realizedTrades today
   const isMobile = useIsMobile();
   const { state: accountState } = useAccount();
   const walletAddress = (accountState as { address?: string })?.address ?? null;
@@ -1389,7 +1388,8 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
                     drafting. Intelligence AT the decision, not scattered across tabs. */}
                 {form.symbol && symbolListed && (
                   <div style={{ marginTop: 12 }}>
-                    <LiveRead symbol={form.symbol} direction={form.direction} trades={realizedTrades} />
+                    <LiveRead symbol={form.symbol} direction={form.direction} trades={realizedTrades}
+                      levels={built ? { entryPrice: entryN, stopLoss: stopN, takeProfit1: tpN } : undefined} wallet={wallet} />
                   </div>
                 )}
 
