@@ -282,7 +282,7 @@ export default function TheLabPage() {
         )}
         {activeTab === "thesis" && (
           <>
-            <ThesisView />
+            <ThesisView realizedTrades={connected ? processedTrades : undefined} wallet={rootWalletAddress} />
             <ThesisAnalyticsView />
           </>
         )}
