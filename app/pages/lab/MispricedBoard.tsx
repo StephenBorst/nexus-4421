@@ -23,6 +23,7 @@ import { AGENT_API } from "./agentTypes";
 import { useIsMobile } from "./useIsMobile";
 import { SectionHeader } from "./components";
 import { ForecastDivergence } from "./ForecastDivergence";
+import { MacroEvents } from "./MacroEvents";
 
 type EdgeQuality = { tier: "PROVEN" | "TRAP" | "MIXED" | "UNPROVEN"; revertedPct: number | null; samples: number };
 type Market = {
@@ -451,6 +452,13 @@ export function MispricedBoard() {
           the Intel tab. */}
       <div style={{ marginTop: 28, paddingTop: 4, borderTop: `1px solid ${C.border}` }}>
         <ForecastDivergence />
+      </div>
+
+      {/* Macro & Events — the event-trader corner (Fed/geopolitics/policy), a directional
+          risk lens on the biggest Polymarket macro markets → a graded thesis. The execution
+          seam a macro-intelligence partner plugs into. */}
+      <div style={{ marginTop: 28, paddingTop: 4, borderTop: `1px solid ${C.border}` }}>
+        <MacroEvents />
       </div>
     </div>
   );

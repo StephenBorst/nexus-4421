@@ -621,6 +621,25 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "get_macro_events",
+    description:
+      "Get the MACRO / EVENTS board — the most liquid Polymarket MACRO & geopolitical markets (Fed rate decisions, recession, wars/invasions, ceasefires, elections, crypto policy), each with the crowd's probability and — where the macro relationship is textbook — a directional RISK LENS (rate cut → risk-on, war → risk-off, ceasefire → risk-on). Use for 'what macro events matter right now', 'what's the geopolitical risk', 'what could move crypto this week', 'is the Fed going to cut', or to turn a macro/event view into a tradeable crypto thesis. The `actionable` events (a lens + a live probability) are the real reads; the rest are context. This is NOT a fair-value oracle and NOT advice — the probability + lens are a starting point to stake a GRADED thesis and execute it on Nexus. Offer to draft_thesis expressing the macro view on a crypto perp (e.g. a risk-off event → a short, risk-on → a long) — but the trader picks the expression; never claim the crypto mapping as fact.",
+    input_schema: { type: "object", properties: {} },
+    run: async () => {
+      const res = await fetch(`${AGENT_API}/intel/events`);
+      if (!res.ok) return JSON.stringify({ error: `macro events failed (${res.status})` });
+      const d = await res.json();
+      type E = { question: string; category: string; riskLens: string | null; actionable: boolean; yesProbPct: number; volumeUsd: number; endDate: string | null };
+      const events = (d?.events ?? []) as E[];
+      return JSON.stringify({
+        actionable_count: d?.actionableCount ?? 0,
+        actionable: events.filter((e) => e.actionable).slice(0, 12).map((e) => ({ q: e.question, category: e.category, risk_lens: e.riskLens, crowd_yes_pct: e.yesProbPct, volume_usd: e.volumeUsd, ends: e.endDate })),
+        context: events.filter((e) => !e.actionable).slice(0, 6).map((e) => ({ q: e.question, category: e.category, crowd_yes_pct: e.yesProbPct })),
+        note: "risk_lens is a TEXTBOOK directional read (risk-on = crypto-supportive, risk-off = crypto-headwind), not a fair value and not advice — a prompt to stake a graded thesis. crowd_yes_pct is Polymarket's probability of the YES outcome. Actionable = a lens + a live probability. The trader chooses which perp expresses the view.",
+      });
+    },
+  },
+  {
     name: "get_defi",
     description:
       "Get DeFi macro context from DeFiLlama: total DeFi TVL, the top chains by TVL, and (if a chain is named) that chain's TVL + rank. Use for 'how's DeFi TVL', 'which chains are growing', 'where's the liquidity', or to frame an asset's chain in macro terms. Read-only, free public data.",
