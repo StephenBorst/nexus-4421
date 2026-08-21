@@ -55,6 +55,105 @@ function fmtEnds(iso: string | null): string {
 // gets profit/loss chroma only as directional data (consistent with the P&L rule).
 const leanColor = (l: string | null) => (l === "UP" ? POS : l === "DOWN" ? NEG : DIM);
 
+// Client-side Orderly candle fetch (same public endpoint the Mispriced Board uses).
+// Fail-soft: null until loaded, [] on error — the chart simply doesn't render.
+function useOrderlyPrice(coin: string, days: number): { t: number; c: number }[] | null {
+  const [price, setPrice] = useState<{ t: number; c: number }[] | null>(null);
+  useEffect(() => {
+    let live = true; setPrice(null);
+    const to = Math.floor(Date.now() / 1000), from = to - days * 86400;
+    fetch(`https://api-evm.orderly.org/tv/history?symbol=PERP_${coin}_USDC&resolution=60&from=${from}&to=${to}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!live) return;
+        if (d && d.s === "ok" && Array.isArray(d.t) && Array.isArray(d.c))
+          setPrice(d.t.map((t: number, i: number) => ({ t: t * 1000, c: Number(d.c[i]) })).filter((p: { c: number }) => p.c > 0));
+        else setPrice([]);
+      })
+      .catch(() => { if (live) setPrice([]); });
+    return () => { live = false; };
+  }, [coin, days]);
+  return price;
+}
+
+// ── THE FORECAST CHART — the Quotient "Silver" view on our tape ────────────────
+// Price over the window with the prediction market's TARGET drawn as a level (the
+// forecast's "median"), the gap between price and target shaded (the implied move),
+// a right-edge current-price value box, and date ticks. Honest: one target + one
+// probability (we don't fake quartiles), colored by the forecast lean.
+function ForecastChart({ coin, markPrice, target, forecastLean, forecastProbPct }: {
+  coin: string; markPrice: number | null; target: number | null; forecastLean: string | null; forecastProbPct: number;
+}) {
+  const price = useOrderlyPrice(coin, 21);
+  const pc = (price || []).filter((p) => Number.isFinite(p.c) && p.c > 0);
+  if (pc.length < 2) return null;
+
+  const VB_W = 440, padL = 3, gutterR = 62, plotW = VB_W - padL - gutterR;
+  const top = 13, H = 150, plotBot = H - 18;
+  const cs = pc.map((p) => p.c);
+  const tgt = target != null && Number.isFinite(target) ? target : null;
+  const mk = markPrice != null && Number.isFinite(markPrice) ? markPrice : cs[cs.length - 1];
+  const vals = [...cs, mk]; if (tgt != null) vals.push(tgt);
+  const lo = Math.min(...vals), hi = Math.max(...vals), sp = (hi - lo) || 1, pad = sp * 0.08;
+  const py = (c: number) => plotBot - ((c - (lo - pad)) / ((hi + pad) - (lo - pad))) * (plotBot - top);
+  const t0 = pc[0].t, t1 = pc[pc.length - 1].t, tspan = (t1 - t0) || 1;
+  const X = (t: number) => padL + ((t - t0) / tspan) * plotW;
+  const line = pc.map((p) => `${X(p.t).toFixed(1)},${py(p.c).toFixed(1)}`).join(" ");
+  const area = `${line} L${X(t1).toFixed(1)},${plotBot} L${X(t0).toFixed(1)},${plotBot} Z`;
+  const lastY = py(cs[cs.length - 1]);
+  const tgtY = tgt != null ? py(tgt) : null;
+  const lc = leanColor(forecastLean);
+  const ticks = [0, 1, 2].map((i) => {
+    const tt = t0 + (tspan * i) / 2;
+    const anchor: "start" | "middle" | "end" = i === 0 ? "start" : i === 2 ? "end" : "middle";
+    return { x: X(tt), label: new Date(tt).toLocaleDateString(undefined, { month: "short", day: "numeric" }), anchor };
+  });
+  const MF = "var(--nx-font-mono)";
+  return (
+    <svg viewBox={`0 0 ${VB_W} ${H}`} style={{ display: "block", width: "100%", height: "auto", margin: "2px 0 8px" }} role="img" aria-label={`${coin} price with the ${forecastProbPct}% forecast target level.`}>
+      {/* implied-move zone: current price → forecast target */}
+      {tgtY != null && <rect x={padL} y={Math.min(lastY, tgtY)} width={plotW} height={Math.abs(tgtY - lastY) || 1} fill={lc} opacity="0.08" />}
+      <path d={area} fill={BONE} opacity="0.04" />
+      <polyline points={line} fill="none" stroke="#9a9aa2" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" />
+      {tgtY != null && <>
+        <line x1={padL} y1={tgtY} x2={plotW} y2={tgtY} stroke={lc} strokeWidth="1" strokeDasharray="4 3" opacity="0.9" />
+        <text x={padL + 2} y={tgtY - 3.5} fill={lc} fontFamily={MF} fontSize="7.5" fontWeight="700">TARGET {fmtPrice(tgt)} · {forecastProbPct}% {forecastLean}</text>
+      </>}
+      <circle cx={X(t1)} cy={lastY} r="2.5" fill={BONE} />
+      <line x1={X(t1)} y1={lastY} x2={VB_W - gutterR} y2={lastY} stroke="#33333a" strokeWidth="0.5" strokeDasharray="2 2" />
+      <rect x={VB_W - gutterR} y={lastY - 8} width={gutterR - 6} height={16} rx="2" fill="#141416" stroke="#33333a" />
+      <text x={VB_W - gutterR + 4} y={lastY + 3.4} fill={BONE} fontFamily={MF} fontSize="8.5" fontWeight="700">{fmtPrice(cs[cs.length - 1])}</text>
+      <line x1={padL} y1={plotBot + 4} x2={plotW} y2={plotBot + 4} stroke="rgba(255,255,255,0.08)" strokeWidth="0.75" />
+      {ticks.map((tk, i) => <text key={i} x={Math.max(padL, Math.min(plotW, tk.x))} y={plotBot + 13} textAnchor={tk.anchor} fill={FAINT} fontFamily={MF} fontSize="7.5">{tk.label}</text>)}
+    </svg>
+  );
+}
+
+// One divergent market — the flagged signal, now with the premium price+target chart.
+function DivergentCard({ m, onDraft }: { m: ForecastMarket; onDraft: (m: ForecastMarket) => void }) {
+  return (
+    <div style={{ border: `1px solid ${WARN}44`, background: "#1c1608", borderRadius: 2, padding: "10px 12px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+        <span style={{ color: WARN, fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", border: `1px solid ${WARN}55`, borderRadius: 2, padding: "1px 6px" }}>◆ DIVERGENT</span>
+        <span style={{ color: BONE, fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 700 }}>{m.coin}</span>
+        <span style={{ color: FAINT, fontSize: 10, fontFamily: "var(--nx-font-mono)" }}>{fmtPrice(m.markPrice)}</span>
+        {m.endDate ? <span style={{ color: FAINT, fontSize: 10, fontFamily: "var(--nx-font-mono)", marginLeft: "auto" }}>ends {fmtEnds(m.endDate)}</span> : null}
+      </div>
+      <div style={{ color: "#c4c4cc", fontSize: 12, lineHeight: 1.45, marginBottom: 8 }}>{m.question}</div>
+      <ForecastChart coin={m.coin} markPrice={m.markPrice} target={m.target} forecastLean={m.forecastLean} forecastProbPct={m.forecastProbPct} />
+      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
+        <span style={{ color: DIM }}>forecast <b style={{ color: BONE }}>{m.forecastProbPct}%</b> → lean <b style={{ color: leanColor(m.forecastLean) }}>{m.forecastLean}</b></span>
+        <span style={{ color: DIM }}>tape (funding) <b style={{ color: leanColor(m.fundingLean) }}>{m.fundingLean}</b></span>
+        {m.target != null ? <span style={{ color: DIM }}>{fmtPrice(m.target)} target ({m.distancePct}%)</span> : null}
+        <span style={{ color: FAINT }}>{fmtUsd(m.volumeUsd)} vol</span>
+        <button type="button" onClick={() => onDraft(m)} className="nx-press"
+          style={{ marginLeft: "auto", color: BONE, background: "transparent", border: "1px solid #33333a", borderRadius: 2, padding: "3px 10px", fontFamily: "var(--nx-font-mono)", fontSize: 10, cursor: "pointer" }}
+        >◆ draft thesis</button>
+      </div>
+    </div>
+  );
+}
+
 export function ForecastDivergence() {
   const [markets, setMarkets] = useState<ForecastMarket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,29 +226,7 @@ export function ForecastDivergence() {
             {divergent.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {divergent.map((m) => (
-                  <div key={m.id ?? m.question} style={{
-                    border: `1px solid ${WARN}44`, background: "#1c1608", borderRadius: 2, padding: "10px 12px",
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-                      <span style={{ color: WARN, fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", border: `1px solid ${WARN}55`, borderRadius: 2, padding: "1px 6px" }}>◆ DIVERGENT</span>
-                      <span style={{ color: BONE, fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 700 }}>{m.coin}</span>
-                      <span style={{ color: FAINT, fontSize: 10, fontFamily: "var(--nx-font-mono)" }}>{fmtPrice(m.markPrice)}</span>
-                      {m.endDate ? <span style={{ color: FAINT, fontSize: 10, fontFamily: "var(--nx-font-mono)", marginLeft: "auto" }}>ends {fmtEnds(m.endDate)}</span> : null}
-                    </div>
-                    <div style={{ color: "#c4c4cc", fontSize: 12, lineHeight: 1.45, marginBottom: 8 }}>{m.question}</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
-                      <span style={{ color: DIM }}>forecast <b style={{ color: BONE }}>{m.forecastProbPct}%</b> → lean <b style={{ color: leanColor(m.forecastLean) }}>{m.forecastLean}</b></span>
-                      <span style={{ color: DIM }}>tape (funding) <b style={{ color: leanColor(m.fundingLean) }}>{m.fundingLean}</b></span>
-                      {m.target != null ? <span style={{ color: DIM }}>{fmtPrice(m.target)} target ({m.distancePct}%)</span> : null}
-                      <span style={{ color: FAINT }}>{fmtUsd(m.volumeUsd)} vol</span>
-                      <button
-                        type="button"
-                        onClick={() => draftFrom(m)}
-                        className="nx-press"
-                        style={{ marginLeft: "auto", color: BONE, background: "transparent", border: "1px solid #33333a", borderRadius: 2, padding: "3px 10px", fontFamily: "var(--nx-font-mono)", fontSize: 10, cursor: "pointer" }}
-                      >◆ draft thesis</button>
-                    </div>
-                  </div>
+                  <DivergentCard key={m.id ?? m.question} m={m} onDraft={draftFrom} />
                 ))}
               </div>
             ) : (
