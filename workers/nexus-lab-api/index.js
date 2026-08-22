@@ -2048,6 +2048,25 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       }), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=120", ...cors(request) } });
     }
 
+    // ── POST /wargame — Miroshark war-game scenario (red-team a thesis / macro event) ──
+    // Builds the optimal Miroshark simulation prompt from a Lab object. Running the sim
+    // itself costs $1 USDC/call via x402 on Base (x402.miroshark.xyz/run), so the INLINE
+    // paid run is gated (MIROSHARK_ENABLED + a funded MIROSHARK_PAYER_KEY) and pending the
+    // payment-economics decision; until then we return the scenario + a self-serve hand-off
+    // so a user can war-game it on miroshark.xyz. This is a SYNTHETIC red-team, NOT a signal.
+    if (parts[0] === "wargame" && request.method === "POST") {
+      let body = {}; try { body = await request.json(); } catch { /* ignore */ }
+      const scenario = wargameScenario(body || {});
+      if (!scenario) return json({ error: "empty scenario — pass {kind:'thesis'|'macro', ...} or {query}" }, request, 400);
+      const enabled = env.MIROSHARK_ENABLED === "true" && !!env.MIROSHARK_PAYER_KEY;
+      return json({
+        scenario,
+        enabled,           // true once a funded x402 payer is configured (inline run)
+        handoff: "https://www.miroshark.xyz",
+        disclaimer: "Synthetic war-game (hundreds of grounded AI agents argue + trade a prediction market) — a red-team to surface the bull/bear case and blind spots, NOT a signal or a forecast.",
+      }, request);
+    }
+
     // ── /signals/house — the systematic house track record (seeds the caller board) ──
     // GET (?)= DRY preview: the calls that WOULD post right now, no write (safe, derived
     // from the public board). POST = actually publish, gated by the HOUSE_SIGNALS_ADMIN

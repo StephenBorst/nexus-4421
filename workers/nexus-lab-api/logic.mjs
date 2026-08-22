@@ -832,6 +832,34 @@ export function houseCallFromSignal(m, now = Date.now(), cfg = HOUSE_CALL) {
   };
 }
 
+// ── MIROSHARK WAR-GAME — turn a Lab object into a good simulation scenario ─────
+// Miroshark (x402.miroshark.xyz/run) spawns hundreds of grounded agents that argue +
+// trade a prediction market on a scenario. We use it as a WAR-GAME / red-team, NEVER a
+// signal (it's synthetic — what agents THINK would happen). This builds the natural-
+// language `query` that gets the most useful red-team out of it: always ask for the bull
+// case, the bear case, the invalidation, and where consensus lands (the trader's blind
+// spots). Decision-independent (no payment here) so it's stable across how we meter it.
+export function wargameScenario(input) {
+  const kind = input && input.kind;
+  const tail = "Surface the strongest bull case, the strongest bear case, what would invalidate it, and where consensus lands.";
+  if (kind === "thesis") {
+    const coin = input.coin || "the asset";
+    const dir = input.direction === "LONG" ? "rises" : input.direction === "SHORT" ? "falls" : "moves";
+    const tgt = input.target ? ` toward ${input.target}` : "";
+    const from = input.entry ? ` from ${input.entry}` : "";
+    const notes = input.notes ? ` Context: ${String(input.notes).slice(0, 400)}` : "";
+    return `Simulate how crypto traders, online communities, and a prediction market would react over the next 1-2 weeks if ${coin} ${dir}${tgt}${from}.${notes} ${tail}`.trim();
+  }
+  if (kind === "macro") {
+    const q = input.question || "this event";
+    const prob = Number.isFinite(input.yesProbPct) ? ` The crowd currently prices it at ${input.yesProbPct}% YES.` : "";
+    const lens = input.lens ? ` It's a ${input.lens} setup for crypto.` : "";
+    return `Simulate how markets and online communities would react to this event resolving both YES and NO: "${q}".${prob}${lens} Model the reaction paths and the second-order effects on crypto (BTC/ETH). ${tail}`;
+  }
+  const free = String((input && input.query) || "").trim();
+  return free ? `Simulate reactions to: ${free}. ${tail}` : "";
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // LOSS POSTMORTEMS  (why did it lose — from a FIXED taxonomy, so it aggregates)
 // ═══════════════════════════════════════════════════════════════════════════

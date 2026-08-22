@@ -13,7 +13,7 @@ import {
   validateArenaRegistration, arenaAgentConfig,
   parsePriceTarget, forecastDivergence, FORECAST,
   classifyMacro, macroEvents,
-  houseCallFromSignal,
+  houseCallFromSignal, wargameScenario,
 } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
@@ -1790,4 +1790,15 @@ test("houseCallFromSignal: LONG fade inverts levels; NONE / bad mark → null", 
   assert.ok(long.takeProfit1 > 150 && long.stopLoss < 150, "long TP above / SL below");
   assert.equal(houseCallFromSignal({ coin: "X", markPrice: 10, direction: "NONE", fundingAnnualPct: 0 }), null);
   assert.equal(houseCallFromSignal({ coin: "X", markPrice: 0, direction: "SHORT", fundingAnnualPct: 5 }), null);
+});
+
+// ── wargameScenario (Miroshark red-team prompt builder) ────────────────────────
+test("wargameScenario: thesis + macro + freeform build directional red-team prompts", () => {
+  const th = wargameScenario({ kind: "thesis", coin: "BTC", direction: "SHORT", target: 90000, entry: 100000, notes: "funding stretched" });
+  assert.match(th, /BTC falls toward 90000 from 100000/);
+  assert.match(th, /bull case/); assert.match(th, /bear case/); assert.match(th, /invalidate/);
+  const mc = wargameScenario({ kind: "macro", question: "Fed cuts in Sept?", yesProbPct: 62, lens: "RISK_ON" });
+  assert.match(mc, /Fed cuts in Sept\?/); assert.match(mc, /62% YES/); assert.match(mc, /RISK_ON/);
+  assert.equal(wargameScenario({ query: "" }), "");
+  assert.match(wargameScenario({ query: "ETF approved" }), /Simulate reactions to: ETF approved/);
 });
