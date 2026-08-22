@@ -22,7 +22,7 @@ export function MacroView() {
         note="INTELLIGENCE → A CRYPTO TRADE"
       />
       <div style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: 13.5, color: C.text.fog, lineHeight: 1.65, maxWidth: 660, marginBottom: 4 }}>
-        Fed decisions, geopolitics, and policy — the macro forces that move crypto, read as a textbook risk-on / risk-off lens.
+        Fed decisions, the economy, and crypto policy — the macro forces that move crypto, read as a textbook risk-on / risk-off lens.
         You don't trade the event here; you trade the <b style={{ color: C.text.bright }}>crypto expression</b> (BTC / ETH, long or short) on Nexus,
         and public price grades the call. The prediction market is the signal — the trade is one you can actually take. Not a fair-value oracle, not advice.
       </div>

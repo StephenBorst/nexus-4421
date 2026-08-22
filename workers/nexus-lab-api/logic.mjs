@@ -1710,6 +1710,9 @@ export function forecastDivergence(polyMarkets, futuresRows, cfg = FORECAST, opt
 // a GRADED thesis the trader stakes and executes on Nexus, not advice. This is the
 // execution-layer seam an intelligence partner (macro/event discovery) plugs into.
 export const MACRO = { minVolumeUsd: 25000, limit: 40 };
+// The macro categories that map to a CRYPTO trade you can take on Nexus (risk-on/off via
+// BTC/ETH). GEOPOLITICS + ELECTION are excluded — non-tradeable prediction markets.
+export const MACRO_TRADEABLE = new Set(["RATES", "ECONOMY", "CRYPTO_POLICY"]);
 
 // ⚠️ REGEX HARDENING: stems that take suffixes use `\w*` (or explicit suffix groups) INSIDE
 // the `\b…\b` wrapper — a bare `\b(cut)\b` fails to match "cuts"/"cutting" because the char
@@ -1747,6 +1750,11 @@ export function macroEvents(polyMarkets, cfg = MACRO) {
     if (!q) continue;
     const klass = classifyMacro(q);
     if (!klass) continue;
+    // Only CRYPTO-MAPPED macro forces — the ones that translate to a trade you can take
+    // here (Fed/rates, macro economy, crypto policy → BTC/ETH risk-on/off). Purely
+    // GEOPOLITICS + ELECTION prediction markets are pulled: we can't trade them, so they
+    // don't belong on a DEX intelligence surface. (Everything in house.)
+    if (!MACRO_TRADEABLE.has(klass.category)) continue;
     const volume = Number(pm.volumeNum ?? pm.volume ?? 0) || 0;
     if (volume < cfg.minVolumeUsd) continue;
     const outcomes = parseJsonArray(pm.outcomes).map((x) => String(x).toLowerCase());
