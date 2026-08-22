@@ -822,6 +822,10 @@ export function houseCallFromSignal(m, now = Date.now(), cfg = HOUSE_CALL) {
     takeProfit1,
     takeProfit2: 0,
     riskReward: round(cfg.tpPct / cfg.slPct, 2),
+    // Full thesis shape (the UI reads these) — a partial object crashed ThesisCard's
+    // `leverage.toFixed`. Systematic calls have no sizing, so these are 0/neutral.
+    riskPercent: 0, accountSize: 0, fundingRate: 0, positionSize: 0, leverage: 0,
+    fundingCost8h: 0, fundingCost24h: 0, fundingCost72h: 0,
     createdAt: now,
     status: "ACTIVE",
     actualPnl: null,

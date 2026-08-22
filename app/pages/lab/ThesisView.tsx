@@ -21,6 +21,13 @@ import { ThesisAdvisor } from "./ThesisAdvisor";
 import { PnlChart, EmptyState, Coachmark } from "./components";
 import { SharePoster, type PosterData } from "./SharePoster";
 
+// Crash-proof number formatting — a partial thesis (e.g. a systematic house call with
+// no leverage/positionSize/fundingCost) must NEVER take the whole app down with
+// `undefined.toFixed` (it did, on mobile). NaN/undefined → 0. Prices auto-scale decimals
+// so a sub-dollar coin (POL $0.11) keeps precision instead of rounding to "$0.11".
+const nf = (v: unknown, d: number) => (Number.isFinite(Number(v)) ? Number(v) : 0).toFixed(d);
+const priceDp = (v: unknown) => { const n = Math.abs(Number(v) || 0); return n >= 1000 ? 2 : n >= 1 ? 2 : n >= 0.01 ? 4 : 6; };
+
 function calcThesis(form: {
   entryPrice: string; stopLoss: string; takeProfit1: string; takeProfit2: string;
   riskPercent: string; accountSize: string; fundingRate: string; direction: "LONG" | "SHORT";
@@ -106,17 +113,17 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
           <div style={{ minWidth: 52 }}>
             <div style={{ fontSize: 16, color: "#fff", fontWeight: "bold", fontFamily: "var(--nx-font-mono)" }}>{t.symbol.replace("PERP_","").replace("_USDC","")}</div>
             <div style={{ fontSize: 10, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)" }}>
-              {t.direction === "LONG" ? "↑" : "↓"} {t.direction} · {t.leverage.toFixed(1)}x
+              {t.direction === "LONG" ? "↑" : "↓"} {t.direction} · {nf(t.leverage, 1)}x
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(6, auto)", gap: isMobile ? "8px 12px" : "0 16px", flex: 1 }}>
             {[
-              { label: "ENTRY", val: `$${t.entryPrice.toFixed(2)}` },
-              { label: "STOP", val: `$${t.stopLoss.toFixed(2)}`, color: "#f7525f" },
-              { label: "TP1", val: `$${t.takeProfit1.toFixed(2)}`, color: "#ededf0" },
-              { label: "SIZE", val: `$${t.positionSize.toFixed(0)}` },
-              { label: "R:R", val: `1:${t.riskReward.toFixed(2)}`, color: t.riskReward >= 2 ? "#ededf0" : "#fbbf24" },
-              { label: "72H FUND", val: `$${t.fundingCost72h.toFixed(3)}`, color: "#a1a1aa" },
+              { label: "ENTRY", val: `$${nf(t.entryPrice, priceDp(t.entryPrice))}` },
+              { label: "STOP", val: `$${nf(t.stopLoss, priceDp(t.stopLoss))}`, color: "#f7525f" },
+              { label: "TP1", val: `$${nf(t.takeProfit1, priceDp(t.takeProfit1))}`, color: "#ededf0" },
+              { label: "SIZE", val: (Number(t.positionSize) || 0) > 0 ? `$${nf(t.positionSize, 0)}` : "—" },
+              { label: "R:R", val: `1:${nf(t.riskReward, 2)}`, color: (Number(t.riskReward) || 0) >= 2 ? "#ededf0" : "#fbbf24" },
+              { label: "72H FUND", val: (Number(t.fundingCost72h) || 0) !== 0 ? `$${nf(t.fundingCost72h, 3)}` : "—", color: "#a1a1aa" },
             ].map(({ label, val, color }) => (
               <div key={label}>
                 <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
