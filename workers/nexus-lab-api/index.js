@@ -2193,12 +2193,49 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         if (res.ok) rows = await res.json();
         else available = false; // source_leader column not migrated / query rejected
       } catch (e) { console.error("[creator-earnings] supabase error:", e); available = false; }
+      // Guardrail: a caller can't earn from their OWN trades (copier === leader).
+      rows = rows.filter((r) => String(r.wallet_address || "").toLowerCase() !== leader);
+      const earn = creatorEarnings(rows);
+      const paidUsd = Number(await env.LAB_STORE.get(`creator:paid:${leader}`)) || 0;
+      const pendingUsd = Math.max(0, Math.round((earn.earnedUsd - paidUsd) * 100) / 100);
       const payload = {
-        leader, available, ...creatorEarnings(rows), minPayoutUsd: CREATOR_FEE.minPayoutUsd,
+        leader, available, ...earn, paidUsd, pendingUsd,
+        minPayoutUsd: CREATOR_FEE.minPayoutUsd, claimable: pendingUsd >= CREATOR_FEE.minPayoutUsd,
         note: "Fee-share earned from Nexus agent copies attributed to this caller (source_leader) — round-trip taker fee × the creator share, recomputable from public order data. A commission for being copied, not a P&L or revenue share.",
       };
       await env.LAB_STORE.put(CK, JSON.stringify(payload), { expirationTtl: 300 });
       return json(payload, request);
+    }
+
+    // ── POST /creator/claim — claim pending creator fee-share (#1 payout) ─────────
+    // walletSig-authed (the caller proves wallet ownership). Records a claim REQUEST for
+    // operator settlement (USDC on Arbitrum from the treasury/broker pool) — deliberately
+    // NOT an automated on-chain send here: paying out real funds is a money path that
+    // gets a funded payout wallet + a co-test, never a blind auto-transfer. Idempotent-ish
+    // via a short lock; the operator marks it paid (bumps creator:paid) on settlement.
+    if (parts[0] === "creator" && parts[1] === "claim" && request.method === "POST") {
+      let body = {}; try { body = await request.json(); } catch { /* ignore */ }
+      const caller = typeof body.walletSig === "string" ? recoverEthAddress("nexus-trading-key-v1", body.walletSig) : null;
+      if (!caller) return json({ error: "walletSig_required", hint: "Claim requires walletSig = sign_message('nexus-trading-key-v1')." }, request, 401);
+      const leader = caller.toLowerCase();
+      if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return json({ error: "unavailable" }, request, 503);
+      let rows = [];
+      try {
+        const res = await fetch(`${env.SUPABASE_URL}/rest/v1/agent_trades?select=entry_price,qty,symbol,wallet_address&source_leader=ilike.${leader}&limit=10000`,
+          { headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` } });
+        if (res.ok) rows = await res.json();
+      } catch { /* treat as 0 */ }
+      rows = rows.filter((r) => String(r.wallet_address || "").toLowerCase() !== leader);
+      const earned = creatorEarnings(rows).earnedUsd;
+      const paid = Number(await env.LAB_STORE.get(`creator:paid:${leader}`)) || 0;
+      const pending = Math.max(0, Math.round((earned - paid) * 100) / 100);
+      if (pending < CREATOR_FEE.minPayoutUsd) return json({ error: "below_min", pendingUsd: pending, minPayoutUsd: CREATOR_FEE.minPayoutUsd }, request, 400);
+      // Record the claim request (dedupe re-submits within the window).
+      const reqKey = `creator:claim_req:${leader}`;
+      const existing = JSON.parse((await env.LAB_STORE.get(reqKey)) || "null");
+      if (existing && existing.status === "pending") return json({ ok: true, status: "pending", amountUsd: existing.amountUsd, note: "A claim is already queued — you'll be paid to your wallet in USDC on Arbitrum shortly." }, request);
+      await env.LAB_STORE.put(reqKey, JSON.stringify({ amountUsd: pending, wallet: leader, ts: Date.now(), status: "pending" }), { expirationTtl: 30 * 86400 });
+      return json({ ok: true, status: "queued", amountUsd: pending, note: "Claim submitted — you'll be paid to your wallet in USDC on Arbitrum. A commission for calls people copied." }, request);
     }
 
     // ── /signals/house — the systematic house track record (seeds the caller board) ──

@@ -213,6 +213,10 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
                 id: t.id, symbol: t.symbol, direction: t.direction,
                 entryPrice: t.entryPrice, stopLoss: t.stopLoss, takeProfit1: t.takeProfit1,
                 takeProfit2: t.takeProfit2, leverage: t.leverage,
+                // #2 attribution: a COPIED call deployed to the agent credits the original
+                // caller (source_leader) so they earn the creator fee-share. Self-copies are
+                // excluded server-side in the earnings calc (wallet_address === leader).
+                source: t.copiedFromWallet || undefined,
               }, navigate)}
               title="Hand the agent THIS exact trade: it enters your direction and manages to your stop/targets with the agent's full exit engine (scale-out, trailing, breakeven, timeout). One-shot."
               style={{ ...navBtnStyle, fontSize: 10, color: "#ededf0", borderColor: "#33333a", minHeight: 36, padding: "6px 12px" }}>
