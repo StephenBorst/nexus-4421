@@ -276,8 +276,8 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
 
   const thesisBtn = (onClick: () => void) => (
     <button onClick={onClick} title="Turn this into a reasoned thesis — sized, R:R'd, and gradeable in the Thesis Engine"
-      style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#a1a1aa", background: "none", border: "1px solid #232327", borderRadius: 3, padding: "3px 7px", cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}>
-      ◆
+      style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#a1a1aa", background: "none", border: "1px solid #232327", borderRadius: 3, padding: "3px 8px", cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}>
+      ◆ plan
     </button>
   );
 
@@ -285,8 +285,8 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
   // alive surface). Consensus cards carry the trader count.
   const shareBtn = (d: PosterData) => (
     <button onClick={() => setPoster(d)} title="Share this signal"
-      style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", background: "none", border: "1px solid #232327", borderRadius: 3, padding: "3px 7px", cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}>
-      ↗
+      style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", background: "none", border: "1px solid #232327", borderRadius: 3, padding: "3px 8px", cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}>
+      ↗ share
     </button>
   );
 
@@ -327,7 +327,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
       </Coachmark>
 
       {loading && !board && !events && (
-        <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 12, padding: 24, textAlign: "center" }}>// indexing Hyperliquid…</div>
+        <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 12, padding: 24, textAlign: "center" }}>indexing Hyperliquid…</div>
       )}
       {error && !board && !events && <EmptyState message={error} />}
 
@@ -450,7 +450,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
       {/* ── TRACKED SIGNALS — graded tier crossings (low-noise, ~daily) ── */}
       {trackedSignals.length > 0 && (
         <div style={{ ...agentCardStyle, marginBottom: 12 }}>
-          <div style={agentLabelStyle}>// TRACKED SIGNALS <span style={{ color: "#52525b" }}>— Operator-tier changes, graded from realized-PnL consistency</span></div>
+          <div style={agentLabelStyle}>TRACKED SIGNALS <span style={{ color: "#52525b" }}>— Operator-tier changes, graded from realized-PnL consistency</span></div>
           <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
             {trackedSignals.map((s, i) => {
               const up = s.kind === "TIER_UP";
@@ -477,7 +477,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
         return (
         <div style={agentCardStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <div style={agentLabelStyle}>// SMART MONEY BOARD <span style={{ color: "#52525b" }}>— ◆ Orderly (native) + Hyperliquid</span></div>
+            <div style={agentLabelStyle}>SMART MONEY BOARD <span style={{ color: "#52525b" }}>— ◆ Orderly (native) + Hyperliquid</span></div>
             <button onClick={() => setWatchOnly((v) => !v)} disabled={watch.length === 0}
               title={watch.length === 0 ? "Star traders below to build a watchlist" : "Show only your watchlist"}
               style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.04em", color: watchOnly ? TRACKED : "#71717a", background: watchOnly ? "#1a1a1e" : "none", border: `1px solid ${watchOnly ? "#33333a" : "#232327"}`, borderRadius: 3, padding: "4px 9px", cursor: watch.length === 0 ? "default" : "pointer", opacity: watch.length === 0 ? 0.5 : 1 }}>

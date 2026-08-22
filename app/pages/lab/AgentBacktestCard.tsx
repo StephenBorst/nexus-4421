@@ -33,7 +33,7 @@ export function AgentBacktestCard({
     <div style={agentCardStyle}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={agentLabelStyle}>// BACKTEST</div>
+          <div style={agentLabelStyle}>BACKTEST</div>
           <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ededf0", border: "1px solid #33333a", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
         </div>
         {isPro && (

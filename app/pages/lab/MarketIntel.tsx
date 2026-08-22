@@ -106,7 +106,7 @@ function NewsTab() {
 
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 6 }}>
-        <span style={{ color: TEAL, fontSize: 10, letterSpacing: "0.12em" }}>// MARKET INTELLIGENCE FEED</span>
+        <span style={{ color: TEAL, fontSize: 10, letterSpacing: "0.12em" }}>MARKET INTELLIGENCE FEED</span>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {loading
             ? <span style={{ color: TEAL, fontSize: 10 }}>⟳ CONNECTING</span>

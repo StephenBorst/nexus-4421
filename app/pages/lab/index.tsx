@@ -169,7 +169,6 @@ export default function TheLabPage() {
       {/* ── BRIEFING HEADER ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "6px 10px" : "6px 18px", background: "#0f0f11", borderBottom: "1px solid #232327", flexWrap: "wrap", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#ededf0", letterSpacing: "0.25em", fontWeight: "bold", textShadow: "0 0 12px rgba(255,255,255,0.25)" }}>//</span>
           <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#f4f4f5", letterSpacing: "0.25em", fontWeight: "bold" }}>THE LAB</span>
           <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#ededf0", boxShadow: "0 0 8px #ededf0", animation: "pulse 2s infinite" }} />
         </div>

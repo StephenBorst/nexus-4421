@@ -665,9 +665,7 @@ export default function MiniApp() {
     <div style={shell}>
       {/* Header — editorial lockup: mono wordmark → serif headline → amber hairline rule */}
       <div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ color: accent, fontWeight: "bold", letterSpacing: "0.25em", fontFamily: mono }}>//</span>
-          <span style={{ color: "#fff", fontWeight: "bold", letterSpacing: "0.2em", fontFamily: mono }}>NEXUS</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>          <span style={{ color: "#fff", fontWeight: "bold", letterSpacing: "0.2em", fontFamily: mono }}>NEXUS</span>
           <span style={{ fontSize: 8, color: "#52525b", letterSpacing: "0.18em", fontFamily: mono }}>TRADING&nbsp;LABS</span>
           <button onClick={saveApp} style={{ marginLeft: "auto", background: added ? "#1a1a1e" : "none", border: `1px solid ${added ? "#33333a" : "#232327"}`, borderRadius: 3, color: added ? profit : "#a1a1aa", fontFamily: mono, fontSize: 9, padding: "3px 9px", cursor: "pointer", letterSpacing: "0.06em" }}>{added ? "★ SAVED" : "★ SAVE"}</button>
         </div>

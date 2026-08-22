@@ -147,7 +147,7 @@ export function buildMarketRead(input: MarketReadInput): Insight[] {
   const out: Insight[] = [];
 
   // 1 — Tape headline: the BREADTH lens (what setups the tape favors) — NOT a second
-  // market-mood SCORE. The Market Terminal's "// THE MARKET READ" gauge is the one
+  // market-mood SCORE. The Market Terminal's "THE MARKET READ" gauge is the one
   // canonical numeric regime read on this tab (fear-greed + BTC dom + mcap); this line
   // stays qualitative (label + setup guidance) so the two don't read as duplicate scores.
   if (tape) {

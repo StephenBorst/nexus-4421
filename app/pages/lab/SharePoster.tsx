@@ -81,7 +81,7 @@ function PosterSVG({ data, svgRef }: { data: PosterData; svgRef: React.Ref<SVGSV
 
   const MONO = "'IBM Plex Mono', ui-monospace, monospace";
   const SANS = "Manrope, Arial, sans-serif";
-  const kindLabel = data.kind === "trade" ? "// AUTONOMOUS TRADE" : data.kind === "smart" ? "// SMART MONEY SIGNAL" : "// TRADE THESIS";
+  const kindLabel = data.kind === "trade" ? "AUTONOMOUS TRADE" : data.kind === "smart" ? "SMART MONEY SIGNAL" : "TRADE THESIS";
   // Trade outcome bar: zero-centered, length ∝ |P&L%| (capped), win right / loss left.
   const pnlPct = data.kind === "trade" ? (data.pnlPct ?? 0) : null;
   const barMag = pnlPct != null ? Math.min(1, Math.abs(pnlPct) / 6) : 0;
@@ -128,7 +128,7 @@ function PosterSVG({ data, svgRef }: { data: PosterData; svgRef: React.Ref<SVGSV
 
       {/* ── RIGHT: brand column (mirrors the SDK PnL poster) ── */}
       <line x1="830" y1="150" x2="830" y2="470" stroke={ACCENT} strokeOpacity="0.25" strokeWidth="2" />
-      <text x={RX} y="228" textAnchor="end" fontFamily={MONO} fontSize="15" letterSpacing="5" fill={ACCENT} fillOpacity="0.85">// OMNICHAIN TRADING</text>
+      <text x={RX} y="228" textAnchor="end" fontFamily={MONO} fontSize="15" letterSpacing="5" fill={ACCENT} fillOpacity="0.85">OMNICHAIN TRADING</text>
       <text x={RX} y="300" textAnchor="end" fontFamily={SANS} fontSize="56" fontWeight="700" fill={BRIGHT}>Nexus</text>
       <text x={RX} y="358" textAnchor="end" fontFamily={SANS} fontSize="56" fontWeight="700" fill="#71717a">Trading</text>
       <text x={RX} y="416" textAnchor="end" fontFamily={SANS} fontSize="56" fontWeight="700" fill={BRIGHT}>Labs</text>

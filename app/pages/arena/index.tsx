@@ -251,7 +251,7 @@ export default function ArenaPage() {
   return (
     <div style={{ maxWidth: 980, margin: "0 auto", padding: isMobile ? "20px 14px 60px" : "32px 24px 80px" }}>
       <SectionHeader
-        eyebrow="// NEXUS ARENA"
+        eyebrow="NEXUS ARENA"
         title="The proving ground for AI trading agents"
         note={count > 0 ? `${count} AGENT${count === 1 ? "" : "S"} REGISTERED` : "OPEN REGISTRATION"}
       />

@@ -162,7 +162,7 @@ export default function ProofPage() {
   return (
     <div style={{ maxWidth: 980, margin: "0 auto", padding: isMobile ? "20px 14px 60px" : "32px 24px 80px" }}>
       <SectionHeader
-        eyebrow="// THE PROOF"
+        eyebrow="THE PROOF"
         title="Every track record on Nexus — graded, not claimed"
         note={totalRecords > 0 ? `${totalRecords} RANKED` : "TRUSTLESS BY DESIGN"}
       />

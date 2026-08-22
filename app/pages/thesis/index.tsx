@@ -322,7 +322,7 @@ export default function ThesisPage() {
             in" so the viral traffic explores instead of bouncing. Hidden once connected. */}
         {!myWallet && (
           <div style={{ marginBottom: 12, border: "1px solid #232327", borderLeft: "2px solid #ededf0", borderRadius: 6, background: "#0f0f11", padding: "14px 16px" }}>
-            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase", color: "#71717a", marginBottom: 6 }}>// NEXUS TRADING LABS</div>
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase", color: "#71717a", marginBottom: 6 }}>NEXUS TRADING LABS</div>
             <div style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: 13.5, color: "#a1a1aa", lineHeight: 1.6, marginBottom: 12 }}>
               This call is graded <b style={{ color: "#f4f4f5" }}>on-chain vs public price</b> — the tape decides the outcome, not the trader. Explore live calls from verified callers, or x-ray any wallet's real record. <span style={{ color: "#71717a" }}>No login to look.</span>
             </div>

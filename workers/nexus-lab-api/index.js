@@ -2072,7 +2072,7 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         scenario,
         enabled,           // true once a funded x402 payer is configured (inline run)
         handoff: "https://www.miroshark.xyz",
-        disclaimer: "Synthetic war-game (hundreds of grounded AI agents argue + trade a prediction market) — a red-team to surface the bull/bear case and blind spots, NOT a signal or a forecast.",
+        disclaimer: "Simulation — hundreds of grounded AI agents react across markets and communities to surface the bull case, bear case, and blind spots. A thinking tool to pressure-test the trade, NOT a signal or a forecast.",
       }, request);
     }
 

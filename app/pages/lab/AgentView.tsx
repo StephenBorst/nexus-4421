@@ -605,12 +605,12 @@ export function AgentView() {
           <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 10 }}>Here&apos;s the full arsenal you&apos;ll get ↓</div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 8, marginTop: 8 }}>
-          {feature("// EXECUTION MODES", "🧪 PAPER — simulated, no key, zero risk. ASSISTED — it surfaces signals you place yourself. AUTONOMOUS — it trades within your risk limits.")}
-          {feature("// SIGNAL STRATEGIES", "Funding-fade, OI-divergence, and confluence — plus momentum & mean-reversion, or bring your own signal via webhook.", "5 modes")}
-          {feature("// HARD GUARDRAILS", "Daily-loss cap, max trades/day, take-profit, stop-loss, max-hold — and a one-tap KILL switch. Order-only keys cannot withdraw a cent.")}
-          {feature("// ADVANCED EXITS", "Multi-level scale-out, trailing stop, and breakeven — the agent manages the whole exit for you, then grades each slice on-chain.")}
-          {feature("// BACKTEST + VALIDATE", "Replay any config on 60d of real price + a walk-forward across markets — prove an edge before you risk a cent.", "◆ PRO")}
-          {feature("// TRUSTLESS RECORD", "Every trade settles on Orderly with an on-chain order ID, graded objectively and ranked on the TOP AGENTS board — a record nobody can fake.")}
+          {feature("EXECUTION MODES", "🧪 PAPER — simulated, no key, zero risk. ASSISTED — it surfaces signals you place yourself. AUTONOMOUS — it trades within your risk limits.")}
+          {feature("SIGNAL STRATEGIES", "Funding-fade, OI-divergence, and confluence — plus momentum & mean-reversion, or bring your own signal via webhook.", "5 modes")}
+          {feature("HARD GUARDRAILS", "Daily-loss cap, max trades/day, take-profit, stop-loss, max-hold — and a one-tap KILL switch. Order-only keys cannot withdraw a cent.")}
+          {feature("ADVANCED EXITS", "Multi-level scale-out, trailing stop, and breakeven — the agent manages the whole exit for you, then grades each slice on-chain.")}
+          {feature("BACKTEST + VALIDATE", "Replay any config on 60d of real price + a walk-forward across markets — prove an edge before you risk a cent.", "◆ PRO")}
+          {feature("TRUSTLESS RECORD", "Every trade settles on Orderly with an on-chain order ID, graded objectively and ranked on the TOP AGENTS board — a record nobody can fake.")}
         </div>
       </div>
     );
@@ -936,7 +936,7 @@ export function AgentView() {
           {/* Track record — surfaced before activation so users judge on real numbers.
               Live (Supabase) and Paper (state ledger) are kept strictly separate. */}
           {(config.mode === "PAPER" || (agentState?.paper_trades?.length ?? 0) > 0) && (
-            <AgentTrackRecord title="// 🧪 PAPER TRACK RECORD" accent="#d4d4d8" trades={agentState?.paper_trades ?? []} paper onReset={resetPaperRecord} />
+            <AgentTrackRecord title="🧪 PAPER TRACK RECORD" accent="#d4d4d8" trades={agentState?.paper_trades ?? []} paper onReset={resetPaperRecord} />
           )}
 
           {/* Graduation nudge — once a paper agent is proven, bridge to live */}
@@ -971,7 +971,7 @@ export function AgentView() {
             );
           })()}
 
-          <AgentTrackRecord title="// LIVE TRACK RECORD" accent="#a1a1aa" trades={trades} summary={standing?.stats ?? null} />
+          <AgentTrackRecord title="LIVE TRACK RECORD" accent="#a1a1aa" trades={trades} summary={standing?.stats ?? null} />
 
           {/* Onboarding + key-status panel */}
           <div style={{ ...agentCardStyle, borderColor: tradingKey ? "#232327" : "#4a3a00" }}>
@@ -1082,7 +1082,7 @@ export function AgentView() {
           {/* Opt-in INVERT — the "fade your own signal" lever. If a config is
               systematically wrong, the edge is the opposite trade. */}
           <AgentToggleCard
-            label="// INVERT SIGNAL — fade the edge"
+            label="INVERT SIGNAL — fade the edge"
             description={<>Flip every entry to the OPPOSITE direction — short when the signal says long, and vice-versa. If a config is systematically WRONG (net-negative in the direction it fires), the edge IS the fade. <b style={{ color: "#ededf0" }}>Prove it first:</b> run Test / Sweep with this on and compare the net R against it off. Off by default.</>}
             on={!!config.invertSignal}
             onToggle={() => setConfig({ ...config, invertSignal: !config.invertSignal })}
@@ -1094,14 +1094,14 @@ export function AgentView() {
               by the brain and set by the Bankr skill, so renaming it would break live
               agents. Only the LABEL moved to "tape" (see MarketTape.tsx on the naming). */}
           <AgentToggleCard
-            label="// MARKET TAPE FILTER"
+            label="MARKET TAPE FILTER"
             description={<>Skip NEW entries that fight a strong tape — RISK-ON gates shorts, RISK-OFF gates longs. Never flips direction or touches open positions. Test in PAPER first. (See the live tape in Market Intel.)</>}
             on={!!config.respectRegime}
             onToggle={() => setConfig({ ...config, respectRegime: !config.respectRegime })}
           />
 
           <AgentToggleCard
-            label="// SMART-MONEY FILTER"
+            label="SMART-MONEY FILTER"
             description={<>Skip a NEW entry that fights a strong consensus (3+) of top on-chain traders on that symbol — see it live in the Smart Money tab. A guardrail, not a signal (smart money is often early AND often wrong). Test in PAPER first.</>}
             on={!!config.respectSmartMoney}
             onToggle={() => setConfig({ ...config, respectSmartMoney: !config.respectSmartMoney })}
@@ -1161,7 +1161,7 @@ export function AgentView() {
           })()}
 
           <AgentToggleCard
-            label="// VOLATILITY-SCALED STOPS"
+            label="VOLATILITY-SCALED STOPS"
             description={<>Sizes TP/SL to each symbol&apos;s recent ATR instead of a flat % — so a high-vol coin (SOL) isn&apos;t noise-stopped and a calm one isn&apos;t over-given. Keeps your R:R ratio. Test in PAPER first.</>}
             on={!!config.volScaledStops}
             onToggle={() => setConfig({ ...config, volScaledStops: !config.volScaledStops })}

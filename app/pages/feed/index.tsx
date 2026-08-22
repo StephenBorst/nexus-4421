@@ -1607,10 +1607,24 @@ export default function FeedPage() {
   // eyebrow → serif headline → fading bone rule). The eyebrow is stable brand;
   // the headline tracks the active view so the page reads as one place.
   const feedHead = {
-    feed:      { eyebrow: "// THE FEED", title: "Every call, graded by the tape" },
-    ranks:     { eyebrow: "// THE FEED", title: "Verified callers, ranked" },
-    following: { eyebrow: "// THE FEED", title: "Traders you follow" },
+    feed:      { eyebrow: "THE FEED", title: "Every call, graded by the tape" },
+    ranks:     { eyebrow: "THE FEED", title: "Verified callers, ranked" },
+    following: { eyebrow: "THE FEED", title: "Traders you follow" },
   }[view];
+
+  // Editorial sub-nav — the same treatment as the Lab tabs (Manrope, underline-active,
+  // no boxes/glyphs on desktop; compact chip on mobile).
+  const feedTab = (active: boolean): React.CSSProperties => isMobile ? {
+    background: active ? "#1a1a1e" : "none", border: `1px solid ${active ? "#33333a" : "#232327"}`,
+    color: active ? "#f4f4f5" : "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10,
+    letterSpacing: "0.06em", fontWeight: 600, padding: "6px 4px", cursor: "pointer", borderRadius: 4,
+    flex: 1, textAlign: "center", whiteSpace: "nowrap",
+  } : {
+    background: "none", border: "none", borderBottom: `2px solid ${active ? "#ededf0" : "transparent"}`,
+    color: active ? "#f4f4f5" : "#71717a", fontFamily: "var(--nx-font-ui)", fontSize: 12.5,
+    letterSpacing: "0.01em", fontWeight: active ? 600 : 500, padding: "5px 12px 8px",
+    cursor: "pointer", borderRadius: 0, whiteSpace: "nowrap", transition: "color 140ms ease",
+  };
 
   return (
     <div style={{ background: "#0a0a0b", minHeight: "100svh", padding: 0 }}>
@@ -1636,41 +1650,11 @@ export default function FeedPage() {
       <div style={{ borderBottom: "1px solid #232327", background: "#0f0f11" }}>
       <div style={{ maxWidth: 860, margin: "0 auto", display: "flex", gap: 8, padding: "8px 16px", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", rowGap: 8, boxSizing: "border-box" }}>
         <div style={{ display: "flex", gap: isMobile ? 4 : 6, flexWrap: isMobile ? "nowrap" : "wrap", rowGap: 6, width: isMobile ? "100%" : undefined }}>
-          <button
-            onClick={() => setView("feed")}
-            style={{
-              background: view === "feed" ? "#1a1a1e" : "none",
-              border: `1px solid ${view === "feed" ? "#ededf0" : "#232327"}`,
-              color: view === "feed" ? "#ededf0" : "#71717a",
-              fontFamily: "var(--nx-font-mono)", fontSize: 10,
-              padding: isMobile ? "6px 4px" : "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
-              flex: isMobile ? 1 : undefined, textAlign: "center",
-            }}
-          >{isMobile ? "FEED" : "■ FEED"}</button>
-          <button
-            onClick={() => setView("ranks")}
-            style={{
-              background: view === "ranks" ? "#1a1a1e" : "none",
-              border: `1px solid ${view === "ranks" ? "#ededf0" : "#232327"}`,
-              color: view === "ranks" ? "#ededf0" : "#71717a",
-              fontFamily: "var(--nx-font-mono)", fontSize: 10,
-              padding: isMobile ? "6px 4px" : "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
-              flex: isMobile ? 1 : undefined, textAlign: "center",
-            }}
-          >{isMobile ? "RANKS" : "◆ RANKS"}</button>
+          <button onClick={() => setView("feed")} style={feedTab(view === "feed")}>{isMobile ? "FEED" : "Feed"}</button>
+          <button onClick={() => setView("ranks")} style={feedTab(view === "ranks")}>{isMobile ? "RANKS" : "Ranks"}</button>
           {/* Ph24: following tab — only when connected */}
           {walletAddress && (
-            <button
-              onClick={() => setView("following")}
-              style={{
-                background: view === "following" ? "#1a1a1e" : "none",
-                border: `1px solid ${view === "following" ? "#d4d4d8" : "#232327"}`,
-                color: view === "following" ? "#d4d4d8" : "#71717a",
-                fontFamily: "var(--nx-font-mono)", fontSize: 10,
-                padding: isMobile ? "6px 4px" : "4px 10px", cursor: "pointer", borderRadius: 3, letterSpacing: "0.08em",
-                flex: isMobile ? 1 : undefined, textAlign: "center",
-              }}
-            >{isMobile ? "FOLLOW" : "◈ FOLLOWING"}{following.size > 0 ? ` (${following.size})` : ""}</button>
+            <button onClick={() => setView("following")} style={feedTab(view === "following")}>{isMobile ? "FOLLOW" : "Following"}{following.size > 0 ? ` (${following.size})` : ""}</button>
           )}
           {view !== "ranks" && (
             <>

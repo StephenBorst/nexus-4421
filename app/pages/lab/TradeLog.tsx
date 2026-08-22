@@ -28,9 +28,9 @@ function CalendarView({ dayGroups, onDayClick, viewMonth, viewYear, onPrevMonth,
           <span style={{ fontSize: 20, color: "#ededf0", fontFamily: "var(--nx-font-mono)" }}>{MONTH_NAMES[viewMonth]} {viewYear}</span>
         </div>
         <div style={{ ...cardStyle, display: "flex", gap: 20, padding: "10px 16px" }}>
-          <div><div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{"// PNL"}</div><div style={{ fontSize: 16, color: totalPnl >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)" }}>{formatPnl(totalPnl)}</div></div>
+          <div><div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{"PNL"}</div><div style={{ fontSize: 16, color: totalPnl >= 0 ? "#3ecf8e" : "#f7525f", fontFamily: "var(--nx-font-mono)" }}>{formatPnl(totalPnl)}</div></div>
           <div style={{ width: 1, background: "#232327" }} />
-          <div><div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{"// DAYS"}</div><div style={{ fontSize: 16, color: "#ededf0", fontFamily: "var(--nx-font-mono)" }}>{tradingDays}</div></div>
+          <div><div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>{"DAYS"}</div><div style={{ fontSize: 16, color: "#ededf0", fontFamily: "var(--nx-font-mono)" }}>{tradingDays}</div></div>
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>

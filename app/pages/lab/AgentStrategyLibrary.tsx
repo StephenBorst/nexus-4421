@@ -34,7 +34,7 @@ export function AgentStrategyLibrary({
   return (
     <>
       <div style={agentCardStyle}>
-        <div style={agentLabelStyle}>// STRATEGY LIBRARY</div>
+        <div style={agentLabelStyle}>STRATEGY LIBRARY</div>
         <div style={{ color: "#71717a", fontFamily: "var(--nx-font-ui)", fontSize: 10, marginTop: 6, marginBottom: 10, lineHeight: 1.5 }}>
           Save the config above as a named strategy, then load it back anytime. Build → test → save your best.
         </div>
@@ -76,7 +76,7 @@ export function AgentStrategyLibrary({
       {/* ── COMMUNITY STRATEGIES — browse shared configs, ranked by author's graded record ── */}
       <div style={agentCardStyle}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-          <div style={agentLabelStyle}>// COMMUNITY STRATEGIES</div>
+          <div style={agentLabelStyle}>COMMUNITY STRATEGIES</div>
           <div style={{ display: "flex", gap: 6 }}>
             {[{ k: "", l: "ALL" }, { k: "DAY", l: "DAY" }, { k: "SWING", l: "SWING" }].map(({ k, l }) => (
               <button key={l} onClick={() => loadCommunity(k)} style={{ ...navBtnStyle, fontSize: 9, padding: "4px 10px", ...(community !== null && communityStyle === k ? { color: "#ededf0", borderColor: "#ededf050" } : {}) }}>{l}</button>

@@ -217,7 +217,7 @@ export default function AnalyzePage() {
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: isMobile ? "20px 14px 60px" : "32px 24px 80px", color: BRIGHT }}>
       <SectionHeader
-        eyebrow="// WALLET X-RAY"
+        eyebrow="WALLET X-RAY"
         title="X-ray any trader. Grade the tape."
         note="NO LOGIN · PUBLIC DATA"
       />

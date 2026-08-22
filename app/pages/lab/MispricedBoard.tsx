@@ -522,7 +522,7 @@ export function MispricedBoard() {
   return (
     <div>
       <SectionHeader
-        eyebrow="// MISPRICED BOARD"
+        eyebrow="MISPRICED BOARD"
         title="Where the crowd is overpaying"
         note={scanned > 0 ? <span><span style={{ color: C.text.bright }}>{scanned}</span> scanned · <span style={{ color: C.accent }}>{mispricedCount}</span> mispriced</span> : "FUNDING-EDGE LENS"}
       />

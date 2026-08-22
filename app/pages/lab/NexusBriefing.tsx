@@ -213,7 +213,7 @@ export function NexusBriefing({
           serif headline → amber rule). The live meta (read type · date · tape) and the
           collapse control ride in the note slot. */}
       <SectionHeader
-        eyebrow="// THE BRIEFING"
+        eyebrow="THE BRIEFING"
         title="What matters right now"
         note={
           <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>

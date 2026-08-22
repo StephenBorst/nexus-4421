@@ -262,7 +262,7 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
   return (
     <div style={{ marginBottom: 28 }}>
       <SectionHeader
-        eyebrow="// THE BOARD"
+        eyebrow="THE BOARD"
         title="Every market, one read"
         note={<span>{signals ? `${rows.length} markets` : "loading…"} · every column verifiable</span>}
       />

@@ -60,7 +60,7 @@ export function TraderDetail({ source, address, accountId, myAddress, onClose }:
             </div>
           )}
 
-          {source === "orderly" && loading && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#71717a", padding: "20px 0", textAlign: "center" }}>// pulling on-chain record…</div>}
+          {source === "orderly" && loading && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#71717a", padding: "20px 0", textAlign: "center" }}>pulling on-chain record…</div>}
 
           {source === "orderly" && !loading && !d && <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#71717a", padding: "20px 0", textAlign: "center" }}>No indexed record for this account.</div>}
 

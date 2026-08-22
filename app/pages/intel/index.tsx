@@ -469,7 +469,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
       {/* ── Header ─────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "6px" }}>
         <div>
-          <span style={{ color: TEAL }}>// </span>
+          <span style={{ color: TEAL }}></span>
           <span style={{ color: BRIGHT, fontWeight: 700, letterSpacing: "0.08em", fontSize: "13px" }}>
             NEXUS INTEL — MARKET TERMINAL
           </span>
@@ -496,7 +496,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
 
       {/* ── The Market Read (regime) ─────────────────────────── */}
       <Card style={{ marginBottom: "10px" }}>
-        <SectionTitle>// THE MARKET READ</SectionTitle>
+        <SectionTitle>THE MARKET READ</SectionTitle>
 
         <div style={{ marginBottom: "6px" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: "10px", marginBottom: "4px", flexWrap: "wrap" }}>
@@ -518,7 +518,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
         </div>
 
         <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "10px" }}>
-          <div style={{ color: DIM, fontSize: "10px", letterSpacing: "0.1em", marginBottom: "8px" }}>// FACTOR BREAKDOWN</div>
+          <div style={{ color: DIM, fontSize: "10px", letterSpacing: "0.1em", marginBottom: "8px" }}>FACTOR BREAKDOWN</div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3, 1fr)", gap: "12px" }}>
 
             {/* Fear / Greed */}
@@ -704,7 +704,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
         return (
           <Card style={{ marginBottom: "10px", border: `1px solid ${tensionColor === RED ? "rgba(247,82,95,0.25)" : tensionColor === GREEN ? "rgba(62,207,142,0.18)" : "rgba(251,191,36,0.15)"}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-              <SectionTitle style={{ marginBottom: 0 }}>// YOUR POSITION CONTEXT</SectionTitle>
+              <SectionTitle style={{ marginBottom: 0 }}>YOUR POSITION CONTEXT</SectionTitle>
               <span style={{ color: tensionColor, fontSize: "10px", letterSpacing: "0.07em", fontWeight: 700 }}>{tensionLabel}</span>
             </div>
 
@@ -759,7 +759,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
 
         {/* ── Derivatives Intelligence ──────────────────────── */}
         <Card>
-          <SectionTitle>// DERIVATIVES INTELLIGENCE — ORDERLY NETWORK</SectionTitle>
+          <SectionTitle>DERIVATIVES INTELLIGENCE — ORDERLY NETWORK</SectionTitle>
 
           {renderDeriv("BTC", btcD, lsRatios["BTC"] ?? null)}
           {renderDeriv("ETH", ethD, lsRatios["ETH"] ?? null)}
@@ -767,7 +767,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
 
           {alsoActive.length > 0 && (
             <div style={{ marginTop: "6px" }}>
-              <div style={{ color: DIM, fontSize: "10px", letterSpacing: "0.1em", marginBottom: "6px" }}>// ALSO ACTIVE (HL)</div>
+              <div style={{ color: DIM, fontSize: "10px", letterSpacing: "0.1em", marginBottom: "6px" }}>ALSO ACTIVE (HL)</div>
               {alsoActive.map(a => (
                 <div key={a.name} style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px", fontSize: "12px" }}>
                   <span style={{ color: MUTED }}>{a.name}</span>
@@ -784,7 +784,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
 
         {/* ── Movers 24H ────────────────────────────────────── */}
         <Card>
-          <SectionTitle>// MOVERS 24H</SectionTitle>
+          <SectionTitle>MOVERS 24H</SectionTitle>
 
           <div style={{ marginBottom: "12px" }}>
             <div style={{ color: GREEN, fontSize: "10px", letterSpacing: "0.08em", marginBottom: "6px" }}>▲ GAINERS</div>
@@ -842,7 +842,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
       {/* ── Liquidations 24H ─────────────────────── */}
       <Card style={{ marginBottom: "10px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-          <SectionTitle style={{ marginBottom: 0 }}>// LIQUIDATIONS 24H</SectionTitle>
+          <SectionTitle style={{ marginBottom: 0 }}>LIQUIDATIONS 24H</SectionTitle>
           <span style={{ color: DIM, fontSize: "10px" }}>VIA OKX + ORDERLY OI</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "10px" }}>
@@ -901,7 +901,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
             {/* ── Long/Short Positioning ──────────────────────────────── */}
       <Card style={{ marginBottom: "10px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-          <SectionTitle style={{ marginBottom: 0 }}>// LONG / SHORT POSITIONING</SectionTitle>
+          <SectionTitle style={{ marginBottom: 0 }}>LONG / SHORT POSITIONING</SectionTitle>
           <span style={{ color: DIM, fontSize: "10px" }}>VIA OKX ACCOUNT RATIO</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "10px" }}>
@@ -950,7 +950,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
             {/* ── Position Intelligence ───────────────────────────── */}
       <Card style={{ marginBottom: "10px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px", flexWrap: "wrap", gap: "4px" }}>
-          <SectionTitle style={{ marginBottom: 0 }}>// POSITION INTELLIGENCE</SectionTitle>
+          <SectionTitle style={{ marginBottom: 0 }}>POSITION INTELLIGENCE</SectionTitle>
           <span style={{ color: DIM, fontSize: "10px" }}>ORDERLY NETWORK · {timestamp || "—"}</span>
         </div>
 
@@ -1072,7 +1072,7 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
 
       {/* ── Footer ──────────────────────────────────────────────────── */}
       <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "4px", color: DIM, fontSize: "10px", letterSpacing: "0.05em", marginTop: "4px" }}>
-        <div>// DATA: COINGECKO · OKX · ORDERLY NETWORK · ALTERNATIVE.ME</div>
+        <div>DATA: COINGECKO · OKX · ORDERLY NETWORK · ALTERNATIVE.ME</div>
         <div>AUTO-REFRESH: {REFRESH_INTERVAL}s · {countdown}s AGO</div>
       </div>
 

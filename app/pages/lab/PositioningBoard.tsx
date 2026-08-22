@@ -113,7 +113,7 @@ export function PositioningBoard({ trades }: { trades?: ProcessedTrade[] } = {})
   return (
     <div style={{ marginBottom: 8 }}>
       <SectionHeader
-        eyebrow="// POSITIONING"
+        eyebrow="POSITIONING"
         title="Crowd vs. smart money"
         note={confluence > 0 ? `${confluence} CONFLUENCE` : "FADE VS FOLLOW"}
       />

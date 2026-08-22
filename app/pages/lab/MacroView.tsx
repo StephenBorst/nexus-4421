@@ -17,7 +17,7 @@ export function MacroView() {
   return (
     <div>
       <SectionHeader
-        eyebrow="// MACRO & EVENTS"
+        eyebrow="MACRO & EVENTS"
         title="What the world is pricing"
         note="POLYMARKET · GRADED"
       />

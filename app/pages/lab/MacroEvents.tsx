@@ -197,13 +197,13 @@ function WarGame({ body }: { body: Record<string, unknown> }) {
   if (state === "idle") return (
     <button type="button" onClick={run} className="nx-press"
       style={{ color: FOG, background: "transparent", border: `1px solid ${BORDER_STRONG}`, borderRadius: 2, padding: "3px 10px", fontFamily: MF, fontSize: 10, cursor: "pointer" }}
-      title="Red-team this with a Miroshark agent simulation">⚔ war-game this</button>
+      title="Simulate how this plays out — hundreds of agents react across markets and communities">◆ Simulate</button>
   );
-  if (state === "loading") return <span style={{ color: FAINT, fontFamily: MF, fontSize: 10 }}>building scenario…</span>;
+  if (state === "loading") return <span style={{ color: FAINT, fontFamily: MF, fontSize: 10 }}>running simulation…</span>;
   return (
     <div style={{ width: "100%", marginTop: 8, border: `1px solid ${BORDER}`, borderRadius: 2, background: INSET, padding: "10px 12px" }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-        <span style={{ color: FOG, fontFamily: MF, fontSize: 9, letterSpacing: "0.14em" }}>⚔ WAR-GAME · SYNTHETIC RED-TEAM</span>
+        <span style={{ color: FOG, fontFamily: MF, fontSize: 9, letterSpacing: "0.14em" }}>◆ SIMULATION · WHAT COULD HAPPEN</span>
         <button type="button" onClick={() => setState("idle")} style={{ marginLeft: "auto", color: FAINT, background: "transparent", border: "none", fontFamily: MF, fontSize: 10, cursor: "pointer" }}>✕</button>
       </div>
       {res?.scenario ? (
