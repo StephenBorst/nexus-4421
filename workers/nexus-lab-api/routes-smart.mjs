@@ -294,6 +294,24 @@ async function storeConsensus(env, traders) {
       if (count >= 2) out[coin] = { side: l >= s ? "LONG" : "SHORT", count, long: l, short: s };
     }
     await env.NEXUS_AGENT.put("sm:consensus", JSON.stringify(out), { expirationTtl: 3600 });
+
+    // Persist an HOURLY history snapshot per coin (sm:hist:{coin}) so the smart-money
+    // lean becomes a TIME SERIES — the input the smart-money-confluence fade backtest
+    // needs (mirrors oi:hist, which is how OI history was solved). Best-effort; the
+    // ≥55-min guard dedupes the ~10-min board rebuilds down to an hourly series.
+    const now = Date.now();
+    for (const coin in out) {
+      try {
+        const key = `sm:hist:${coin}`;
+        const raw = await env.NEXUS_AGENT.get(key);
+        const hist = raw ? JSON.parse(raw) : [];
+        const last = hist[hist.length - 1];
+        if (last && now - last.t < 55 * 60 * 1000) continue; // keep it hourly
+        hist.push({ t: now, side: out[coin].side, long: out[coin].long, short: out[coin].short });
+        if (hist.length > 2200) hist.splice(0, hist.length - 2200); // ~90d hourly
+        await env.NEXUS_AGENT.put(key, JSON.stringify(hist));
+      } catch { /* per-coin best-effort */ }
+    }
   } catch { /* non-fatal */ }
 }
 
@@ -404,6 +422,21 @@ export async function handleSmart(parts, request, env, ctx) {
   // the caller's scope is exactly what broke /smart/trader and /smart/xray on the first
   // extraction (free variable → clean bundle → ReferenceError in production).
   const url = new URL(request.url);
+
+  // ── GET /smart/consensus[/history?coin=] — the smart-money lean (now + series) ──
+  // No coin → the current per-coin consensus map. ?coin= → that coin's hourly history
+  // (sm:hist, accumulating for the confluence backtest). Public, fail-soft.
+  if (parts[0] === "smart" && parts[1] === "consensus" && request.method === "GET") {
+    const coin = (url.searchParams.get("coin") || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+    if (coin && parts[2] === "history") {
+      let hist = [];
+      try { const raw = await env.NEXUS_AGENT.get(`sm:hist:${coin}`); hist = raw ? JSON.parse(raw) : []; } catch { /* empty */ }
+      return json({ coin, points: hist }, request);
+    }
+    let map = {};
+    try { const c = await env.NEXUS_AGENT.get("sm:consensus"); map = c ? JSON.parse(c) : {}; } catch { /* empty */ }
+    return json({ consensus: map, updatedAt: Date.now() }, request);
+  }
 
   if (parts[0] === "smart" && parts[1] === "board" && request.method === "GET") {
     const CACHE_KEY = SM_BOARD_CACHE;
