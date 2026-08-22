@@ -2057,23 +2057,44 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       }), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=120", ...cors(request) } });
     }
 
-    // ── POST /wargame — Miroshark war-game scenario (red-team a thesis / macro event) ──
-    // Builds the optimal Miroshark simulation prompt from a Lab object. Running the sim
-    // itself costs $1 USDC/call via x402 on Base (x402.miroshark.xyz/run), so the INLINE
-    // paid run is gated (MIROSHARK_ENABLED + a funded MIROSHARK_PAYER_KEY) and pending the
-    // payment-economics decision; until then we return the scenario + a self-serve hand-off
-    // so a user can war-game it on miroshark.xyz. This is a SYNTHETIC red-team, NOT a signal.
+    // ── POST /wargame — Miroshark trade SIMULATION (inline, no hand-off) ──────────
+    // Builds the optimal Miroshark scenario, and when {run:true} + configured, executes
+    // the paid simulation INLINE via x402 (x402.miroshark.xyz/run, $1 USDC/call on Base)
+    // and returns the result so the whole flow stays in our UI. Payment is signed
+    // server-side with MIROSHARK_PAYER_KEY (a funded Base wallet — set by the operator,
+    // never handled here). A global daily cap bounds cost. Synthetic — a thinking tool,
+    // NOT a signal.
+    const MIRO_DISCLAIMER = "Simulation — hundreds of grounded AI agents react across markets and communities to surface the bull case, bear case, and blind spots. A thinking tool to pressure-test the trade, NOT a signal or a forecast.";
     if (parts[0] === "wargame" && request.method === "POST") {
       let body = {}; try { body = await request.json(); } catch { /* ignore */ }
       const scenario = wargameScenario(body || {});
       if (!scenario) return json({ error: "empty scenario — pass {kind:'thesis'|'macro', ...} or {query}" }, request, 400);
       const enabled = env.MIROSHARK_ENABLED === "true" && !!env.MIROSHARK_PAYER_KEY;
-      return json({
-        scenario,
-        enabled,           // true once a funded x402 payer is configured (inline run)
-        handoff: "https://www.miroshark.xyz",
-        disclaimer: "Simulation — hundreds of grounded AI agents react across markets and communities to surface the bull case, bear case, and blind spots. A thinking tool to pressure-test the trade, NOT a signal or a forecast.",
-      }, request);
+      // Scenario preview (no {run}) or not configured → return the scenario + state.
+      if (!body.run || !enabled) {
+        return json({ scenario, enabled, disclaimer: MIRO_DISCLAIMER }, request);
+      }
+      // PAID RUN — bound cost with a global daily cap first (fail-closed).
+      const cap = Number(env.MIROSHARK_DAILY_CAP || 20);
+      const capKey = `miro:runs:${new Date().toISOString().slice(0, 10)}`;
+      let used = 0;
+      try { used = Number(await env.LAB_STORE.get(capKey)) || 0; } catch { /* treat as 0 */ }
+      if (used >= cap) return json({ scenario, enabled: true, ran: false, error: "daily simulation cap reached — try again tomorrow" }, request, 429);
+      try {
+        const { createSigner, wrapFetchWithPayment } = await import("x402-fetch");
+        const signer = await createSigner("base", env.MIROSHARK_PAYER_KEY);
+        const payFetch = wrapFetchWithPayment(fetch, signer);
+        const r = await payFetch("https://x402.miroshark.xyz/run", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: scenario }),
+        });
+        const result = await r.json().catch(() => ({}));
+        if (!r.ok) return json({ scenario, enabled: true, ran: false, error: `simulation failed (${r.status})`, detail: result }, request, 502);
+        try { await env.LAB_STORE.put(capKey, String(used + 1), { expirationTtl: 172800 }); } catch { /* best-effort */ }
+        return json({ scenario, enabled: true, ran: true, result, disclaimer: MIRO_DISCLAIMER }, request);
+      } catch (e) {
+        return json({ scenario, enabled: true, ran: false, error: `simulation error: ${String(e)}` }, request, 502);
+      }
     }
 
     // ── /signals/house — the systematic house track record (seeds the caller board) ──

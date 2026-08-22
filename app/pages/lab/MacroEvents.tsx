@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
 import { C } from "@/config/theme";
+import { Simulate } from "./Simulate";
 
 // ── Macro / Events card — the intelligence corner for event traders ──────────
 // Sibling of Forecast Divergence, but for MACRO & geopolitical events (Fed, recession,
@@ -178,52 +179,6 @@ function MacroProbChart({ event }: { event: MacroEvent }) {
   );
 }
 
-// ── WAR-GAME (Miroshark) — red-team this event before you trade it ────────────
-// Builds the optimal Miroshark simulation scenario (POST /wargame) and, for now, hands
-// off so the user can run the synthetic red-team on miroshark.xyz. Framed as a war-game,
-// NEVER a signal. The inline PAID run ($NEXUS or your own USDC) is the next step; when
-// the backend reports enabled, this surfaces the pay-and-run flow in place of the handoff.
-function WarGame({ body }: { body: Record<string, unknown> }) {
-  const [state, setState] = useState<"idle" | "loading" | "open">("idle");
-  const [res, setRes] = useState<{ scenario?: string; handoff?: string; disclaimer?: string; enabled?: boolean } | null>(null);
-  const run = () => {
-    setState("loading");
-    fetch(`${AGENT_API}/wargame`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
-      .then((r) => r.json())
-      .then((d) => { setRes(d); setState("open"); })
-      .catch(() => { setRes({ scenario: "" }); setState("open"); });
-  };
-  const MF = "var(--nx-font-mono)";
-  if (state === "idle") return (
-    <button type="button" onClick={run} className="nx-press"
-      style={{ color: FOG, background: "transparent", border: `1px solid ${BORDER_STRONG}`, borderRadius: 2, padding: "3px 10px", fontFamily: MF, fontSize: 10, cursor: "pointer" }}
-      title="Simulate how this plays out — hundreds of agents react across markets and communities">◆ Simulate</button>
-  );
-  if (state === "loading") return <span style={{ color: FAINT, fontFamily: MF, fontSize: 10 }}>running simulation…</span>;
-  return (
-    <div style={{ width: "100%", marginTop: 8, border: `1px solid ${BORDER}`, borderRadius: 2, background: INSET, padding: "10px 12px" }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-        <span style={{ color: FOG, fontFamily: MF, fontSize: 9, letterSpacing: "0.14em" }}>◆ SIMULATION · WHAT COULD HAPPEN</span>
-        <button type="button" onClick={() => setState("idle")} style={{ marginLeft: "auto", color: FAINT, background: "transparent", border: "none", fontFamily: MF, fontSize: 10, cursor: "pointer" }}>✕</button>
-      </div>
-      {res?.scenario ? (
-        <>
-          <div style={{ color: BONE, fontSize: 12, lineHeight: 1.5, marginBottom: 8 }}>{res.scenario}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <a href={res.handoff || "https://www.miroshark.xyz"} target="_blank" rel="noopener noreferrer" className="nx-press"
-              style={{ color: BONE, background: "transparent", border: `1px solid ${BORDER_STRONG}`, borderRadius: 2, padding: "3px 10px", fontFamily: MF, fontSize: 10, textDecoration: "none" }}>run on Miroshark ↗</a>
-            <button type="button" onClick={() => { try { navigator.clipboard?.writeText(res.scenario || ""); } catch { /* ignore */ } }}
-              style={{ color: FOG, background: "transparent", border: `1px solid ${BORDER}`, borderRadius: 2, padding: "3px 10px", fontFamily: MF, fontSize: 10, cursor: "pointer" }}>copy scenario</button>
-          </div>
-          <div style={{ color: FAINT, fontFamily: MF, fontSize: 8.5, lineHeight: 1.5, marginTop: 8 }}>{res.disclaimer}</div>
-        </>
-      ) : (
-        <div style={{ color: FAINT, fontFamily: MF, fontSize: 10 }}>Couldn't build a scenario — try again.</div>
-      )}
-    </div>
-  );
-}
-
 // Per-event crowd-probability meter (snapshot fallback when the history line can't load)
 // — the YES prob with a center line and the risk-lens coloring.
 function MacroMeter({ pct, lens }: { pct: number; lens: string | null }) {
@@ -329,7 +284,7 @@ export function MacroEvents() {
                       <span style={{ color: DIM }}>crowd <b style={{ color: BONE }}>{e.yesProbPct}%</b> yes</span>
                       <span style={{ color: FAINT }}>{fmtUsd(e.volumeUsd)} vol</span>
                       <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-                        <WarGame body={{ kind: "macro", question: e.question, yesProbPct: e.yesProbPct, lens: e.riskLens }} />
+                        <Simulate body={{ kind: "macro", question: e.question, yesProbPct: e.yesProbPct, lens: e.riskLens }} />
                         <button
                           type="button"
                           onClick={() => draftFrom(e)}

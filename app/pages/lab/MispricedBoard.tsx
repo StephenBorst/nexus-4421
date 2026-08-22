@@ -22,6 +22,7 @@ import { C, MONO, UI, RADIUS } from "@/config/theme";
 import { AGENT_API } from "./agentTypes";
 import { useIsMobile } from "./useIsMobile";
 import { SectionHeader } from "./components";
+import { Simulate } from "./Simulate";
 
 type EdgeQuality = { tier: "PROVEN" | "TRAP" | "MIXED" | "UNPROVEN"; revertedPct: number | null; samples: number };
 // The SYNTHESIS input — where the graded top Orderly traders (the sharp capital) actually
@@ -489,6 +490,16 @@ export function MispricedBoard() {
                 color: C.accent, background: "none", border: `1px solid ${C.borderStrong}`, borderRadius: RADIUS.md, padding: "9px 15px", cursor: "pointer",
               }}>Draft this fade →</button>
             </div>
+
+            {/* Pressure-test the fade before you take it — run it through a simulation. */}
+            {m.direction !== "NONE" && (
+              <div style={{ marginTop: 12 }}>
+                <Simulate label="◆ Simulate this fade" body={{
+                  kind: "thesis", coin: m.coin, direction: m.direction, entry: m.markPrice,
+                  notes: `Funding fade — ${m.coin} funding is ${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr, the crowd is offside ${m.direction === "SHORT" ? "long" : "short"}; fading for the mean-revert.`,
+                }} />
+              </div>
+            )}
           </div>
 
           {/* Learnable legend */}
