@@ -2081,24 +2081,93 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       try { used = Number(await env.LAB_STORE.get(capKey)) || 0; } catch { /* treat as 0 */ }
       if (used >= cap) return json({ scenario, enabled: true, ran: false, error: "daily simulation cap reached — try again tomorrow" }, request, 429);
       try {
-        const { createSigner, wrapFetchWithPayment } = await import("x402-fetch");
+        const { createSigner } = await import("x402-fetch");
+        const { createPaymentHeader } = await import("x402/client");
         // Normalize the key: viem's privateKeyToAccount needs a 0x-prefixed 32-byte hex
         // string. Wallet exports often omit 0x, and a paste can leave whitespace/newline.
         const rawKey = String(env.MIROSHARK_PAYER_KEY || "").trim().replace(/\s+/g, "");
         const pk = rawKey.startsWith("0x") ? rawKey : `0x${rawKey}`;
         const signer = await createSigner("base", pk);
-        const payFetch = wrapFetchWithPayment(fetch, signer);
-        const r = await payFetch("https://x402.miroshark.xyz/run", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: scenario }),
-        });
-        const result = await r.json().catch(() => ({}));
-        if (!r.ok) return json({ scenario, enabled: true, ran: false, error: `simulation failed (${r.status})`, detail: result }, request, 502);
+        const RUN_URL = "https://x402.miroshark.xyz/run";
+        // Miroshark wants { prompt } and is x402 v2: the payment requirements come back in
+        // the `payment-required` RESPONSE HEADER (base64 JSON), not the body — so x402-fetch
+        // (v1, body-reader) can't drive it. Hand-build: 402 → decode header → sign payment →
+        // retry with X-PAYMENT. /run is ASYNC (returns run_id + status_url to poll).
+        const reqInit = (extra) => ({ method: "POST", headers: { "Content-Type": "application/json", ...(extra || {}) }, body: JSON.stringify({ prompt: scenario }) });
+        const chal = await fetch(RUN_URL, reqInit());
+        if (chal.status !== 402) {
+          const j = await chal.json().catch(() => ({}));
+          if (chal.ok) { try { await env.LAB_STORE.put(capKey, String(used + 1), { expirationTtl: 172800 }); } catch { /* best-effort */ } return json({ scenario, enabled: true, ran: "queued", job: j.data || j, disclaimer: MIRO_DISCLAIMER }, request); }
+          return json({ scenario, enabled: true, ran: false, error: `unexpected ${chal.status} (no 402 challenge)`, detail: j }, request, 502);
+        }
+        const prb64 = chal.headers.get("payment-required");
+        if (!prb64) return json({ scenario, enabled: true, ran: false, error: "402 had no payment-required header" }, request, 502);
+        const bin = atob(prb64.replace(/-/g, "+").replace(/_/g, "/"));
+        const challenge = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))));
+        const accepts = challenge.accepts || [];
+        if (!accepts.length) return json({ scenario, enabled: true, ran: false, error: "challenge had no payment options" }, request, 502);
+        // Remap the v2 challenge (CAIP-2 network, `amount`) into the v1 PaymentRequirements
+        // shape x402@1.2.0 expects (short network, `maxAmountRequired`, resource/mimeType).
+        const NET_MAP = { "eip155:8453": "base", "eip155:84532": "base-sepolia" };
+        const a = accepts[0], rsrc = challenge.resource || {};
+        const req0 = {
+          scheme: a.scheme || "exact",
+          network: NET_MAP[a.network] || a.network,
+          maxAmountRequired: String(a.amount ?? a.maxAmountRequired ?? "0"),
+          resource: a.resource || rsrc.url || RUN_URL,
+          description: a.description || rsrc.description || "MiroShark simulation",
+          mimeType: a.mimeType || rsrc.mimeType || "application/json",
+          payTo: a.payTo,
+          maxTimeoutSeconds: a.maxTimeoutSeconds ?? 300,
+          asset: a.asset,
+          extra: a.extra,
+        };
+        let xPayment = await createPaymentHeader(signer, 1, req0);
+        // x402@1.2.0 builds a v1 envelope (network "base", x402Version 1). Miroshark's v2
+        // facilitator matches the payload network to the challenge (CAIP-2) + expects
+        // version 2 — neither is covered by the EIP-3009 signature, so patch the envelope.
+        let xPaymentUrl = xPayment;
+        try {
+          const obj = JSON.parse(atob(xPayment));
+          obj.network = accepts[0].network;                 // eip155:8453
+          obj.x402Version = challenge.x402Version || 2;      // 2
+          const std = btoa(JSON.stringify(obj));
+          xPayment = std;
+          xPaymentUrl = std.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); // base64url variant
+        } catch { /* send as built */ }
+        // Spec: retry with a signed X-PAYMENT header (base64 v2 PaymentPayload). Success = 202.
+        // Try standard base64 first; if re-challenged, retry the base64url variant.
+        let paid = await fetch(RUN_URL, reqInit({ "X-PAYMENT": xPayment }));
+        if (paid.status === 402 && xPaymentUrl !== xPayment) {
+          paid = await fetch(RUN_URL, reqInit({ "X-PAYMENT": xPaymentUrl }));
+        }
+        const out = await paid.json().catch(() => ({}));
+        if (!paid.ok) {
+          // Decode the re-challenge / error header for a precise reason (why the payment
+          // was rejected) — invaluable while reconciling the v1 lib with the v2 facilitator.
+          let reason = null;
+          try { const h = paid.headers.get("payment-required") || paid.headers.get("x-payment-response"); if (h) reason = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(h.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)))); } catch { /* ignore */ }
+          return json({ scenario, enabled: true, ran: false, error: `run rejected (${paid.status}) — Miroshark's x402 v2 facilitator did not accept the payment`, detail: out, reason }, request, 502);
+        }
         try { await env.LAB_STORE.put(capKey, String(used + 1), { expirationTtl: 172800 }); } catch { /* best-effort */ }
-        return json({ scenario, enabled: true, ran: true, result, disclaimer: MIRO_DISCLAIMER }, request);
+        return json({ scenario, enabled: true, ran: "queued", job: out.data || out, disclaimer: MIRO_DISCLAIMER }, request);
       } catch (e) {
         return json({ scenario, enabled: true, ran: false, error: `simulation error: ${String(e)}` }, request, 502);
       }
+    }
+
+    // ── GET /wargame/status?url= — poll a Miroshark run's status/report (async) ────
+    // The sim runs async after payment; the client polls this proxy (SSRF-guarded to
+    // miroshark hosts) until the report is ready. No payment here — the $1 was the /run.
+    if (parts[0] === "wargame" && parts[1] === "status" && request.method === "GET") {
+      const u = new URL(request.url).searchParams.get("url") || "";
+      let host = ""; try { host = new URL(u).host; } catch { /* invalid */ }
+      if (!/(^|\.)miroshark\.xyz$/i.test(host)) return json({ error: "invalid status url" }, request, 400);
+      try {
+        const r = await fetch(u, { headers: { "Accept": "application/json" } });
+        const d = await r.json().catch(() => ({}));
+        return json({ httpStatus: r.status, ...(d.data ? d : { data: d }) }, request);
+      } catch (e) { return json({ error: String(e) }, request, 502); }
     }
 
     // ── /signals/house — the systematic house track record (seeds the caller board) ──
