@@ -467,20 +467,19 @@ export default function IntelPage({ embedded = false }: { embedded?: boolean }) 
     <div className="nx-stagger" style={page}>
 
       {/* ── Header ─────────────────────────────────────────── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "6px" }}>
-        <div>
-          <span style={{ color: TEAL }}></span>
-          <span style={{ color: BRIGHT, fontWeight: 700, letterSpacing: "0.08em", fontSize: "13px" }}>
-            NEXUS INTEL — MARKET TERMINAL
-          </span>
-        </div>
-        <div style={{ color: DIM, fontSize: "11px", display: "flex", alignItems: "center", gap: "8px" }}>
-          {timestamp && <span>LAST: {timestamp}</span>}
-          <span>AUTO-REFRESH: {REFRESH_INTERVAL}s</span>
-          {loading
-            ? <span style={{ color: TEAL }}>⟳ UPDATING</span>
-            : <span style={{ color: DIM }}>{countdown}s</span>
-          }
+      {/* Standalone: an editorial header (eyebrow → serif), matching the rest of the Lab.
+          Embedded in the Lab, MarketIntelView already provides the header — so we show only
+          a thin live-status line here (no duplicate title). */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
+        {!embedded ? (
+          <div>
+            <div style={{ fontSize: "9px", color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: "5px" }}>Read the tape</div>
+            <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: "24px", fontWeight: 700, color: "#f4f4f5", lineHeight: 1.1, letterSpacing: "-0.01em" }}>Market Terminal</div>
+          </div>
+        ) : <span />}
+        <div style={{ color: DIM, fontSize: "10px", fontFamily: "var(--nx-font-mono)", display: "flex", alignItems: "center", gap: "8px", letterSpacing: "0.05em" }}>
+          {timestamp && <span>updated {timestamp}</span>}
+          {loading ? <span style={{ color: TEAL }}>⟳ live</span> : <span>{countdown}s</span>}
         </div>
       </div>
 
