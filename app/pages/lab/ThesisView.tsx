@@ -19,6 +19,7 @@ import { AGENT_API } from "./agentTypes";
 import { ThesisTimeline } from "./ThesisTimeline";
 import { ThesisAdvisor } from "./ThesisAdvisor";
 import { PnlChart, EmptyState, Coachmark } from "./components";
+import { Collapsible } from "./Collapsible";
 import { SharePoster, type PosterData } from "./SharePoster";
 
 // Crash-proof number formatting — a partial thesis (e.g. a systematic house call with
@@ -1515,6 +1516,12 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
             )}
           </div>
 
+          {/* The full manual calculator — levels, sizing, catalyst, charts. QUICK CALL
+              above is a self-contained fast path (posts a graded call on its own), so the
+              detailed builder folds behind disclosure. Auto-opens when a draft (catalyst /
+              notes prefilled) is in play, so the "draft this fade → thesis" flow shows its
+              levels; collapsed for a fresh quick call. */}
+          <Collapsible title="◆ FINE-TUNE THE CALL" subtitle="levels, sizing, catalyst, charts — for a full plan or a live order" defaultOpen={!!(form.catalyst || form.notes)} storageKey="nx_thesis_finetune">
           <div style={cardStyle}>
             <div style={{ fontSize: 10, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.1em", marginBottom: 12 }}>&#9632; INSTRUMENT</div>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 160px", gap: 8 }}>
@@ -1768,6 +1775,7 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
               );
             })()}
           </div>
+          </Collapsible>
         </div>
 
         {/* Output Panel */}
