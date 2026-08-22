@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { fusePositioning, positioningRead } from "@/lib/positioning.mjs";
 import type { ProcessedTrade } from "./types";
+import { C } from "@/config/theme";
 
 // ── THE READ — the pre-trade fusion panel (Phase-3 synthesis) ────────────────
 // The decision moment used to be intelligence-blind: the Thesis Engine showed funding
@@ -117,7 +118,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   );
 
   return (
-    <div style={{ border: `1px solid ${aligned ? "#2a3a30" : against ? "#3a3320" : BORDER}`, borderLeft: `2px solid ${tone}`, background: "#101012", borderRadius: 8, padding: "12px 14px", marginBottom: 14 }}>
+    <div style={{ border: `1px solid ${aligned ? "#2a3a30" : against ? "#3a3320" : BORDER}`, borderLeft: `2px solid ${tone}`, background: C.surfaceAlt, borderRadius: 8, padding: "12px 14px", marginBottom: 14 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <span style={{ width: 6, height: 6, borderRadius: "50%", background: tone, boxShadow: `0 0 8px ${tone}88` }} />
         <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", color: BONE }}>THE READ · {coin}</span>

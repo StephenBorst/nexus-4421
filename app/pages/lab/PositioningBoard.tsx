@@ -152,7 +152,7 @@ export function PositioningBoard({ trades }: { trades?: ProcessedTrade[] } = {})
             const v = verdictStyle[r.verdict];
             const actionable = r.verdict === "CONFLUENCE" || r.verdict === "CROWD";
             return (
-              <div key={r.coin} style={{ border: `1px solid ${r.verdict === "CONFLUENCE" ? "#33333a" : BORDER}`, background: "#101012", borderRadius: 8, padding: "11px 13px" }}>
+              <div key={r.coin} style={{ border: `1px solid ${r.verdict === "CONFLUENCE" ? "#33333a" : BORDER}`, background: C.surfaceAlt, borderRadius: 8, padding: "11px 13px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <span style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.1em", color: v.color, background: v.bg, border: `1px solid ${v.color}44`, borderRadius: 3, padding: "2px 7px" }}>{v.label}</span>
                   <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: "#fff" }}>{r.coin}</span>
