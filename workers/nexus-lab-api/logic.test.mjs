@@ -1802,3 +1802,25 @@ test("wargameScenario: thesis + macro + freeform build directional red-team prom
   assert.equal(wargameScenario({ query: "" }), "");
   assert.match(wargameScenario({ query: "ETF approved" }), /Simulate reactions to: ETF approved/);
 });
+
+// ── creatorEarnings (#2 per-thesis fee-share) ──────────────────────────────────
+import { creatorEarnings, CREATOR_FEE } from "./logic.mjs";
+test("creatorEarnings: fee = notional × bps × round-trip × share; dedupes copiers", () => {
+  const rows = [
+    { entry_price: 100, qty: 10, symbol: "PERP_BTC_USDC", wallet_address: "0xAAA" }, // notional 1000
+    { entry_price: 50, qty: 4, symbol: "PERP_ETH_USDC", wallet_address: "0xaaa" },   // notional 200 (same copier, cased)
+    { entry_price: 0, qty: 5, symbol: "PERP_X_USDC", wallet_address: "0xBBB" },       // zero notional → skipped
+  ];
+  const e = creatorEarnings(rows);
+  assert.equal(e.trades, 2);
+  assert.equal(e.copiers, 1); // 0xAAA == 0xaaa
+  assert.equal(e.volumeUsd, 1200);
+  // fee = 1200 * 2.5/10000 * 2 = 0.6 ; earned = 0.6 * 0.20 = 0.12
+  assert.equal(e.feesUsd, 0.6);
+  assert.equal(e.earnedUsd, 0.12);
+  assert.equal(e.sharePct, 20);
+});
+test("creatorEarnings: empty → zeros", () => {
+  const e = creatorEarnings([]);
+  assert.equal(e.trades, 0); assert.equal(e.earnedUsd, 0);
+});

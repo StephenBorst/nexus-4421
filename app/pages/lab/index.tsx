@@ -26,6 +26,7 @@ import { Collapsible } from "./Collapsible";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
 import { LabStanding } from "./LabStanding";
 import { CommandPalette } from "./CommandPalette";
+import { CreatorEarnings } from "./CreatorEarnings";
 import { NexusBriefing } from "./NexusBriefing";
 import { DecisionBoard } from "./DecisionBoard";
 import { CountUp } from "./components";
@@ -354,6 +355,7 @@ export default function TheLabPage() {
             the working surface above. */}
         <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #232327", display: "flex", flexDirection: "column", gap: 12 }}>
           <NexusBuyBar />
+          {connected && <CreatorEarnings address={rootWalletAddress} />}
           {connected && <NexusPro walletAddress={rootWalletAddress} />}
         </div>
       </div>

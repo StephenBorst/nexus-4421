@@ -1269,6 +1269,40 @@ export function aggregateAgentTrades(rows) {
   return { trades, wins, net, grossWin, grossLoss, daysActive, firstTradeAt: first === Infinity ? 0 : first };
 }
 
+// ── CREATOR FEE-SHARE (#2) — what a caller earned from being copied ───────────
+// The per-thesis rebate: when a copier trades a call attributed to a leader
+// (source_leader), a slice of the BROKER FEE that trade generated accrues to the
+// leader. Computed from the SAME on-chain-auditable agent_trades rows the copy-record
+// uses — notional = entry_price × qty, round-trip taker fee, × the creator share.
+// Pure + recomputable from public order data (fee = notional × bps), same trustless
+// standard as grading. A fee-share, NOT a P&L-share (a losing copy still paid a fee) —
+// which is the honest, legally-clean design (creator commission, not revenue share).
+export const CREATOR_FEE = { feeBps: 2.5, roundTrip: 2, share: 0.20, minPayoutUsd: 5 };
+
+export function creatorEarnings(rows, cfg = CREATOR_FEE) {
+  let feesUsd = 0, volumeUsd = 0; const copiers = new Set(); const lines = [];
+  for (const r of rows || []) {
+    const entry = Math.abs(parseFloat(r.entry_price) || 0);
+    const qty = Math.abs(parseFloat(r.qty) || 0);
+    const notional = entry * qty;
+    if (!(notional > 0)) continue;
+    const fee = notional * (cfg.feeBps / 10000) * cfg.roundTrip; // entry + exit taker
+    const earned = fee * cfg.share;
+    feesUsd += fee; volumeUsd += notional;
+    if (r.wallet_address) copiers.add(String(r.wallet_address).toLowerCase());
+    lines.push({
+      symbol: String(r.symbol || "").replace("PERP_", "").replace("_USDC", ""),
+      notional: round(notional, 2), fee: round(fee, 4), earned: round(earned, 4),
+    });
+  }
+  return {
+    trades: lines.length, copiers: copiers.size,
+    volumeUsd: round(volumeUsd, 2), feesUsd: round(feesUsd, 2),
+    earnedUsd: round(feesUsd * cfg.share, 2), sharePct: Math.round(cfg.share * 100),
+    lines: lines.slice(-50),
+  };
+}
+
 // Risk-adjusted 0–100 score: win rate + capped profit factor, shrunk by sample
 // size so a lucky 3-trade run can't outrank a proven record.
 export function agentScore(a, cfg = AGENT_BOARD) {

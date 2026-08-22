@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -2168,6 +2168,37 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         const d = await r.json().catch(() => ({}));
         return json({ httpStatus: r.status, ...(d.data ? d : { data: d }) }, request);
       } catch (e) { return json({ error: String(e) }, request, 502); }
+    }
+
+    // ── GET /creator/earnings/:leader — creator fee-share earned from copies (#2) ──
+    // What a caller earned from being copied: the round-trip taker fee on Nexus agent
+    // trades attributed to them (source_leader) × the creator share. Computed from the
+    // same on-chain-auditable rows as copy-record; recomputable from public order data.
+    // A COMMISSION for being copied, not a P&L or revenue share. Read-only (MVP); payout
+    // is the follow-on. Fail-soft {available:false} if the source_leader column is absent.
+    if (parts[0] === "creator" && parts[1] === "earnings" && parts[2]) {
+      if (request.method !== "GET") return new Response("method not allowed", { status: 405 });
+      const leader = String(parts[2]).toLowerCase();
+      if (!/^0x[a-f0-9]{40}$/.test(leader)) return json({ error: "valid 0x leader required" }, request, 400);
+      if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return json({ leader, available: false, ...creatorEarnings([]) }, request);
+      const CK = `creatorearn:${leader}`;
+      const cached = await env.LAB_STORE.get(CK);
+      if (cached) return json(JSON.parse(cached), request);
+      let rows = [], available = true;
+      try {
+        const res = await fetch(
+          `${env.SUPABASE_URL}/rest/v1/agent_trades?select=entry_price,qty,symbol,wallet_address&source_leader=ilike.${leader}&limit=10000`,
+          { headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` } }
+        );
+        if (res.ok) rows = await res.json();
+        else available = false; // source_leader column not migrated / query rejected
+      } catch (e) { console.error("[creator-earnings] supabase error:", e); available = false; }
+      const payload = {
+        leader, available, ...creatorEarnings(rows), minPayoutUsd: CREATOR_FEE.minPayoutUsd,
+        note: "Fee-share earned from Nexus agent copies attributed to this caller (source_leader) — round-trip taker fee × the creator share, recomputable from public order data. A commission for being copied, not a P&L or revenue share.",
+      };
+      await env.LAB_STORE.put(CK, JSON.stringify(payload), { expirationTtl: 300 });
+      return json(payload, request);
     }
 
     // ── /signals/house — the systematic house track record (seeds the caller board) ──
