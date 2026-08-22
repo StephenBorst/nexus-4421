@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
