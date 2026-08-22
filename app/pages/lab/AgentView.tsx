@@ -871,6 +871,26 @@ export function AgentView() {
       {/* ─── CONFIG TAB ──────────────────────────────────── */}
       {tab === "config" && (
         <div>
+          {/* Config at a glance — the whole setup in one strip before the controls, so the
+              tab opens as a READ, not a wall of panels. The controls below edit it live. */}
+          <div style={{ ...agentCardStyle, display: "flex", flexWrap: "wrap", gap: 18, alignItems: "center", rowGap: 12, borderLeft: "2px solid #ededf0" }}>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", marginRight: 2 }}>Your setup</span>
+            {([
+              ["MODE", String(config.mode ?? "PAPER")],
+              ["STYLE", deriveStyle(config)],
+              ["STRATEGY", String(config.signalMode ?? "—")],
+              ["SYMBOLS", (config.symbols || []).length ? (config.symbols || []).join(" · ") : "none yet"],
+              ["$/TRADE", config.capitalPerTrade ? `$${config.capitalPerTrade}` : "—"],
+              ["LEVERAGE", config.leverage ? `${config.leverage}×` : "—"],
+              ["MAX/DAY", config.maxTradesPerDay != null ? String(config.maxTradesPerDay) : "—"],
+              ["DAILY STOP", config.maxDailyLossUsdc ? `$${config.maxDailyLossUsdc}` : "—"],
+            ] as [string, string][]).map(([k, v]) => (
+              <span key={k} style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.12em", color: "#52525b" }}>{k}</span>
+                <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#ededf0", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200 }}>{v}</span>
+              </span>
+            ))}
+          </div>
           {/* ── TRADING STYLE — the friendly on-ramp: pick a horizon, get a tuned
               starting config. Day/Swing are the agent's honest home (hourly data +
               1-min cron + funding edge); scalping/position are intentionally absent. */}

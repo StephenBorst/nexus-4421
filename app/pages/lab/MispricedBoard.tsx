@@ -431,9 +431,12 @@ export function MispricedBoard() {
           padding: "6px 11px", cursor: "pointer", marginBottom: 16,
         }}>← BACK TO BOARD</button>
 
-        <div style={{ display: isMobile ? "block" : "grid", gridTemplateColumns: "minmax(0,430px) 1fr", gap: 28, alignItems: "start" }}>
+        {/* Primo layout: the card (with the hero chart) takes the bulk of the width so the
+            SynthChart breathes; the learnable legend fills the right cleanly instead of a
+            smushed card + a big empty gap. Capped so it doesn't sprawl on ultra-wide. */}
+        <div style={{ display: isMobile ? "block" : "grid", gridTemplateColumns: "minmax(0,1.75fr) minmax(260px,1fr)", gap: 32, alignItems: "start", maxWidth: 1240 }}>
           {/* The card */}
-          <div style={{ position: "relative", border: `1px solid ${C.border}`, borderLeft: `2px solid ${C.accent}`, borderRadius: RADIUS.lg, padding: 22, background: "linear-gradient(180deg,#17171a 0%,#0d0d0f 100%)", overflow: "hidden" }}>
+          <div style={{ position: "relative", border: `1px solid ${C.border}`, borderLeft: `2px solid ${C.accent}`, borderRadius: RADIUS.lg, padding: "24px 28px", background: "linear-gradient(180deg,#17171a 0%,#0d0d0f 100%)", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: MONO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: C.text.muted }}>
               <span style={{ color: C.text.fog }}>◆ Nexus · Funding edge</span>
               <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: C.accent }}>◆ WATCHING</span>
