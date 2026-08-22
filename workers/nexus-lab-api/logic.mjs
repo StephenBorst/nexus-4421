@@ -827,8 +827,8 @@ export function houseCallFromSignal(m, now = Date.now(), cfg = HOUSE_CALL) {
     actualPnl: null,
     isPublic: true,
     source: "nexus-signal", // marks the systematic house call (vs a human thesis)
-    catalyst: `Funding fade · ${fundTxt}`,
-    notes: `Systematic Nexus signal — funding on ${m.coin} is stretched (${fundTxt}), fading the one-sided crowd for the mean-revert. Graded trustlessly from public price, first-touch TP vs SL. Not advice.`,
+    catalyst: `Funding fade - ${fundTxt}`,
+    notes: `Systematic Nexus signal - funding on ${m.coin} is stretched (${fundTxt}), fading the one-sided crowd for the mean-revert. Graded trustlessly from public price, first-touch TP vs SL. Not advice.`,
   };
 }
 
