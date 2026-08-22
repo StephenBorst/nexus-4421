@@ -2082,7 +2082,11 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       if (used >= cap) return json({ scenario, enabled: true, ran: false, error: "daily simulation cap reached — try again tomorrow" }, request, 429);
       try {
         const { createSigner, wrapFetchWithPayment } = await import("x402-fetch");
-        const signer = await createSigner("base", env.MIROSHARK_PAYER_KEY);
+        // Normalize the key: viem's privateKeyToAccount needs a 0x-prefixed 32-byte hex
+        // string. Wallet exports often omit 0x, and a paste can leave whitespace/newline.
+        const rawKey = String(env.MIROSHARK_PAYER_KEY || "").trim().replace(/\s+/g, "");
+        const pk = rawKey.startsWith("0x") ? rawKey : `0x${rawKey}`;
+        const signer = await createSigner("base", pk);
         const payFetch = wrapFetchWithPayment(fetch, signer);
         const r = await payFetch("https://x402.miroshark.xyz/run", {
           method: "POST", headers: { "Content-Type": "application/json" },
