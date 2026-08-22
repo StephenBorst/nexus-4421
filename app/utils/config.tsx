@@ -409,14 +409,14 @@ const allMenuItems = [
           // matching the editorial design system so it feels owned, not bolted on.
           main: {
             component: (
-              <Link to="/" style={{ display: "flex", alignItems: "center", gap: 9, textDecoration: "none" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
                 <img
                   src={withBasePath("/icon-512.png")}
                   alt="Nexus Trading Labs"
                   style={{ height: "30px", width: "auto", flexShrink: 0 }}
                 />
                 <span style={{ fontFamily: "var(--nx-font-serif, 'Libre Baskerville', Georgia, serif)", fontSize: 19, fontWeight: 700, color: "#f4f4f5", letterSpacing: "0.01em", lineHeight: 1, whiteSpace: "nowrap" }}>Nexus</span>
-              </Link>
+              </span>
             ),
           },
           secondary: {
