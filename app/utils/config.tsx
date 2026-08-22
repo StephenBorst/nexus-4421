@@ -344,11 +344,13 @@ const allMenuItems = [
               />
             )}
             <Link to="/">
-              {isMobile &&
-              getRuntimeConfigBoolean("VITE_HAS_SECONDARY_LOGO") ? (
+              {isMobile ? (
+                // Mobile: the real Nexus brand mark (icon-only to save nav width),
+                // NOT the old generic secondary logo — keeps the mark congruent with
+                // the desktop lockup (same icon-512 asset).
                 <img
-                  src={withBasePath("/logo-secondary.webp")}
-                  alt="logo"
+                  src={withBasePath("/icon-512.png")}
+                  alt="Nexus Trading Labs"
                   style={{ height: "30px", width: "auto", flexShrink: 0, objectFit: "contain" }}
                 />
               ) : (

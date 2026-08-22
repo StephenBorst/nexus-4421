@@ -83,7 +83,7 @@ export default function SignalsNavButton() {
         onClick={toggle}
         title={unseen > 0 ? `Signals, ${unseen} new` : "Signals"}
         aria-label={unseen > 0 ? `Signals, ${unseen} new` : "Signals"}
-        style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", border: "none", cursor: "pointer", color: "var(--oui-color-base-contrast-54, #d4d4d8)", padding: 0 }}
+        style={{ appearance: "none", WebkitAppearance: "none", position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", border: "none", cursor: "pointer", color: "var(--oui-color-base-contrast-54, #d4d4d8)", padding: 0 }}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -110,7 +110,7 @@ export default function SignalsNavButton() {
             </div>
           ) : (
             list.map((s) => (
-              <button key={s.id} onClick={() => go(s)} style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", borderBottom: "1px solid #1a1a1e", cursor: "pointer", padding: "11px 14px" }}>
+              <button key={s.id} onClick={() => go(s)} style={{ appearance: "none", WebkitAppearance: "none", display: "block", width: "100%", textAlign: "left", background: "none", border: "none", borderBottom: "1px solid #1a1a1e", cursor: "pointer", padding: "11px 14px" }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                   <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: s.kind === "DIVERGENCE" ? "#fbbf24" : "#3ecf8e", flexShrink: 0 }}>{KIND_GLYPH[s.kind] ?? "◆"}</span>
                   <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#f4f4f5", fontWeight: 600, lineHeight: 1.35 }}>{s.title}</span>
