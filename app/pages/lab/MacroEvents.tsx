@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
+import { C } from "@/config/theme";
 
 // ── Macro / Events card — the intelligence corner for event traders ──────────
 // Sibling of Forecast Divergence, but for MACRO & geopolitical events (Fed, recession,
@@ -12,8 +13,12 @@ import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
 // intelligence partner (macro-event discovery) plugs into. Fail-soft.
 
 const AGENT_API = "https://og.nexustradinglabs.com";
-const BONE = "#ededf0", DIM = "#71717a", FAINT = "#52525b";
-const POS = "#3ecf8e", NEG = "#f7525f";
+// Palette repointed to the canonical design tokens (app/config/theme.ts) — collapses
+// the local-hex drift so this corner matches the Mispriced Board + the rest of the Lab.
+const BONE = C.text.bright, DIM = C.text.muted, FAINT = C.text.faint;
+const POS = C.pos, NEG = C.neg;
+const SURFACE = C.surface, SURFACE_ALT = C.surfaceAlt, INSET = C.inset;
+const BORDER = C.border, BORDER_STRONG = C.borderStrong, FOG = C.text.fog;
 
 interface MacroEvent {
   id: string | null;
@@ -88,7 +93,7 @@ function MacroProxyChart() {
   });
   const MF = "var(--nx-font-mono)";
   return (
-    <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+    <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: `1px solid ${BORDER}` }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 2 }}>
         <span style={{ color: FAINT, fontFamily: MF, fontSize: 9, letterSpacing: "0.14em" }}>MACRO PROXY · BTC/USDC</span>
         <span style={{ color: up ? POS : NEG, fontFamily: MF, fontSize: 9 }}>{up ? "+" : ""}{chg}% · 30d</span>
@@ -97,10 +102,10 @@ function MacroProxyChart() {
       <svg viewBox={`0 0 ${VB_W} ${H}`} style={{ display: "block", width: "100%", height: "auto" }} role="img" aria-label="BTC price over the last 30 days, the macro-proxy expression.">
         <path d={area} fill={up ? POS : NEG} opacity="0.06" />
         <polyline points={line} fill="none" stroke={up ? POS : NEG} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" opacity="0.9" />
-        <line x1={X(t1)} y1={lastY} x2={VB_W - gutterR} y2={lastY} stroke="#33333a" strokeWidth="0.5" strokeDasharray="2 2" />
-        <rect x={VB_W - gutterR} y={lastY - 8} width={gutterR - 6} height={16} rx="2" fill="#141416" stroke="#33333a" />
+        <line x1={X(t1)} y1={lastY} x2={VB_W - gutterR} y2={lastY} stroke={BORDER_STRONG} strokeWidth="0.5" strokeDasharray="2 2" />
+        <rect x={VB_W - gutterR} y={lastY - 8} width={gutterR - 6} height={16} rx="2" fill={SURFACE} stroke={BORDER_STRONG} />
         <text x={VB_W - gutterR + 4} y={lastY + 3.4} fill={BONE} fontFamily={MF} fontSize="8.5" fontWeight="700">${Math.round(cs[cs.length - 1]).toLocaleString()}</text>
-        <line x1={padL} y1={plotBot + 4} x2={plotW} y2={plotBot + 4} stroke="rgba(255,255,255,0.08)" strokeWidth="0.75" />
+        <line x1={padL} y1={plotBot + 4} x2={plotW} y2={plotBot + 4} stroke={BORDER} strokeWidth="0.75" />
         {ticks.map((tk, i) => <text key={i} x={Math.max(padL, Math.min(plotW, tk.x))} y={plotBot + 13} textAnchor={tk.anchor} fill={FAINT} fontFamily={MF} fontSize="7.5">{tk.label}</text>)}
       </svg>
     </div>
@@ -157,16 +162,16 @@ function MacroProbChart({ event }: { event: MacroEvent }) {
       </div>
       <svg viewBox={`0 0 ${VB_W} ${H}`} style={{ display: "block", width: "100%", height: "auto" }} role="img" aria-label={`YES probability over time for: ${event.question}`}>
         {mid != null && <>
-          <line x1={padL} y1={mid} x2={plotW} y2={mid} stroke="#3a3a42" strokeWidth="0.75" strokeDasharray="3 4" />
+          <line x1={padL} y1={mid} x2={plotW} y2={mid} stroke={BORDER_STRONG} strokeWidth="0.75" strokeDasharray="3 4" />
           <text x={padL + 2} y={mid - 3} fill={FAINT} fontFamily={MF} fontSize="6.5" letterSpacing="0.5">50% · COIN-FLIP</text>
         </>}
         <path d={area} fill={c} opacity="0.07" />
         <polyline points={line} fill="none" stroke={c} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" opacity="0.92" />
         <circle cx={X(t1)} cy={lastY} r="2.5" fill={c} />
-        <line x1={X(t1)} y1={lastY} x2={VB_W - gutterR} y2={lastY} stroke="#33333a" strokeWidth="0.5" strokeDasharray="2 2" />
-        <rect x={VB_W - gutterR} y={lastY - 8} width={gutterR - 6} height={16} rx="2" fill="#141416" stroke={c + "88"} />
+        <line x1={X(t1)} y1={lastY} x2={VB_W - gutterR} y2={lastY} stroke={BORDER_STRONG} strokeWidth="0.5" strokeDasharray="2 2" />
+        <rect x={VB_W - gutterR} y={lastY - 8} width={gutterR - 6} height={16} rx="2" fill={SURFACE} stroke={c + "88"} />
         <text x={VB_W - gutterR + 4} y={lastY + 3.4} fill={c} fontFamily={MF} fontSize="8.5" fontWeight="700">{Math.round(lastPct)}%</text>
-        <line x1={padL} y1={plotBot + 4} x2={plotW} y2={plotBot + 4} stroke="rgba(255,255,255,0.08)" strokeWidth="0.75" />
+        <line x1={padL} y1={plotBot + 4} x2={plotW} y2={plotBot + 4} stroke={BORDER} strokeWidth="0.75" />
         {ticks.map((tk, i) => <text key={i} x={Math.max(padL, Math.min(plotW, tk.x))} y={plotBot + 13} textAnchor={tk.anchor} fill={FAINT} fontFamily={MF} fontSize="7.5">{tk.label}</text>)}
       </svg>
     </div>
@@ -180,9 +185,9 @@ function MacroMeter({ pct, lens }: { pct: number; lens: string | null }) {
   const p = Math.max(0, Math.min(100, pct));
   return (
     <div style={{ margin: "2px 0 9px" }}>
-      <div style={{ position: "relative", height: 6, background: "#0e0e10", border: "1px solid #26262c", borderRadius: 3, overflow: "hidden" }}>
+      <div style={{ position: "relative", height: 6, background: INSET, border: `1px solid ${BORDER}`, borderRadius: 3, overflow: "hidden" }}>
         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${p}%`, background: c, opacity: 0.5 }} />
-        <div style={{ position: "absolute", left: "50%", top: -1, bottom: -1, width: 1, background: "#3a3a42" }} />
+        <div style={{ position: "absolute", left: "50%", top: -1, bottom: -1, width: 1, background: BORDER_STRONG }} />
         <div style={{ position: "absolute", left: `calc(${p}% - 1px)`, top: -2, bottom: -2, width: 2, background: c }} />
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3, fontFamily: "var(--nx-font-mono)", fontSize: 8, color: FAINT, letterSpacing: "0.08em" }}>
@@ -249,7 +254,7 @@ export function MacroEvents() {
         </div>
       </div>
 
-      <div style={{ background: "#141416", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 2, padding: "14px 16px" }}>
+      <div style={{ background: "#141416", border: `1px solid ${BORDER}`, borderRadius: 2, padding: "14px 16px" }}>
         {loading ? (
           <div style={{ color: FAINT, fontSize: 11, fontFamily: "var(--nx-font-mono)" }}>Reading the macro tape…</div>
         ) : !events.length ? (
@@ -263,16 +268,16 @@ export function MacroEvents() {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {actionable.map((e) => (
                   <div key={e.id ?? e.question} style={{
-                    border: `1px solid ${lensColor(e.riskLens)}33`, background: "#101012", borderRadius: 2, padding: "10px 12px",
+                    border: `1px solid ${lensColor(e.riskLens)}33`, background: SURFACE_ALT, borderRadius: 2, padding: "10px 12px",
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
                       <span style={{ color: lensColor(e.riskLens), fontFamily: "var(--nx-font-mono)", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", border: `1px solid ${lensColor(e.riskLens)}55`, borderRadius: 2, padding: "1px 6px" }}>
                         {lensLabel(e.riskLens)}
                       </span>
-                      <span style={{ color: FAINT, fontFamily: "var(--nx-font-mono)", fontSize: 8.5, letterSpacing: "0.1em", border: "1px solid #2a2a30", borderRadius: 2, padding: "1px 5px" }}>{CAT_LABEL[e.category] ?? e.category}</span>
+                      <span style={{ color: FAINT, fontFamily: "var(--nx-font-mono)", fontSize: 8.5, letterSpacing: "0.1em", border: `1px solid ${BORDER}`, borderRadius: 2, padding: "1px 5px" }}>{CAT_LABEL[e.category] ?? e.category}</span>
                       {e.endDate ? <span style={{ color: FAINT, fontSize: 10, fontFamily: "var(--nx-font-mono)", marginLeft: "auto" }}>ends {fmtEnds(e.endDate)}</span> : null}
                     </div>
-                    <div style={{ color: "#c4c4cc", fontSize: 12, lineHeight: 1.45, marginBottom: 8 }}>{e.question}</div>
+                    <div style={{ color: FOG, fontSize: 12, lineHeight: 1.45, marginBottom: 8 }}>{e.question}</div>
                     <MacroProbChart event={e} />
                     <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
                       <span style={{ color: DIM }}>crowd <b style={{ color: BONE }}>{e.yesProbPct}%</b> yes</span>
@@ -281,7 +286,7 @@ export function MacroEvents() {
                         type="button"
                         onClick={() => draftFrom(e)}
                         className="nx-press"
-                        style={{ marginLeft: "auto", color: BONE, background: "transparent", border: "1px solid #33333a", borderRadius: 2, padding: "3px 10px", fontFamily: "var(--nx-font-mono)", fontSize: 10, cursor: "pointer" }}
+                        style={{ marginLeft: "auto", color: BONE, background: "transparent", border: `1px solid ${BORDER_STRONG}`, borderRadius: 2, padding: "3px 10px", fontFamily: "var(--nx-font-mono)", fontSize: 10, cursor: "pointer" }}
                       >◆ draft thesis</button>
                     </div>
                   </div>
@@ -294,14 +299,14 @@ export function MacroEvents() {
             )}
 
             {context.length > 0 && (
-              <div style={{ marginTop: actionable.length ? 14 : 12, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 10 }}>
+              <div style={{ marginTop: actionable.length ? 14 : 12, borderTop: `1px solid ${BORDER}`, paddingTop: 10 }}>
                 <div style={{ color: FAINT, fontSize: 9, fontFamily: "var(--nx-font-mono)", letterSpacing: "0.14em", marginBottom: 8 }}>CONTEXT · what the event crowd is pricing</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {context.map((e) => (
                     <div key={e.id ?? e.question} style={{ display: "flex", alignItems: "baseline", gap: 8, fontFamily: "var(--nx-font-mono)", fontSize: 10, lineHeight: 1.4 }}>
                       <span style={{ color: DIM, minWidth: 54 }}>{CAT_LABEL[e.category] ?? e.category}</span>
                       <span style={{ color: BONE, minWidth: 40 }}>{e.yesProbPct}%</span>
-                      <span style={{ color: "#9a9aa2", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.question}</span>
+                      <span style={{ color: FOG, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.question}</span>
                     </div>
                   ))}
                 </div>

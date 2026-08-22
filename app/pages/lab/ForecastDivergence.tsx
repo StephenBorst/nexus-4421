@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
+import { C } from "@/config/theme";
 
 // ── Forecast Divergence card (the prediction-market lens) ────────────────────
 // Quotient-informed sibling of the Mispriced Board: reads the FORECASTING crowd
@@ -11,8 +12,11 @@ import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
 // renders a quiet "no linked forecasts" line when the feed is sparse (by design).
 
 const AGENT_API = "https://og.nexustradinglabs.com";
-const BONE = "#ededf0", DIM = "#71717a", FAINT = "#52525b";
-const WARN = "#fbbf24", POS = "#3ecf8e", NEG = "#f7525f";
+// Palette repointed to the canonical design tokens (app/config/theme.ts) — collapses
+// the local-hex drift so this corner matches the Mispriced Board + the rest of the Lab.
+const BONE = C.text.bright, DIM = C.text.muted, FAINT = C.text.faint;
+const WARN = C.warn, POS = C.pos, NEG = C.neg;
+const SURFACE = C.surface, BORDER = C.border, BORDER_STRONG = C.borderStrong, FOG = C.text.fog;
 
 interface ForecastMarket {
   id: string | null;
@@ -115,16 +119,16 @@ function ForecastChart({ coin, markPrice, target, forecastLean, forecastProbPct 
       {/* implied-move zone: current price → forecast target */}
       {tgtY != null && <rect x={padL} y={Math.min(lastY, tgtY)} width={plotW} height={Math.abs(tgtY - lastY) || 1} fill={lc} opacity="0.08" />}
       <path d={area} fill={BONE} opacity="0.04" />
-      <polyline points={line} fill="none" stroke="#9a9aa2" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" />
+      <polyline points={line} fill="none" stroke={FOG} strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" />
       {tgtY != null && <>
         <line x1={padL} y1={tgtY} x2={plotW} y2={tgtY} stroke={lc} strokeWidth="1" strokeDasharray="4 3" opacity="0.9" />
         <text x={padL + 2} y={tgtY - 3.5} fill={lc} fontFamily={MF} fontSize="7.5" fontWeight="700">TARGET {fmtPrice(tgt)} · {forecastProbPct}% {forecastLean}</text>
       </>}
       <circle cx={X(t1)} cy={lastY} r="2.5" fill={BONE} />
-      <line x1={X(t1)} y1={lastY} x2={VB_W - gutterR} y2={lastY} stroke="#33333a" strokeWidth="0.5" strokeDasharray="2 2" />
-      <rect x={VB_W - gutterR} y={lastY - 8} width={gutterR - 6} height={16} rx="2" fill="#141416" stroke="#33333a" />
+      <line x1={X(t1)} y1={lastY} x2={VB_W - gutterR} y2={lastY} stroke={BORDER_STRONG} strokeWidth="0.5" strokeDasharray="2 2" />
+      <rect x={VB_W - gutterR} y={lastY - 8} width={gutterR - 6} height={16} rx="2" fill={SURFACE} stroke={BORDER_STRONG} />
       <text x={VB_W - gutterR + 4} y={lastY + 3.4} fill={BONE} fontFamily={MF} fontSize="8.5" fontWeight="700">{fmtPrice(cs[cs.length - 1])}</text>
-      <line x1={padL} y1={plotBot + 4} x2={plotW} y2={plotBot + 4} stroke="rgba(255,255,255,0.08)" strokeWidth="0.75" />
+      <line x1={padL} y1={plotBot + 4} x2={plotW} y2={plotBot + 4} stroke={BORDER} strokeWidth="0.75" />
       {ticks.map((tk, i) => <text key={i} x={Math.max(padL, Math.min(plotW, tk.x))} y={plotBot + 13} textAnchor={tk.anchor} fill={FAINT} fontFamily={MF} fontSize="7.5">{tk.label}</text>)}
     </svg>
   );
@@ -177,16 +181,16 @@ function ForecastProbLine({ token, lean, question }: { token: string | null; lea
       </div>
       <svg viewBox={`0 0 ${VB_W} ${H}`} style={{ display: "block", width: "100%", height: "auto" }} role="img" aria-label={`YES probability over time for: ${question}`}>
         {mid != null && <>
-          <line x1={padL} y1={mid} x2={plotW} y2={mid} stroke="#3a3a42" strokeWidth="0.75" strokeDasharray="3 4" />
+          <line x1={padL} y1={mid} x2={plotW} y2={mid} stroke={BORDER_STRONG} strokeWidth="0.75" strokeDasharray="3 4" />
           <text x={padL + 2} y={mid - 3} fill={FAINT} fontFamily={MF} fontSize="6.5" letterSpacing="0.5">50% · COIN-FLIP</text>
         </>}
         <path d={area} fill={c} opacity="0.07" />
         <polyline points={line} fill="none" stroke={c} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" opacity="0.92" />
         <circle cx={X(t1)} cy={lastY} r="2.5" fill={c} />
-        <line x1={X(t1)} y1={lastY} x2={VB_W - gutterR} y2={lastY} stroke="#33333a" strokeWidth="0.5" strokeDasharray="2 2" />
-        <rect x={VB_W - gutterR} y={lastY - 8} width={gutterR - 6} height={16} rx="2" fill="#141416" stroke={c + "88"} />
+        <line x1={X(t1)} y1={lastY} x2={VB_W - gutterR} y2={lastY} stroke={BORDER_STRONG} strokeWidth="0.5" strokeDasharray="2 2" />
+        <rect x={VB_W - gutterR} y={lastY - 8} width={gutterR - 6} height={16} rx="2" fill={SURFACE} stroke={c + "88"} />
         <text x={VB_W - gutterR + 4} y={lastY + 3.4} fill={c} fontFamily={MF} fontSize="8.5" fontWeight="700">{Math.round(lastPct)}%</text>
-        <line x1={padL} y1={plotBot + 4} x2={plotW} y2={plotBot + 4} stroke="rgba(255,255,255,0.08)" strokeWidth="0.75" />
+        <line x1={padL} y1={plotBot + 4} x2={plotW} y2={plotBot + 4} stroke={BORDER} strokeWidth="0.75" />
         {ticks.map((tk, i) => <text key={i} x={Math.max(padL, Math.min(plotW, tk.x))} y={plotBot + 13} textAnchor={tk.anchor} fill={FAINT} fontFamily={MF} fontSize="7.5">{tk.label}</text>)}
       </svg>
     </div>
@@ -203,7 +207,7 @@ function DivergentCard({ m, onDraft }: { m: ForecastMarket; onDraft: (m: Forecas
         <span style={{ color: FAINT, fontSize: 10, fontFamily: "var(--nx-font-mono)" }}>{fmtPrice(m.markPrice)}</span>
         {m.endDate ? <span style={{ color: FAINT, fontSize: 10, fontFamily: "var(--nx-font-mono)", marginLeft: "auto" }}>ends {fmtEnds(m.endDate)}</span> : null}
       </div>
-      <div style={{ color: "#c4c4cc", fontSize: 12, lineHeight: 1.45, marginBottom: 8 }}>{m.question}</div>
+      <div style={{ color: FOG, fontSize: 12, lineHeight: 1.45, marginBottom: 8 }}>{m.question}</div>
       <ForecastChart coin={m.coin} markPrice={m.markPrice} target={m.target} forecastLean={m.forecastLean} forecastProbPct={m.forecastProbPct} />
       <ForecastProbLine token={m.clobTokenId} lean={m.forecastLean} question={m.question} />
       <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
@@ -212,7 +216,7 @@ function DivergentCard({ m, onDraft }: { m: ForecastMarket; onDraft: (m: Forecas
         {m.target != null ? <span style={{ color: DIM }}>{fmtPrice(m.target)} target ({m.distancePct}%)</span> : null}
         <span style={{ color: FAINT }}>{fmtUsd(m.volumeUsd)} vol</span>
         <button type="button" onClick={() => onDraft(m)} className="nx-press"
-          style={{ marginLeft: "auto", color: BONE, background: "transparent", border: "1px solid #33333a", borderRadius: 2, padding: "3px 10px", fontFamily: "var(--nx-font-mono)", fontSize: 10, cursor: "pointer" }}
+          style={{ marginLeft: "auto", color: BONE, background: "transparent", border: `1px solid ${BORDER_STRONG}`, borderRadius: 2, padding: "3px 10px", fontFamily: "var(--nx-font-mono)", fontSize: 10, cursor: "pointer" }}
         >◆ draft thesis</button>
       </div>
     </div>
@@ -277,7 +281,7 @@ export function ForecastDivergence() {
       </div>
 
       <div style={{
-        background: "#141416", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 2, padding: "14px 16px",
+        background: "#141416", border: `1px solid ${BORDER}`, borderRadius: 2, padding: "14px 16px",
       }}>
         {loading ? (
           <div style={{ color: FAINT, fontSize: 11, fontFamily: "var(--nx-font-mono)" }}>Reading prediction markets…</div>
@@ -309,7 +313,7 @@ export function ForecastDivergence() {
                     <div key={m.id ?? m.question} style={{ display: "flex", alignItems: "baseline", gap: 8, fontFamily: "var(--nx-font-mono)", fontSize: 10, lineHeight: 1.4 }}>
                       <span style={{ color: BONE, fontWeight: 700, minWidth: 34 }}>{m.coin}</span>
                       <span style={{ color: BONE, minWidth: 40 }}>{m.forecastProbPct}%</span>
-                      <span style={{ color: "#9a9aa2", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.question}</span>
+                      <span style={{ color: FOG, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.question}</span>
                       {m.alignment === "ALIGNED" ? <span style={{ color: POS, fontSize: 9 }}>aligned</span> : null}
                     </div>
                   ))}
