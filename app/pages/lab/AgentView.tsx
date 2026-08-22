@@ -11,6 +11,7 @@ import { STRATEGY_PRESETS } from "@/config/strategyPresets";
 import { STYLE_PRESETS, deriveStyle, type TradingStyle } from "@/config/agentStyles";
 import { AGENT_PREFILL_KEY, DIRECTIVE_PREFILL_KEY, type AgentPrefill, type DirectiveDraft } from "@/utils/agentPrefill";
 import { PnlChart, CountUp, TableSkeleton, Coachmark } from "./components";
+import { Collapsible } from "./Collapsible";
 import { SharePoster, type PosterData } from "./SharePoster";
 
 
@@ -891,6 +892,10 @@ export function AgentView() {
               </span>
             ))}
           </div>
+          {/* Quick-start (style + presets) is the ONBOARDING on-ramp — collapsed once the
+              user has configured (has symbols), so the config opens on the essentials, not
+              the onboarding. Open by default for a fresh, unconfigured agent. */}
+          <Collapsible title="◆ QUICK START" subtitle="pick a style or load a preset" defaultOpen={!(config.symbols && config.symbols.length)} storageKey="nx_agent_quickstart">
           {/* ── TRADING STYLE — the friendly on-ramp: pick a horizon, get a tuned
               starting config. Day/Swing are the agent's honest home (hourly data +
               1-min cron + funding edge); scalping/position are intentionally absent. */}
@@ -952,6 +957,7 @@ export function AgentView() {
               })}
             </div>
           </div>
+          </Collapsible>
 
           {/* Track record — surfaced before activation so users judge on real numbers.
               Live (Supabase) and Paper (state ledger) are kept strictly separate. */}
@@ -1099,6 +1105,13 @@ export function AgentView() {
             </div>
           </div>
 
+          {/* The experimental FILTERS & CONDITIONING cluster (invert, tape, smart-money,
+              regime/session/vol, vol-scaled stops) — all opt-in, off by default, validate
+              on Test/Sweep. Tucked behind disclosure so the config flows mode → strategy →
+              symbols → risk; auto-opens if any filter is already active. */}
+          <Collapsible title="◆ FILTERS & CONDITIONING" subtitle="experimental — validate on Test / Sweep first"
+            defaultOpen={!!(config.invertSignal || config.respectRegime || config.respectSmartMoney || config.volScaledStops || (config.tradeSessions && config.tradeSessions.length) || config.minVolAtrPct || config.maxVolAtrPct)}
+            storageKey="nx_agent_filters">
           {/* Opt-in INVERT — the "fade your own signal" lever. If a config is
               systematically wrong, the edge is the opposite trade. */}
           <AgentToggleCard
@@ -1186,6 +1199,7 @@ export function AgentView() {
             on={!!config.volScaledStops}
             onToggle={() => setConfig({ ...config, volScaledStops: !config.volScaledStops })}
           />
+          </Collapsible>
 
           <div style={agentCardStyle}>
             <div style={agentLabelStyle}>WATCHLIST — SELECT SYMBOLS</div>
