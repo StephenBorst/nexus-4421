@@ -56,7 +56,7 @@ import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./b
 import { twapSchedule, twapProgress } from "../nexus-agent-exec/logic.mjs";
 // Route families lifted out of the 74-route fetch handler (see shared.mjs for the
 // migration rules — one family per commit, read-only families first).
-import { handleSmart, refreshSmartSeed, sweepTrackedXray } from "./routes-smart.mjs";
+import { handleSmart, refreshSmartSeed, sweepTrackedXray, snapshotSmartConsensus } from "./routes-smart.mjs";
 import { handleTheses } from "./routes-theses.mjs";
 import { handleAgents } from "./routes-agents.mjs";
 import { handleArena } from "./routes-arena.mjs";
@@ -670,6 +670,14 @@ export default {
     ctx.waitUntil((async () => {
       try { const n = await snapshotStances(env); console.log(`[stances] snapshotted ${n} symbol leans`); }
       catch (e) { console.error("[stances] snapshot failed:", String(e)); }
+    })());
+    // Hourly: snapshot the smart-money consensus lean per symbol → appends the
+    // sm:hist:{coin} TIME SERIES reliably (not just on board views), so the
+    // smart-money-conditioned fade becomes backtestable as the history matures
+    // (mirrors how the brain accrues oi:hist). Fail-soft; best-effort.
+    ctx.waitUntil((async () => {
+      try { const n = await snapshotSmartConsensus(env); console.log(`[smart] consensus snapshot: ${n} traders`); }
+      catch (e) { console.error("[smart] consensus snapshot failed:", String(e)); }
     })());
     // Hourly: classify each core symbol's trend regime (the momentum signal source),
     // cached for the /signals hot path + the fusion. Runs BEFORE delivery so the push

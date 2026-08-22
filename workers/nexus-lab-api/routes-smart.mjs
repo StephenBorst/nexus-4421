@@ -412,6 +412,36 @@ async function smartSeed(env) {
   return SMART_SEED;
 }
 
+// ── Hourly cron: snapshot the smart-money consensus + append sm:hist ────────────
+// storeConsensus (which writes the sm:hist:{coin} TIME SERIES) previously ran ONLY
+// inside the /smart/board GET handler, so the series only grew when someone loaded
+// the board — leaving it too sparse to backtest the smart-money-confluence fade.
+// This drives the SAME build on the hourly cron (mirroring how the brain accrues
+// oi:hist every tick), so the orthogonal-signal history matures reliably even when
+// nobody's viewing. Also warms the board cache. Best-effort; fail-soft on the cron side.
+export async function snapshotSmartConsensus(env) {
+  const [orderly, seed, coinSet] = await Promise.all([buildOrderlyBoard(), smartSeed(env), orderlyPerpCoins(env)]);
+  const hl = await batched(seed.slice(0, 10), 8, async (s) => {
+    try {
+      const state = await hlInfo({ type: "clearinghouseState", user: s.a });
+      return {
+        source: "hl", address: s.a, pnl: s.p, pnlLabel: "30d", roi: s.r,
+        accountValue: Math.round(parseFloat(state?.marginSummary?.accountValue || "0")),
+        positions: hlPositions(state, coinSet),
+      };
+    } catch {
+      return { source: "hl", address: s.a, pnl: s.p, pnlLabel: "30d", roi: s.r, accountValue: 0, positions: [] };
+    }
+  });
+  const traders = [...orderly, ...hl];
+  await updateOrderlyFeed(env, orderly);
+  await storeConsensus(env, traders); // writes sm:consensus + appends sm:hist:{coin}
+  // Warm the board cache so the next viewer gets an instant, fresh board.
+  const payload = { traders, count: traders.length, orderly: orderly.length, hl: hl.length, updatedAt: Date.now() };
+  try { await env.LAB_STORE.put(SM_BOARD_CACHE, JSON.stringify(payload), { expirationTtl: 600 }); } catch { /* non-fatal */ }
+  return traders.length;
+}
+
 // ── Route dispatcher ──────────────────────────────────────────────────────────
 // ⚠️ `ctx` is required, not optional: /smart/board schedules background work via
 // ctx.waitUntil (feed diff + consensus store). Dropping it here would ReferenceError
