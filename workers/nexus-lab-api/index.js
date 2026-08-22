@@ -607,15 +607,24 @@ async function getOnChainWallets(env) {
 async function generateHouseCalls(env, { dryRun = false, max = 1 } = {}) {
   const houseAddr = String(env.HOUSE_CALLER_ADDRESS || "").toLowerCase();
   if (!/^0x[0-9a-f]{40}$/.test(houseAddr)) return { skipped: "HOUSE_CALLER_ADDRESS not set" };
-  let rows = [];
+  // Prefer the already-computed board (KV, maintained by /intel/mispriced + kept warm by
+  // the Lab's polling) — avoids the flaky direct futures fetch (Orderly intermittently
+  // serves an HTML 403 to header-light Worker calls). Fall back to a fresh fetch only if
+  // the cache is cold.
+  let markets = null;
   try {
-    const res = await fetch("https://api-evm.orderly.org/v1/public/futures", {
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36", "Accept": "application/json, text/plain, */*" },
-    });
-    rows = (await res.json())?.data?.rows || [];
-  } catch (e) { return { error: `futures fetch failed: ${e}` }; }
-  const board = mispricedBoard(rows);
-  const fades = (board.markets || []).filter((m) => m.status === "MISPRICED" && m.direction !== "NONE").sort((a, b) => b.edge - a.edge);
+    const cached = await env.LAB_STORE.get("intel:mispriced:v1");
+    if (cached) { const c = JSON.parse(cached); if (Array.isArray(c?.markets)) markets = c.markets; }
+  } catch { /* fall through to fetch */ }
+  if (!markets) {
+    try {
+      const res = await fetch("https://api-evm.orderly.org/v1/public/futures", {
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36", "Accept": "application/json, text/plain, */*" },
+      });
+      markets = mispricedBoard((await res.json())?.data?.rows || []).markets;
+    } catch (e) { return { error: `no board available (cache cold + futures fetch failed): ${e}` }; }
+  }
+  const fades = (markets || []).filter((m) => m.status === "MISPRICED" && m.direction !== "NONE").sort((a, b) => b.edge - a.edge);
   if (!fades.length) return { posted: [], note: "no fade signal right now" };
 
   const raw = await env.LAB_STORE.get(`lab:${houseAddr}`);
