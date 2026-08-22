@@ -59,9 +59,25 @@ export function buildSignals({ signals, consensus, xrayEvents } = {}) {
     const fundNote = extended
       ? ` Funding is already crowded ${sideWord(dir)} (${(fund * 100).toFixed(3)}%/8h) — a LATE ride, tighten the stop.`
       : " Funding isn't crowded yet — room to run.";
+    // LEVELS — the 4H EMA8 traders actually retest to (the read a sharp friend gives you).
+    // "At the EMA8" after a trend = the first-retest continuation zone; else name the level to watch.
+    const ema8 = Number(mom.ema8_4h) || null;
+    const mark = Number(mom.mark_price) || null;
+    let levelNote = "";
+    if (ema8 && mark) {
+      const fmt = (v) => v >= 1000 ? v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : v >= 1 ? v.toFixed(2) : v.toPrecision(4);
+      const distPct = ((mark - ema8) / ema8) * 100;
+      const withTrend = (dir === "LONG" && distPct >= 0) || (dir === "SHORT" && distPct <= 0);
+      if (Math.abs(distPct) <= 0.9)
+        levelNote = ` It just pulled back to its 4H EMA8 ($${fmt(ema8)}) — the first retest of the trend, where continuation entries set up.`;
+      else if (withTrend)
+        levelNote = ` Holding ${dir === "LONG" ? "above" : "below"} its 4H EMA8 ($${fmt(ema8)}); a pullback to that level is the lower-risk entry.`;
+      else
+        levelNote = ` Now on the far side of its 4H EMA8 ($${fmt(ema8)}) — the trend is stretched; wait for it to reclaim the level.`;
+    }
     out.push({ id: `mom-${mom.symbol}-${dir}`, kind: "MOMENTUM", priority: extended ? 66 : 72, ts: now, tab: "intel",
       title: `${mom.symbol} is trending — ${sideWord(dir)} momentum${extended ? " (late)" : ""}`,
-      detail: `${mom.symbol} is in a strong ${dir === "LONG" ? "uptrend" : "downtrend"} (${move >= 0 ? "+" : ""}${move}%) with open interest rising (+${oi}%/hr) — new money committing, a with-trend read.${fundNote}` });
+      detail: `${mom.symbol} is in a strong ${dir === "LONG" ? "uptrend" : "downtrend"} (${move >= 0 ? "+" : ""}${move}%) with open interest rising (+${oi}%/hr) — new money committing, a with-trend read.${levelNote}${fundNote}` });
   }
 
   // 3 — Tracked-wallet tier crossings (a watched wallet earned/lost a consistency tier).

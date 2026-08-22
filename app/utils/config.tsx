@@ -404,17 +404,21 @@ const allMenuItems = [
       },
       orderlyAppProvider: {
         appIcons: {
-          main: getRuntimeConfigBoolean("VITE_HAS_PRIMARY_LOGO")
-            ? {
-                component: (
-                  <img
-                    src={withBasePath("/logo.webp")}
-                    alt="logo"
-                    style={{ height: "42px" }}
-                  />
-                ),
-              }
-            : { img: withBasePath("/orderly-logo.svg") },
+          // The Nexus brand lockup — permanent + prominent top-left (it read as generic/
+          // borrowed before, and was gated behind an env flag). Mark + serif wordmark,
+          // matching the editorial design system so it feels owned, not bolted on.
+          main: {
+            component: (
+              <Link to="/" style={{ display: "flex", alignItems: "center", gap: 9, textDecoration: "none" }}>
+                <img
+                  src={withBasePath("/icon-512.png")}
+                  alt="Nexus Trading Labs"
+                  style={{ height: "30px", width: "auto", flexShrink: 0 }}
+                />
+                <span style={{ fontFamily: "var(--nx-font-serif, 'Libre Baskerville', Georgia, serif)", fontSize: 19, fontWeight: 700, color: "#f4f4f5", letterSpacing: "0.01em", lineHeight: 1, whiteSpace: "nowrap" }}>Nexus</span>
+              </Link>
+            ),
+          },
           secondary: {
             img: getRuntimeConfigBoolean("VITE_HAS_SECONDARY_LOGO")
               ? withBasePath("/logo-secondary.webp")

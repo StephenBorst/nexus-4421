@@ -9,6 +9,17 @@ import { buildSignals } from "../../app/lib/signals.mjs";
 
 const SIGNAL_SYMS = ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC", "PERP_ARB_USDC", "PERP_HYPE_USDC", "PERP_XRP_USDC", "PERP_DOGE_USDC"];
 
+// Final EMA value over a close series (SMA-seeded). The levels traders actually watch —
+// so a momentum signal can say "pulled back to the 4H EMA8 ($X), the retest of the trend"
+// instead of just "it's trending". Null when there aren't enough candles.
+function emaLast(vals, period) {
+  if (!Array.isArray(vals) || vals.length < period) return null;
+  const k = 2 / (period + 1);
+  let ema = vals.slice(0, period).reduce((s, v) => s + v, 0) / period;
+  for (let i = period; i < vals.length; i++) ema = vals[i] * k + ema * (1 - k);
+  return ema;
+}
+
 // The MOMENTUM signal source. A trend read per core symbol, classified from 1h OHLC by
 // the SAME classifyRegime that grades a caller's align edge — so "ride the trend" (a
 // momentum setup) and "your align edge is WITH the trend" (the user's class) speak one
@@ -35,7 +46,20 @@ export async function snapshotTrendRegimes(env) {
       const curOi = Number(prevMkt?.oi) || null;
       const priorReg = JSON.parse((await KV.get(`regime:${bare}`)) || "null");
       const oiChangePct = (priorReg?.oi && curOi) ? Number((((curOi - priorReg.oi) / priorReg.oi) * 100).toFixed(2)) : null;
-      await KV.put(`regime:${bare}`, JSON.stringify({ trend: reg.trend, vol: reg.vol, movePct: reg.movePct, oi: curOi, oiChangePct, t: Date.now() }), { expirationTtl: 6 * 3600 });
+      // 4H EMA8/EMA21 — the trend levels traders retest to. One extra fetch per symbol,
+      // hourly. Rounded to sensible precision for the price magnitude.
+      let ema8 = null, ema21 = null;
+      try {
+        const d4 = await (await fetch(`https://api-evm.orderly.org/tv/history?symbol=${sym}&resolution=240&from=${now - 240 * 3600}&to=${now}`)).json();
+        if (d4 && d4.s === "ok" && Array.isArray(d4.c) && d4.c.length >= 8) {
+          const c4 = d4.c.map(Number).filter(Number.isFinite);
+          const r8 = emaLast(c4, 8), r21 = emaLast(c4, 21);
+          const dp = c4[c4.length - 1] >= 1000 ? 0 : c4[c4.length - 1] >= 1 ? 2 : 5;
+          ema8 = r8 != null ? Number(r8.toFixed(dp)) : null;
+          ema21 = r21 != null ? Number(r21.toFixed(dp)) : null;
+        }
+      } catch { /* no levels this run */ }
+      await KV.put(`regime:${bare}`, JSON.stringify({ trend: reg.trend, vol: reg.vol, movePct: reg.movePct, oi: curOi, oiChangePct, ema8, ema21, t: Date.now() }), { expirationTtl: 6 * 3600 });
       stored++;
     } catch { /* skip this symbol */ }
   }));
@@ -67,6 +91,7 @@ export async function computeSignalRows(env) {
         oi_change_pct: Number((oiChange * 100).toFixed(3)),
         funding_signal: sig.fundingSignal, oi_signal: sig.oiSignal, confluence: sig.confluence,
         trend: reg?.trend ?? null, trend_move_pct: reg?.movePct ?? null, trend_oi_pct: reg?.oiChangePct ?? null,
+        ema8_4h: reg?.ema8 ?? null, ema21_4h: reg?.ema21 ?? null,
       };
     } catch { return null; }
   }));

@@ -18,13 +18,13 @@ export function MacroView() {
     <div>
       <SectionHeader
         eyebrow="MACRO & EVENTS"
-        title="What the world is pricing"
-        note="POLYMARKET · GRADED"
+        title="What could move crypto"
+        note="INTELLIGENCE → A CRYPTO TRADE"
       />
       <div style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: 13.5, color: C.text.fog, lineHeight: 1.65, maxWidth: 660, marginBottom: 4 }}>
-        The forecasting crowd, not the funding crowd. Fed decisions, geopolitics, and policy — the biggest prediction markets, with a
-        textbook risk-on / risk-off lens where it's earned. See a read you believe, draft it into a call, and let public price grade it.
-        Not a fair-value oracle and not advice — the seam a macro-intelligence partner plugs into.
+        Fed decisions, geopolitics, and policy — the macro forces that move crypto, read as a textbook risk-on / risk-off lens.
+        You don't trade the event here; you trade the <b style={{ color: C.text.bright }}>crypto expression</b> (BTC / ETH, long or short) on Nexus,
+        and public price grades the call. The prediction market is the signal — the trade is one you can actually take. Not a fair-value oracle, not advice.
       </div>
 
       {/* the macro/geopolitical events board — the hero + the Quotient corner */}
