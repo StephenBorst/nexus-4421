@@ -795,6 +795,43 @@ export function edgeQuality(reversion, cfg = EDGE_QUALITY) {
 // Rank order for the board: proven edge first, traps last (avoid fading them).
 export const EDGE_QUALITY_RANK = { PROVEN: 0, MIXED: 1, UNPROVEN: 2, TRAP: 3 };
 
+// ── HOUSE SIGNALS — the systematic track record that SEEDS the caller board ────
+// Turn a mispriced-board fade into a concrete, gradeable CALL published under a house
+// identity. The whole point of the trustless graph is proof; a live, honestly-graded
+// house record (graded by the SAME public first-touch engine as any human call) fills
+// the empty boards + demonstrates the methodology + becomes share content. Levels are
+// DETERMINISTIC: entry = mark, TP toward the mean-revert, SL against, at a fixed R;
+// direction = the fade side (opposite the crowd). Returns null when there's no fade.
+export const HOUSE_CALL = { tpPct: 4, slPct: 3 }; // ~1.33R mean-reversion fade
+
+export function houseCallFromSignal(m, now = Date.now(), cfg = HOUSE_CALL) {
+  if (!m || m.direction === "NONE" || !(Number(m.markPrice) > 0)) return null;
+  const entry = Number(m.markPrice);
+  const long = m.direction === "LONG";
+  const dp = entry >= 1000 ? 1 : entry >= 1 ? 3 : 6;
+  const takeProfit1 = round(long ? entry * (1 + cfg.tpPct / 100) : entry * (1 - cfg.tpPct / 100), dp);
+  const stopLoss = round(long ? entry * (1 - cfg.slPct / 100) : entry * (1 + cfg.slPct / 100), dp);
+  const fund = Number(m.fundingAnnualPct);
+  const fundTxt = `${fund >= 0 ? "+" : ""}${fund}%/yr`;
+  return {
+    id: `nexus-${m.coin}-${now}`,
+    symbol: m.coin,
+    direction: m.direction,
+    entryPrice: entry,
+    stopLoss,
+    takeProfit1,
+    takeProfit2: 0,
+    riskReward: round(cfg.tpPct / cfg.slPct, 2),
+    createdAt: now,
+    status: "ACTIVE",
+    actualPnl: null,
+    isPublic: true,
+    source: "nexus-signal", // marks the systematic house call (vs a human thesis)
+    catalyst: `Funding fade · ${fundTxt}`,
+    notes: `Systematic Nexus signal — funding on ${m.coin} is stretched (${fundTxt}), fading the one-sided crowd for the mean-revert. Graded trustlessly from public price, first-touch TP vs SL. Not advice.`,
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // LOSS POSTMORTEMS  (why did it lose — from a FIXED taxonomy, so it aggregates)
 // ═══════════════════════════════════════════════════════════════════════════

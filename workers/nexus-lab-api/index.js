@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -597,6 +597,54 @@ async function getOnChainWallets(env) {
   }
 }
 
+// ── HOUSE SIGNALS — seed the caller board with a systematic, graded track record ──
+// Takes the current top funding-fade off the mispriced board and publishes it as a
+// graded thesis under the house identity (HOUSE_CALLER_ADDRESS), so the empty caller
+// boards fill with REAL graded outcomes (same public first-touch engine as any human
+// call). Deduped per coin (skip if an ungraded house call on that coin exists, or one
+// was posted <24h ago). dryRun previews WITHOUT writing — safe to expose. The whole
+// feature stays DARK until HOUSE_SIGNALS_ENABLED="true" (the caller checks the flag).
+async function generateHouseCalls(env, { dryRun = false, max = 1 } = {}) {
+  const houseAddr = String(env.HOUSE_CALLER_ADDRESS || "").toLowerCase();
+  if (!/^0x[0-9a-f]{40}$/.test(houseAddr)) return { skipped: "HOUSE_CALLER_ADDRESS not set" };
+  let rows = [];
+  try {
+    const res = await fetch("https://api-evm.orderly.org/v1/public/futures", {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36", "Accept": "application/json, text/plain, */*" },
+    });
+    rows = (await res.json())?.data?.rows || [];
+  } catch (e) { return { error: `futures fetch failed: ${e}` }; }
+  const board = mispricedBoard(rows);
+  const fades = (board.markets || []).filter((m) => m.status === "MISPRICED" && m.direction !== "NONE").sort((a, b) => b.edge - a.edge);
+  if (!fades.length) return { posted: [], note: "no fade signal right now" };
+
+  const raw = await env.LAB_STORE.get(`lab:${houseAddr}`);
+  const data = raw ? JSON.parse(raw) : { theses: [] };
+  const existing = data.theses || [];
+  const now = Date.now(), DAY = 24 * 3600 * 1000;
+  const toPost = [];
+  for (const m of fades) {
+    if (toPost.length >= max) break;
+    // dedup: skip a coin with a house call <24h old OR an ungraded (still-ACTIVE) one
+    const recent = existing.find((t) => t.symbol === m.coin &&
+      ((now - (t.createdAt || 0) < DAY) || (t.status === "ACTIVE" && t.gradedOutcome !== "WIN" && t.gradedOutcome !== "LOSS")));
+    if (recent) continue;
+    const call = houseCallFromSignal(m, now);
+    if (call) toPost.push(call);
+  }
+  if (dryRun) return { dryRun: true, house: houseAddr, candidates: toPost };
+  if (!toPost.length) return { posted: [], note: "top fades all deduped (recent/active)" };
+  data.theses = [...toPost, ...existing].slice(0, 500);
+  await env.LAB_STORE.put(`lab:${houseAddr}`, JSON.stringify(data));
+  // Ensure the feed/leaderboard has a name for the house identity (one-time seed).
+  try {
+    const pk = `profile:${houseAddr}`;
+    if (!(await env.LAB_STORE.get(pk)))
+      await env.LAB_STORE.put(pk, JSON.stringify({ displayName: env.HOUSE_CALLER_NAME || "Nexus Signals", bio: "Systematic funding-fade signals — graded trustlessly from public price." }));
+  } catch { /* best-effort */ }
+  return { house: houseAddr, posted: toPost.map((c) => ({ id: c.id, symbol: c.symbol, direction: c.direction, entry: c.entryPrice, tp: c.takeProfit1, sl: c.stopLoss })) };
+}
+
 export default {
   // Cron (wrangler.toml [triggers]) — best-effort refresh of the Smart Money
   // tracked set from the live HL leaderboard. Fails safe: on error the routes
@@ -627,6 +675,15 @@ export default {
       try { const r = await deliverSignals(env); if (r.sent) console.log(`[signals] pushed ${r.id} to ${r.sent} chats`); }
       catch (e) { console.error("[signals] delivery failed:", String(e)); }
     })());
+    // Hourly: generate the systematic HOUSE CALL that seeds the caller board — DARK by
+    // default; only runs (writes/publishes) when HOUSE_SIGNALS_ENABLED="true". Graded by
+    // the same public engine as everyone else on the next grade cron.
+    if (env.HOUSE_SIGNALS_ENABLED === "true") {
+      ctx.waitUntil((async () => {
+        try { const r = await generateHouseCalls(env); if (r.posted?.length) console.log(`[house] posted ${r.posted.length} signal(s)`); }
+        catch (e) { console.error("[house] generation failed:", String(e)); }
+      })());
+    }
     // 12h: refresh the Smart Money tracked set + snapshot every watched wallet's
     // Tracked Record (accrues even when nobody's viewing it).
     if (event.cron === "0 */12 * * *") {
@@ -1989,6 +2046,24 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         query: meta.query, move, catalysts: [], asOf: new Date().toISOString(),
         note: "Headlines are candidate context, not confirmed causes — correlation is not causation.",
       }), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=120", ...cors(request) } });
+    }
+
+    // ── /signals/house — the systematic house track record (seeds the caller board) ──
+    // GET (?)= DRY preview: the calls that WOULD post right now, no write (safe, derived
+    // from the public board). POST = actually publish, gated by the HOUSE_SIGNALS_ADMIN
+    // secret so only the operator can force one; normal cadence is the hourly cron (which
+    // only runs when HOUSE_SIGNALS_ENABLED="true"). Whole feature is DARK until configured.
+    if (parts[0] === "signals" && parts[1] === "house") {
+      if (request.method === "GET") {
+        return json(await generateHouseCalls(env, { dryRun: true }), request);
+      }
+      if (request.method === "POST") {
+        const admin = String(env.HOUSE_SIGNALS_ADMIN || "");
+        let body = {}; try { body = await request.json(); } catch { /* ignore */ }
+        if (!admin || body.secret !== admin) return json({ error: "unauthorized" }, request, 401);
+        return json(await generateHouseCalls(env, { dryRun: false, max: Number(body.max) || 1 }), request);
+      }
+      return new Response("method not allowed", { status: 405 });
     }
 
     // ── /intel/mispriced — the funding-edge board (price every market, show the gap) ──

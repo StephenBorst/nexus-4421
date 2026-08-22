@@ -13,6 +13,7 @@ import {
   validateArenaRegistration, arenaAgentConfig,
   parsePriceTarget, forecastDivergence, FORECAST,
   classifyMacro, macroEvents,
+  houseCallFromSignal,
 } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
@@ -1767,4 +1768,26 @@ test("forecastDivergence: coin filter + non-target market surfaces forecast with
   assert.equal(r.markets[0].target, null);          // not a price-target market
   assert.equal(r.markets[0].divergence, false);
   assert.equal(r.markets[0].forecastProbPct, 80);
+});
+
+// ── houseCallFromSignal (systematic house call that seeds the caller board) ────
+test("houseCallFromSignal: SHORT fade sets TP below / SL above entry, grades WIN on revert", () => {
+  const m = { coin: "BTC", markPrice: 100000, direction: "SHORT", fundingAnnualPct: 40 };
+  const call = houseCallFromSignal(m, 1000);
+  assert.equal(call.direction, "SHORT");
+  assert.equal(call.entryPrice, 100000);
+  assert.ok(call.takeProfit1 < 100000, "short TP is below entry");
+  assert.ok(call.stopLoss > 100000, "short SL is above entry");
+  assert.equal(call.isPublic, true);
+  assert.equal(call.source, "nexus-signal");
+  // a candle that touches TP (price fell) before SL → WIN via the same public engine
+  const cd = { t: [1001], h: [100050], l: [call.takeProfit1 - 1] };
+  assert.equal(gradeCall(call, cd).outcome, "WIN");
+});
+
+test("houseCallFromSignal: LONG fade inverts levels; NONE / bad mark → null", () => {
+  const long = houseCallFromSignal({ coin: "SOL", markPrice: 150, direction: "LONG", fundingAnnualPct: -30 }, 1);
+  assert.ok(long.takeProfit1 > 150 && long.stopLoss < 150, "long TP above / SL below");
+  assert.equal(houseCallFromSignal({ coin: "X", markPrice: 10, direction: "NONE", fundingAnnualPct: 0 }), null);
+  assert.equal(houseCallFromSignal({ coin: "X", markPrice: 0, direction: "SHORT", fundingAnnualPct: 5 }), null);
 });
