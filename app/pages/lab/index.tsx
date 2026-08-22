@@ -135,18 +135,18 @@ export default function TheLabPage() {
   // (Holders Room sits outside the loop — it's community access, not a trading step,
   // and pretending otherwise would be the same dishonesty in the other direction.)
   const tabs: { id: TabId; label: string; short: string; phase: string }[] = [
-    { id: "intel",          label: "[ MARKET INTEL ]",       short: "INTEL", phase: "OBSERVE" },
-    { id: "macro",          label: "[ MACRO ]",              short: "MACRO", phase: "OBSERVE" },
-    { id: "smart",          label: "[ SMART MONEY ]",        short: "SMART", phase: "OBSERVE" },
-    { id: "thesis",         label: "[ NEXUS THESIS ENGINE ]", short: "LAB",  phase: "PLAN"    },
-    { id: "agent",          label: "[ TRADING AGENT ]",      short: "AGENT", phase: "EXECUTE" },
-    { id: "quicktrade",     label: "[ QUICK TRADE ]",        short: "TRADE", phase: "EXECUTE" },
-    { id: "copies",         label: "[ COPY TRADES ]",        short: "COPY",  phase: "EXECUTE" },
+    { id: "intel",          label: "Market Intel",       short: "INTEL", phase: "OBSERVE" },
+    { id: "macro",          label: "Macro",              short: "MACRO", phase: "OBSERVE" },
+    { id: "smart",          label: "Smart Money",        short: "SMART", phase: "OBSERVE" },
+    { id: "thesis",         label: "Thesis Engine",      short: "LAB",   phase: "PLAN"    },
+    { id: "agent",          label: "Trading Agent",      short: "AGENT", phase: "EXECUTE" },
+    { id: "quicktrade",     label: "Quick Trade",        short: "TRADE", phase: "EXECUTE" },
+    { id: "copies",         label: "Copy Trades",        short: "COPY",  phase: "EXECUTE" },
     // Holders Room is community access, not a trading step — it sits between EXECUTE
     // and PROVE so the loop still ENDS on Analytics (which closes it back to the top).
-    { id: "holders",        label: "[ HOLDERS ROOM ]",       short: "ROOM",  phase: ""        },
-    { id: "tradelog",       label: "[ TRADING LOG ]",        short: "LOG",   phase: "PROVE"   },
-    { id: "analytics",      label: "[ ANALYTICS ]",          short: "STATS", phase: "PROVE"   },
+    { id: "holders",        label: "Holders Room",       short: "ROOM",  phase: ""        },
+    { id: "tradelog",       label: "Trading Log",        short: "LOG",   phase: "PROVE"   },
+    { id: "analytics",      label: "Analytics",          short: "STATS", phase: "PROVE"   },
   ];
   // Group in declaration order — the array above IS the loop's order.
   const tabGroups = tabs.reduce<{ phase: string; items: typeof tabs }[]>((acc, t) => {
@@ -202,28 +202,35 @@ export default function TheLabPage() {
             <div key={group.phase || `x${gi}`} style={{ display: "contents" }}>
               {!isMobile && gi > 0 && group.phase && (
                 <span style={{
-                  fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.16em",
-                  color: "#52525b", flexShrink: 0, padding: "0 8px 0 10px",
-                  borderLeft: "1px solid #232327",
+                  fontFamily: "var(--nx-font-mono)", fontSize: 7.5, letterSpacing: "0.24em",
+                  color: "#3f3f46", flexShrink: 0, padding: "1px 12px 0 16px", alignSelf: "center",
+                  borderLeft: "1px solid #1c1c20", textTransform: "uppercase",
                 }}>{group.phase}</span>
               )}
-              {group.items.map((tab) => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-              background: activeTab === tab.id ? "#1a1a1e" : "none",
-              border: `1px solid ${activeTab === tab.id ? "#ededf0" : "transparent"}`,
-              color: activeTab === tab.id ? "#ededf0" : "#71717a",
-              fontFamily: "var(--nx-font-mono)",
-              fontSize: isMobile ? 10 : 11,
-              padding: isMobile ? "6px 8px" : "5px 12px",
-              cursor: "pointer",
-              letterSpacing: "0.05em",
-              borderRadius: 3,
-              minHeight: isMobile ? 36 : "auto",
-              flex: isMobile ? "1 0 21%" : "none",
-              flexShrink: isMobile ? 1 : 0,
-              whiteSpace: "nowrap",
-            }}>{isMobile ? tab.short : tab.label}</button>
-              ))}
+              {group.items.map((tab) => {
+                const active = activeTab === tab.id;
+                return (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              onMouseEnter={(e) => { if (!active && !isMobile) e.currentTarget.style.color = "#d4d4d8"; }}
+              onMouseLeave={(e) => { if (!active && !isMobile) e.currentTarget.style.color = "#71717a"; }}
+              style={isMobile ? {
+                background: active ? "#1a1a1e" : "none",
+                border: `1px solid ${active ? "#33333a" : "#232327"}`,
+                color: active ? "#f4f4f5" : "#71717a",
+                fontFamily: "var(--nx-font-mono)", fontSize: 10, letterSpacing: "0.06em", fontWeight: 600,
+                padding: "6px 8px", cursor: "pointer", borderRadius: 4,
+                minHeight: 36, flex: "1 0 21%", flexShrink: 1, whiteSpace: "nowrap",
+              } : {
+                background: "none", border: "none",
+                borderBottom: `2px solid ${active ? "#ededf0" : "transparent"}`,
+                color: active ? "#f4f4f5" : "#71717a",
+                fontFamily: "var(--nx-font-ui)", fontSize: 12.5, letterSpacing: "0.01em",
+                fontWeight: active ? 600 : 500,
+                padding: "5px 13px 8px", cursor: "pointer", borderRadius: 0,
+                whiteSpace: "nowrap", transition: "color 140ms ease",
+              }}>{isMobile ? tab.short : tab.label}</button>
+                );
+              })}
             </div>
           ))}
         </div>

@@ -58,6 +58,10 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
   const [detail, setDetail] = useState<{ source: "orderly" | "hl"; address: string; accountId?: string } | null>(null);
   const [watch, setWatch] = useState<string[]>(loadWatch);
   const [watchOnly, setWatchOnly] = useState(false);
+  // Progressive disclosure — lead with the signal (consensus + a short feed/board),
+  // expand for the full depth. Kills the "long scroll of raw data" without hiding it.
+  const [feedAll, setFeedAll] = useState(false);
+  const [boardAll, setBoardAll] = useState(false);
   const [trackMap, setTrackMap] = useState<Record<string, TrackChip>>({});
   const [trackedSignals, setTrackedSignals] = useState<XrayEvent[]>([]);
   const [toast, setToast] = useState<string | null>(null);
@@ -349,11 +353,11 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
         </div>
       )}
 
-      {/* ── SMART MONEY CONSENSUS — the highest-conviction signal ── */}
+      {/* ── SMART MONEY CONSENSUS — the HERO: the highest-conviction signal ── */}
       {consensus.length > 0 && (
-        <div style={{ ...agentCardStyle, marginBottom: 12, borderColor: "#33333a" }}>
-          <div style={agentLabelStyle}>◆ SMART MONEY CONSENSUS <span style={{ color: "#52525b" }}>— coins multiple tracked traders agree on</span></div>
-          <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
+        <div style={{ ...agentCardStyle, marginBottom: 12, borderColor: "#33333a", borderLeft: "2px solid #ededf0" }}>
+          <div style={{ ...agentLabelStyle, fontSize: 12, letterSpacing: "0.14em" }}>◆ SMART MONEY CONSENSUS <span style={{ color: "#52525b", letterSpacing: "0.06em" }}>— the strongest read: coins several top traders agree on</span></div>
+          <div className="nx-stagger" style={{ marginTop: 10, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
             {consensus.map((c) => (
               <div key={`${c.sym}${c.side}`} style={{ display: "flex", alignItems: "center", gap: 10, rowGap: 6, flexWrap: "wrap", padding: "8px 10px", border: "1px solid #1a1a1e", borderRadius: 6, background: "#0f0f11" }}>
                 <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, color: "#ededf0", flexShrink: 0 }}>{c.sym}</span>
@@ -393,7 +397,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
             Top on-chain traders opening &amp; closing positions in real time — ⚡ copies a move into a trade your agent manages.
           </div>
           <div style={{ marginTop: 10, display: "flex", flexDirection: "column" }}>
-            {events.slice(0, 20).map((e, i) => {
+            {events.slice(0, feedAll ? 30 : 8).map((e, i) => {
               const watched = watch.includes(e.addr);
               const isOpen = e.type === "OPEN";
               const long = e.side === "LONG";
@@ -434,6 +438,12 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
               );
             })}
           </div>
+          {events.length > 8 && (
+            <button onClick={() => setFeedAll((v) => !v)}
+              style={{ marginTop: 8, width: "100%", background: "none", border: "1px solid #232327", borderRadius: 4, color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, letterSpacing: "0.05em", padding: "6px 0", cursor: "pointer" }}>
+              {feedAll ? "▲ show less" : `▼ show ${Math.min(30, events.length) - 8} more`}
+            </button>
+          )}
         </div>
       )}
 
@@ -478,7 +488,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
             <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#71717a", padding: "16px 0", textAlign: "center" }}>No watched traders in the current board. Star ★ any trader to track them.</div>
           )}
           <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-            {shown.map((t, i) => {
+            {shown.slice(0, boardAll ? 999 : 6).map((t, i) => {
               const starred = watch.includes(t.address);
               return (
               <div key={t.address} style={{ border: "1px solid #1a1a1e", borderRadius: 6, padding: "10px 12px" }}>
@@ -532,6 +542,12 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
               );
             })}
           </div>
+          {shown.length > 6 && (
+            <button onClick={() => setBoardAll((v) => !v)}
+              style={{ marginTop: 8, width: "100%", background: "none", border: "1px solid #232327", borderRadius: 4, color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10, letterSpacing: "0.05em", padding: "6px 0", cursor: "pointer" }}>
+              {boardAll ? "▲ show top 6" : `▼ show ${shown.length - 6} more traders`}
+            </button>
+          )}
           <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 10, lineHeight: 1.5 }}>
             ◆ Orderly traders (public settlement indexer) copy natively; Hyperliquid traders copy directionally on Nexus. The agent manages the exit. Not financial advice.
           </div>
