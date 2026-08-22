@@ -619,7 +619,7 @@ export function AgentView() {
   if (loading) {
     return (
       <div style={agentCardStyle}>
-        <div style={{ ...agentLabelStyle, opacity: 0.7 }}>// LOADING AGENT STATE…</div>
+        <div style={{ ...agentLabelStyle, opacity: 0.7 }}>LOADING AGENT STATE…</div>
         <TableSkeleton rows={5} />
       </div>
     );
@@ -736,7 +736,7 @@ export function AgentView() {
         const num = (n?: number) => (n && n > 0 ? `$${n.toLocaleString(undefined, { maximumFractionDigits: n < 10 ? 4 : 2 })}` : "—");
         return (
           <div style={{ ...agentCardStyle, borderColor: "#ededf0", background: "#0f0f11", marginBottom: 12 }}>
-            <div style={agentLabelStyle}>// ▶ TRADE THIS THESIS <span style={{ color: "#71717a" }}>— one-shot, managed by the agent</span></div>
+            <div style={agentLabelStyle}>▶ TRADE THIS THESIS <span style={{ color: "#71717a" }}>— one-shot, managed by the agent</span></div>
             <div style={{ marginTop: 10 }}>
               <Coachmark storageKey="nexus_coach_arm_v1" badge="STEP 2 / 2" title="Arm in PAPER first">
                 This hands the agent <strong style={{ color: "#d4d4d8" }}>this exact trade</strong> — your direction, your stops and targets — and it manages the exit for you (scale-out, trailing, breakeven, timeout). Start in <strong style={{ color: "#d4d4d8" }}>PAPER</strong> to watch it work risk-free, then flip to GO LIVE once you trust it. Every close is graded on-chain.
@@ -875,7 +875,7 @@ export function AgentView() {
               starting config. Day/Swing are the agent's honest home (hourly data +
               1-min cron + funding edge); scalping/position are intentionally absent. */}
           <div style={agentCardStyle}>
-            <div style={agentLabelStyle}>// TRADING STYLE <span style={{ color: "#71717a" }}>— pick your horizon to start</span></div>
+            <div style={agentLabelStyle}>TRADING STYLE <span style={{ color: "#71717a" }}>— pick your horizon to start</span></div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
               {(Object.keys(STYLE_PRESETS) as TradingStyle[]).map((k) => {
                 const p = STYLE_PRESETS[k];
@@ -904,7 +904,7 @@ export function AgentView() {
           {/* Quick-start preset templates. Loads into config for review; user still
               saves explicitly. PRO presets gated by isPro. */}
           <div style={agentCardStyle}>
-            <div style={agentLabelStyle}>// QUICK-START PRESETS <span style={{ color: "#71717a" }}>— load a preset, review, save</span></div>
+            <div style={agentLabelStyle}>QUICK-START PRESETS <span style={{ color: "#71717a" }}>— load a preset, review, save</span></div>
             <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginTop: 10 }}>
               {STRATEGY_PRESETS.map((p) => {
                 const locked = !!p.pro && !isPro;
@@ -975,7 +975,7 @@ export function AgentView() {
 
           {/* Onboarding + key-status panel */}
           <div style={{ ...agentCardStyle, borderColor: tradingKey ? "#232327" : "#4a3a00" }}>
-            <div style={agentLabelStyle}>// HOW THE AGENT WORKS</div>
+            <div style={agentLabelStyle}>HOW THE AGENT WORKS</div>
             <p style={{ margin: "8px 0 0", color: "#a1a1aa", fontFamily: "var(--nx-font-ui)", fontSize: 11, lineHeight: 1.6 }}>
               The agent is a disciplined operator of <strong style={{ color: "#d4d4d8" }}>your</strong> edge — you choose the strategy and risk limits, it runs them tirelessly and <strong style={{ color: "#d4d4d8" }}>every call is graded objectively on-chain</strong>. It doesn't promise alpha; it proves what actually worked.
             </p>
@@ -999,7 +999,7 @@ export function AgentView() {
           </div>
 
           <div style={agentCardStyle}>
-            <div style={agentLabelStyle}>// EXECUTION MODE</div>
+            <div style={agentLabelStyle}>EXECUTION MODE</div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               {([
                 { mode: "PAPER" as const,      color: "#d4d4d8", desc: "Simulated — no real orders, no key needed. Test risk-free." },
@@ -1039,7 +1039,7 @@ export function AgentView() {
           </div>
 
           <div style={agentCardStyle}>
-            <div style={agentLabelStyle}>// STRATEGY — SIGNAL MODE</div>
+            <div style={agentLabelStyle}>STRATEGY — SIGNAL MODE</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
               {([
                 { v: "CONFLUENCE", label: "CONFLUENCE", hint: "Funding AND OI must agree — the strictest filter, so the fewest entries" },
@@ -1125,7 +1125,7 @@ export function AgentView() {
             };
             return (
               <div style={agentCardStyle}>
-                <div style={agentLabelStyle}>// REGIME CONDITIONING <span style={{ color: "#52525b", fontSize: 8 }}>— experimental, opt-in</span></div>
+                <div style={agentLabelStyle}>REGIME CONDITIONING <span style={{ color: "#52525b", fontSize: 8 }}>— experimental, opt-in</span></div>
                 <div style={{ ...agentLabelStyle, fontSize: 9, marginTop: 6, color: "#71717a", letterSpacing: 0 }}>
                   Only enter where a signal actually works. Backtest finding: inverted-confluence hits ~<b style={{ color: "#3ecf8e" }}>60%</b> in high volatility and bleeds in the Asia session. <b style={{ color: "#ededf0" }}>Prove it on Test / Sweep first.</b>
                 </div>
@@ -1168,7 +1168,7 @@ export function AgentView() {
           />
 
           <div style={agentCardStyle}>
-            <div style={agentLabelStyle}>// WATCHLIST — SELECT SYMBOLS</div>
+            <div style={agentLabelStyle}>WATCHLIST — SELECT SYMBOLS</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
               {AVAILABLE_SYMBOLS.map((sym) => {
                 const selected = config.symbols.includes(sym);
@@ -1196,7 +1196,7 @@ export function AgentView() {
           </div>
 
           <div style={agentCardStyle}>
-            <div style={agentLabelStyle}>// RISK PARAMETERS</div>
+            <div style={agentLabelStyle}>RISK PARAMETERS</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginTop: 8 }}>
               {[
                 { key: "leverage", label: "LEVERAGE", suffix: "x", min: 1, max: 20, step: 1 },
@@ -1274,7 +1274,7 @@ export function AgentView() {
             return (
               <div style={agentCardStyle}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-                  <div style={agentLabelStyle}>// ADVANCED EXITS</div>
+                  <div style={agentLabelStyle}>ADVANCED EXITS</div>
                   <button onClick={toggleScaleOut} style={{
                     fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "4px 12px", borderRadius: 3, cursor: "pointer",
                     background: scaleOut ? "#ededf015" : "#0a0a0b",
@@ -1358,7 +1358,7 @@ export function AgentView() {
               <div style={agentCardStyle}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={agentLabelStyle}>// DCA / SAFETY ORDERS</div>
+                    <div style={agentLabelStyle}>DCA / SAFETY ORDERS</div>
                     <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ededf0", border: "1px solid #33333a", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
                   </div>
                   <button onClick={isPro ? toggle : undefined} disabled={!isPro} style={{
@@ -1404,7 +1404,7 @@ export function AgentView() {
           {/* ── SIGNAL WEBHOOK — TradingView / external signal → your agent (PRO) ── */}
           <div style={agentCardStyle}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-              <div style={agentLabelStyle}>// SIGNAL WEBHOOK</div>
+              <div style={agentLabelStyle}>SIGNAL WEBHOOK</div>
               <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#ededf0", border: "1px solid #33333a", borderRadius: 3, padding: "2px 8px" }}>◆ PRO</span>
             </div>
             {!isPro ? (
@@ -1456,7 +1456,7 @@ export function AgentView() {
           </>)}
 
           <div style={agentCardStyle}>
-            <div style={agentLabelStyle}>// RISK SUMMARY</div>
+            <div style={agentLabelStyle}>RISK SUMMARY</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12, marginTop: 8 }}>
               {[
                 { label: "NOTIONAL / TRADE", value: `$${(config.capitalPerTrade * config.leverage).toFixed(0)}` },
@@ -1570,7 +1570,7 @@ export function AgentView() {
           {/* Pending theses — ASSISTED mode review queue */}
           {pending.length > 0 && (
             <div style={{ ...agentCardStyle, borderColor: "#fbbf2440" }}>
-              <div style={{ ...agentLabelStyle, color: "#fbbf24" }}>// THESES AWAITING REVIEW ({pending.length})</div>
+              <div style={{ ...agentLabelStyle, color: "#fbbf24" }}>THESES AWAITING REVIEW ({pending.length})</div>
               {pending.map((t) => (
                 <div key={t.id} style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -1618,7 +1618,7 @@ export function AgentView() {
           )}
 
           <div style={agentCardStyle}>
-            <div style={agentLabelStyle}>// AGENT STATUS</div>
+            <div style={agentLabelStyle}>AGENT STATUS</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12, marginTop: 8 }}>
               <div>
                 <div style={{ ...agentLabelStyle, fontSize: 9 }}>STATE</div>
@@ -1803,7 +1803,7 @@ export function AgentView() {
 
           {agentState?.last_signal && agentState.last_signal.symbol && (
             <div style={agentCardStyle}>
-              <div style={agentLabelStyle}>// LAST SIGNAL</div>
+              <div style={agentLabelStyle}>LAST SIGNAL</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12, marginTop: 8 }}>
                 <div>
                   <div style={{ ...agentLabelStyle, fontSize: 9 }}>SYMBOL</div>
@@ -1834,7 +1834,7 @@ export function AgentView() {
           )}
 
           <div style={agentCardStyle}>
-            <div style={agentLabelStyle}>// WATCHING</div>
+            <div style={agentLabelStyle}>WATCHING</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
               {config.symbols.map((sym) => (
                 <span key={sym} style={{
@@ -2047,7 +2047,7 @@ export function AgentView() {
         <div>
           <div style={{ ...agentCardStyle, borderColor: "#232327" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={agentLabelStyle}>// TOP AUTONOMOUS AGENTS</div>
+              <div style={agentLabelStyle}>TOP AUTONOMOUS AGENTS</div>
               <button onClick={loadLeaderboard} disabled={lbLoading} style={{ ...navBtnStyle, fontSize: 9, padding: "3px 10px", color: "#71717a" }}>
                 {lbLoading ? "…" : "↻ REFRESH"}
               </button>
