@@ -2190,7 +2190,13 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
           // was rejected) — invaluable while reconciling the v1 lib with the v2 facilitator.
           let reason = null;
           try { const h = paid.headers.get("payment-required") || paid.headers.get("x-payment-response"); if (h) reason = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(h.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)))); } catch { /* ignore */ }
-          return json({ scenario, enabled: true, ran: false, error: `run rejected (${paid.status}) — Miroshark's x402 v2 facilitator did not accept the payment`, detail: out, reason }, request, 502);
+          // Surface the facilitator's ACTUAL rejection reason in the visible error string
+          // so a co-test tells us exactly why (invalid_signature vs insufficient_funds vs
+          // invalid_network vs …) instead of the opaque "did not accept the payment".
+          const facReason = reason?.error || reason?.reason || reason?.message || reason?.invalidReason
+            || out?.error || out?.reason || out?.message || (Array.isArray(out?.accepts) ? "re-challenged (payload shape/network mismatch)" : null);
+          const facStr = facReason ? (typeof facReason === "string" ? facReason : JSON.stringify(facReason)) : "no reason returned";
+          return json({ scenario, enabled: true, ran: false, error: `run rejected (${paid.status}) — facilitator reason: ${facStr}`, detail: out, reason, payer: payerAddr }, request, 502);
         }
         try { await env.LAB_STORE.put(capKey, String(used + 1), { expirationTtl: 172800 }); } catch { /* best-effort */ }
         return json({ scenario, enabled: true, ran: "queued", job: out.data || out, disclaimer: MIRO_DISCLAIMER }, request);
