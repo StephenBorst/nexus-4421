@@ -75,6 +75,39 @@ export async function fetchCvd(coin, windowMs = 65 * 60 * 1000) {
   } catch { return null; }
 }
 
+// Pure: order-book imbalance over the top levels = (bidNotional − askNotional) /
+// (bid + ask), in [−1, 1]. Positive = bid-heavy (buyers stacked = support → LONG);
+// negative = ask-heavy (sellers stacked = resistance → SHORT). OKX books rows are
+// [price, size, _, orders]. Exported for tests.
+export function computeImbalance(bids, asks) {
+  const vol = (rows) => (rows || []).reduce((s, x) => s + (parseFloat(x[0]) || 0) * (parseFloat(x[1]) || 0), 0);
+  const b = vol(bids), a = vol(asks);
+  if (b + a <= 0) return null;
+  return Math.round(((b - a) / (b + a)) * 1000) / 1000;
+}
+
+// Network: live order-book imbalance for one coin (OKX top-20). Microstructure only —
+// too fast to snapshot hourly, so this is a LIVE decision-moment read, not accumulated.
+export async function fetchOrderbook(coin) {
+  const spot = coinToSpot(coin);
+  if (!spot) return null;
+  try {
+    const r = await fetch(`https://www.okx.com/api/v5/market/books?instId=${spot}-SWAP&sz=20`);
+    const j = await r.json();
+    if (j.code !== "0") return null;
+    const bk = j.data?.[0];
+    const imbalance = computeImbalance(bk?.bids, bk?.asks);
+    return imbalance == null ? null : { coin: spot.replace("-USDT", ""), imbalance };
+  } catch { return null; }
+}
+
+// Live imbalance → a directional support/resistance read, or null if too balanced.
+export function classifyOrderbook(imbalance) {
+  const SKEW = 0.35; // book noise floor — only a decisive lean counts
+  if (imbalance == null || Math.abs(imbalance) < SKEW) return null;
+  return { side: imbalance > 0 ? "LONG" : "SHORT", imbalance };
+}
+
 // Live basis → a directional QUALITY read for the fade, or null if too flat to matter.
 // side = which fade direction the basis supports; |basis| must clear PREMIUM to count.
 export function classifyBasis(basisPct) {

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { coinToSpot, computeBasisPct, aggregateCvd, classifyBasis } from "./flow.mjs";
+import { coinToSpot, computeBasisPct, aggregateCvd, classifyBasis, computeImbalance, classifyOrderbook } from "./flow.mjs";
 
 test("coinToSpot maps to OKX USDT spot", () => {
   assert.equal(coinToSpot("PERP_BTC_USDC"), "BTC-USDT");
@@ -34,4 +34,19 @@ test("classifyBasis: premium → SHORT, discount → LONG, flat → null", () =>
   assert.equal(classifyBasis(-0.1).side, "LONG");
   assert.equal(classifyBasis(0.01), null); // below the 0.03% threshold
   assert.equal(classifyBasis(null), null);
+});
+
+test("computeImbalance: bid-heavy positive, ask-heavy negative", () => {
+  // rows: [price, size, _, orders]
+  const imb = computeImbalance([["100", "10"]], [["100", "2"]]); // 1000 bid vs 200 ask
+  assert.ok(imb > 0.6 && imb <= 1);
+  assert.ok(computeImbalance([["100", "1"]], [["100", "9"]]) < 0); // ask-heavy
+  assert.equal(computeImbalance([], []), null);
+});
+
+test("classifyOrderbook: decisive lean only (|imb| >= 0.35)", () => {
+  assert.equal(classifyOrderbook(0.5).side, "LONG");   // bid-heavy → support
+  assert.equal(classifyOrderbook(-0.5).side, "SHORT"); // ask-heavy → resistance
+  assert.equal(classifyOrderbook(0.2), null);          // too balanced
+  assert.equal(classifyOrderbook(null), null);
 });

@@ -51,7 +51,7 @@ async function prevCopyLeaders(env, address) {
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate, runBacktest, fetchCandles, fetchFundingAt, makeFundingPctAt } from "./backtest.mjs";
 import { snapshotLiquidations, fetchLiquidations, classifyFlush } from "./liquidations.mjs";
-import { snapshotFlow, fetchBasis, fetchCvd, classifyBasis } from "./flow.mjs";
+import { snapshotFlow, fetchBasis, fetchCvd, classifyBasis, fetchOrderbook, classifyOrderbook } from "./flow.mjs";
 // TWAP planner/status — reuse the exec worker's tested logic (wrangler bundles the
 // cross-dir import, same as backtest.mjs). ONE planner, so start-validation and the
 // cron fire from identical rules.
@@ -4258,15 +4258,16 @@ document.getElementById("btn").addEventListener("click",go);
       let cur = null;
       try { const c = await env.LAB_STORE.get(CUR); if (c) cur = JSON.parse(c); } catch { /* ignore */ }
       if (!cur) {
-        const [basis, cvd] = await Promise.all([fetchBasis(coin), fetchCvd(coin)]);
-        cur = { basis, cvd };
-        if (basis || cvd) { try { await env.LAB_STORE.put(CUR, JSON.stringify(cur), { expirationTtl: 60 }); } catch { /* best-effort */ } }
+        const [basis, cvd, ob] = await Promise.all([fetchBasis(coin), fetchCvd(coin), fetchOrderbook(coin)]);
+        cur = { basis, cvd, ob };
+        if (basis || cvd || ob) { try { await env.LAB_STORE.put(CUR, JSON.stringify(cur), { expirationTtl: 60 }); } catch { /* best-effort */ } }
       }
       const basisSignal = cur?.basis ? classifyBasis(cur.basis.basisPct) : null;
+      const obSignal = cur?.ob ? classifyOrderbook(cur.ob.imbalance) : null;
       let bHist = [], cHist = [];
       try { const r = await KV.get(`basis:hist:${coin}`); bHist = r ? JSON.parse(r) : []; } catch { /* empty */ }
       try { const r = await KV.get(`cvd:hist:${coin}`); cHist = r ? JSON.parse(r) : []; } catch { /* empty */ }
-      return json({ coin, basis: cur?.basis || null, cvd: cur?.cvd || null, basisSignal, basisPoints: bHist.length, cvdPoints: cHist.length, basisHistory: bHist.slice(-72), cvdHistory: cHist.slice(-72) }, request);
+      return json({ coin, basis: cur?.basis || null, cvd: cur?.cvd || null, ob: cur?.ob || null, basisSignal, obSignal, basisPoints: bHist.length, cvdPoints: cHist.length, basisHistory: bHist.slice(-72), cvdHistory: cHist.slice(-72) }, request);
     }
 
     // ── POST /agent/hook/:token — TradingView / external signal webhook ──────
