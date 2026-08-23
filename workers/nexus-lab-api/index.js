@@ -2199,15 +2199,32 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
           // DEEP DEBUG: capture exactly WHAT WE SENT vs WHAT THE CHALLENGE ASKED, so the
           // field mismatch is visible in one co-test. Signature redacted; everything else
           // (challenge terms + our EIP-3009 authorization) is non-secret.
-          let sent = null;
+          let sent = null, sigCheck = null;
           try {
             const p = JSON.parse(atob(xPayment));
             const auth = p?.payload?.authorization || null;
             sent = { x402Version: p?.x402Version, scheme: p?.scheme, network: p?.network,
               authorization: auth ? { from: auth.from, to: auth.to, value: auth.value, validAfter: auth.validAfter, validBefore: auth.validBefore } : null,
               hasSignature: !!p?.payload?.signature };
-          } catch { /* ignore */ }
-          const debug = { challenge: { x402Version: challenge.x402Version, accept0: accepts[0] }, sent, domainVersionUsed: extra.version, assetUsed: req0.asset };
+            // Recover the EIP-3009 signature ourselves with the exact Base-USDC domain — if it
+            // resolves to the payer under version "2", our signature is unimpeachable and the
+            // rejection is 100% facilitator-side.
+            if (auth && p?.payload?.signature) {
+              const { recoverTypedDataAddress } = await import("viem");
+              const recovered = await recoverTypedDataAddress({
+                domain: { name: extra.name || "USD Coin", version: String(extra.version || "2"), chainId: 8453, verifyingContract: req0.asset },
+                types: { TransferWithAuthorization: [
+                  { name: "from", type: "address" }, { name: "to", type: "address" }, { name: "value", type: "uint256" },
+                  { name: "validAfter", type: "uint256" }, { name: "validBefore", type: "uint256" }, { name: "nonce", type: "bytes32" },
+                ] },
+                primaryType: "TransferWithAuthorization",
+                message: { from: auth.from, to: auth.to, value: BigInt(auth.value), validAfter: BigInt(auth.validAfter), validBefore: BigInt(auth.validBefore), nonce: auth.nonce },
+                signature: p.payload.signature,
+              });
+              sigCheck = { recovered, matchesPayer: recovered.toLowerCase() === String(auth.from).toLowerCase() };
+            }
+          } catch (e) { sigCheck = { error: String(e.message || e) }; }
+          const debug = { challenge: { x402Version: challenge.x402Version, accept0: accepts[0] }, sent, sigCheck, domainVersionUsed: extra.version, assetUsed: req0.asset };
           return json({ scenario, enabled: true, ran: false, error: `run rejected (${paid.status}) — facilitator reason: ${facStr}`, detail: out, reason, payer: payerAddr, debug }, request, 502);
         }
         try { await env.LAB_STORE.put(capKey, String(used + 1), { expirationTtl: 172800 }); } catch { /* best-effort */ }
