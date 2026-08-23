@@ -2189,14 +2189,16 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
           }
         }
         let xPayment = await createPaymentHeader(signer, 1, req0);
-        // x402@1.2.0 builds a v1 envelope (network "base", x402Version 1). Miroshark's v2
-        // facilitator matches the payload network to the challenge (CAIP-2) + expects
-        // version 2 — neither is covered by the EIP-3009 signature, so patch the envelope.
+        // ⚠️ v2 PaymentPayload shape (founder-confirmed fix): the envelope must carry a
+        // top-level `accepted` = the EXACT challenge entry we're paying for, VERBATIM (string
+        // equality — asset checksummed, payTo lowercase, as received), NOT flat scheme/network
+        // fields. x402@1.2.0 emits the v1 flat shape, so rebuild: keep only its signed
+        // payload{signature,authorization} and wrap it in the v2 envelope. Flat fields made
+        // their decoder fail → treated as unpaid → verify never ran (no invalidReason).
         try {
-          const obj = JSON.parse(atob(xPayment));
-          obj.network = accepts[0].network;                 // eip155:8453
-          obj.x402Version = challenge.x402Version || 2;      // 2
-          xPayment = btoa(JSON.stringify(obj));             // STANDARD base64 (no url-safe, no line breaks)
+          const built = JSON.parse(atob(xPayment));
+          const v2 = { x402Version: challenge.x402Version || 2, accepted: accepts[0], payload: built.payload };
+          xPayment = btoa(JSON.stringify(v2));              // STANDARD base64 (no url-safe, no line breaks)
         } catch { /* send as built */ }
         // Attach X-PAYMENT to the PAID retry via a Headers object (most robust — a plain
         // object header can be dropped by some fetch impls), standard base64 only (the
@@ -2227,7 +2229,7 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
           try {
             const p = JSON.parse(atob(xPayment));
             const auth = p?.payload?.authorization || null;
-            sent = { x402Version: p?.x402Version, scheme: p?.scheme, network: p?.network,
+            sent = { x402Version: p?.x402Version, hasAccepted: !!p?.accepted, acceptedNetwork: p?.accepted?.network,
               authorization: auth ? { from: auth.from, to: auth.to, value: auth.value, validAfter: auth.validAfter, validBefore: auth.validBefore } : null,
               hasSignature: !!p?.payload?.signature };
             // Recover the EIP-3009 signature ourselves with the exact Base-USDC domain — if it
