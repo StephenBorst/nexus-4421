@@ -2208,6 +2208,10 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         // reaching their middleware — this is the belt-and-suspenders wiring for that.
         const paidHeaders = new Headers();
         paidHeaders.set("Content-Type", "application/json");
+        // Miroshark's v2 server reads the payment from PAYMENT-SIGNATURE (their docs wrongly
+        // said X-PAYMENT — the real cause of the whole saga). Send the spec-clean header +
+        // keep X-PAYMENT for their compat fallback + other x402 facilitators.
+        paidHeaders.set("PAYMENT-SIGNATURE", xPayment);
         paidHeaders.set("X-PAYMENT", xPayment);
         paidHeaders.set("Access-Control-Expose-Headers", "X-PAYMENT-RESPONSE");
         const paid = await fetch(RUN_URL, { method: "POST", headers: paidHeaders, body: JSON.stringify({ prompt: scenario }) });
