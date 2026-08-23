@@ -116,6 +116,72 @@ export function classifyBasis(basisPct) {
   return { side: basisPct > 0 ? "SHORT" : "LONG", basisPct };
 }
 
+// ── OPTIONS SKEW (Deribit) ───────────────────────────────────────────────────
+// The options market's fear/greed — orthogonal to spot/perp entirely. SKEW = nearest-
+// expiry ~10%-OTM put IV − call IV (a risk-reversal proxy). Puts richer (skew↑) = downside
+// fear/hedging; calls richer (skew↓) = upside greed. Classified vs its OWN trailing history
+// (crypto's baseline skew varies), so an EXTREME = a sentiment stretch: more fear than usual
+// = capitulation → LONG (fade the fear); more greed than usual → SHORT. BTC/ETH/SOL only
+// (the liquid Deribit options). Slow signal → fits hourly, accumulates in skew:hist.
+const DERIBIT_CCYS = new Set(["BTC", "ETH", "SOL"]);
+const MON = { JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5, JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11 };
+
+// Pure: parse a Deribit option instrument, e.g. "BTC-25JUN27-150000-P".
+export function parseDeribitInstrument(name) {
+  const p = String(name || "").split("-");
+  if (p.length < 4) return null;
+  const m = /^(\d{1,2})([A-Z]{3})(\d{2})$/.exec(p[1]);
+  if (!m || !(m[2] in MON)) return null;
+  return { expiry: Date.UTC(2000 + +m[3], MON[m[2]], +m[1], 8), strike: +p[2], type: p[3] };
+}
+
+// Pure: from parsed option rows [{expiry,strike,type,iv,underlying}] compute the nearest
+// viable expiry's 10%-OTM put−call IV skew. Exported for tests.
+export function computeSkew(rows, now = Date.now()) {
+  const valid = (rows || []).filter((r) => r && r.iv > 0 && r.strike > 0 && r.underlying > 0 && r.expiry - now > 2 * 86400000);
+  if (!valid.length) return null;
+  const u = valid[0].underlying;
+  const byExp = {};
+  for (const r of valid) (byExp[r.expiry] = byExp[r.expiry] || []).push(r);
+  for (const e of Object.keys(byExp).map(Number).sort((a, b) => a - b)) {
+    const grp = byExp[e];
+    const puts = grp.filter((r) => r.type === "P"), calls = grp.filter((r) => r.type === "C");
+    if (puts.length < 3 || calls.length < 3) continue;
+    const nearest = (arr, t) => arr.reduce((a, b) => (Math.abs(b.strike - t) < Math.abs(a.strike - t) ? b : a));
+    const put = nearest(puts, u * 0.9), call = nearest(calls, u * 1.1);
+    return { skew: Math.round((put.iv - call.iv) * 100) / 100, putIv: put.iv, callIv: call.iv, days: Math.round((e - now) / 86400000) };
+  }
+  return null;
+}
+
+// Network: live options skew for one coin (Deribit book summary). BTC/ETH/SOL only.
+export async function fetchSkew(coin) {
+  const c = String(coin || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+  if (!DERIBIT_CCYS.has(c)) return null;
+  try {
+    const r = await fetch(`https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=${c}&kind=option`);
+    const j = await r.json();
+    const rows = (j.result || []).map((x) => {
+      const p = parseDeribitInstrument(x.instrument_name);
+      return p ? { ...p, iv: parseFloat(x.mark_iv), underlying: parseFloat(x.underlying_price) } : null;
+    });
+    const s = computeSkew(rows);
+    return s ? { coin: c, ...s } : null;
+  } catch { return null; }
+}
+
+// Live skew vs its OWN trailing history → a sentiment-extreme read, or null. More put-fear
+// than usual → LONG (fade capitulation); more call-greed than usual → SHORT. Needs ≥12 pts.
+export function classifySkew(hist, current) {
+  const pts = (hist || []).map((p) => p.skew).filter(Number.isFinite);
+  if (pts.length < 12 || current == null) return null;
+  const sorted = [...pts].sort((a, b) => a - b);
+  const med = sorted[Math.floor(sorted.length / 2)];
+  const dev = current - med;
+  if (Math.abs(dev) < 3) return null; // <3 IV pts from its norm = not a stretch
+  return { side: dev > 0 ? "LONG" : "SHORT", skew: current, dev: Math.round(dev * 100) / 100 };
+}
+
 // Hourly cron: append {t, basisPct} to basis:hist and {t, cvd, buy, sell} to cvd:hist
 // per coin (≥55-min guard → hourly; ~90d cap). Best-effort per coin.
 export async function snapshotFlow(env, coins) {
@@ -125,10 +191,11 @@ export async function snapshotFlow(env, coins) {
     const bare = String(coin).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
     const now = Date.now();
     try {
-      const [basis, cvd] = await Promise.all([fetchBasis(coin), fetchCvd(coin)]);
+      const [basis, cvd, skew] = await Promise.all([fetchBasis(coin), fetchCvd(coin), fetchSkew(coin)]);
       if (basis) await appendHist(KV, `basis:hist:${bare}`, { t: now, basisPct: basis.basisPct }, now);
       if (cvd) await appendHist(KV, `cvd:hist:${bare}`, { t: now, cvd: cvd.cvd, buy: cvd.buy, sell: cvd.sell }, now);
-      if (basis || cvd) n++;
+      if (skew) await appendHist(KV, `skew:hist:${bare}`, { t: now, skew: skew.skew }, now);
+      if (basis || cvd || skew) n++;
     } catch { /* per-coin best-effort */ }
   }
   return n;
