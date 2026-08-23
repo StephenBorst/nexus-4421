@@ -51,7 +51,7 @@ async function prevCopyLeaders(env, address) {
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate, runBacktest, fetchCandles, fetchFundingAt, makeFundingPctAt } from "./backtest.mjs";
 import { snapshotLiquidations, fetchLiquidations, classifyFlush, estimatePendingLevels } from "./liquidations.mjs";
-import { snapshotFlow, fetchBasis, fetchCvd, classifyBasis, fetchOrderbook, classifyOrderbook, fetchSkew, classifySkew } from "./flow.mjs";
+import { snapshotFlow, fetchBasis, fetchCvd, classifyBasis, fetchOrderbook, classifyOrderbook } from "./flow.mjs";
 import { okxJson } from "./okx.mjs";
 // TWAP planner/status — reuse the exec worker's tested logic (wrangler bundles the
 // cross-dir import, same as backtest.mjs). ONE planner, so start-validation and the
@@ -1363,9 +1363,9 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       // Miroshark sims cost the operator ~$1/run — so users buy credits (pay USDC/Arbitrum
       // or $NEXUS/Base to the receiver, same rail + verify as subs) and spend one per run.
       // Self-funding + drives $NEXUS demand. $1 = 1 credit. GET reads the balance.
-      // $ price of one credit (=one sim) — env-tunable markup over the ~$1 x402 cost. Default
-      // $2 = a healthy margin on a premium AI feature; set SIM_CREDIT_USD to retune.
-      const SIM_CREDIT_USD = Number(env.SIM_CREDIT_USD) || 2;
+      // $ price of one credit (=one sim). Default $1 = at-cost ("pressure-test any trade for
+      // a buck" — a marketing line, not a profit center). Env-tunable via SIM_CREDIT_USD.
+      const SIM_CREDIT_USD = Number(env.SIM_CREDIT_USD) || 1;
       if (parts[0] === "sim" && parts[1] === "credits" && parts[2] && parts[2] !== "verify" && request.method === "GET") {
         try { const raw = await env.LAB_STORE.get(`sim:credits:${parts[2].toLowerCase()}`); return json({ credits: raw ? Number(raw) : 0, priceUsd: SIM_CREDIT_USD }, request); }
         catch { return json({ credits: 0, priceUsd: SIM_CREDIT_USD }, request); }
@@ -2163,7 +2163,7 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       // PAY-PER-SIM — the user must hold a sim credit (bought via /sim/credits/verify).
       // walletSig identifies the payer (sign_message('nexus-trading-key-v1')). No sig or no
       // credit → 402 with buy info. The credit is spent only on a successful queue (below).
-      const simPrice = Number(env.SIM_CREDIT_USD) || 2;
+      const simPrice = Number(env.SIM_CREDIT_USD) || 1;
       const simWallet = typeof body.walletSig === "string" ? recoverEthAddress("nexus-trading-key-v1", body.walletSig) : null;
       if (!simWallet) return json({ scenario, enabled: true, ran: false, error: "credit_required", priceUsd: simPrice, hint: `Buy sim credits, then sign to run. Each simulation costs 1 credit ($${simPrice}).` }, request, 402);
       const creditKey = `sim:credits:${simWallet}`;
@@ -4355,21 +4355,19 @@ document.getElementById("btn").addEventListener("click",go);
       let cur = null;
       try { const c = await env.LAB_STORE.get(CUR); if (c) cur = JSON.parse(c); } catch { /* ignore */ }
       if (!cur) {
-        const [basis, cvd, ob, skew] = await Promise.all([fetchBasis(coin), fetchCvd(coin), fetchOrderbook(coin), fetchSkew(coin)]);
-        cur = { basis, cvd, ob, skew };
+        // OKX only (basis/CVD/order-book). Options skew/DVOL is CLIENT-SIDE (Deribit blocks CF).
+        const [basis, cvd, ob] = await Promise.all([fetchBasis(coin), fetchCvd(coin), fetchOrderbook(coin)]);
+        cur = { basis, cvd, ob };
         // Only cache a snapshot that actually captured basis (the primary read) — a transient
-        // OKX ticker hiccup otherwise pins a null basis for 60s. Non-core coins (no Deribit skew)
-        // still cache on basis alone.
+        // OKX ticker hiccup otherwise pins a null basis for 60s.
         if (basis) { try { await env.LAB_STORE.put(CUR, JSON.stringify(cur), { expirationTtl: 60 }); } catch { /* best-effort */ } }
       }
       const basisSignal = cur?.basis ? classifyBasis(cur.basis.basisPct) : null;
       const obSignal = cur?.ob ? classifyOrderbook(cur.ob.imbalance) : null;
-      let bHist = [], cHist = [], skHist = [];
+      let bHist = [], cHist = [];
       try { const r = await KV.get(`basis:hist:${coin}`); bHist = r ? JSON.parse(r) : []; } catch { /* empty */ }
       try { const r = await KV.get(`cvd:hist:${coin}`); cHist = r ? JSON.parse(r) : []; } catch { /* empty */ }
-      try { const r = await KV.get(`skew:hist:${coin}`); skHist = r ? JSON.parse(r) : []; } catch { /* empty */ }
-      const skewSignal = cur?.skew ? classifySkew(skHist, cur.skew.skew) : null;
-      return json({ coin, basis: cur?.basis || null, cvd: cur?.cvd || null, ob: cur?.ob || null, skew: cur?.skew || null, term: cur?.skew?.term || null, basisSignal, obSignal, skewSignal, basisPoints: bHist.length, cvdPoints: cHist.length, skewPoints: skHist.length, basisHistory: bHist.slice(-72), cvdHistory: cHist.slice(-72) }, request);
+      return json({ coin, basis: cur?.basis || null, cvd: cur?.cvd || null, ob: cur?.ob || null, basisSignal, obSignal, basisPoints: bHist.length, cvdPoints: cHist.length, basisHistory: bHist.slice(-72), cvdHistory: cHist.slice(-72) }, request);
     }
 
     // ── POST /agent/hook/:token — TradingView / external signal webhook ──────

@@ -216,11 +216,13 @@ export async function snapshotFlow(env, coins) {
     const bare = String(coin).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
     const now = Date.now();
     try {
-      const [basis, cvd, skew] = await Promise.all([fetchBasis(coin), fetchCvd(coin), fetchSkew(coin)]);
+      // NOTE: options skew/DVOL is fetched CLIENT-SIDE (Deribit hard-blocks CF egress — see
+      // app/lib/deribit.mjs), so no server-side skew snapshot here (it always failed). OKX
+      // basis + CVD work fine from the worker.
+      const [basis, cvd] = await Promise.all([fetchBasis(coin), fetchCvd(coin)]);
       if (basis) await appendHist(KV, `basis:hist:${bare}`, { t: now, basisPct: basis.basisPct }, now);
       if (cvd) await appendHist(KV, `cvd:hist:${bare}`, { t: now, cvd: cvd.cvd, buy: cvd.buy, sell: cvd.sell }, now);
-      if (skew && Number.isFinite(skew.skew)) await appendHist(KV, `skew:hist:${bare}`, { t: now, skew: skew.skew }, now);
-      if (basis || cvd || skew) n++;
+      if (basis || cvd) n++;
     } catch { /* per-coin best-effort */ }
   }
   return n;

@@ -53,7 +53,6 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   }, [coin]);
   const [basis, setBasis] = useState<{ side: "LONG" | "SHORT"; basisPct: number } | null>(null);
   const [ob, setOb] = useState<{ side: "LONG" | "SHORT"; imbalance: number } | null>(null);
-  const [skew, setSkew] = useState<{ side: "LONG" | "SHORT"; dev: number } | null>(null);
   const [rawBasis, setRawBasis] = useState<number | null>(null);
   const [term, setTerm] = useState<{ structure: string; ratio: number; frontIv: number; backIv: number } | null>(null);
 
@@ -61,12 +60,12 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   // (>0) = froth → SHORT, discount → LONG. OB: bid-heavy = support → LONG, ask-heavy → SHORT.
   // Skew (BTC/ETH/SOL): more put-fear than usual = capitulation → LONG, more call-greed → SHORT.
   useEffect(() => {
-    if (!coin) { setBasis(null); setOb(null); setSkew(null); setRawBasis(null); setTerm(null); return; }
+    if (!coin) { setBasis(null); setOb(null); setRawBasis(null); return; }
     let off = false;
     const sideOf = (s: { side?: string } | null | undefined) => (s && (s.side === "LONG" || s.side === "SHORT") ? s : null);
     fetch(`${AGENT_API}/intel/flow/${coin}`).then((r) => r.json())
-      .then((d) => { if (off) return; setBasis((sideOf(d?.basisSignal) as typeof basis) ?? null); setOb((sideOf(d?.obSignal) as typeof ob) ?? null); setSkew((sideOf(d?.skewSignal) as typeof skew) ?? null); setRawBasis(typeof d?.basis?.basisPct === "number" ? d.basis.basisPct : null); })
-      .catch(() => { if (!off) { setBasis(null); setOb(null); setSkew(null); setRawBasis(null); } });
+      .then((d) => { if (off) return; setBasis((sideOf(d?.basisSignal) as typeof basis) ?? null); setOb((sideOf(d?.obSignal) as typeof ob) ?? null); setRawBasis(typeof d?.basis?.basisPct === "number" ? d.basis.basisPct : null); })
+      .catch(() => { if (!off) { setBasis(null); setOb(null); setRawBasis(null); } });
     return () => { off = true; };
   }, [coin]);
 
@@ -179,7 +178,6 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
     if (crowdLong !== rawBasis > 0) { const bounce = crowdLong ? "LONG" : "SHORT"; reads.push({ label: "funding×basis", val: "premium fading", side: bounce, ok: bounce === direction }); }
   }
   if (ob) reads.push({ label: "order book", val: `${ob.imbalance > 0 ? "bid" : "ask"}-heavy`, side: ob.side, ok: ob.side === direction });
-  if (skew) reads.push({ label: "options skew", val: `${skew.dev > 0 ? "fear" : "greed"} ${skew.dev > 0 ? "+" : ""}${skew.dev}`, side: skew.side, ok: skew.side === direction });
   if (record?.side) reads.push({ label: `your ${coin}`, val: `${record.side.net >= 0 ? "+" : "-"}$${Math.abs(record.side.net)} · ${record.side.n}t · ${record.side.wr}%`, side: record.side.net >= 0 ? direction : null, ok: record.side.net > 0 });
   else if (record) reads.push({ label: `your ${coin}`, val: `${record.net >= 0 ? "+" : "-"}$${Math.abs(record.net)} · ${record.n}t`, side: record.net >= 0 ? direction : null, ok: record.net > 0 });
   const agree = reads.filter((r) => r.ok).length;
@@ -189,7 +187,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const convWord = convLevel === "HIGH" ? "HIGH CONVICTION" : convLevel === "MODERATE" ? "MODERATE" : convLevel === "AGAINST" ? "READS DISAGREE" : "LOW CONVICTION";
 
   const loading = fused === undefined;
-  const nothing = fused === null && !callers && !record && !advice && !baseRate && !flush && !basis && !ob && !skew && !magnets && !term;
+  const nothing = fused === null && !callers && !record && !advice && !baseRate && !flush && !basis && !ob && !magnets && !term;
 
   // THE SYNTHESIS — one honest "so what" line woven from the full engine: the conviction
   // headline (from the multi-axis tally), then the context the chips don't spell out — the
