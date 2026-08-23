@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { SectionHeader } from "./components";
 import type { TabId, ProcessedTrade } from "./types";
-import { buildBriefing, buildMarketRead, buildFusion, buildForecastRead, computeTape, type BriefingTrade, type Insight, type MarketSignal, type ForecastRead } from "./briefing";
+import { buildBriefing, buildMarketRead, buildFusion, computeTape, type BriefingTrade, type Insight, type MarketSignal } from "./briefing";
 import { recordFlag, coachingInsight } from "@/lib/coaching.mjs";
 import { buildOperatorProfile, profileNarrative } from "@/lib/operatorProfile.mjs";
 import { tiltRead, sessionEdge, overtradingRead, sizingRead } from "@/lib/behavioral.mjs";
@@ -31,10 +31,14 @@ const TONE: Record<Insight["tone"], { bar: string; dot: string }> = {
   info: { bar: "#33333a", dot: "#71717a" },
 };
 
-function InsightRow({ ins, onSelectTab }: { ins: Insight; onSelectTab: (t: TabId) => void }) {
+function InsightRow({ ins, onSelectTab, rank }: { ins: Insight; onSelectTab: (t: TabId) => void; rank?: number }) {
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "8px 14px", borderBottom: "1px solid #131316", borderLeft: `2px solid ${TONE[ins.tone].bar}` }}>
-      <span style={{ width: 5, height: 5, borderRadius: "50%", background: TONE[ins.tone].dot, flexShrink: 0, marginTop: 5 }} />
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "10px 14px", borderBottom: "1px solid #131316", borderLeft: `2px solid ${TONE[ins.tone].bar}` }}>
+      {rank != null ? (
+        <span style={{ flexShrink: 0, width: 18, height: 18, marginTop: 1, borderRadius: "50%", border: `1px solid ${TONE[ins.tone].dot}`, color: TONE[ins.tone].dot, fontFamily: "var(--nx-font-mono)", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{rank}</span>
+      ) : (
+        <span style={{ width: 5, height: 5, borderRadius: "50%", background: TONE[ins.tone].dot, flexShrink: 0, marginTop: 5 }} />
+      )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#f4f4f5", fontWeight: 600, lineHeight: 1.3 }}>{ins.title}</div>
         <div style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: 11.5, color: "#a1a1aa", lineHeight: 1.5, marginTop: 2 }}>{ins.detail}</div>
@@ -74,7 +78,6 @@ export function NexusBriefing({
   const [myContrarian, setMyContrarian] = useState<{ calls: number; avgR: number } | null>(null);
   const [myAlignEdge, setMyAlignEdge] = useState<{ best: { bucket: string; avgR: number } } | null>(null);
   const [process, setProcess] = useState<Record<string, unknown> | null>(null);
-  const [forecasts, setForecasts] = useState<ForecastRead[] | null>(null);
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(COLLAPSE_KEY) === "1"; } catch { return false; }
   });
@@ -89,8 +92,6 @@ export function NexusBriefing({
     fetch(`${AGENT_API}/agents/live`).then((r) => r.json()).then((j) => { if (alive) setLiveAgents(typeof j?.count === "number" ? j.count : (Array.isArray(j?.positions) ? j.positions.length : 0)); }).catch(() => { /* no live count */ });
     // The merit-weighted caller lean per symbol — the graded crowd, for the fusion.
     fetch(`${AGENT_API}/theses/consensus`).then((r) => r.json()).then((j) => { if (alive) setConsensus(j?.consensus ?? null); }).catch(() => { /* no crowd lean */ });
-    // Prediction-market forecast divergences — the forecasting crowd vs the tape.
-    fetch(`${AGENT_API}/intel/forecasts`).then((r) => r.json()).then((j) => { if (alive) setForecasts(Array.isArray(j?.markets) ? j.markets : []); }).catch(() => { /* no forecast read */ });
     return () => { alive = false; };
   }, []);
 
@@ -187,18 +188,22 @@ export function NexusBriefing({
     [rows, signals, liveAgents, tape, personal.length, fusion]
   );
 
-  // Forecast divergence — surfaced when a near-money prediction-market read is
-  // offside the tape. De-duped against the fusion's symbol so we don't echo it.
-  const forecast = useMemo(
-    () => buildForecastRead(forecasts).filter((f) => !fusion.some((x) => x.meta?.symbol === f.meta?.symbol)).slice(0, 1),
-    [forecasts, fusion]
-  );
+  // ⭐ THE ACTION QUEUE — the deepening: instead of three separate lenses, merge every
+  // read into ONE list ranked by priority and present it as a numbered "what to act on,
+  // in order" queue. The fusion (your edge × the market) naturally floats to the top by
+  // its own priority; coaching/personal/market fall in behind by importance. Deduped by id.
+  const queue = useMemo(() => {
+    const all: Insight[] = [...fusion, ...(coaching ? [coaching] : []), ...personal, ...market];
+    const seen = new Set<string>();
+    const dedup = all.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
+    return dedup.sort((a, b) => b.priority - a.priority).slice(0, 5);
+  }, [fusion, coaching, personal, market]);
 
-  if (!fusion.length && !personal.length && !market.length && !forecast.length) return null;
+  if (!queue.length) return null;
 
   const toggle = () => setCollapsed((c) => { const n = !c; try { localStorage.setItem(COLLAPSE_KEY, n ? "1" : "0"); } catch { /* ignore */ } return n; });
 
-  const total = fusion.length + personal.length + market.length + forecast.length + (coaching ? 1 : 0);
+  const total = queue.length;
   const askAi = () => window.dispatchEvent(new CustomEvent("nexus:assistant-ask", {
     detail: {
       prompt: personal.length
@@ -251,33 +256,10 @@ export function NexusBriefing({
               )}
             </div>
           )}
-          {/* ⭐ The fusion leads — "is this setup mine". Labeled only when other lenses show. */}
-          {fusion.length > 0 && (
-            <>
-              {(personal.length > 0 || market.length > 0) && <GroupLabel text="The read · your edge × the market" />}
-              {fusion.map((ins) => <InsightRow key={ins.id} ins={ins} onSelectTab={onSelectTab} />)}
-            </>
-          )}
-          {/* Personal lens next when present, labeled only when other lenses show. */}
-          {(personal.length > 0 || coaching) && (
-            <>
-              {(fusion.length > 0 || market.length > 0) && <GroupLabel text="Your terminal" />}
-              {coaching && <InsightRow key={coaching.id} ins={coaching} onSelectTab={onSelectTab} />}
-              {personal.map((ins) => <InsightRow key={ins.id} ins={ins} onSelectTab={onSelectTab} />)}
-            </>
-          )}
-          {market.length > 0 && (
-            <>
-              {(fusion.length > 0 || personal.length > 0) && <GroupLabel text="The market" />}
-              {market.map((ins) => <InsightRow key={ins.id} ins={ins} onSelectTab={onSelectTab} />)}
-            </>
-          )}
-          {forecast.length > 0 && (
-            <>
-              {(fusion.length > 0 || personal.length > 0 || market.length > 0) && <GroupLabel text="Forecasters vs the tape" />}
-              {forecast.map((ins) => <InsightRow key={ins.id} ins={ins} onSelectTab={onSelectTab} />)}
-            </>
-          )}
+          {/* ⭐ THE ACTION QUEUE — one ranked list, most important first. What to act on,
+              in order — your edge × the market floats to the top by priority. */}
+          <GroupLabel text={personal.length ? "Act on this — in order" : "Watch this — in order"} />
+          {queue.map((ins, i) => <InsightRow key={ins.id} ins={ins} onSelectTab={onSelectTab} rank={i + 1} />)}
           {/* Deep-dive hand-off to the copilot */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "9px 14px" }}>
             <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", letterSpacing: "0.05em" }}>deterministic — no AI, no key, just the data</span>

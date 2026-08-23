@@ -49,7 +49,7 @@ async function prevCopyLeaders(env, address) {
   catch { return []; }
 }
 
-import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate } from "./backtest.mjs";
+import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate, runBacktest, fetchCandles, fetchFundingAt, makeFundingPctAt } from "./backtest.mjs";
 // TWAP planner/status — reuse the exec worker's tested logic (wrangler bundles the
 // cross-dir import, same as backtest.mjs). ONE planner, so start-validation and the
 // cron fire from identical rules.
@@ -4134,6 +4134,38 @@ document.getElementById("btn").addEventListener("click",go);
       const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
       const raw = await AGENT_KV.get(`oi:hist:${parts[2]}`);
       return json({ symbol: parts[2], points: raw ? JSON.parse(raw) : [] }, request);
+    }
+
+    // ── GET /intel/baserate/:symbol — the honest "base rate at the decision" ──────
+    // How the funding-fade setup on this coin has ACTUALLY resolved historically:
+    // first-touch TP-vs-SL over 60d of mature public funding+price, run through the
+    // SAME backtest engine that grades live calls (not a vibe). Conditioned on
+    // genuinely-stretched funding (≥90th percentile), the premise THE READ shows.
+    // Often <50% by design — an honest "this setup hasn't worked here, trust your
+    // thesis" is the premium, trust-building read. Cached 6h. Public, fail-soft.
+    if (parts[0] === "intel" && parts[1] === "baserate" && parts[2] && request.method === "GET") {
+      const coin = String(parts[2]).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+      const symbol = `PERP_${coin}_USDC`;
+      const CACHE = `baserate:${coin}:v1`;
+      try { const c = await env.LAB_STORE.get(CACHE); if (c) return json(JSON.parse(c), request); } catch { /* ignore */ }
+      try {
+        const cfg = { signalMode: "FUNDING_ONLY", fundingThreshold: 0.01, fundingPercentileMin: 90, tpPercent: 2, slPercent: 1, maxHoldHours: 4, leverage: 5, capitalPerTrade: 50, feeBps: 3, oiChangeThreshold: 0 };
+        const [candles, funding] = await Promise.all([fetchCandles(symbol, 60), fetchFundingAt(symbol)]);
+        if (!candles.length) return json({ coin, available: false }, request);
+        const res = runBacktest(candles, funding.at, cfg, makeFundingPctAt(funding.rows));
+        const out = {
+          coin,
+          available: res.trades >= 8, // need a real sample before quoting a rate
+          setup: "funding-fade · stretched (≥90th pct funding)", tp: 2, sl: 1, windowDays: 60,
+          samples: res.trades, hitRate: res.winRate,
+          expectancyR: Math.round((res.avgPnlPct / cfg.slPercent) * 100) / 100,
+          netUsd: res.netUsd,
+        };
+        try { await env.LAB_STORE.put(CACHE, JSON.stringify(out), { expirationTtl: 21600 }); } catch { /* best-effort */ }
+        return json(out, request);
+      } catch (e) {
+        return json({ coin, available: false, error: String(e.message || e) }, request);
+      }
     }
 
     // ── POST /agent/hook/:token — TradingView / external signal webhook ──────

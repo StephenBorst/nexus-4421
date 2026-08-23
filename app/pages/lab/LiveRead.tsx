@@ -26,6 +26,7 @@ type Regime = { trend?: string; vol?: string; atrPct?: number };
 type Warning = { text: string; severity?: string; kind?: string };
 type Advice = { regime: Regime | null; alignment: string | null; warnings: Warning[]; plan: { flags?: string[] } | null; yourRecord: { trend?: { avgR: number; calls: number } | null; vol?: { avgR: number; calls: number } | null } | null } | null;
 type Levels = { entryPrice: number; stopLoss: number; takeProfit1: number };
+type BaseRate = { available: boolean; hitRate: number; samples: number; expectancyR: number; windowDays: number; setup?: string };
 
 const TREND_WORD: Record<string, string> = { TREND_UP: "uptrend", TREND_DOWN: "downtrend", CHOP: "chop" };
 const VOL_WORD: Record<string, string> = { CALM: "calm", NORMAL: "normal vol", VOLATILE: "volatile" };
@@ -35,6 +36,19 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const [fused, setFused] = useState<Fused | null | undefined>(undefined); // undefined=loading, null=no read
   const [callers, setCallers] = useState<{ side: "LONG" | "SHORT"; participants: number } | null>(null);
   const [advice, setAdvice] = useState<Advice>(null);
+  const [baseRate, setBaseRate] = useState<BaseRate | null>(null);
+
+  // Historical base rate for the funding-fade setup on this coin — the honest "how has
+  // this actually resolved" number, computed server-side by the REAL backtest engine over
+  // 60d of public funding+price (first-touch TP vs SL). Cached; fail-soft.
+  useEffect(() => {
+    if (!coin) { setBaseRate(null); return; }
+    let off = false;
+    fetch(`${AGENT_API}/intel/baserate/${coin}`).then((r) => r.json())
+      .then((d) => { if (!off) setBaseRate(d && d.available ? d : null); })
+      .catch(() => { if (!off) setBaseRate(null); });
+    return () => { off = true; };
+  }, [coin]);
 
   // Once the LEVELS are set, run the SAME grading the call will get later (/theses/advice):
   // the market regime, any plan defects (late entry, stop in noise, R:R mismatch…), and your
@@ -91,7 +105,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const against = boardLean != null && direction !== boardLean;
 
   const loading = fused === undefined;
-  const nothing = fused === null && !callers && !record && !advice;
+  const nothing = fused === null && !callers && !record && !advice && !baseRate;
 
   // one honest synthesis line, reacting to what the user is drafting
   const synth = (() => {
@@ -138,8 +152,20 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
             {fused && fused.verdict === "SPLIT" && chip("Positioning", <span style={{ color: WARN }}>⚡ SPLIT</span>, WARN)}
             {callers && chip("Callers", <span style={{ color: dirColor(callers.side) }}>{callers.side}<span style={{ color: FAINT, fontWeight: 400 }}> · {callers.participants}</span></span>)}
             {record && chip(`Your ${coin}`, <span style={{ color: record.net >= 0 ? POS : NEG }}>{record.net >= 0 ? "+" : "-"}${Math.abs(record.net)}<span style={{ color: FAINT, fontWeight: 400 }}> · {record.n}t · {record.wr}%</span></span>)}
+            {baseRate && chip("Fade base rate", <span style={{ color: baseRate.expectancyR > 0 ? POS : WARN }}>{baseRate.hitRate}%<span style={{ color: FAINT, fontWeight: 400 }}> · {baseRate.samples}× · {baseRate.expectancyR >= 0 ? "+" : ""}{baseRate.expectancyR}R</span></span>)}
           </div>
           {synth && <div style={{ fontFamily: UI, fontSize: 12.5, color: tone === POS ? "#8fdcb8" : tone, lineHeight: 1.55 }}>{synth}</div>}
+
+          {/* BASE RATE — the honest historical resolution of the funding-fade setup here,
+              from the same engine that grades live. Often below break-even by design; when
+              it is, the read is "don't lean on this setup — trust your own edge." */}
+          {baseRate && (
+            <div style={{ marginTop: 8, fontFamily: UI, fontSize: 11.5, color: FOG, lineHeight: 1.5 }}>
+              <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED }}>BASE RATE · </span>
+              the funding-fade on {coin} resolved to target <b style={{ color: baseRate.expectancyR > 0 ? POS : WARN }}>{baseRate.hitRate}%</b> over {baseRate.samples} stretched-funding instances ({baseRate.windowDays}d), {baseRate.expectancyR >= 0 ? "+" : ""}{baseRate.expectancyR}R avg.{" "}
+              <span style={{ color: MUTED }}>{baseRate.expectancyR > 0 ? "A real edge here — still size for variance." : "This setup has bled here — lean on your own thesis, not the fade."}</span>
+            </div>
+          )}
 
           {/* GRADING PREVIEW — once levels are set, the SAME grading the call will get:
               regime it's posted into, your record there, and any plan defect. */}
