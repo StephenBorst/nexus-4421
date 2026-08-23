@@ -2141,6 +2141,30 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
           asset: a.asset || (isBaseMainnet ? BASE_USDC : a.asset),
           extra,
         };
+        // ── Payer-balance precheck ────────────────────────────────────────────────
+        // The x402 facilitator (CDP) verifies the SIGNER actually holds the funds on
+        // Base mainnet before executing — an unfunded/underfunded payer silently fails
+        // verify() and just re-emits the 402. Surface a precise, actionable balance
+        // error (with the payer address, which is NOT secret) instead of the opaque
+        // "facilitator did not accept the payment".
+        let payerAddr = null;
+        try { payerAddr = signer?.account?.address || signer?.address || null; } catch { /* derive below */ }
+        if (!payerAddr) { try { const { privateKeyToAccount } = await import("viem/accounts"); payerAddr = privateKeyToAccount(pk).address; } catch { /* skip precheck */ } }
+        if (payerAddr && isBaseMainnet) {
+          const need = BigInt(req0.maxAmountRequired || "0");
+          const bd = "0x70a08231000000000000000000000000" + payerAddr.slice(2);
+          let bal = null;
+          for (const rpc of ["https://base-rpc.publicnode.com", "https://mainnet.base.org", "https://base.llamarpc.com"]) {
+            try {
+              const r = await fetch(rpc, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to: req0.asset || BASE_USDC, data: bd }, "latest"] }) });
+              const j = await r.json();
+              if (j.result) { bal = BigInt(j.result); break; }
+            } catch { /* try next rpc */ }
+          }
+          if (bal != null && bal < need) {
+            return json({ scenario, enabled: true, ran: false, error: `payer wallet ${payerAddr} holds ${(Number(bal) / 1e6).toFixed(2)} USDC on Base — needs ≥ ${(Number(need) / 1e6).toFixed(2)} USDC for this run. Fund it and retry.`, payer: payerAddr, balanceUsdc: Number(bal) / 1e6, requiredUsdc: Number(need) / 1e6 }, request, 402);
+          }
+        }
         let xPayment = await createPaymentHeader(signer, 1, req0);
         // x402@1.2.0 builds a v1 envelope (network "base", x402Version 1). Miroshark's v2
         // facilitator matches the payload network to the challenge (CAIP-2) + expects
