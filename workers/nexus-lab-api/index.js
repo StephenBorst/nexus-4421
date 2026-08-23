@@ -2192,21 +2192,22 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         // x402@1.2.0 builds a v1 envelope (network "base", x402Version 1). Miroshark's v2
         // facilitator matches the payload network to the challenge (CAIP-2) + expects
         // version 2 — neither is covered by the EIP-3009 signature, so patch the envelope.
-        let xPaymentUrl = xPayment;
         try {
           const obj = JSON.parse(atob(xPayment));
           obj.network = accepts[0].network;                 // eip155:8453
           obj.x402Version = challenge.x402Version || 2;      // 2
-          const std = btoa(JSON.stringify(obj));
-          xPayment = std;
-          xPaymentUrl = std.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); // base64url variant
+          xPayment = btoa(JSON.stringify(obj));             // STANDARD base64 (no url-safe, no line breaks)
         } catch { /* send as built */ }
-        // Spec: retry with a signed X-PAYMENT header (base64 v2 PaymentPayload). Success = 202.
-        // Try standard base64 first; if re-challenged, retry the base64url variant.
-        let paid = await fetch(RUN_URL, reqInit({ "X-PAYMENT": xPayment }));
-        if (paid.status === 402 && xPaymentUrl !== xPayment) {
-          paid = await fetch(RUN_URL, reqInit({ "X-PAYMENT": xPaymentUrl }));
-        }
+        // Attach X-PAYMENT to the PAID retry via a Headers object (most robust — a plain
+        // object header can be dropped by some fetch impls), standard base64 only (the
+        // founder confirmed verify expects standard, not url-safe), + mirror x402-fetch's
+        // CORS expose header. Founder diag: "verify was never called" ⇒ the header wasn't
+        // reaching their middleware — this is the belt-and-suspenders wiring for that.
+        const paidHeaders = new Headers();
+        paidHeaders.set("Content-Type", "application/json");
+        paidHeaders.set("X-PAYMENT", xPayment);
+        paidHeaders.set("Access-Control-Expose-Headers", "X-PAYMENT-RESPONSE");
+        const paid = await fetch(RUN_URL, { method: "POST", headers: paidHeaders, body: JSON.stringify({ prompt: scenario }) });
         const out = await paid.json().catch(() => ({}));
         if (!paid.ok) {
           // Decode the re-challenge / error header for a precise reason (why the payment
@@ -2247,7 +2248,7 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
               sigCheck = { recovered, matchesPayer: recovered.toLowerCase() === String(auth.from).toLowerCase() };
             }
           } catch (e) { sigCheck = { error: String(e.message || e) }; }
-          const debug = { challenge: { x402Version: challenge.x402Version, accept0: accepts[0] }, sent, sigCheck, domainVersionUsed: extra.version, assetUsed: req0.asset };
+          const debug = { challenge: { x402Version: challenge.x402Version, accept0: accepts[0] }, sent, sigCheck, domainVersionUsed: extra.version, assetUsed: req0.asset, xPaymentLen: xPayment.length, xPaymentStdB64: /^[A-Za-z0-9+/]+={0,2}$/.test(xPayment) };
           return json({ scenario, enabled: true, ran: false, error: `run rejected (${paid.status}) — facilitator reason: ${facStr}`, detail: out, reason, payer: payerAddr, debug }, request, 502);
         }
         try { await env.LAB_STORE.put(capKey, String(used + 1), { expirationTtl: 172800 }); } catch { /* best-effort */ }
