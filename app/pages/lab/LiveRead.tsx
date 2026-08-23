@@ -19,7 +19,6 @@ const BONE = "#ededf0", FOG = "#a1a1aa", MUTED = "#71717a", FAINT = "#52525b";
 const POS = "#3ecf8e", NEG = "#f7525f", WARN = "#e0a458", BORDER = "#232327", INSET = "#0c0c0e";
 
 const bare = (s: string) => String(s || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
-const dirColor = (d: string | null) => (d === "LONG" ? POS : d === "SHORT" ? NEG : MUTED);
 
 type Fused = { coin: string; verdict: "CONFLUENCE" | "SPLIT" | "CROWD" | "SMART"; crowdFade: "LONG" | "SHORT" | null; smartSide: "LONG" | "SHORT" | null; fundingAnnualPct: number | null; smartTraders: number };
 type Regime = { trend?: string; vol?: string; atrPct?: number };
@@ -139,17 +138,18 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   // rate, your own realized record). Agreement across uncorrelated sources is the only
   // thing that's held up — so we gate conviction on the TALLY, and stay fully explainable
   // by listing exactly which reads confirm and which push back. Never a black-box score.
-  const reads: { label: string; side: "LONG" | "SHORT" | null; ok: boolean }[] = [];
-  if (flush) { const fs = flush.side === "DOWN" ? "SHORT" : "LONG"; reads.push({ label: `liq flush ${flush.ratio}×`, side: fs, ok: fs === direction }); }
-  if (basis) reads.push({ label: `basis ${basis.basisPct > 0 ? "+" : ""}${basis.basisPct}%`, side: basis.side, ok: basis.side === direction });
-  if (ob) reads.push({ label: `book ${ob.imbalance > 0 ? "bid" : "ask"}-heavy`, side: ob.side, ok: ob.side === direction });
-  if (skew) reads.push({ label: `options ${skew.dev > 0 ? "fear" : "greed"}`, side: skew.side, ok: skew.side === direction });
-  if (fused?.crowdFade) reads.push({ label: "funding fade", side: fused.crowdFade, ok: fused.crowdFade === direction });
-  if (fused?.smartSide) reads.push({ label: "smart money", side: fused.smartSide, ok: fused.smartSide === direction });
-  if (callers) reads.push({ label: "graded callers", side: callers.side, ok: callers.side === direction });
-  if (baseRate) reads.push({ label: `base rate ${baseRate.expectancyR >= 0 ? "+EV" : "−EV"}`, side: boardLean, ok: baseRate.expectancyR > 0 && boardLean === direction });
-  if (record?.side) reads.push({ label: `your ${coin} record`, side: record.side.net >= 0 ? direction : null, ok: record.side.net > 0 });
-  else if (record) reads.push({ label: `your ${coin} record`, side: record.net >= 0 ? direction : null, ok: record.net > 0 });
+  const reads: { label: string; val: string; side: "LONG" | "SHORT" | null; ok: boolean }[] = [];
+  if (fused?.crowdFade) reads.push({ label: "funding fade", val: fused.fundingAnnualPct != null ? `${fused.crowdFade} · ${fused.fundingAnnualPct}%/yr` : fused.crowdFade, side: fused.crowdFade, ok: fused.crowdFade === direction });
+  if (fused?.smartSide) reads.push({ label: "smart money", val: `${fused.smartSide} · ${fused.smartTraders}`, side: fused.smartSide, ok: fused.smartSide === direction });
+  if (fused && (fused.verdict === "CONFLUENCE" || fused.verdict === "SPLIT")) reads.push({ label: "positioning", val: fused.verdict === "CONFLUENCE" ? "◆ confluence" : "⚡ split", side: fused.verdict === "CONFLUENCE" ? boardLean : null, ok: fused.verdict === "CONFLUENCE" && boardLean === direction });
+  if (callers) reads.push({ label: "graded callers", val: `${callers.side} · ${callers.participants}`, side: callers.side, ok: callers.side === direction });
+  if (baseRate) reads.push({ label: "base rate", val: `${baseRate.hitRate}% · ${baseRate.expectancyR >= 0 ? "+" : ""}${baseRate.expectancyR}R`, side: boardLean, ok: baseRate.expectancyR > 0 && boardLean === direction });
+  if (flush) { const fs = flush.side === "DOWN" ? "SHORT" : "LONG"; reads.push({ label: "liq flush", val: `${flush.ratio}× ${flush.side === "DOWN" ? "↓longs" : "↑shorts"}`, side: fs, ok: fs === direction }); }
+  if (basis) reads.push({ label: "spot-perp basis", val: `${basis.basisPct > 0 ? "+" : ""}${basis.basisPct}% ${basis.basisPct > 0 ? "prem" : "disc"}`, side: basis.side, ok: basis.side === direction });
+  if (ob) reads.push({ label: "order book", val: `${ob.imbalance > 0 ? "bid" : "ask"}-heavy`, side: ob.side, ok: ob.side === direction });
+  if (skew) reads.push({ label: "options skew", val: `${skew.dev > 0 ? "fear" : "greed"} ${skew.dev > 0 ? "+" : ""}${skew.dev}`, side: skew.side, ok: skew.side === direction });
+  if (record?.side) reads.push({ label: `your ${coin}`, val: `${record.side.net >= 0 ? "+" : "-"}$${Math.abs(record.side.net)} · ${record.side.n}t · ${record.side.wr}%`, side: record.side.net >= 0 ? direction : null, ok: record.side.net > 0 });
+  else if (record) reads.push({ label: `your ${coin}`, val: `${record.net >= 0 ? "+" : "-"}$${Math.abs(record.net)} · ${record.n}t`, side: record.net >= 0 ? direction : null, ok: record.net > 0 });
   const agree = reads.filter((r) => r.ok).length;
   const pushback = reads.filter((r) => r.side && r.side !== direction).length;
   const convLevel = reads.length >= 3 && agree >= 4 ? "HIGH" : agree >= 2 && agree > pushback ? "MODERATE" : pushback > agree ? "AGAINST" : "LOW";
@@ -176,13 +176,6 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   })();
 
   const tone = aligned ? POS : against ? WARN : FOG;
-  const chip = (label: string, val: React.ReactNode, color = FOG) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <span style={{ fontFamily: MONO, fontSize: 8, letterSpacing: "0.12em", color: MUTED }}>{label}</span>
-      <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color }}>{val}</span>
-    </div>
-  );
-
   return (
     <div style={{ border: `1px solid ${aligned ? "#2a3a30" : against ? "#3a3320" : BORDER}`, borderLeft: `2px solid ${tone}`, background: C.surfaceAlt, borderRadius: 8, padding: "12px 14px", marginBottom: 14 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -197,35 +190,35 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
         <div style={{ fontFamily: MONO, fontSize: 10.5, color: MUTED, lineHeight: 1.5 }}>No strong read on {coin} right now — no funding extreme, no sharp cluster, no record here yet. Trust your own thesis.</div>
       ) : (
         <>
-          {/* CONVICTION VERDICT — how many independent reads agree with your direction.
-              The engine = agreement across orthogonal sources, not any single dial.
-              Explainable: the confirming reads are chipped below. */}
+          {/* CONVICTION VERDICT — how many INDEPENDENT, orthogonal reads agree with your
+              direction. Verdict leads (tinted hero); the evidence is ONE self-contained grid
+              below — each read shows its value AND its alignment (✓ aligns / ✗ against / ·
+              neutral), colored by alignment. Never a black-box score. */}
           {reads.length > 0 && (
-            <div style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 8, background: `${convColor}12`, border: `1px solid ${convColor}33` }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: convColor }}>◆ {convWord}</span>
-                <span style={{ fontFamily: MONO, fontSize: 10.5, color: FOG }}>{agree}/{reads.length} reads align {direction}{pushback > 0 ? ` · ${pushback} against` : ""}</span>
+            <>
+              <div style={{ marginBottom: 10, padding: "10px 12px", borderRadius: 8, background: `${convColor}12`, border: `1px solid ${convColor}33` }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: convColor }}>◆ {convWord}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 10.5, color: FOG }}>{agree}/{reads.length} reads align {direction}{pushback > 0 ? ` · ${pushback} against` : ""}</span>
+                </div>
               </div>
-              <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 9 }}>
-                {reads.map((r) => (
-                  <span key={r.label} title={r.side ? `${r.label}: ${r.side}` : r.label} style={{ fontFamily: MONO, fontSize: 8.5, color: r.ok ? POS : (r.side && r.side !== direction ? NEG : FAINT), border: `1px solid ${r.ok ? "#2a3a30" : r.side && r.side !== direction ? "#3a2530" : BORDER}`, borderRadius: 3, padding: "2px 6px", background: INSET }}>{r.ok ? "✓" : r.side && r.side !== direction ? "✗" : "·"} {r.label}</span>
-                ))}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 6, marginBottom: 10 }}>
+                {reads.map((r) => {
+                  const c = r.ok ? POS : (r.side && r.side !== direction ? NEG : FAINT);
+                  const bd = r.ok ? "#2a3a30" : (r.side && r.side !== direction ? "#3a2530" : BORDER);
+                  return (
+                    <div key={r.label} style={{ display: "flex", alignItems: "baseline", gap: 7, border: `1px solid ${bd}`, borderRadius: 5, padding: "6px 9px", background: INSET }}>
+                      <span style={{ fontFamily: MONO, fontSize: 10, color: c, flexShrink: 0 }}>{r.ok ? "✓" : r.side && r.side !== direction ? "✗" : "·"}</span>
+                      <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+                        <span style={{ fontFamily: MONO, fontSize: 8, letterSpacing: "0.1em", color: MUTED, textTransform: "uppercase" }}>{r.label}</span>
+                        <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: c === FAINT ? FOG : c, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.val}</span>
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            </>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(88px, 1fr))", gap: 12, marginBottom: 10 }}>
-            {fused && fused.crowdFade && chip("Funding", <span>fade <span style={{ color: dirColor(fused.crowdFade) }}>{fused.crowdFade}</span>{fused.fundingAnnualPct != null ? ` · ${fused.fundingAnnualPct}%/yr` : ""}</span>)}
-            {fused && fused.smartSide && chip("Smart money", <span style={{ color: dirColor(fused.smartSide) }}>{fused.smartSide}<span style={{ color: FAINT, fontWeight: 400 }}> · {fused.smartTraders}</span></span>)}
-            {fused && fused.verdict === "CONFLUENCE" && chip("Positioning", <span style={{ color: BONE }}>◆ CONFLUENCE</span>, BONE)}
-            {fused && fused.verdict === "SPLIT" && chip("Positioning", <span style={{ color: WARN }}>⚡ SPLIT</span>, WARN)}
-            {callers && chip("Callers", <span style={{ color: dirColor(callers.side) }}>{callers.side}<span style={{ color: FAINT, fontWeight: 400 }}> · {callers.participants}</span></span>)}
-            {record && chip(`Your ${coin}`, <span style={{ color: record.net >= 0 ? POS : NEG }}>{record.net >= 0 ? "+" : "-"}${Math.abs(record.net)}<span style={{ color: FAINT, fontWeight: 400 }}> · {record.n}t · {record.wr}%</span></span>)}
-            {baseRate && chip("Fade base rate", <span style={{ color: baseRate.expectancyR > 0 ? POS : WARN }}>{baseRate.hitRate}%<span style={{ color: FAINT, fontWeight: 400 }}> · {baseRate.samples}× · {baseRate.expectancyR >= 0 ? "+" : ""}{baseRate.expectancyR}R</span></span>)}
-            {flush && chip("Liq flush", <span style={{ color: flush.side === "DOWN" ? NEG : POS }}>{flush.side === "DOWN" ? "↓ longs" : "↑ shorts"}<span style={{ color: FAINT, fontWeight: 400 }}> · {flush.ratio}×</span></span>)}
-            {basis && chip("Spot-perp basis", <span style={{ color: dirColor(basis.side) }}>{basis.basisPct > 0 ? "+" : ""}{basis.basisPct}%<span style={{ color: FAINT, fontWeight: 400 }}> · {basis.basisPct > 0 ? "premium" : "discount"}</span></span>)}
-            {ob && chip("Order book", <span style={{ color: dirColor(ob.side) }}>{ob.imbalance > 0 ? "bid" : "ask"}-heavy<span style={{ color: FAINT, fontWeight: 400 }}> · {Math.abs(ob.imbalance)}</span></span>)}
-            {skew && chip("Options skew", <span style={{ color: dirColor(skew.side) }}>{skew.dev > 0 ? "fear" : "greed"}<span style={{ color: FAINT, fontWeight: 400 }}> · {skew.dev > 0 ? "+" : ""}{skew.dev}</span></span>)}
-          </div>
           {synth && <div style={{ fontFamily: UI, fontSize: 12.5, color: tone === POS ? "#8fdcb8" : tone, lineHeight: 1.55 }}>{synth}</div>}
 
           {/* BASE RATE — the honest historical resolution of the funding-fade setup here,
