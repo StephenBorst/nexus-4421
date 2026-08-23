@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { C } from "@/config/theme";
+import { rankConviction, convictionLevel } from "@/lib/conviction.mjs";
 
 // ── CONVICTION SCANNER — the engine, market-wide ─────────────────────────────
 // THE READ synthesizes ~12 orthogonal axes for ONE symbol you're drafting. This is
@@ -14,10 +15,8 @@ import { C } from "@/config/theme";
 const AGENT_API = "https://og.nexustradinglabs.com";
 const MONO = "var(--nx-font-mono)";
 
-type Read = { label: string; ok: boolean; had: boolean };
+type Read = { label: string; ok: boolean };
 type Row = { coin: string; direction: "LONG" | "SHORT"; fundingAnnualPct: number; extra: number; against: number; reads: Read[] };
-
-const bare = (s: string) => String(s || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
 
 export function ConvictionScanner() {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -32,24 +31,8 @@ export function ConvictionScanner() {
         fetch(`${AGENT_API}/theses/consensus`).then((r) => r.json()).catch(() => null),
       ]).then(([mp, sm, cons]) => {
         if (off) return;
-        const smMap: Record<string, { side?: string; count?: number }> = sm?.consensus || {};
-        const cMap: Record<string, { side?: string; participants?: number }> = cons?.consensus || {};
-        const markets = (mp?.markets || []).filter((m: { direction?: string }) => m.direction === "LONG" || m.direction === "SHORT");
-        const out: Row[] = markets.map((m: { coin: string; direction: "LONG" | "SHORT"; fundingAnnualPct: number }) => {
-          const coin = bare(m.coin);
-          const dir = m.direction;
-          const reads: Read[] = [{ label: "funding", ok: true, had: true }];
-          const s = smMap[coin];
-          if (s?.side === "LONG" || s?.side === "SHORT") reads.push({ label: "smart", ok: s.side === dir, had: true });
-          const c = cMap[coin];
-          if ((c?.side === "LONG" || c?.side === "SHORT")) reads.push({ label: "callers", ok: c.side === dir, had: true });
-          const extra = reads.filter((r) => r.label !== "funding" && r.ok).length; // confirmations beyond funding
-          const against = reads.filter((r) => !r.ok).length;
-          return { coin, direction: dir, fundingAnnualPct: m.fundingAnnualPct, extra, against, reads };
-        });
-        // Rank: net confirmation (extra − against) first, then bigger funding edge.
-        out.sort((a, b) => (b.extra - b.against) - (a.extra - a.against) || Math.abs(b.fundingAnnualPct) - Math.abs(a.fundingAnnualPct));
-        setRows(out.slice(0, 8));
+        // Shared ranker (same logic the copilot's get_conviction uses — one source of truth).
+        setRows(rankConviction(mp?.markets || [], sm?.consensus || {}, cons?.consensus || {}, 8) as Row[]);
       }).catch(() => { if (!off) setRows([]); });
     };
     load();
@@ -72,13 +55,13 @@ export function ConvictionScanner() {
   if (rows === null) return <div style={{ fontFamily: MONO, fontSize: 10.5, color: C.text.faint, padding: "8px 0" }}>Scanning the board…</div>;
   if (!rows.length) return null;
 
-  const convOf = (r: Row) => {
-    const net = r.extra - r.against;
-    if (net >= 2) return { word: "HIGH", color: C.pos };
-    if (net === 1) return { word: "MODERATE", color: "#8fdcb8" };
-    if (r.against > r.extra) return { word: "CONFLICTED", color: C.warn };
-    return { word: "FUNDING-ONLY", color: C.text.muted };
+  const CONV: Record<string, { word: string; color: string }> = {
+    HIGH: { word: "HIGH", color: C.pos },
+    MODERATE: { word: "MODERATE", color: "#8fdcb8" },
+    CONFLICTED: { word: "CONFLICTED", color: C.warn },
+    FUNDING_ONLY: { word: "FUNDING-ONLY", color: C.text.muted },
   };
+  const convOf = (r: Row) => CONV[convictionLevel(r)] || CONV.FUNDING_ONLY;
 
   return (
     <div style={{ marginBottom: 22 }}>

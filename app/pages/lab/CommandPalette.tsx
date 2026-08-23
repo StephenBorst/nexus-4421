@@ -37,6 +37,7 @@ export function CommandPalette({ onSelectTab }: { onSelectTab: (t: TabId) => voi
     return [
       tab("intel", "Market Intel", "scan funding oi movers"),
       tab("smart", "Smart Money", "top traders hyperliquid whales copy signal mispriced funding edge fade crowd overpaying gaps"),
+      { id: "nav:conviction", label: "Conviction Scanner", hint: "board", keywords: "conviction scanner highest agreement multi-axis setups where to look rank fade signals align", run: () => onSelectTab("smart") },
       tab("thesis", "Nexus Thesis Engine", "plan position size r:r"),
       tab("agent", "Trading Agent", "autonomous bot automate"),
       tab("quicktrade", "Quick Trade", "buy sell perp order"),

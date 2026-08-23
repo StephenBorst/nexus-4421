@@ -14,6 +14,7 @@ import { deployDirectiveFromThesis } from "@/utils/agentPrefill";
 import { buildOperatorProfile, profileNarrative, PUBLIC_READS } from "@/lib/operatorProfile.mjs";
 import { bookConcentration } from "@/lib/bookRisk.mjs";
 import { fusePositioning, positioningRead } from "@/lib/positioning.mjs";
+import { rankConviction, convictionLevel } from "@/lib/conviction.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const AGENT_API = "https://og.nexustradinglabs.com";
@@ -350,6 +351,42 @@ export const TOOLS: ToolDef[] = [
       } catch { /* skip */ }
       if (!Object.keys(out).length) return JSON.stringify({ error: "regime data unavailable" });
       return JSON.stringify(out);
+    },
+  },
+  {
+    name: "get_conviction",
+    description:
+      "Get the CONVICTION SCANNER — the multi-axis engine ranked across the whole market. For every funding-stretched coin it tallies how many INDEPENDENT reads (the funding fade + on-chain smart money + the graded caller crowd) point the SAME way, and ranks by net agreement. Use for 'what's the highest-conviction setup right now', 'where do the signals agree', 'what should I be watching', or to triage the board before a deeper look. HIGH = 2+ independent reads confirm the fade; CONFLICTED = the reads disagree. This is a triage of AGREEMENT, not advice — the real depth is in THE READ (open_conviction sends the user there). Offer to draft_thesis on a HIGH-conviction row.",
+    input_schema: { type: "object", properties: {} },
+    run: async () => {
+      const [mp, sm, cons] = await Promise.all([
+        fetch(`${AGENT_API}/intel/mispriced`).then((r) => r.json()).catch(() => null),
+        fetch(`${AGENT_API}/smart/consensus`).then((r) => r.json()).catch(() => null),
+        fetch(`${AGENT_API}/theses/consensus`).then((r) => r.json()).catch(() => null),
+      ]);
+      type CRead = { label: string; ok: boolean };
+      type CRow = { coin: string; direction: string; reads: CRead[]; fundingAnnualPct: number; extra: number; against: number };
+      const ranked = rankConviction(mp?.markets || [], sm?.consensus || {}, cons?.consensus || {}, 10) as CRow[];
+      if (!ranked.length) return JSON.stringify({ error: "no funding-stretched markets right now (quiet tape)" });
+      return JSON.stringify({
+        board: ranked.map((r: CRow) => ({
+          coin: r.coin, fade_direction: r.direction, conviction: convictionLevel(r),
+          confirming: r.reads.filter((x: CRead) => x.ok).map((x: CRead) => x.label), against: r.reads.filter((x: CRead) => !x.ok).map((x: CRead) => x.label),
+          funding_annual_pct: r.fundingAnnualPct,
+        })),
+        note: "Ranked by how many independent reads (funding + smart money + graded callers) confirm the fade. HIGH = 2+ confirm. Agreement across uncorrelated sources is the signal — but it's triage, not advice. The full ~12-axis breakdown for one coin is in THE READ.",
+      });
+    },
+  },
+  {
+    name: "open_conviction",
+    description:
+      "Open the CONVICTION SCANNER (the market-wide multi-axis board, at the top of the Smart Money tab). Use when the user wants to browse the highest-conviction setups across markets. Read-only; places no order.",
+    input_schema: { type: "object", properties: {} },
+    run: async (_args, ctx) => {
+      ctx.navigate?.(`/lab?tab=smart`);
+      try { window.dispatchEvent(new CustomEvent("nexus:lab-tab", { detail: { tab: "smart" } })); } catch { /* deep-link handles it */ }
+      return JSON.stringify({ navigated: "/lab?tab=smart", note: "Opened the Conviction Scanner — the highest-agreement fades across the board. A HIGH-conviction row can be drafted into a graded thesis." });
     },
   },
   {
