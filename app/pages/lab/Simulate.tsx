@@ -22,13 +22,14 @@ export function Simulate({ body, label = "◆ Simulate", wallet }: { body: Recor
   const [prog, setProg] = useState<Prog | null>(null);
   const [done, setDone] = useState<{ shareUrl?: string; message?: string; error?: string } | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
+  const [price, setPrice] = useState(2);
   const [needBuy, setNeedBuy] = useState(false);
   const [buyChain, setBuyChain] = useState<"arbitrum" | "base">("arbitrum");
   const [buyTx, setBuyTx] = useState("");
   const [buyMsg, setBuyMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const refreshCredits = () => { if (wallet) fetch(`${AGENT_API}/sim/credits/${wallet.toLowerCase()}`).then((r) => r.json()).then((d) => setCredits(Number(d?.credits) || 0)).catch(() => {}); };
+  const refreshCredits = () => { if (wallet) fetch(`${AGENT_API}/sim/credits/${wallet.toLowerCase()}`).then((r) => r.json()).then((d) => { setCredits(Number(d?.credits) || 0); if (d?.priceUsd) setPrice(Number(d.priceUsd)); }).catch(() => {}); };
 
   const build = () => {
     setState("building");
@@ -113,9 +114,9 @@ export function Simulate({ body, label = "◆ Simulate", wallet }: { body: Recor
       {/* Buy-credits panel — shown when out of credits (manual txHash verify, same rail as PRO). */}
       {needBuy && (
         <div style={{ border: `1px solid ${C.borderStrong}`, borderRadius: 5, padding: "9px 10px", marginBottom: 8 }}>
-          <div style={{ color: C.text.bright, fontFamily: MF, fontSize: 10.5, fontWeight: 700, marginBottom: 5 }}>Out of sim credits — 1 credit ($1) per run</div>
+          <div style={{ color: C.text.bright, fontFamily: MF, fontSize: 10.5, fontWeight: 700, marginBottom: 5 }}>Out of sim credits — 1 credit (${price}) per run</div>
           <div style={{ color: C.text.fog, fontSize: 11, lineHeight: 1.5, marginBottom: 7 }}>
-            Send {buyChain === "arbitrum" ? "≥ 1 USDC on Arbitrum" : "≥ $1 of $NEXUS on Base"} to <span style={{ color: C.text.bright, wordBreak: "break-all" }}>{SIM_RECEIVER}</span> ($1 = 1 credit, buy any amount), then paste the tx below.
+            Send {buyChain === "arbitrum" ? `≥ ${price} USDC on Arbitrum` : `≥ $${price} of $NEXUS on Base`} to <span style={{ color: C.text.bright, wordBreak: "break-all" }}>{SIM_RECEIVER}</span> (${price} = 1 credit, buy any amount), then paste the tx below.
           </div>
           <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
             {(["arbitrum", "base"] as const).map((ch) => (
