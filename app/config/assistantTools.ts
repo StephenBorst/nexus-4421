@@ -611,73 +611,6 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
-    name: "get_forecasts",
-    description:
-      "Get the FORECAST DIVERGENCE board — Polymarket prediction-market forecasts on assets we trade, joined to our funding/positioning. On price-target markets it flags where the FORECASTING crowd (folded probability → directional lean) disagrees with the LEVERAGED tape (funding lean), but ONLY for near-money strikes where that read is meaningful (a far tail strike carries no directional signal and is surfaced, not flagged). Use for 'what do prediction markets say about BTC', 'where do forecasters and the tape disagree', 'is the crowd's forecast offside vs positioning'. Pass a symbol to focus one asset. This is NOT a fair-value oracle and NOT advice — we do not compute a fair probability (that's not ours to claim); it's a divergence worth INVESTIGATING and staking a graded thesis on. Offer to draft_thesis on a standout divergence.",
-    input_schema: {
-      type: "object",
-      properties: { symbol: { type: "string", description: "Optional ticker (BTC, ETH, SOL…) to focus one asset." } },
-    },
-    run: async (args) => {
-      const focus = shortTicker(String(args.symbol ?? ""));
-      const url = focus ? `${AGENT_API}/intel/forecasts/${focus}` : `${AGENT_API}/intel/forecasts`;
-      const board = await fetch(url).then((r) => r.json()).catch(() => null);
-      type F = { coin: string; question: string; forecastProbPct: number; target: number | null; targetDirection: string | null; distancePct: number | null; forecastLean: string | null; fundingLean: string | null; nearMoney: boolean | null; alignment: string | null; divergence: boolean; volumeUsd: number; endDate: string | null };
-      const markets: F[] = board?.markets ?? [];
-      if (!markets.length) return JSON.stringify({ error: "no linked prediction markets right now (sparse by design — mostly BTC/ETH/SOL + major narratives)" });
-      // Lead with flagged divergences, then near-money reads, then context.
-      const rows = markets.slice(0, 12).map((m) => ({
-        coin: m.coin, question: m.question, forecast_yes_pct: m.forecastProbPct,
-        target: m.target, target_dir: m.targetDirection, distance_pct: m.distancePct,
-        forecast_lean: m.forecastLean, funding_lean: m.fundingLean,
-        near_money: m.nearMoney, alignment: m.alignment,
-        divergence: m.divergence || undefined, volume_usd: m.volumeUsd, ends: m.endDate,
-      }));
-      return JSON.stringify({
-        divergent_count: board?.divergentCount ?? null,
-        markets: rows,
-        note: "forecast_yes_pct is Polymarket's crowd probability; forecast_lean folds it (low YES on an 'up' bet = a DOWN lean). A DIVERGENCE = near-money forecast lean vs funding lean disagree with conviction — a prompt to investigate, not a signal to trade. Far strikes are context only. Offer to draft a graded thesis on a standout.",
-      });
-    },
-  },
-  {
-    name: "get_macro_events",
-    description:
-      "Get the MACRO / EVENTS board — the most liquid Polymarket MACRO & geopolitical markets (Fed rate decisions, recession, wars/invasions, ceasefires, elections, crypto policy), each with the crowd's probability and — where the macro relationship is textbook — a directional RISK LENS (rate cut → risk-on, war → risk-off, ceasefire → risk-on). Use for 'what macro events matter right now', 'what's the geopolitical risk', 'what could move crypto this week', 'is the Fed going to cut', or to turn a macro/event view into a tradeable crypto thesis. The `actionable` events (a lens + a live probability) are the real reads; the rest are context. This is NOT a fair-value oracle and NOT advice — the probability + lens are a starting point to stake a GRADED thesis and execute it on Nexus. Offer to draft_thesis expressing the macro view on a crypto perp (e.g. a risk-off event → a short, risk-on → a long) — but the trader picks the expression; never claim the crypto mapping as fact.",
-    input_schema: { type: "object", properties: {} },
-    run: async () => {
-      const res = await fetch(`${AGENT_API}/intel/events`);
-      if (!res.ok) return JSON.stringify({ error: `macro events failed (${res.status})` });
-      const d = await res.json();
-      type E = { question: string; category: string; riskLens: string | null; actionable: boolean; yesProbPct: number; volumeUsd: number; endDate: string | null };
-      const events = (d?.events ?? []) as E[];
-      return JSON.stringify({
-        actionable_count: d?.actionableCount ?? 0,
-        actionable: events.filter((e) => e.actionable).slice(0, 12).map((e) => ({ q: e.question, category: e.category, risk_lens: e.riskLens, crowd_yes_pct: e.yesProbPct, volume_usd: e.volumeUsd, ends: e.endDate })),
-        context: events.filter((e) => !e.actionable).slice(0, 6).map((e) => ({ q: e.question, category: e.category, crowd_yes_pct: e.yesProbPct })),
-        note: "risk_lens is a TEXTBOOK directional read (risk-on = crypto-supportive, risk-off = crypto-headwind), not a fair value and not advice — a prompt to stake a graded thesis. crowd_yes_pct is Polymarket's probability of the YES outcome. Actionable = a lens + a live probability. The trader chooses which perp expresses the view.",
-      });
-    },
-  },
-  {
-    name: "get_macro_callers",
-    description:
-      "Get the MACRO-CALLER leaderboard — traders ranked on their TRUSTLESS record over EVENT-DRIVEN calls only (macro/geopolitical catalysts: Fed, recession, war, policy). Graded from public price exactly like the main caller board (first-touch TP vs SL), never self-reported — a verifiable macro/event track record, the thing that doesn't exist elsewhere. Use for 'who's actually good at macro', 'who called the Fed / the war right', 'is anyone proven on events', or to show that macro conviction can be graded, not just claimed. Sparse at cold-start by design (needs 3+ resolved event-driven calls to rank); `emerging` shows who's building one. To create a macro call, draft a thesis from the Macro & Events board.",
-    input_schema: { type: "object", properties: {} },
-    run: async () => {
-      const res = await fetch(`${AGENT_API}/theses/macro-leaderboard`);
-      if (!res.ok) return JSON.stringify({ error: `macro leaderboard failed (${res.status})` });
-      const d = await res.json();
-      type M = { rank?: number; wallet: string; displayName?: string | null; calls: number; hitRate: number; avgR: number; totalR: number; categories?: string[]; callsToQualify?: number };
-      const fmt = (e: M) => ({ rank: e.rank, name: e.displayName || `${e.wallet.slice(0, 6)}…${e.wallet.slice(-4)}`, macro_calls: e.calls, hit_rate_pct: e.hitRate, avg_r: e.avgR, total_r: e.totalR, categories: e.categories, needs_more: e.callsToQualify });
-      return JSON.stringify({
-        ranked: ((d?.leaderboard ?? []) as M[]).slice(0, 15).map(fmt),
-        emerging: ((d?.emerging ?? []) as M[]).slice(0, 10).map(fmt),
-        note: "Ranked = 3+ resolved event-driven calls, net-positive by R, scored by the same expectancy as the main board. Graded from public price — nobody types in whether they were right about the Fed. Empty/sparse at cold-start is by design.",
-      });
-    },
-  },
-  {
     name: "get_defi",
     description:
       "Get DeFi macro context from DeFiLlama: total DeFi TVL, the top chains by TVL, and (if a chain is named) that chain's TVL + rank. Use for 'how's DeFi TVL', 'which chains are growing', 'where's the liquidity', or to frame an asset's chain in macro terms. Read-only, free public data.",
@@ -818,17 +751,6 @@ TOOLS.push(
       ctx.navigate?.(`/lab?tab=smart`);
       try { window.dispatchEvent(new CustomEvent("nexus:lab-tab", { detail: { tab: "smart" } })); } catch { /* deep-link handles it */ }
       return JSON.stringify({ navigated: "/lab?tab=smart", note: "Opened Smart Money — smart-wallet follow up top, the funding-edge fade board below. Rows can be drafted into a thesis." });
-    },
-  },
-  {
-    name: "open_macro",
-    description:
-      "Open the MACRO & EVENTS tab in the Lab — the prediction-market / event lens (Fed decisions, geopolitics, policy from Polymarket with a risk-on/risk-off read), the forecast-divergence board, and the trustless MACRO CALLERS leaderboard. Use when the user wants to browse macro events, what could move crypto, or who's proven on macro. Read-only; places no order.",
-    input_schema: { type: "object", properties: {} },
-    run: async (_args, ctx) => {
-      ctx.navigate?.(`/lab?tab=macro`);
-      try { window.dispatchEvent(new CustomEvent("nexus:lab-tab", { detail: { tab: "macro" } })); } catch { /* deep-link handles it */ }
-      return JSON.stringify({ navigated: "/lab?tab=macro", note: "Opened Macro & Events. An event with a risk lens can be drafted into a graded thesis." });
     },
   },
   {

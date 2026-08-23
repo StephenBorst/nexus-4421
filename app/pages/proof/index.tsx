@@ -17,7 +17,7 @@ const BONE = "#ededf0", BRIGHT = "#f4f4f5", FOG = "#a1a1aa", MUTED = "#71717a", 
 const POS = "#3ecf8e", NEG = "#f7525f";
 const BORDER = "#232327", SURFACE_ALT = "#0f0f11", INSET = "#08080a";
 
-type Filter = "all" | "callers" | "macro" | "agents" | "arena" | "desks";
+type Filter = "all" | "callers" | "agents" | "arena" | "desks";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const usd = (n: number) => `${n < 0 ? "-" : "+"}$${Math.abs(n) >= 1000 ? `${(Math.abs(n) / 1000).toFixed(1)}K` : Math.abs(n).toFixed(2)}`;
@@ -25,7 +25,6 @@ const label: React.CSSProperties = { fontFamily: MONO, fontSize: 9, letterSpacin
 
 // ── data types (only the fields we render) ──
 type Caller = { wallet: string; displayName?: string; pfp?: string; hitRate: number; avgR: number; calls: number; score: number; meritRank?: { glyph: string; title: string } | null };
-type MacroCaller = { rank: number; wallet: string; displayName?: string | null; pfp?: string | null; calls: number; hitRate: number; avgR: number; totalR: number; score: number; categories?: string[]; meritRank?: { glyph: string; title: string } | null };
 type Agent = { rank: number; wallet: string; displayName?: string; pfp?: string; trades: number; winRate: number; netPnl: number; profitFactor: number; score: number };
 type ArenaAgent = { wallet: string; name: string; builder?: string; currentPosition?: { symbol: string; direction: string } | null; paper?: { trades: number; winRate: number; netPnl: number } | null; live?: { trades: number; winRate: number; netPnl: number } | null };
 type Desk = { id: string; name: string; rank: number; members: number; calls: number; hitRate: number; totalR: number; score: number };
@@ -126,7 +125,6 @@ export default function ProofPage() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<Filter>("all");
   const [callers, setCallers] = useState<Caller[] | null>(null);
-  const [macroCallers, setMacroCallers] = useState<MacroCaller[] | null>(null);
   const [agents, setAgents] = useState<Agent[] | null>(null);
   const [arena, setArena] = useState<ArenaAgent[] | null>(null);
   const [desks, setDesks] = useState<Desk[] | null>(null);
@@ -135,7 +133,6 @@ export default function ProofPage() {
 
   const load = useCallback(() => {
     fetch(`${API}/theses/leaderboard`).then((r) => r.json()).then((d) => setCallers(Array.isArray(d?.leaderboard) ? d.leaderboard : [])).catch(() => setCallers([]));
-    fetch(`${API}/theses/macro-leaderboard`).then((r) => r.json()).then((d) => setMacroCallers(Array.isArray(d?.leaderboard) ? d.leaderboard : [])).catch(() => setMacroCallers([]));
     fetch(`${API}/agents/leaderboard`).then((r) => r.json()).then((d) => setAgents(Array.isArray(d?.leaderboard) ? d.leaderboard : [])).catch(() => setAgents([]));
     fetch(`${API}/arena/agents`).then((r) => r.json()).then((d) => setArena(Array.isArray(d?.agents) ? d.agents : [])).catch(() => setArena([]));
     fetch(`${API}/desks`).then((r) => r.json()).then((d) => setDesks(Array.isArray(d?.desks) ? d.desks : [])).catch(() => setDesks([]));
@@ -153,7 +150,6 @@ export default function ProofPage() {
   const filters: { id: Filter; label: string }[] = [
     { id: "all", label: "ALL" },
     { id: "callers", label: "CALLERS" },
-    { id: "macro", label: "MACRO" },
     { id: "agents", label: "AGENTS" },
     { id: "arena", label: "ARENA" },
     { id: "desks", label: "DESKS" },
@@ -243,34 +239,6 @@ export default function ProofPage() {
                   <span style={nameCell}>{c.displayName || short(c.wallet)}</span>
                   {c.meritRank?.glyph && <span title={c.meritRank.title} style={{ fontFamily: MONO, fontSize: 10, color: BONE, flexShrink: 0 }}>{c.meritRank.glyph}</span>}
                   <span style={statCell}>{c.calls} calls · {c.hitRate}% · {c.avgR >= 0 ? "+" : ""}{c.avgR}R</span>
-                  <span style={{ ...scoreCell, color: c.score > 0 ? BONE : FAINT }}>{c.score || "—"}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </BoardShell>
-      )}
-
-      {/* MACRO CALLERS — the same graded record, over event-driven calls only. The thing
-          that doesn't exist anywhere: a verifiable macro/event track record. */}
-      {show("macro") && (
-        <BoardShell title="◇ MACRO CALLERS" count={macroCallers?.length}>
-          {macroCallers === null ? empty("loading…") : macroCallers.length === 0 ? empty("No ranked macro callers yet — 3+ resolved event-driven calls to rank. Draft one from the Macro & Events board.") : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {macroCallers.slice(0, 15).map((c) => (
-                <div key={c.wallet} onClick={() => navigate(`/feed/trader/${c.wallet}`)} style={rowStyle(true)}>
-                  <span style={rankCell}>{c.rank}</span>
-                  <Pfp src={c.pfp || undefined} />
-                  <span style={nameCell}>{c.displayName || short(c.wallet)}</span>
-                  {c.meritRank?.glyph && <span title={c.meritRank.title} style={{ fontFamily: MONO, fontSize: 10, color: BONE, flexShrink: 0 }}>{c.meritRank.glyph}</span>}
-                  <span style={statCell}>{c.calls} macro · {c.hitRate}% · {c.avgR >= 0 ? "+" : ""}{c.avgR}R</span>
-                  {c.categories && c.categories.length > 0 && (
-                    <span style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                      {c.categories.slice(0, 3).map((cat) => (
-                        <span key={cat} style={{ fontFamily: MONO, fontSize: 8, color: MUTED, border: `1px solid ${BORDER}`, borderRadius: 3, padding: "1px 5px" }}>{cat === "GEOPOLITICS" ? "GEO" : cat === "CRYPTO_POLICY" ? "POLICY" : cat}</span>
-                      ))}
-                    </span>
-                  )}
                   <span style={{ ...scoreCell, color: c.score > 0 ? BONE : FAINT }}>{c.score || "—"}</span>
                 </div>
               ))}

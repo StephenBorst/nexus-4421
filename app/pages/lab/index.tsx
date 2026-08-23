@@ -20,7 +20,6 @@ import { MarketIntelView } from "./MarketIntel";
 import { MarketTape } from "./MarketTape";
 import { SmartMoneyView } from "./SmartMoneyView";
 import { MispricedBoard } from "./MispricedBoard";
-import { MacroView } from "./MacroView";
 import { PositioningBoard } from "./PositioningBoard";
 import { Collapsible } from "./Collapsible";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
@@ -137,7 +136,6 @@ export default function TheLabPage() {
   // and pretending otherwise would be the same dishonesty in the other direction.)
   const tabs: { id: TabId; label: string; short: string; phase: string }[] = [
     { id: "intel",          label: "Market Intel",       short: "INTEL", phase: "OBSERVE" },
-    { id: "macro",          label: "Macro",              short: "MACRO", phase: "OBSERVE" },
     { id: "smart",          label: "Smart Money",        short: "SMART", phase: "OBSERVE" },
     { id: "thesis",         label: "Thesis Engine",      short: "LAB",   phase: "PLAN"    },
     { id: "agent",          label: "Trading Agent",      short: "AGENT", phase: "EXECUTE" },
@@ -343,7 +341,6 @@ export default function TheLabPage() {
             </Collapsible>
           </>
         )}
-        {activeTab === "macro" && <MacroView />}
         {activeTab === "agent" && <AgentView />}
         {activeTab === "holders" && <HoldersRoom walletAddress={rootWalletAddress} />}
         {activeTab === "quicktrade" && <QuickTrade />}
