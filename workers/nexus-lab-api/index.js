@@ -50,6 +50,7 @@ async function prevCopyLeaders(env, address) {
 }
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate, runBacktest, fetchCandles, fetchFundingAt, makeFundingPctAt } from "./backtest.mjs";
+import { snapshotLiquidations, fetchLiquidations, classifyFlush } from "./liquidations.mjs";
 // TWAP planner/status — reuse the exec worker's tested logic (wrangler bundles the
 // cross-dir import, same as backtest.mjs). ONE planner, so start-validation and the
 // cron fire from identical rules.
@@ -678,6 +679,17 @@ export default {
     ctx.waitUntil((async () => {
       try { const n = await snapshotSmartConsensus(env); console.log(`[smart] consensus snapshot: ${n} traders`); }
       catch (e) { console.error("[smart] consensus snapshot failed:", String(e)); }
+    })());
+    // Hourly: accumulate the LIVE liquidation feed (OKX) into liq:hist:{coin} — the
+    // real forced-unwind flow per coin. Seeds the liquidation-flush signal (our best
+    // backtest lead) with REAL data (vs the OHLC proxy), same accumulate-hourly pattern
+    // as oi:hist. Fail-soft; best-effort per coin.
+    ctx.waitUntil((async () => {
+      try {
+        const coins = ["BTC", "ETH", "SOL", "BNB", "XRP", "LINK", "DOGE", "AVAX", "HYPE"];
+        const n = await snapshotLiquidations(env, coins);
+        console.log(`[liq] snapshotted ${n} coins' liquidation flow`);
+      } catch (e) { console.error("[liq] snapshot failed:", String(e)); }
     })());
     // Hourly: classify each core symbol's trend regime (the momentum signal source),
     // cached for the /signals hot path + the fusion. Runs BEFORE delivery so the push
@@ -4201,6 +4213,27 @@ document.getElementById("btn").addEventListener("click",go);
       } catch (e) {
         return json({ coin, available: false, error: String(e.message || e) }, request);
       }
+    }
+
+    // ── GET /intel/liquidations/:coin — live liquidation feed + accrued history ──
+    // OKX forced-close flow for the coin: the CURRENT hour (live), the recorded
+    // liq:hist series, and a FLUSH classification (this hour's magnitude vs the coin's
+    // own trailing median). DOWN flush = longs capitulating (fade-short entry window),
+    // UP = shorts squeezed. Public, read-only, fail-soft. Current fetch cached 60s.
+    if (parts[0] === "intel" && parts[1] === "liquidations" && parts[2] && request.method === "GET") {
+      const coin = String(parts[2]).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+      const KV = env.NEXUS_AGENT || env.LAB_STORE;
+      const CUR = `liq:cur:${coin}`;
+      let current = null;
+      try { const c = await env.LAB_STORE.get(CUR); if (c) current = JSON.parse(c); } catch { /* ignore */ }
+      if (!current) {
+        current = await fetchLiquidations(coin);
+        if (current) { try { await env.LAB_STORE.put(CUR, JSON.stringify(current), { expirationTtl: 60 }); } catch { /* best-effort */ } }
+      }
+      let hist = [];
+      try { const raw = await KV.get(`liq:hist:${coin}`); hist = raw ? JSON.parse(raw) : []; } catch { /* empty */ }
+      const flush = current ? classifyFlush(hist, current) : null;
+      return json({ coin, current, flush, points: hist.length, history: hist.slice(-72) }, request);
     }
 
     // ── POST /agent/hook/:token — TradingView / external signal webhook ──────
