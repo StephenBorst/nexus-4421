@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { fusePositioning, positioningRead } from "@/lib/positioning.mjs";
+import { fetchDeribitTerm } from "@/lib/deribit.mjs";
 import type { ProcessedTrade } from "./types";
 import { C } from "@/config/theme";
 
@@ -63,8 +64,17 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
     let off = false;
     const sideOf = (s: { side?: string } | null | undefined) => (s && (s.side === "LONG" || s.side === "SHORT") ? s : null);
     fetch(`${AGENT_API}/intel/flow/${coin}`).then((r) => r.json())
-      .then((d) => { if (off) return; setBasis((sideOf(d?.basisSignal) as typeof basis) ?? null); setOb((sideOf(d?.obSignal) as typeof ob) ?? null); setSkew((sideOf(d?.skewSignal) as typeof skew) ?? null); setRawBasis(typeof d?.basis?.basisPct === "number" ? d.basis.basisPct : null); setTerm(d?.term && d.term.structure ? d.term : null); })
-      .catch(() => { if (!off) { setBasis(null); setOb(null); setSkew(null); setRawBasis(null); setTerm(null); } });
+      .then((d) => { if (off) return; setBasis((sideOf(d?.basisSignal) as typeof basis) ?? null); setOb((sideOf(d?.obSignal) as typeof ob) ?? null); setSkew((sideOf(d?.skewSignal) as typeof skew) ?? null); setRawBasis(typeof d?.basis?.basisPct === "number" ? d.basis.basisPct : null); })
+      .catch(() => { if (!off) { setBasis(null); setOb(null); setSkew(null); setRawBasis(null); } });
+    return () => { off = true; };
+  }, [coin]);
+
+  // Vol regime (DVOL term structure) — fetched CLIENT-SIDE: Deribit hard-blocks the worker's
+  // datacenter IP but works from the browser (same as our GeckoTerminal fetch). BTC/ETH/SOL.
+  useEffect(() => {
+    if (!coin) { setTerm(null); return; }
+    let off = false;
+    fetchDeribitTerm(coin).then((t) => { if (!off) setTerm(t && t.structure ? t : null); }).catch(() => { if (!off) setTerm(null); });
     return () => { off = true; };
   }, [coin]);
 
