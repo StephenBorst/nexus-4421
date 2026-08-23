@@ -4300,7 +4300,7 @@ document.getElementById("btn").addEventListener("click",go);
       try { const r = await KV.get(`cvd:hist:${coin}`); cHist = r ? JSON.parse(r) : []; } catch { /* empty */ }
       try { const r = await KV.get(`skew:hist:${coin}`); skHist = r ? JSON.parse(r) : []; } catch { /* empty */ }
       const skewSignal = cur?.skew ? classifySkew(skHist, cur.skew.skew) : null;
-      return json({ coin, basis: cur?.basis || null, cvd: cur?.cvd || null, ob: cur?.ob || null, skew: cur?.skew || null, basisSignal, obSignal, skewSignal, basisPoints: bHist.length, cvdPoints: cHist.length, skewPoints: skHist.length, basisHistory: bHist.slice(-72), cvdHistory: cHist.slice(-72) }, request);
+      return json({ coin, basis: cur?.basis || null, cvd: cur?.cvd || null, ob: cur?.ob || null, skew: cur?.skew || null, term: cur?.skew?.term || null, basisSignal, obSignal, skewSignal, basisPoints: bHist.length, cvdPoints: cHist.length, skewPoints: skHist.length, basisHistory: bHist.slice(-72), cvdHistory: cHist.slice(-72) }, request);
     }
 
     // ── POST /agent/hook/:token — TradingView / external signal webhook ──────

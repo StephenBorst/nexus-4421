@@ -53,17 +53,18 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const [ob, setOb] = useState<{ side: "LONG" | "SHORT"; imbalance: number } | null>(null);
   const [skew, setSkew] = useState<{ side: "LONG" | "SHORT"; dev: number } | null>(null);
   const [rawBasis, setRawBasis] = useState<number | null>(null);
+  const [term, setTerm] = useState<{ structure: string; ratio: number; frontIv: number; backIv: number } | null>(null);
 
   // Spot-perp basis + order-book imbalance + options skew (one fetch). Basis: perp premium
   // (>0) = froth → SHORT, discount → LONG. OB: bid-heavy = support → LONG, ask-heavy → SHORT.
   // Skew (BTC/ETH/SOL): more put-fear than usual = capitulation → LONG, more call-greed → SHORT.
   useEffect(() => {
-    if (!coin) { setBasis(null); setOb(null); setSkew(null); setRawBasis(null); return; }
+    if (!coin) { setBasis(null); setOb(null); setSkew(null); setRawBasis(null); setTerm(null); return; }
     let off = false;
     const sideOf = (s: { side?: string } | null | undefined) => (s && (s.side === "LONG" || s.side === "SHORT") ? s : null);
     fetch(`${AGENT_API}/intel/flow/${coin}`).then((r) => r.json())
-      .then((d) => { if (off) return; setBasis((sideOf(d?.basisSignal) as typeof basis) ?? null); setOb((sideOf(d?.obSignal) as typeof ob) ?? null); setSkew((sideOf(d?.skewSignal) as typeof skew) ?? null); setRawBasis(typeof d?.basis?.basisPct === "number" ? d.basis.basisPct : null); })
-      .catch(() => { if (!off) { setBasis(null); setOb(null); setSkew(null); setRawBasis(null); } });
+      .then((d) => { if (off) return; setBasis((sideOf(d?.basisSignal) as typeof basis) ?? null); setOb((sideOf(d?.obSignal) as typeof ob) ?? null); setSkew((sideOf(d?.skewSignal) as typeof skew) ?? null); setRawBasis(typeof d?.basis?.basisPct === "number" ? d.basis.basisPct : null); setTerm(d?.term && d.term.structure ? d.term : null); })
+      .catch(() => { if (!off) { setBasis(null); setOb(null); setSkew(null); setRawBasis(null); setTerm(null); } });
     return () => { off = true; };
   }, [coin]);
 
@@ -177,7 +178,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const convWord = convLevel === "HIGH" ? "HIGH CONVICTION" : convLevel === "MODERATE" ? "MODERATE" : convLevel === "AGAINST" ? "READS DISAGREE" : "LOW CONVICTION";
 
   const loading = fused === undefined;
-  const nothing = fused === null && !callers && !record && !advice && !baseRate && !flush && !basis && !ob && !skew && !magnets;
+  const nothing = fused === null && !callers && !record && !advice && !baseRate && !flush && !basis && !ob && !skew && !magnets && !term;
 
   // one honest synthesis line, reacting to what the user is drafting
   const synth = (() => {
@@ -261,6 +262,16 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
               {magnets.below[0] && magnets.above[0] ? " · " : ""}
               {magnets.above[0] && <>upside pull <b style={{ color: POS }}>${magnets.above[0].price >= 1000 ? magnets.above[0].price.toLocaleString() : magnets.above[0].price}</b> <span style={{ color: FAINT }}>(short liqs)</span></>}
               <span style={{ color: MUTED }}> — estimated, where cascades sit.</span>
+            </div>
+          )}
+
+          {/* VOL REGIME — DVOL term structure. Backwardation (front vol > back) = acute
+              near-term stress, the regime mean-reversion fades work best in. BTC/ETH/SOL. */}
+          {term && (
+            <div style={{ marginTop: 8, fontFamily: UI, fontSize: 11.5, color: FOG, lineHeight: 1.5 }}>
+              <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED }}>VOL REGIME · </span>
+              options are in <b style={{ color: term.structure === "backwardation" ? WARN : term.structure === "contango" ? POS : FOG }}>{term.structure}</b> ({term.frontIv}v front / {term.backIv}v back).{" "}
+              <span style={{ color: MUTED }}>{term.structure === "backwardation" ? "Acute near-term stress — fades work best here, but size for the move." : term.structure === "contango" ? "Calm/complacent — trends over fades." : "Neutral vol curve."}</span>
             </div>
           )}
 

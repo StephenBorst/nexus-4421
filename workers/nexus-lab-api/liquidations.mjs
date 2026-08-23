@@ -72,14 +72,19 @@ export function computeLevels(details, sinceMs, bucketPct = 0.3, topN = 4) {
 // at ≈ P·(1+1/L). Project every recent bar across common leverage bands, bucket by price →
 // the clusters are the magnets price tends to get pulled toward (cascade fuel). An estimate,
 // clearly labeled — a heatmap-lite, not exchange truth. Pure + tested.
-// candles: [{ c, h, l, v? }] recent (hourly). Returns { above, below } nearest big clusters.
+// candles: [{ c, h, l, v? }] recent (hourly), NEWEST-FIRST (OKX order). Returns { above,
+// below } nearest big clusters. Weighting: volume × RECENCY decay — recent price zones are
+// where positions most likely still sit, so they dominate the projected liq magnets (a
+// position opened 2 weeks ago is more likely already closed/liquidated than one from today).
 export function estimatePendingLevels(candles, currentPrice, opts = {}) {
-  const { bucketPct = 0.5, rangePct = 25, topN = 5, levs = [[10, 0.15], [25, 0.3], [50, 0.3], [100, 0.25]] } = opts;
+  const { bucketPct = 0.5, rangePct = 25, topN = 5, halfLifeBars = 96, levs = [[10, 0.15], [25, 0.3], [50, 0.3], [100, 0.25]] } = opts;
   if (!Array.isArray(candles) || !candles.length || !(currentPrice > 0)) return { above: [], below: [] };
   const buckets = new Map();
-  for (const c of candles) {
+  for (let i = 0; i < candles.length; i++) {
+    const c = candles[i];
     const entry = Number(c.c) || 0;
-    const vol = Number(c.v) || (Number(c.h) - Number(c.l)) || 1; // volume, else range as a proxy
+    const recency = Math.pow(0.5, i / halfLifeBars); // i=0 newest → weight 1, decays with age
+    const vol = (Number(c.v) || (Number(c.h) - Number(c.l)) || 1) * recency;
     if (!(entry > 0)) continue;
     for (const [L, w] of levs) {
       for (const [liq, side] of [[entry * (1 - 1 / L), "long"], [entry * (1 + 1 / L), "short"]]) {

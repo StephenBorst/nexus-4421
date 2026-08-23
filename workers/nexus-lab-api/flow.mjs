@@ -154,6 +154,30 @@ export function computeSkew(rows, now = Date.now()) {
   return null;
 }
 
+// Pure: DVOL TERM STRUCTURE from the option chain — ATM implied vol of the nearest expiry
+// vs a ~monthly expiry. Front > back (backwardation) = acute near-term stress/fear (event
+// risk priced in) — the vol regime where mean-reversion fades work best; front < back
+// (contango) = calm/complacent. Returns { frontIv, backIv, ratio, structure }. Exported for tests.
+export function computeTermStructure(rows, now = Date.now()) {
+  const valid = (rows || []).filter((r) => r && r.iv > 0 && r.strike > 0 && r.underlying > 0 && r.expiry - now > 1 * 86400000);
+  if (valid.length < 6) return null;
+  const u = valid[0].underlying;
+  const byExp = {};
+  for (const r of valid) (byExp[r.expiry] = byExp[r.expiry] || []).push(r);
+  const exps = Object.keys(byExp).map(Number).sort((a, b) => a - b);
+  if (exps.length < 2) return null;
+  const atmIv = (grp) => grp.reduce((a, b) => (Math.abs(b.strike - u) < Math.abs(a.strike - u) ? b : a)).iv;
+  const front = exps[0];
+  // back = the expiry nearest ~30d out (else the furthest available)
+  const back = exps.reduce((best, e) => (Math.abs((e - now) / 86400000 - 30) < Math.abs((best - now) / 86400000 - 30) ? e : best), exps[exps.length - 1]);
+  if (back === front) return null;
+  const frontIv = atmIv(byExp[front]), backIv = atmIv(byExp[back]);
+  if (!(frontIv > 0) || !(backIv > 0)) return null;
+  const ratio = Math.round((frontIv / backIv) * 1000) / 1000;
+  const structure = ratio >= 1.05 ? "backwardation" : ratio <= 0.95 ? "contango" : "flat";
+  return { frontIv: Math.round(frontIv * 10) / 10, backIv: Math.round(backIv * 10) / 10, ratio, structure, frontDays: Math.round((front - now) / 86400000), backDays: Math.round((back - now) / 86400000) };
+}
+
 // Network: live options skew for one coin (Deribit book summary). BTC/ETH/SOL only.
 export async function fetchSkew(coin) {
   const c = String(coin || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
@@ -166,7 +190,9 @@ export async function fetchSkew(coin) {
       return p ? { ...p, iv: parseFloat(x.mark_iv), underlying: parseFloat(x.underlying_price) } : null;
     });
     const s = computeSkew(rows);
-    return s ? { coin: c, ...s } : null;
+    const term = computeTermStructure(rows);
+    if (!s && !term) return null;
+    return { coin: c, ...(s || {}), term: term || null };
   } catch { return null; }
 }
 
@@ -194,7 +220,7 @@ export async function snapshotFlow(env, coins) {
       const [basis, cvd, skew] = await Promise.all([fetchBasis(coin), fetchCvd(coin), fetchSkew(coin)]);
       if (basis) await appendHist(KV, `basis:hist:${bare}`, { t: now, basisPct: basis.basisPct }, now);
       if (cvd) await appendHist(KV, `cvd:hist:${bare}`, { t: now, cvd: cvd.cvd, buy: cvd.buy, sell: cvd.sell }, now);
-      if (skew) await appendHist(KV, `skew:hist:${bare}`, { t: now, skew: skew.skew }, now);
+      if (skew && Number.isFinite(skew.skew)) await appendHist(KV, `skew:hist:${bare}`, { t: now, skew: skew.skew }, now);
       if (basis || cvd || skew) n++;
     } catch { /* per-coin best-effort */ }
   }

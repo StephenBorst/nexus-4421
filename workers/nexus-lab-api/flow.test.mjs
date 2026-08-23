@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { coinToSpot, computeBasisPct, aggregateCvd, classifyBasis, computeImbalance, classifyOrderbook, parseDeribitInstrument, computeSkew, classifySkew } from "./flow.mjs";
+import { coinToSpot, computeBasisPct, aggregateCvd, classifyBasis, computeImbalance, classifyOrderbook, parseDeribitInstrument, computeSkew, classifySkew, computeTermStructure } from "./flow.mjs";
 
 test("coinToSpot maps to OKX USDT spot", () => {
   assert.equal(coinToSpot("PERP_BTC_USDC"), "BTC-USDT");
@@ -74,6 +74,25 @@ test("computeSkew: nearest expiry 10%-OTM put−call IV", () => {
   const s = computeSkew(rows, now);
   assert.equal(s.skew, 10);   // 60 (put) − 50 (call)
   assert.equal(s.days, 10);
+});
+
+test("computeTermStructure: front>back = backwardation (stress), front<back = contango", () => {
+  const now = Date.now();
+  const u = 100000;
+  const front = now + 3 * 86400000, back = now + 30 * 86400000;
+  // backwardation: front ATM IV 80 > back ATM IV 60
+  const bw = [
+    { expiry: front, strike: 100000, type: "C", iv: 80, underlying: u },
+    { expiry: front, strike: 95000, type: "P", iv: 82, underlying: u },
+    { expiry: front, strike: 105000, type: "C", iv: 79, underlying: u },
+    { expiry: back, strike: 100000, type: "C", iv: 60, underlying: u },
+    { expiry: back, strike: 95000, type: "P", iv: 61, underlying: u },
+    { expiry: back, strike: 105000, type: "C", iv: 59, underlying: u },
+  ];
+  const t = computeTermStructure(bw, now);
+  assert.equal(t.structure, "backwardation");
+  assert.ok(t.ratio > 1.05);
+  assert.equal(computeTermStructure([], now), null);
 });
 
 test("classifySkew: extreme vs own history → fear LONG / greed SHORT", () => {
