@@ -34,6 +34,15 @@ import WatchOnlyBanner from "./WatchOnlyBanner";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 
+// Price formatter that scales decimals by magnitude — a flat toFixed(2) rendered
+// sub-cent tokens (PUMP ~$0.005) as "$0.00" on the feed cards. Keeps majors clean,
+// small-caps precise. NaN/undefined-safe.
+const px = (n: unknown) => {
+  const v = Math.abs(Number(n) || 0);
+  const dp = v >= 1 ? 2 : v >= 0.01 ? 4 : v >= 0.0001 ? 6 : 8;
+  return (Number(n) || 0).toFixed(dp);
+};
+
 // Regime buckets → the trader's own words. Server keys are stable; labels aren't.
 const REGIME_LABEL: Record<string, string> = {
   "trend:TREND_UP": "uptrends",
@@ -293,9 +302,9 @@ function CopyModal({
         {/* Original levels (read-only) */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(70px, 1fr))", gap: "8px 12px", marginBottom: 16, padding: 10, background: "#0f0f11", borderRadius: 4, border: "1px solid #232327" }}>
           {[
-            { label: "ENTRY", val: `$${thesis.entryPrice.toFixed(2)}`, color: "#a1a1aa" },
-            { label: "STOP",  val: `$${thesis.stopLoss.toFixed(2)}`,   color: "#f7525f" },
-            { label: "TP1",   val: `$${thesis.takeProfit1.toFixed(2)}`, color: "#ededf0" },
+            { label: "ENTRY", val: `$${px(thesis.entryPrice)}`, color: "#a1a1aa" },
+            { label: "STOP",  val: `$${px(thesis.stopLoss)}`,   color: "#f7525f" },
+            { label: "TP1",   val: `$${px(thesis.takeProfit1)}`, color: "#ededf0" },
             { label: "R:R",   val: `1:${thesis.riskReward.toFixed(2)}`, color: thesis.riskReward >= 2 ? "#ededf0" : "#fbbf24" },
           ].map(({ label, val, color }) => (
             <div key={label}>
@@ -577,7 +586,7 @@ function FeedCard({
         }}>
           {thesis.direction === "LONG" ? "↑" : "↓"} {thesis.direction}
         </span>
-        <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a" }}>{thesis.leverage.toFixed(1)}x</span>
+        {(Number(thesis.leverage) || 0) > 0 && <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a" }}>{thesis.leverage.toFixed(1)}x</span>}
         {(thesis.copyCount ?? 0) > 0 && (
           <span style={{
             fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#a1a1aa",
@@ -602,11 +611,11 @@ function FeedCard({
           last column off-card) on narrow phones; unchanged at desktop width. */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(70px, 1fr))", gap: "8px 12px", marginBottom: 10 }}>
         {[
-          { label: "ENTRY", val: `$${thesis.entryPrice.toFixed(2)}`, color: undefined },
-          { label: "STOP",  val: `$${thesis.stopLoss.toFixed(2)}`,   color: "#f7525f" },
-          { label: "TP1",   val: `$${thesis.takeProfit1.toFixed(2)}`, color: "#ededf0" },
+          { label: "ENTRY", val: `$${px(thesis.entryPrice)}`, color: undefined },
+          { label: "STOP",  val: `$${px(thesis.stopLoss)}`,   color: "#f7525f" },
+          { label: "TP1",   val: `$${px(thesis.takeProfit1)}`, color: "#ededf0" },
           { label: "R:R",   val: `1:${thesis.riskReward.toFixed(2)}`, color: thesis.riskReward >= 2 ? "#ededf0" : "#fbbf24" },
-          { label: "SIZE",  val: `$${thesis.positionSize.toFixed(0)}`, color: undefined },
+          { label: "SIZE",  val: (Number(thesis.positionSize) || 0) > 0 ? `$${thesis.positionSize.toFixed(0)}` : "—", color: undefined },
         ].map(({ label, val, color }) => (
           <div key={label}>
             <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)" }}>{label}</div>
@@ -626,7 +635,7 @@ function FeedCard({
             <div>
               <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)" }}>MARK</div>
               <div style={{ fontSize: 12, color: "#fff", fontFamily: "var(--nx-font-mono)", fontWeight: "bold", marginTop: 2 }}>
-                ${markPrice.toFixed(markPrice < 10 ? 4 : 2)}
+                ${px(markPrice)}
               </div>
             </div>
             <div>
