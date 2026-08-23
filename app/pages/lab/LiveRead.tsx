@@ -104,6 +104,25 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const aligned = boardLean != null && direction === boardLean;
   const against = boardLean != null && direction !== boardLean;
 
+  // ── CONVICTION — the engine isn't one signal; it's how many INDEPENDENT, orthogonal
+  // reads agree with the direction you're drafting. Each is a distinct data source
+  // (crowd funding, on-chain smart money, the graded caller crowd, the historical base
+  // rate, your own realized record). Agreement across uncorrelated sources is the only
+  // thing that's held up — so we gate conviction on the TALLY, and stay fully explainable
+  // by listing exactly which reads confirm and which push back. Never a black-box score.
+  const reads: { label: string; side: "LONG" | "SHORT" | null; ok: boolean }[] = [];
+  if (fused?.crowdFade) reads.push({ label: "funding fade", side: fused.crowdFade, ok: fused.crowdFade === direction });
+  if (fused?.smartSide) reads.push({ label: "smart money", side: fused.smartSide, ok: fused.smartSide === direction });
+  if (callers) reads.push({ label: "graded callers", side: callers.side, ok: callers.side === direction });
+  if (baseRate) reads.push({ label: `base rate ${baseRate.expectancyR >= 0 ? "+EV" : "−EV"}`, side: boardLean, ok: baseRate.expectancyR > 0 && boardLean === direction });
+  if (record?.side) reads.push({ label: `your ${coin} record`, side: record.side.net >= 0 ? direction : null, ok: record.side.net > 0 });
+  else if (record) reads.push({ label: `your ${coin} record`, side: record.net >= 0 ? direction : null, ok: record.net > 0 });
+  const agree = reads.filter((r) => r.ok).length;
+  const pushback = reads.filter((r) => r.side && r.side !== direction).length;
+  const convLevel = reads.length >= 3 && agree >= 4 ? "HIGH" : agree >= 2 && agree > pushback ? "MODERATE" : pushback > agree ? "AGAINST" : "LOW";
+  const convColor = convLevel === "HIGH" ? POS : convLevel === "MODERATE" ? "#8fdcb8" : convLevel === "AGAINST" ? NEG : WARN;
+  const convWord = convLevel === "HIGH" ? "HIGH CONVICTION" : convLevel === "MODERATE" ? "MODERATE" : convLevel === "AGAINST" ? "READS DISAGREE" : "LOW CONVICTION";
+
   const loading = fused === undefined;
   const nothing = fused === null && !callers && !record && !advice && !baseRate;
 
@@ -145,6 +164,20 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
         <div style={{ fontFamily: MONO, fontSize: 10.5, color: MUTED, lineHeight: 1.5 }}>No strong read on {coin} right now — no funding extreme, no sharp cluster, no record here yet. Trust your own thesis.</div>
       ) : (
         <>
+          {/* CONVICTION VERDICT — how many independent reads agree with your direction.
+              The engine = agreement across orthogonal sources, not any single dial.
+              Explainable: the confirming reads are chipped below. */}
+          {reads.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10, paddingBottom: 10, borderBottom: `1px solid ${BORDER}` }}>
+              <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: convColor }}>◆ {convWord}</span>
+              <span style={{ fontFamily: MONO, fontSize: 10, color: FOG }}>{agree}/{reads.length} reads align {direction}{pushback > 0 ? ` · ${pushback} push back` : ""}</span>
+              <span style={{ display: "flex", gap: 4, flexWrap: "wrap", marginLeft: "auto" }}>
+                {reads.map((r) => (
+                  <span key={r.label} title={r.side ? `${r.label}: ${r.side}` : r.label} style={{ fontFamily: MONO, fontSize: 8, color: r.ok ? POS : (r.side && r.side !== direction ? NEG : FAINT), border: `1px solid ${r.ok ? "#2a3a30" : r.side && r.side !== direction ? "#3a2530" : BORDER}`, borderRadius: 3, padding: "1px 5px" }}>{r.ok ? "✓" : r.side && r.side !== direction ? "✗" : "·"} {r.label}</span>
+                ))}
+              </span>
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(88px, 1fr))", gap: 12, marginBottom: 10 }}>
             {fused && fused.crowdFade && chip("Funding", <span>fade <span style={{ color: dirColor(fused.crowdFade) }}>{fused.crowdFade}</span>{fused.fundingAnnualPct != null ? ` · ${fused.fundingAnnualPct}%/yr` : ""}</span>)}
             {fused && fused.smartSide && chip("Smart money", <span style={{ color: dirColor(fused.smartSide) }}>{fused.smartSide}<span style={{ color: FAINT, fontWeight: 400 }}> · {fused.smartTraders}</span></span>)}
