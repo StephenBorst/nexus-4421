@@ -52,6 +52,7 @@ async function prevCopyLeaders(env, address) {
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate, runBacktest, fetchCandles, fetchFundingAt, makeFundingPctAt } from "./backtest.mjs";
 import { snapshotLiquidations, fetchLiquidations, classifyFlush, estimatePendingLevels } from "./liquidations.mjs";
 import { snapshotFlow, fetchBasis, fetchCvd, classifyBasis, fetchOrderbook, classifyOrderbook, fetchSkew, classifySkew } from "./flow.mjs";
+import { okxJson } from "./okx.mjs";
 // TWAP planner/status — reuse the exec worker's tested logic (wrangler bundles the
 // cross-dir import, same as backtest.mjs). ONE planner, so start-validation and the
 // cron fire from identical rules.
@@ -4261,8 +4262,7 @@ document.getElementById("btn").addEventListener("click",go);
       try { const c = await env.LAB_STORE.get(CACHE); if (c) return json(JSON.parse(c), request); } catch { /* ignore */ }
       try {
         // OKX 1H candles carry volume: [ts, o, h, l, c, vol, ...]. ~300 bars ≈ 12d.
-        const r = await fetch(`https://www.okx.com/api/v5/market/candles?instId=${coin}-USDT-SWAP&bar=1H&limit=300`);
-        const j = await r.json();
+        const j = await okxJson(`https://www.okx.com/api/v5/market/candles?instId=${coin}-USDT-SWAP&bar=1H&limit=300`);
         if (j.code !== "0" || !Array.isArray(j.data) || !j.data.length) return json({ coin, available: false }, request);
         const candles = j.data.map((x) => ({ c: parseFloat(x[4]), h: parseFloat(x[2]), l: parseFloat(x[3]), v: parseFloat(x[5]) }));
         const currentPrice = candles[0].c; // OKX returns newest-first

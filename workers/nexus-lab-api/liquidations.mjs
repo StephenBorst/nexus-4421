@@ -15,6 +15,8 @@
 // CONSTANT per symbol — so sz*bkPx is a stable relative magnitude for detecting a
 // flush against that symbol's OWN history (which is all the signal needs). Not exact USD.
 
+import { okxJson } from "./okx.mjs";
+
 export const OKX_LIQ = "https://www.okx.com/api/v5/public/liquidation-orders";
 
 // Our perp coin → OKX USDT-swap instFamily. OKX liquidity is deepest on USDT swaps.
@@ -109,8 +111,7 @@ export async function fetchLiquidations(coin, windowMs = 65 * 60 * 1000) {
   const fam = coinToInstFamily(coin);
   if (!fam) return null;
   try {
-    const r = await fetch(`${OKX_LIQ}?instType=SWAP&instFamily=${fam}&state=filled&limit=100`);
-    const j = await r.json();
+    const j = await okxJson(`${OKX_LIQ}?instType=SWAP&instFamily=${fam}&state=filled&limit=100`);
     if (j.code !== "0") return null;
     // Response: data:[{ details:[{posSide, sz, bkPx, ts}, ...] }]
     const details = (j.data || []).flatMap((row) => row.details || []);

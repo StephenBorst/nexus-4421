@@ -15,6 +15,8 @@
 // Both accumulate hourly (basis:hist / cvd:hist) — same pattern as oi:hist / liq:hist.
 // OKX is CF-accessible (unlike Binance). Magnitudes are notional-ish (consistent per symbol).
 
+import { okxJson } from "./okx.mjs";
+
 export const OKX_TICKER = "https://www.okx.com/api/v5/market/ticker";
 export const OKX_TRADES = "https://www.okx.com/api/v5/market/trades";
 
@@ -53,8 +55,8 @@ export async function fetchBasis(coin) {
   if (!spot) return null;
   try {
     const [s, p] = await Promise.all([
-      fetch(`${OKX_TICKER}?instId=${spot}`).then((r) => r.json()),
-      fetch(`${OKX_TICKER}?instId=${spot}-SWAP`).then((r) => r.json()),
+      okxJson(`${OKX_TICKER}?instId=${spot}`),
+      okxJson(`${OKX_TICKER}?instId=${spot}-SWAP`),
     ]);
     if (s.code !== "0" || p.code !== "0") return null;
     const basisPct = computeBasisPct(s.data?.[0]?.last, p.data?.[0]?.last);
@@ -68,8 +70,7 @@ export async function fetchCvd(coin, windowMs = 65 * 60 * 1000) {
   const spot = coinToSpot(coin);
   if (!spot) return null;
   try {
-    const r = await fetch(`${OKX_TRADES}?instId=${spot}-SWAP&limit=100`);
-    const j = await r.json();
+    const j = await okxJson(`${OKX_TRADES}?instId=${spot}-SWAP&limit=100`);
     if (j.code !== "0") return null;
     return { coin: spot.replace("-USDT", ""), ...aggregateCvd(j.data || [], Date.now() - windowMs) };
   } catch { return null; }
@@ -92,8 +93,7 @@ export async function fetchOrderbook(coin) {
   const spot = coinToSpot(coin);
   if (!spot) return null;
   try {
-    const r = await fetch(`https://www.okx.com/api/v5/market/books?instId=${spot}-SWAP&sz=20`);
-    const j = await r.json();
+    const j = await okxJson(`https://www.okx.com/api/v5/market/books?instId=${spot}-SWAP&sz=20`);
     if (j.code !== "0") return null;
     const bk = j.data?.[0];
     const imbalance = computeImbalance(bk?.bids, bk?.asks);
