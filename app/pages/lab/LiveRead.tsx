@@ -195,14 +195,16 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
               The engine = agreement across orthogonal sources, not any single dial.
               Explainable: the confirming reads are chipped below. */}
           {reads.length > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10, paddingBottom: 10, borderBottom: `1px solid ${BORDER}` }}>
-              <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: convColor }}>◆ {convWord}</span>
-              <span style={{ fontFamily: MONO, fontSize: 10, color: FOG }}>{agree}/{reads.length} reads align {direction}{pushback > 0 ? ` · ${pushback} push back` : ""}</span>
-              <span style={{ display: "flex", gap: 4, flexWrap: "wrap", marginLeft: "auto" }}>
+            <div style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 8, background: `${convColor}12`, border: `1px solid ${convColor}33` }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: convColor }}>◆ {convWord}</span>
+                <span style={{ fontFamily: MONO, fontSize: 10.5, color: FOG }}>{agree}/{reads.length} reads align {direction}{pushback > 0 ? ` · ${pushback} against` : ""}</span>
+              </div>
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 9 }}>
                 {reads.map((r) => (
-                  <span key={r.label} title={r.side ? `${r.label}: ${r.side}` : r.label} style={{ fontFamily: MONO, fontSize: 8, color: r.ok ? POS : (r.side && r.side !== direction ? NEG : FAINT), border: `1px solid ${r.ok ? "#2a3a30" : r.side && r.side !== direction ? "#3a2530" : BORDER}`, borderRadius: 3, padding: "1px 5px" }}>{r.ok ? "✓" : r.side && r.side !== direction ? "✗" : "·"} {r.label}</span>
+                  <span key={r.label} title={r.side ? `${r.label}: ${r.side}` : r.label} style={{ fontFamily: MONO, fontSize: 8.5, color: r.ok ? POS : (r.side && r.side !== direction ? NEG : FAINT), border: `1px solid ${r.ok ? "#2a3a30" : r.side && r.side !== direction ? "#3a2530" : BORDER}`, borderRadius: 3, padding: "2px 6px", background: INSET }}>{r.ok ? "✓" : r.side && r.side !== direction ? "✗" : "·"} {r.label}</span>
                 ))}
-              </span>
+              </div>
             </div>
           )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(88px, 1fr))", gap: 12, marginBottom: 10 }}>
