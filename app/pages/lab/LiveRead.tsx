@@ -325,6 +325,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
           <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${BORDER}` }}>
             <Simulate
               label="◆ Pressure-test this trade →"
+              wallet={wallet}
               body={{ kind: "thesis", coin, direction, notes: synth || `${direction} ${coin} — ${convWord}, ${agree}/${reads.length} reads align.` }}
             />
           </div>

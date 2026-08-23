@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, simCreditsFor, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -1358,6 +1358,57 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
           return json({ error: "verify failed", detail: String((e && e.message) || e) }, request, 500);
         }
       }
+
+      // ── PAY-PER-SIM CREDITS ──────────────────────────────────────────────────
+      // Miroshark sims cost the operator ~$1/run — so users buy credits (pay USDC/Arbitrum
+      // or $NEXUS/Base to the receiver, same rail + verify as subs) and spend one per run.
+      // Self-funding + drives $NEXUS demand. $1 = 1 credit. GET reads the balance.
+      if (parts[0] === "sim" && parts[1] === "credits" && parts[2] && parts[2] !== "verify" && request.method === "GET") {
+        try { const raw = await env.LAB_STORE.get(`sim:credits:${parts[2].toLowerCase()}`); return json({ credits: raw ? Number(raw) : 0 }, request); }
+        catch { return json({ credits: 0 }, request); }
+      }
+      if (parts[0] === "sim" && parts[1] === "credits" && parts[2] === "verify" && request.method === "POST") {
+        try {
+          const body = await request.json().catch(() => ({}));
+          const txHash = String(body?.txHash || "").trim().toLowerCase();
+          const chain = String(body?.chain || "arbitrum").toLowerCase();
+          if (!/^0x[0-9a-f]{64}$/.test(txHash)) return json({ error: "invalid txHash" }, request, 400);
+          let token, decimals, usdPerToken, minUnits, rpcs;
+          if (chain === "arbitrum") {
+            token = USDC_ARBITRUM; decimals = 6; usdPerToken = 1;
+            minUnits = 1n * 1000000n; // ≥ 1 USDC
+            rpcs = [getArbRpc(env)];
+          } else if (chain === "base") {
+            token = NEXUS_BASE; decimals = 18;
+            const price = await getNexusPriceUsd();
+            if (!price) return json({ error: "could not price $NEXUS right now — pay with USDC on Arbitrum" }, request, 503);
+            usdPerToken = price;
+            minUnits = BigInt(Math.floor((1 / price / 0.88) * 1e18)); // ≥ ~$1 of $NEXUS (12% tol)
+            rpcs = ["https://base-rpc.publicnode.com", "https://mainnet.base.org", "https://base.llamarpc.com"];
+          } else return json({ error: "unsupported chain" }, request, 400);
+          if (await env.LAB_STORE.get(`sim:redeemed:${txHash}`)) return json({ error: "this transaction was already redeemed" }, request, 409);
+          let receipt = null;
+          for (const rpc of rpcs) {
+            try {
+              const res = await fetch(rpc, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionReceipt", params: [txHash] }) });
+              const j = await res.json();
+              if (j && j.result) { receipt = j.result; break; }
+            } catch { /* try next rpc */ }
+          }
+          if (!receipt) return json({ error: "tx not found or still pending — wait for confirmation, then retry" }, request, 404);
+          const v = verifyErc20Payment(receipt, { token, receiver: SUB_RECEIVER, minAmount: minUnits });
+          if (!v.ok) return json({ error: v.reason || "verification failed", hint: chain === "base" ? `Send ≥ $1 of $NEXUS on Base to ${SUB_RECEIVER}` : `Send ≥ 1 USDC on Arbitrum to ${SUB_RECEIVER}` }, request, 400);
+          const bought = simCreditsFor(v.amount, { decimals, usdPerToken, usdPerCredit: 1 });
+          if (bought < 1) return json({ error: "payment below the 1-credit minimum ($1)" }, request, 400);
+          const cur = Number(await env.LAB_STORE.get(`sim:credits:${v.from}`)) || 0;
+          const credits = cur + bought;
+          await env.LAB_STORE.put(`sim:credits:${v.from}`, String(credits));
+          await env.LAB_STORE.put(`sim:redeemed:${txHash}`, v.from);
+          return json({ ok: true, address: v.from, added: bought, credits }, request);
+        } catch (e) {
+          return json({ error: "verify failed", detail: String((e && e.message) || e) }, request, 500);
+        }
+      }
     }
 
     // ── Hosted NEXUS AI inference (PRO-gated proxy) ──────────────
@@ -2106,7 +2157,16 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       if (!body.run || !enabled) {
         return json({ scenario, enabled, disclaimer: MIRO_DISCLAIMER }, request);
       }
-      // PAID RUN — bound cost with a global daily cap first (fail-closed).
+      // PAY-PER-SIM — the user must hold a sim credit (bought via /sim/credits/verify).
+      // walletSig identifies the payer (sign_message('nexus-trading-key-v1')). No sig or no
+      // credit → 402 with buy info. The credit is spent only on a successful queue (below).
+      const simWallet = typeof body.walletSig === "string" ? recoverEthAddress("nexus-trading-key-v1", body.walletSig) : null;
+      if (!simWallet) return json({ scenario, enabled: true, ran: false, error: "credit_required", hint: "Buy sim credits, then sign to run. Each simulation costs 1 credit ($1)." }, request, 402);
+      const creditKey = `sim:credits:${simWallet}`;
+      let credits = 0;
+      try { credits = Number(await env.LAB_STORE.get(creditKey)) || 0; } catch { /* treat as 0 */ }
+      if (credits < 1) return json({ scenario, enabled: true, ran: false, error: "no_credits", credits: 0, hint: "You're out of sim credits — buy more (USDC on Arbitrum or $NEXUS on Base) to run. $1 = 1 credit." }, request, 402);
+      // Global daily cap stays as an operator backstop (fail-closed) on top of credits.
       const cap = Number(env.MIROSHARK_DAILY_CAP || 20);
       const capKey = `miro:runs:${new Date().toISOString().slice(0, 10)}`;
       let used = 0;
@@ -2129,7 +2189,7 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         const chal = await fetch(RUN_URL, reqInit());
         if (chal.status !== 402) {
           const j = await chal.json().catch(() => ({}));
-          if (chal.ok) { try { await env.LAB_STORE.put(capKey, String(used + 1), { expirationTtl: 172800 }); } catch { /* best-effort */ } return json({ scenario, enabled: true, ran: "queued", job: j.data || j, disclaimer: MIRO_DISCLAIMER }, request); }
+          if (chal.ok) { try { await env.LAB_STORE.put(capKey, String(used + 1), { expirationTtl: 172800 }); } catch { /* best-effort */ } try { await env.LAB_STORE.put(creditKey, String(Math.max(0, credits - 1))); } catch { /* best-effort */ } return json({ scenario, enabled: true, ran: "queued", job: j.data || j, creditsLeft: Math.max(0, credits - 1), disclaimer: MIRO_DISCLAIMER }, request); }
           return json({ scenario, enabled: true, ran: false, error: `unexpected ${chal.status} (no 402 challenge)`, detail: j }, request, 502);
         }
         const prb64 = chal.headers.get("payment-required");
@@ -2259,7 +2319,8 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
           return json({ scenario, enabled: true, ran: false, error: `run rejected (${paid.status}) — facilitator reason: ${facStr}`, detail: out, reason, payer: payerAddr, debug }, request, 502);
         }
         try { await env.LAB_STORE.put(capKey, String(used + 1), { expirationTtl: 172800 }); } catch { /* best-effort */ }
-        return json({ scenario, enabled: true, ran: "queued", job: out.data || out, disclaimer: MIRO_DISCLAIMER }, request);
+        try { await env.LAB_STORE.put(creditKey, String(Math.max(0, credits - 1))); } catch { /* best-effort */ }
+        return json({ scenario, enabled: true, ran: "queued", job: out.data || out, creditsLeft: Math.max(0, credits - 1), disclaimer: MIRO_DISCLAIMER }, request);
       } catch (e) {
         return json({ scenario, enabled: true, ran: false, error: `simulation error: ${String(e)}` }, request, 502);
       }

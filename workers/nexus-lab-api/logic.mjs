@@ -912,6 +912,17 @@ export function postmortemSummary(reasons) {
 export const ERC20_TRANSFER_TOPIC =
   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
+// Pure: how many SIM CREDITS an on-chain payment buys. amountUnits = the ERC-20 amount
+// (bigint/string), decimals = token decimals, usdPerToken = USD value per whole token
+// (1 for USDC, live price for $NEXUS), usdPerCredit = price of one sim (default $1). Floors
+// to whole credits so a partial never rounds up. Exported for tests.
+export function simCreditsFor(amountUnits, { decimals, usdPerToken = 1, usdPerCredit = 1 }) {
+  const amt = Number(amountUnits) / Math.pow(10, Number(decimals) || 0);
+  const usd = amt * (Number(usdPerToken) || 0);
+  const credits = Math.floor(usd / (Number(usdPerCredit) || 1));
+  return credits > 0 ? credits : 0;
+}
+
 export function verifyErc20Payment(receipt, { token, receiver, minAmount }) {
   if (!receipt || receipt.status !== "0x1") return { ok: false, reason: "tx not successful" };
   const tokenL = String(token).toLowerCase();

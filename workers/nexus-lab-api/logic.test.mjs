@@ -128,7 +128,18 @@ test("verifyErc20Payment: wrong token contract → not ok", () => {
 });
 
 // ── nexusMinUnits (PRO $NEXUS discount path) ────────────────
-import { nexusMinUnits } from "./logic.mjs";
+import { nexusMinUnits, simCreditsFor } from "./logic.mjs";
+
+test("simCreditsFor: USDC $1=1 credit, $NEXUS priced, floors partials", () => {
+  // 5 USDC (6 dec), $1/token, $1/credit → 5 credits
+  assert.equal(simCreditsFor(5n * 1000000n, { decimals: 6, usdPerToken: 1, usdPerCredit: 1 }), 5);
+  // 2.5 USDC → floors to 2
+  assert.equal(simCreditsFor(2500000n, { decimals: 6, usdPerToken: 1, usdPerCredit: 1 }), 2);
+  // 10M $NEXUS (18 dec) at $0.0000005 = $5 → 5 credits
+  assert.equal(simCreditsFor(10000000n * (10n ** 18n), { decimals: 18, usdPerToken: 0.0000005, usdPerCredit: 1 }), 5);
+  // below $1 → 0
+  assert.equal(simCreditsFor(500000n, { decimals: 6, usdPerToken: 1, usdPerCredit: 1 }), 0);
+});
 
 test("nexusMinUnits: $15 at $0.0000005, 12% tol → ~26.4M tokens in 18-dec units", () => {
   const u = nexusMinUnits(0.0000005, 15, 0.12);

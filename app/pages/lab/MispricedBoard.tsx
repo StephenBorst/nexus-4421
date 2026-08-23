@@ -18,6 +18,7 @@
 // Two independent fail-soft fetches: /intel/mispriced (fast, KV-cached market data)
 // and /theses/consensus (the caller lean), merged by coin here on the client.
 import { useEffect, useMemo, useState } from "react";
+import { useAccount } from "@orderly.network/hooks";
 import { C, MONO, UI, RADIUS } from "@/config/theme";
 import { AGENT_API } from "./agentTypes";
 import { useIsMobile } from "./useIsMobile";
@@ -342,6 +343,8 @@ function SynthesisRead({ m, lean }: { m: Market; lean?: Lean }) {
 
 export function MispricedBoard() {
   const isMobile = useIsMobile();
+  const { state: acct } = useAccount();
+  const wallet = (acct as { address?: string })?.address?.toLowerCase() ?? null;
   const [board, setBoard] = useState<BoardResp | null>(null);
   const [lean, setLean] = useState<Record<string, Lean>>({});
   const [err, setErr] = useState(false);
@@ -497,7 +500,7 @@ export function MispricedBoard() {
             {/* Pressure-test the fade before you take it — run it through a simulation. */}
             {m.direction !== "NONE" && (
               <div style={{ marginTop: 12 }}>
-                <Simulate label="◆ Simulate this fade" body={{
+                <Simulate label="◆ Simulate this fade" wallet={wallet} body={{
                   kind: "thesis", coin: m.coin, direction: m.direction, entry: m.markPrice,
                   notes: `Funding fade — ${m.coin} funding is ${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr, the crowd is offside ${m.direction === "SHORT" ? "long" : "short"}; fading for the mean-revert.`,
                 }} />
