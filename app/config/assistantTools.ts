@@ -15,6 +15,7 @@ import { buildOperatorProfile, profileNarrative, PUBLIC_READS } from "@/lib/oper
 import { bookConcentration } from "@/lib/bookRisk.mjs";
 import { fusePositioning, positioningRead } from "@/lib/positioning.mjs";
 import { rankConviction, convictionLevel } from "@/lib/conviction.mjs";
+import { fetchDeribitTerm } from "@/lib/deribit.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const AGENT_API = "https://og.nexustradinglabs.com";
@@ -351,6 +352,51 @@ export const TOOLS: ToolDef[] = [
       } catch { /* skip */ }
       if (!Object.keys(out).length) return JSON.stringify({ error: "regime data unavailable" });
       return JSON.stringify(out);
+    },
+  },
+  {
+    name: "get_read",
+    description:
+      "Get THE READ — the full multi-axis synthesis for ONE coin, the same engine the Lab shows at the decision. Fuses every orthogonal axis into a conviction verdict for a fade: the funding fade + on-chain smart money + graded callers + the historical base rate + spot-perp basis + the pending liquidation magnets (price targets) + the options vol regime (backwardation = fades favored). Use for 'give me the full read on BTC', 'should I fade X', 'break down the setup on SOL', or any deep single-coin question — this is THE tool for one coin (get_conviction is the market-wide triage). Returns which reads CONFIRM vs push back, so you can narrate the honest verdict. Not advice; when the reads are thin say so.",
+    input_schema: {
+      type: "object",
+      properties: { symbol: { type: "string", description: "Ticker (BTC, ETH, SOL…)." }, direction: { type: "string", enum: ["LONG", "SHORT"], description: "Optional — the direction being weighed; defaults to the funding-fade side." } },
+      required: ["symbol"],
+    },
+    run: async (args) => {
+      const coin = shortTicker(String(args.symbol ?? ""));
+      if (!coin) return JSON.stringify({ error: "pass a symbol (BTC, ETH, SOL…)" });
+      const [mp, sm, cons, br, flow, lm, term] = await Promise.all([
+        fetch(`${AGENT_API}/intel/mispriced`).then((r) => r.json()).catch(() => null),
+        fetch(`${AGENT_API}/smart/consensus`).then((r) => r.json()).catch(() => null),
+        fetch(`${AGENT_API}/theses/consensus`).then((r) => r.json()).catch(() => null),
+        fetch(`${AGENT_API}/intel/baserate/${coin}`).then((r) => r.json()).catch(() => null),
+        fetch(`${AGENT_API}/intel/flow/${coin}`).then((r) => r.json()).catch(() => null),
+        fetch(`${AGENT_API}/intel/liqmap/${coin}`).then((r) => r.json()).catch(() => null),
+        fetchDeribitTerm(coin).catch(() => null),
+      ]);
+      const mkt = (mp?.markets || []).find((m: { coin?: string }) => String(m.coin).toUpperCase() === coin);
+      const fadeDir = mkt?.direction === "LONG" || mkt?.direction === "SHORT" ? mkt.direction : null;
+      const dir = (args.direction === "LONG" || args.direction === "SHORT") ? args.direction : fadeDir;
+      const smSide = sm?.consensus?.[coin]?.side, cSide = cons?.consensus?.[coin]?.side;
+      const confirm: string[] = [], against: string[] = [];
+      const tag = (label: string, side: string | undefined) => { if (side === "LONG" || side === "SHORT") { (side === dir ? confirm : against).push(label); } };
+      if (fadeDir) (fadeDir === dir ? confirm : against).push("funding fade");
+      tag("smart money", smSide); tag("graded callers", cSide);
+      if (br?.available) (br.expectancyR > 0 && fadeDir === dir ? confirm : against).push(`base rate ${br.hitRate}%/${br.expectancyR >= 0 ? "+" : ""}${br.expectancyR}R`);
+      const net = confirm.length - against.length;
+      const conviction = !dir ? "N/A" : net >= 3 ? "HIGH" : net === 2 ? "MODERATE" : against.length > confirm.length ? "AGAINST" : "LOW";
+      return JSON.stringify({
+        coin, direction: dir || "(no funding extreme — pick a side)", conviction,
+        confirming: confirm, pushing_back: against,
+        funding_annual_pct: mkt?.fundingAnnualPct ?? null,
+        smart_money: smSide || "n/a", graded_callers: cSide || "n/a",
+        base_rate: br?.available ? { hit_rate_pct: br.hitRate, expectancy_r: br.expectancyR, samples: br.samples } : "insufficient history",
+        spot_perp_basis_pct: flow?.basis?.basisPct ?? null,
+        vol_regime: term?.structure || "n/a (BTC/ETH/SOL only)",
+        liq_magnets: lm?.available ? { downside_pull: lm.below?.[0]?.price ?? null, upside_pull: lm.above?.[0]?.price ?? null } : "n/a",
+        note: "Agreement across uncorrelated axes is the signal; a below-break-even base rate means 'trust your own thesis, not the fade.' A read, not advice. Offer to draft_thesis or open_symbol.",
+      });
     },
   },
   {
