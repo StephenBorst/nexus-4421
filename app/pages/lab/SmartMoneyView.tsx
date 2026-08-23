@@ -13,6 +13,7 @@ import { EmptyState, Coachmark } from "./components";
 import { SharePoster, type PosterData } from "./SharePoster";
 import { TraderDetail } from "./TraderDetail";
 import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
+import { ConvictionScanner } from "./ConvictionScanner";
 
 interface SmConsensus { sym: string; side: "LONG" | "SHORT"; count: number; netUsd: number; refPrice: number; }
 
@@ -319,6 +320,9 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
           context — then copy a move into a trade your agent manages and grades.
         </span>
       </div>
+
+      {/* Multi-axis conviction scan — the highest-agreement fades across the board. */}
+      <ConvictionScanner />
 
       {/* #3 convert-loop framing — one-time */}
       <Coachmark storageKey="nexus_coach_smart_v1" badge="THE LOOP" title="From watcher to ranked trader">
