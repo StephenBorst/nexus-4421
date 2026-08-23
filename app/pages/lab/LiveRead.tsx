@@ -37,7 +37,18 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const [advice, setAdvice] = useState<Advice>(null);
   const [baseRate, setBaseRate] = useState<BaseRate | null>(null);
   const [flush, setFlush] = useState<{ side: "UP" | "DOWN"; ratio: number } | null>(null);
-  const [liqLevels, setLiqLevels] = useState<{ price: number; mag: number; side: string }[] | null>(null);
+  const [magnets, setMagnets] = useState<{ below: { price: number; side: string }[]; above: { price: number; side: string }[] } | null>(null);
+
+  // Pending liquidation magnets (estimated heatmap) — where leveraged positions will be
+  // force-closed = where price tends to get pulled. Forward-looking; fail-soft. Cached.
+  useEffect(() => {
+    if (!coin) { setMagnets(null); return; }
+    let off = false;
+    fetch(`${AGENT_API}/intel/liqmap/${coin}`).then((r) => r.json())
+      .then((d) => { if (!off) setMagnets(d && d.available ? { below: d.below || [], above: d.above || [] } : null); })
+      .catch(() => { if (!off) setMagnets(null); });
+    return () => { off = true; };
+  }, [coin]);
   const [basis, setBasis] = useState<{ side: "LONG" | "SHORT"; basisPct: number } | null>(null);
   const [ob, setOb] = useState<{ side: "LONG" | "SHORT"; imbalance: number } | null>(null);
   const [skew, setSkew] = useState<{ side: "LONG" | "SHORT"; dev: number } | null>(null);
@@ -60,11 +71,11 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   // capitulating (confirms a SHORT fade); UP = shorts squeezed (confirms a LONG).
   // Activates once ~12h of liq:hist has accrued; fail-soft/hidden until then.
   useEffect(() => {
-    if (!coin) { setFlush(null); setLiqLevels(null); return; }
+    if (!coin) { setFlush(null); return; }
     let off = false;
     fetch(`${AGENT_API}/intel/liquidations/${coin}`).then((r) => r.json())
-      .then((d) => { if (off) return; setFlush(d && d.flush && (d.flush.side === "UP" || d.flush.side === "DOWN") ? d.flush : null); setLiqLevels(Array.isArray(d?.current?.levels) && d.current.levels.length ? d.current.levels : null); })
-      .catch(() => { if (!off) { setFlush(null); setLiqLevels(null); } });
+      .then((d) => { if (!off) setFlush(d && d.flush && (d.flush.side === "UP" || d.flush.side === "DOWN") ? d.flush : null); })
+      .catch(() => { if (!off) setFlush(null); });
     return () => { off = true; };
   }, [coin]);
 
@@ -166,7 +177,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const convWord = convLevel === "HIGH" ? "HIGH CONVICTION" : convLevel === "MODERATE" ? "MODERATE" : convLevel === "AGAINST" ? "READS DISAGREE" : "LOW CONVICTION";
 
   const loading = fused === undefined;
-  const nothing = fused === null && !callers && !record && !advice && !baseRate && !flush && !basis && !ob && !skew && !liqLevels;
+  const nothing = fused === null && !callers && !record && !advice && !baseRate && !flush && !basis && !ob && !skew && !magnets;
 
   // one honest synthesis line, reacting to what the user is drafting
   const synth = (() => {
@@ -241,19 +252,15 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
             </div>
           )}
 
-          {/* LIQUIDATION LEVELS — where forced closes actually clustered recently (real OKX
-              data, heatmap-lite). The magnets/cleared zones price tends to react around. */}
-          {liqLevels && liqLevels.length > 0 && (
+          {/* LIQ MAGNETS — estimated pending liquidation clusters (heatmap-lite): where
+              leveraged positions get force-closed = where price tends to get pulled. */}
+          {magnets && (magnets.below.length > 0 || magnets.above.length > 0) && (
             <div style={{ marginTop: 8, fontFamily: UI, fontSize: 11.5, color: FOG, lineHeight: 1.5 }}>
-              <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED }}>LIQ ZONES · </span>
-              recent forced closes clustered at{" "}
-              {liqLevels.slice(0, 3).map((l, i) => (
-                <span key={l.price}>
-                  {i > 0 ? ", " : ""}<b style={{ color: l.side === "DOWN" ? NEG : POS }}>${l.price >= 1000 ? l.price.toLocaleString() : l.price}</b>
-                  <span style={{ color: FAINT }}> ({l.side === "DOWN" ? "↓longs" : "↑shorts"})</span>
-                </span>
-              ))}
-              <span style={{ color: MUTED }}> — magnets price reacts around.</span>
+              <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED }}>LIQ MAGNETS · </span>
+              {magnets.below[0] && <>downside pull <b style={{ color: NEG }}>${magnets.below[0].price >= 1000 ? magnets.below[0].price.toLocaleString() : magnets.below[0].price}</b> <span style={{ color: FAINT }}>(long liqs)</span></>}
+              {magnets.below[0] && magnets.above[0] ? " · " : ""}
+              {magnets.above[0] && <>upside pull <b style={{ color: POS }}>${magnets.above[0].price >= 1000 ? magnets.above[0].price.toLocaleString() : magnets.above[0].price}</b> <span style={{ color: FAINT }}>(short liqs)</span></>}
+              <span style={{ color: MUTED }}> — estimated, where cascades sit.</span>
             </div>
           )}
 
