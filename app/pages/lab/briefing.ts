@@ -379,13 +379,30 @@ export function buildFusion(input: FusionInput): Insight[] {
     : callersFight ? ` But the credible callers actually lean ${lean!.side} — a real disagreement, so treat it as lower-conviction.`
     : "";
 
+  // ── CONVICTION drives the queue ──────────────────────────────────────────────
+  // The engine isn't one signal; it's how many INDEPENDENT reads back this fade. Count
+  // them, boost the insight's priority by the tally (so the most-confirmed setup rises to
+  // the Briefing's #1 action), tag the title, and dock it when a credible source pushes
+  // back. Same explainable "agreement = signal" logic as THE READ's conviction verdict.
+  const convReads =
+    (klass === "confluence" ? 1 : 0) +   // funding AND OI agree
+    (callersAgree ? 1 : 0) +             // the graded crowd agrees
+    (userSide === fadeDir ? 1 : 0) +     // your measurably stronger side
+    (provenFader ? 1 : 0) +              // your proven crowd-fading record
+    (classAgainst ? 1 : 0);             // counter-trend is your class
+  const highConv = convReads >= 3;
+  const convTag = highConv ? "◆ HIGH CONVICTION · " : "";
+  // Each aligned read lifts it; a credible caller fighting it pulls it back down.
+  const convBoost = convReads * 2 - (callersFight ? 3 : 0);
+  const convLine = convReads >= 2 ? ` ${convReads} independent reads align.` : "";
+
   if (userSide && userSide === fadeDir) {
     out.push({
       id: "fusion-your-setup",
-      priority: 92,
-      tone: "positive",
-      title: `Your setup: fade the crowd ${sideWord(fadeDir)} on ${sym}`,
-      detail: `${sym}: ${setupPhrase} — the crowd is heavily ${heavy}, so the clean fade is ${sideWord(fadeDir)}, and that's your stronger side (${userWr}% win rate)${faderNote}.${classNote}${callerNote}`,
+      priority: 92 + convBoost,
+      tone: highConv ? "positive" : callersFight ? "caution" : "positive",
+      title: `${convTag}Your setup: fade the crowd ${sideWord(fadeDir)} on ${sym}`,
+      detail: `${sym}: ${setupPhrase} — the crowd is heavily ${heavy}, so the clean fade is ${sideWord(fadeDir)}, and that's your stronger side (${userWr}% win rate)${faderNote}.${classNote}${callerNote}${convLine}`,
       action: { label: "Structure it", tab: "thesis" },
       meta: { symbol: sym, direction: fadeDir },
     });
@@ -393,10 +410,10 @@ export function buildFusion(input: FusionInput): Insight[] {
     // No directional edge, but the SETUP CLASS is where their edge lives.
     out.push({
       id: "fusion-your-class",
-      priority: 88,
-      tone: "positive",
-      title: `Your kind of setup: counter-trend fade ${sideWord(fadeDir)} on ${sym}`,
-      detail: `${sym}: ${setupPhrase} — the clean fade is ${sideWord(fadeDir)}, and counter-trend fades are where your edge lives (align +${alignAvgR}R against the trend)${faderNote}.${callerNote}`,
+      priority: 88 + convBoost,
+      tone: highConv ? "positive" : callersFight ? "caution" : "positive",
+      title: `${convTag}Your kind of setup: counter-trend fade ${sideWord(fadeDir)} on ${sym}`,
+      detail: `${sym}: ${setupPhrase} — the clean fade is ${sideWord(fadeDir)}, and counter-trend fades are where your edge lives (align +${alignAvgR}R against the trend)${faderNote}.${callerNote}${convLine}`,
       action: { label: "Structure it", tab: "thesis" },
       meta: { symbol: sym, direction: fadeDir },
     });
