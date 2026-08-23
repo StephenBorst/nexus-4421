@@ -153,7 +153,9 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
               // (the SPA's JS-injected OG tags are invisible to crawlers). It redirects
               // humans straight to the app page.
               const url = `https://og.nexustradinglabs.com/share/thesis/${walletAddress.toLowerCase()}/${t.id}`;
-              const text = `📡 ${tk} ${t.direction} ${t.leverage.toFixed(1)}x\n\nEntry $${t.entryPrice.toFixed(2)} · Stop $${t.stopLoss.toFixed(2)} · TP $${t.takeProfit1.toFixed(2)} (R:R 1:${t.riskReward.toFixed(2)})\n\nGraded on-chain vs public price on Nexus Trading Labs 👇`;
+              // Use the NaN/undefined-safe formatter (nf) — a public call missing any numeric
+              // field (older/partial theses) otherwise crashed the whole card on render (undefined.toFixed).
+              const text = `📡 ${tk} ${t.direction} ${nf(t.leverage, 1)}x\n\nEntry $${nf(t.entryPrice, 2)} · Stop $${nf(t.stopLoss, 2)} · TP $${nf(t.takeProfit1, 2)} (R:R 1:${nf(t.riskReward, 2)})\n\nGraded on-chain vs public price on Nexus Trading Labs 👇`;
               const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
               return (
                 <a href={xUrl} target="_blank" rel="noopener noreferrer" title="Share this call on X"

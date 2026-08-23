@@ -9,7 +9,6 @@ import {
 } from "@orderly.network/ui";
 import { LeftNavProps, LeftNavItem } from "@orderly.network/ui-scaffold";
 import { ExternalLink } from "lucide-react";
-import { getRuntimeConfig, getRuntimeConfigBoolean } from "@/utils/runtime-config";
 import { withBasePath } from "@/utils/base-path";
 
 type LeftNavUIProps = LeftNavProps &
@@ -60,12 +59,11 @@ const LeftNavSheet = modal.create<LeftNavUIProps>((props) => {
         closeOpacity={0.54}
       >
         <div className="oui-relative oui-flex oui-h-full oui-flex-col oui-gap-3">
-          <div className="oui-mt-[6px] oui-flex oui-h-[44px] oui-items-center">
-            {
-              getRuntimeConfigBoolean('VITE_HAS_PRIMARY_LOGO')
-                ? <img src={withBasePath("/logo.webp")} alt="logo" className="oui-h-[32px]" />
-                : <h1 className="oui-text-base-contrast-80 oui-font-bold">{getRuntimeConfig('VITE_ORDERLY_BROKER_NAME')}</h1>
-            }
+          {/* The Nexus lockup — transparent mark (blends seamlessly, no box/border) +
+              serif wordmark, congruent with the desktop/mobile header. */}
+          <div className="oui-mt-[6px] oui-flex oui-h-[44px] oui-items-center" style={{ gap: 9 }}>
+            <img src={withBasePath("/logo-mark.png")} alt="Nexus Trading Labs" className="oui-h-[30px]" style={{ width: "auto", flexShrink: 0 }} />
+            <span style={{ fontFamily: "var(--nx-font-serif, 'Libre Baskerville', Georgia, serif)", fontSize: 19, fontWeight: 700, color: "#f4f4f5", letterSpacing: "0.01em", lineHeight: 1 }}>Nexus</span>
           </div>
           
           <div className="oui-flex oui-h-[calc(100vh-120px)] oui-flex-col oui-items-start oui-overflow-y-auto">

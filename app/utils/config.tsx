@@ -349,7 +349,7 @@ const allMenuItems = [
                 // NOT the old generic secondary logo — keeps the mark congruent with
                 // the desktop lockup (same icon-512 asset).
                 <img
-                  src={withBasePath("/icon-512.png")}
+                  src={withBasePath("/logo-mark.png")}
                   alt="Nexus Trading Labs"
                   style={{ height: "30px", width: "auto", flexShrink: 0, objectFit: "contain" }}
                 />
@@ -413,7 +413,7 @@ const allMenuItems = [
             component: (
               <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
                 <img
-                  src={withBasePath("/icon-512.png")}
+                  src={withBasePath("/logo-mark.png")}
                   alt="Nexus Trading Labs"
                   style={{ height: "30px", width: "auto", flexShrink: 0 }}
                 />
