@@ -51,6 +51,7 @@ async function prevCopyLeaders(env, address) {
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate, runBacktest, fetchCandles, fetchFundingAt, makeFundingPctAt } from "./backtest.mjs";
 import { snapshotLiquidations, fetchLiquidations, classifyFlush } from "./liquidations.mjs";
+import { snapshotFlow, fetchBasis, fetchCvd, classifyBasis } from "./flow.mjs";
 // TWAP planner/status — reuse the exec worker's tested logic (wrangler bundles the
 // cross-dir import, same as backtest.mjs). ONE planner, so start-validation and the
 // cron fire from identical rules.
@@ -690,6 +691,16 @@ export default {
         const n = await snapshotLiquidations(env, coins);
         console.log(`[liq] snapshotted ${n} coins' liquidation flow`);
       } catch (e) { console.error("[liq] snapshot failed:", String(e)); }
+    })());
+    // Hourly: accumulate spot-perp BASIS + CVD (OKX) into basis:hist / cvd:hist — tool #4.
+    // Basis grades fade quality (perp premium = froth, safe to fade); CVD = aggressor flow.
+    // Same accumulate-hourly pattern; seeds both for backtesting. Fail-soft.
+    ctx.waitUntil((async () => {
+      try {
+        const coins = ["BTC", "ETH", "SOL", "BNB", "XRP", "LINK", "DOGE", "AVAX", "HYPE"];
+        const n = await snapshotFlow(env, coins);
+        console.log(`[flow] snapshotted ${n} coins' basis/cvd`);
+      } catch (e) { console.error("[flow] snapshot failed:", String(e)); }
     })());
     // Hourly: classify each core symbol's trend regime (the momentum signal source),
     // cached for the /signals hot path + the fusion. Runs BEFORE delivery so the push
@@ -4234,6 +4245,28 @@ document.getElementById("btn").addEventListener("click",go);
       try { const raw = await KV.get(`liq:hist:${coin}`); hist = raw ? JSON.parse(raw) : []; } catch { /* empty */ }
       const flush = current ? classifyFlush(hist, current) : null;
       return json({ coin, current, flush, points: hist.length, history: hist.slice(-72) }, request);
+    }
+
+    // ── GET /intel/flow/:coin — spot-perp basis + CVD (live + accrued history) ────
+    // Basis grades the fade's quality (perp premium = leverage froth = safe to fade,
+    // supports SHORT; discount supports LONG); CVD = live aggressor flow. Public,
+    // read-only, fail-soft. Live fetch cached 60s.
+    if (parts[0] === "intel" && parts[1] === "flow" && parts[2] && request.method === "GET") {
+      const coin = String(parts[2]).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+      const KV = env.NEXUS_AGENT || env.LAB_STORE;
+      const CUR = `flow:cur:${coin}`;
+      let cur = null;
+      try { const c = await env.LAB_STORE.get(CUR); if (c) cur = JSON.parse(c); } catch { /* ignore */ }
+      if (!cur) {
+        const [basis, cvd] = await Promise.all([fetchBasis(coin), fetchCvd(coin)]);
+        cur = { basis, cvd };
+        if (basis || cvd) { try { await env.LAB_STORE.put(CUR, JSON.stringify(cur), { expirationTtl: 60 }); } catch { /* best-effort */ } }
+      }
+      const basisSignal = cur?.basis ? classifyBasis(cur.basis.basisPct) : null;
+      let bHist = [], cHist = [];
+      try { const r = await KV.get(`basis:hist:${coin}`); bHist = r ? JSON.parse(r) : []; } catch { /* empty */ }
+      try { const r = await KV.get(`cvd:hist:${coin}`); cHist = r ? JSON.parse(r) : []; } catch { /* empty */ }
+      return json({ coin, basis: cur?.basis || null, cvd: cur?.cvd || null, basisSignal, basisPoints: bHist.length, cvdPoints: cHist.length, basisHistory: bHist.slice(-72), cvdHistory: cHist.slice(-72) }, request);
     }
 
     // ── POST /agent/hook/:token — TradingView / external signal webhook ──────

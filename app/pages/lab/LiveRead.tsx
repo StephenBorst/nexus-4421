@@ -38,6 +38,18 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const [advice, setAdvice] = useState<Advice>(null);
   const [baseRate, setBaseRate] = useState<BaseRate | null>(null);
   const [flush, setFlush] = useState<{ side: "UP" | "DOWN"; ratio: number } | null>(null);
+  const [basis, setBasis] = useState<{ side: "LONG" | "SHORT"; basisPct: number } | null>(null);
+
+  // Spot-perp basis (OKX): perp premium (basis>0) = leverage froth → confirms a SHORT
+  // fade; discount → confirms LONG. Grades the fade's QUALITY. Live, fail-soft.
+  useEffect(() => {
+    if (!coin) { setBasis(null); return; }
+    let off = false;
+    fetch(`${AGENT_API}/intel/flow/${coin}`).then((r) => r.json())
+      .then((d) => { if (!off) setBasis(d && d.basisSignal && (d.basisSignal.side === "LONG" || d.basisSignal.side === "SHORT") ? d.basisSignal : null); })
+      .catch(() => { if (!off) setBasis(null); });
+    return () => { off = true; };
+  }, [coin]);
 
   // Live liquidation flush (OKX feed) — a cascade of forced closes. DOWN = longs
   // capitulating (confirms a SHORT fade); UP = shorts squeezed (confirms a LONG).
@@ -125,6 +137,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   // by listing exactly which reads confirm and which push back. Never a black-box score.
   const reads: { label: string; side: "LONG" | "SHORT" | null; ok: boolean }[] = [];
   if (flush) { const fs = flush.side === "DOWN" ? "SHORT" : "LONG"; reads.push({ label: `liq flush ${flush.ratio}×`, side: fs, ok: fs === direction }); }
+  if (basis) reads.push({ label: `basis ${basis.basisPct > 0 ? "+" : ""}${basis.basisPct}%`, side: basis.side, ok: basis.side === direction });
   if (fused?.crowdFade) reads.push({ label: "funding fade", side: fused.crowdFade, ok: fused.crowdFade === direction });
   if (fused?.smartSide) reads.push({ label: "smart money", side: fused.smartSide, ok: fused.smartSide === direction });
   if (callers) reads.push({ label: "graded callers", side: callers.side, ok: callers.side === direction });
@@ -138,7 +151,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const convWord = convLevel === "HIGH" ? "HIGH CONVICTION" : convLevel === "MODERATE" ? "MODERATE" : convLevel === "AGAINST" ? "READS DISAGREE" : "LOW CONVICTION";
 
   const loading = fused === undefined;
-  const nothing = fused === null && !callers && !record && !advice && !baseRate && !flush;
+  const nothing = fused === null && !callers && !record && !advice && !baseRate && !flush && !basis;
 
   // one honest synthesis line, reacting to what the user is drafting
   const synth = (() => {
@@ -201,6 +214,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
             {record && chip(`Your ${coin}`, <span style={{ color: record.net >= 0 ? POS : NEG }}>{record.net >= 0 ? "+" : "-"}${Math.abs(record.net)}<span style={{ color: FAINT, fontWeight: 400 }}> · {record.n}t · {record.wr}%</span></span>)}
             {baseRate && chip("Fade base rate", <span style={{ color: baseRate.expectancyR > 0 ? POS : WARN }}>{baseRate.hitRate}%<span style={{ color: FAINT, fontWeight: 400 }}> · {baseRate.samples}× · {baseRate.expectancyR >= 0 ? "+" : ""}{baseRate.expectancyR}R</span></span>)}
             {flush && chip("Liq flush", <span style={{ color: flush.side === "DOWN" ? NEG : POS }}>{flush.side === "DOWN" ? "↓ longs" : "↑ shorts"}<span style={{ color: FAINT, fontWeight: 400 }}> · {flush.ratio}×</span></span>)}
+            {basis && chip("Spot-perp basis", <span style={{ color: dirColor(basis.side) }}>{basis.basisPct > 0 ? "+" : ""}{basis.basisPct}%<span style={{ color: FAINT, fontWeight: 400 }}> · {basis.basisPct > 0 ? "premium" : "discount"}</span></span>)}
           </div>
           {synth && <div style={{ fontFamily: UI, fontSize: 12.5, color: tone === POS ? "#8fdcb8" : tone, lineHeight: 1.55 }}>{synth}</div>}
 

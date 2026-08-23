@@ -1,0 +1,112 @@
+// ── SPOT-PERP BASIS + CVD (OKX) ──────────────────────────────────────────────
+// Tool #4 in the orthogonal-signal stack. Two reads a funding rate can't give you:
+//
+// BASIS = (perp − spot) / spot. A funding extreme sitting on a perp PREMIUM (basis > 0)
+// is leverage-driven froth — safe to fade. The same funding on a perp at/below spot is
+// backed by real spot demand — a dangerous fade. So basis grades the QUALITY of the fade:
+//   basis > 0  → perp premium (longs paying up)  → confirms a SHORT fade
+//   basis < 0  → perp discount (shorts pressing) → confirms a LONG fade
+//
+// CVD = cumulative volume delta = Σ(taker-buy notional) − Σ(taker-sell notional). Aggressor
+// flow. A price push on FALLING CVD is distribution (weak) — the reversal fuel. We record
+// it hourly (cvd:hist) so CVD-divergence becomes backtestable as the series matures; the
+// live delta shows aggressor pressure now.
+//
+// Both accumulate hourly (basis:hist / cvd:hist) — same pattern as oi:hist / liq:hist.
+// OKX is CF-accessible (unlike Binance). Magnitudes are notional-ish (consistent per symbol).
+
+export const OKX_TICKER = "https://www.okx.com/api/v5/market/ticker";
+export const OKX_TRADES = "https://www.okx.com/api/v5/market/trades";
+
+export function coinToSpot(coin) {
+  const c = String(coin || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "").replace(/_USDT$/, "");
+  return c ? `${c}-USDT` : null;
+}
+
+// Pure: basis % from spot + perp last. Positive = perp premium. Guards bad ticks.
+export function computeBasisPct(spotLast, perpLast) {
+  const s = parseFloat(spotLast), p = parseFloat(perpLast);
+  if (!Number.isFinite(s) || !Number.isFinite(p) || s <= 0) return null;
+  const pct = ((p - s) / s) * 100;
+  return Math.abs(pct) > 10 ? null : Math.round(pct * 1000) / 1000; // >10% = bad data
+}
+
+// Pure: fold OKX taker trades into CVD (buy notional − sell notional) + total, over
+// [sinceMs, now]. side is the AGGRESSOR side. Exported for tests.
+export function aggregateCvd(trades, sinceMs) {
+  let buy = 0, sell = 0, n = 0;
+  for (const t of trades || []) {
+    const ts = Number(t.ts ?? 0);
+    if (!(ts >= sinceMs)) continue;
+    const notional = Math.abs(parseFloat(t.sz || "0")) * Math.abs(parseFloat(t.px || "0"));
+    if (!notional) continue;
+    if (t.side === "buy") buy += notional; else if (t.side === "sell") sell += notional;
+    n++;
+  }
+  const r = (x) => Math.round(x);
+  return { cvd: r(buy - sell), buy: r(buy), sell: r(sell), count: n };
+}
+
+// Network: live basis for one coin (spot vs perp ticker on OKX).
+export async function fetchBasis(coin) {
+  const spot = coinToSpot(coin);
+  if (!spot) return null;
+  try {
+    const [s, p] = await Promise.all([
+      fetch(`${OKX_TICKER}?instId=${spot}`).then((r) => r.json()),
+      fetch(`${OKX_TICKER}?instId=${spot}-SWAP`).then((r) => r.json()),
+    ]);
+    if (s.code !== "0" || p.code !== "0") return null;
+    const basisPct = computeBasisPct(s.data?.[0]?.last, p.data?.[0]?.last);
+    if (basisPct == null) return null;
+    return { coin: spot.replace("-USDT", ""), basisPct, spot: parseFloat(s.data[0].last), perp: parseFloat(p.data[0].last) };
+  } catch { return null; }
+}
+
+// Network: live CVD from the last `windowMs` of taker trades (OKX returns ~recent).
+export async function fetchCvd(coin, windowMs = 65 * 60 * 1000) {
+  const spot = coinToSpot(coin);
+  if (!spot) return null;
+  try {
+    const r = await fetch(`${OKX_TRADES}?instId=${spot}-SWAP&limit=100`);
+    const j = await r.json();
+    if (j.code !== "0") return null;
+    return { coin: spot.replace("-USDT", ""), ...aggregateCvd(j.data || [], Date.now() - windowMs) };
+  } catch { return null; }
+}
+
+// Live basis → a directional QUALITY read for the fade, or null if too flat to matter.
+// side = which fade direction the basis supports; |basis| must clear PREMIUM to count.
+export function classifyBasis(basisPct) {
+  const PREMIUM = 0.03; // % — below this the perp is priced with spot, no froth signal
+  if (basisPct == null || Math.abs(basisPct) < PREMIUM) return null;
+  return { side: basisPct > 0 ? "SHORT" : "LONG", basisPct };
+}
+
+// Hourly cron: append {t, basisPct} to basis:hist and {t, cvd, buy, sell} to cvd:hist
+// per coin (≥55-min guard → hourly; ~90d cap). Best-effort per coin.
+export async function snapshotFlow(env, coins) {
+  const KV = env.NEXUS_AGENT || env.LAB_STORE;
+  let n = 0;
+  for (const coin of coins) {
+    const bare = String(coin).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+    const now = Date.now();
+    try {
+      const [basis, cvd] = await Promise.all([fetchBasis(coin), fetchCvd(coin)]);
+      if (basis) await appendHist(KV, `basis:hist:${bare}`, { t: now, basisPct: basis.basisPct }, now);
+      if (cvd) await appendHist(KV, `cvd:hist:${bare}`, { t: now, cvd: cvd.cvd, buy: cvd.buy, sell: cvd.sell }, now);
+      if (basis || cvd) n++;
+    } catch { /* per-coin best-effort */ }
+  }
+  return n;
+}
+
+async function appendHist(KV, key, point, now) {
+  const raw = await KV.get(key);
+  const hist = raw ? JSON.parse(raw) : [];
+  const last = hist[hist.length - 1];
+  if (last && now - last.t < 55 * 60 * 1000) return; // hourly
+  hist.push(point);
+  if (hist.length > 2200) hist.splice(0, hist.length - 2200);
+  await KV.put(key, JSON.stringify(hist));
+}
