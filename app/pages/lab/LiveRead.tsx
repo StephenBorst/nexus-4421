@@ -320,12 +320,25 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
           {/* PRESSURE-TEST — run the Miroshark sim on this exact trade: 25 agents react over
               10 rounds, surfacing the bull/bear case + where consensus lands. The decision-
               moment stress test, right in the read. */}
-          <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${BORDER}` }}>
-            <Simulate
-              label="◆ Pressure-test this trade →"
-              wallet={wallet}
-              body={{ kind: "thesis", coin, direction, notes: synth || `${direction} ${coin} — ${convWord}, ${agree}/${reads.length} reads align.` }}
-            />
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <Simulate
+                label="◆ Pressure-test this trade →"
+                wallet={wallet}
+                body={{ kind: "thesis", coin, direction, notes: synth || `${direction} ${coin} — ${convWord}, ${agree}/${reads.length} reads align.` }}
+              />
+            </div>
+            {reads.length >= 2 && (() => {
+              // Share the read — on-brand content ("multi-axis, graded, not advice"), pulls eyes
+              // back to the Lab. Frames it as a READ, never a call/signal.
+              const conf = reads.filter((r) => r.ok).map((r) => r.label).slice(0, 4).join(", ");
+              const text = `◆ Nexus read — ${convWord}, ${direction} ${coin}: ${agree}/${reads.length} independent reads align${conf ? ` (${conf})` : ""}. Multi-axis, graded on-chain, not advice. The full breakdown 👇`;
+              const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent("https://trade.nexustradinglabs.com/lab")}`;
+              return (
+                <a href={xUrl} target="_blank" rel="noopener noreferrer" title="Share this read on X" className="nx-press"
+                  style={{ flexShrink: 0, fontFamily: MONO, fontSize: 10, color: FOG, background: "transparent", border: `1px solid ${BORDER}`, borderRadius: 3, padding: "5px 11px", textDecoration: "none", whiteSpace: "nowrap" }}>𝕏 Share the read</a>
+              );
+            })()}
           </div>
 
           <div style={{ fontFamily: MONO, fontSize: 8, color: FAINT, marginTop: 8, lineHeight: 1.5 }}>A read, not a green light — it tightens the odds, it doesn't guarantee them.</div>
