@@ -2196,7 +2196,19 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
           const facReason = reason?.error || reason?.reason || reason?.message || reason?.invalidReason
             || out?.error || out?.reason || out?.message || (Array.isArray(out?.accepts) ? "re-challenged (payload shape/network mismatch)" : null);
           const facStr = facReason ? (typeof facReason === "string" ? facReason : JSON.stringify(facReason)) : "no reason returned";
-          return json({ scenario, enabled: true, ran: false, error: `run rejected (${paid.status}) — facilitator reason: ${facStr}`, detail: out, reason, payer: payerAddr }, request, 502);
+          // DEEP DEBUG: capture exactly WHAT WE SENT vs WHAT THE CHALLENGE ASKED, so the
+          // field mismatch is visible in one co-test. Signature redacted; everything else
+          // (challenge terms + our EIP-3009 authorization) is non-secret.
+          let sent = null;
+          try {
+            const p = JSON.parse(atob(xPayment));
+            const auth = p?.payload?.authorization || null;
+            sent = { x402Version: p?.x402Version, scheme: p?.scheme, network: p?.network,
+              authorization: auth ? { from: auth.from, to: auth.to, value: auth.value, validAfter: auth.validAfter, validBefore: auth.validBefore } : null,
+              hasSignature: !!p?.payload?.signature };
+          } catch { /* ignore */ }
+          const debug = { challenge: { x402Version: challenge.x402Version, accept0: accepts[0] }, sent, domainVersionUsed: extra.version, assetUsed: req0.asset };
+          return json({ scenario, enabled: true, ran: false, error: `run rejected (${paid.status}) — facilitator reason: ${facStr}`, detail: out, reason, payer: payerAddr, debug }, request, 502);
         }
         try { await env.LAB_STORE.put(capKey, String(used + 1), { expirationTtl: 172800 }); } catch { /* best-effort */ }
         return json({ scenario, enabled: true, ran: "queued", job: out.data || out, disclaimer: MIRO_DISCLAIMER }, request);
