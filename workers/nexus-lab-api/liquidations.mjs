@@ -64,6 +64,41 @@ export function computeLevels(details, sinceMs, bucketPct = 0.3, topN = 4) {
     .sort((a, b) => b.mag - a.mag).slice(0, topN);
 }
 
+// ── PENDING liquidation levels (heatmap approximation) ───────────────────────
+// Forward-looking "magnets" — where leveraged positions WILL be force-closed, vs the
+// recent-liq levels above (where they already were). No position data (that's Coinglass-
+// gated), so we APPROXIMATE the Coinglass-style heatmap: positions were opened where price
+// recently traded (weighted by volume); a long opened at P liquidates ≈ P·(1−1/L), a short
+// at ≈ P·(1+1/L). Project every recent bar across common leverage bands, bucket by price →
+// the clusters are the magnets price tends to get pulled toward (cascade fuel). An estimate,
+// clearly labeled — a heatmap-lite, not exchange truth. Pure + tested.
+// candles: [{ c, h, l, v? }] recent (hourly). Returns { above, below } nearest big clusters.
+export function estimatePendingLevels(candles, currentPrice, opts = {}) {
+  const { bucketPct = 0.5, rangePct = 25, topN = 5, levs = [[10, 0.15], [25, 0.3], [50, 0.3], [100, 0.25]] } = opts;
+  if (!Array.isArray(candles) || !candles.length || !(currentPrice > 0)) return { above: [], below: [] };
+  const buckets = new Map();
+  for (const c of candles) {
+    const entry = Number(c.c) || 0;
+    const vol = Number(c.v) || (Number(c.h) - Number(c.l)) || 1; // volume, else range as a proxy
+    if (!(entry > 0)) continue;
+    for (const [L, w] of levs) {
+      for (const [liq, side] of [[entry * (1 - 1 / L), "long"], [entry * (1 + 1 / L), "short"]]) {
+        if (!(liq > 0)) continue;
+        if (Math.abs(liq - currentPrice) / currentPrice * 100 > rangePct) continue; // ignore far levels
+        const bw = entry * bucketPct / 100;
+        const key = Math.round(liq / bw) * bw;
+        const b = buckets.get(key) || { price: 0, long: 0, short: 0 };
+        b.price = key; if (side === "long") b.long += vol * w; else b.short += vol * w;
+        buckets.set(key, b);
+      }
+    }
+  }
+  const all = [...buckets.values()].map((b) => ({ price: Math.round(b.price), mag: Math.round(b.long + b.short), side: b.long >= b.short ? "long" : "short" }));
+  const above = all.filter((x) => x.price > currentPrice).sort((a, b) => b.mag - a.mag).slice(0, topN);
+  const below = all.filter((x) => x.price < currentPrice).sort((a, b) => b.mag - a.mag).slice(0, topN);
+  return { above, below };
+}
+
 // Network: recent liquidations for one coin over the last `windowMs` (default ~65min).
 export async function fetchLiquidations(coin, windowMs = 65 * 60 * 1000) {
   const fam = coinToInstFamily(coin);

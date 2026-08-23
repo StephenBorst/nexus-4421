@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { coinToInstFamily, aggregateLiquidations, classifyFlush, computeLevels } from "./liquidations.mjs";
+import { coinToInstFamily, aggregateLiquidations, classifyFlush, computeLevels, estimatePendingLevels } from "./liquidations.mjs";
 
 test("coinToInstFamily maps our perp coins to OKX USDT swaps", () => {
   assert.equal(coinToInstFamily("PERP_BTC_USDC"), "BTC-USDT");
@@ -34,6 +34,18 @@ test("computeLevels buckets liquidations by price, ranks by magnitude", () => {
   assert.ok(levels.length >= 2);
   assert.equal(levels[0].side, "DOWN");       // biggest cluster is the 70k longs
   assert.ok(levels[0].mag > levels[1].mag);   // ranked by magnitude
+});
+
+test("estimatePendingLevels projects liq magnets above (shorts) and below (longs)", () => {
+  // price traded around 100 recently → longs liq below, shorts liq above
+  const candles = Array.from({ length: 50 }, () => ({ c: 100, h: 101, l: 99, v: 1000 }));
+  const { above, below } = estimatePendingLevels(candles, 100);
+  assert.ok(above.length > 0 && below.length > 0);
+  assert.ok(above.every((x) => x.price > 100));   // above = short liqs
+  assert.ok(below.every((x) => x.price < 100));    // below = long liqs
+  // 100x band sits nearest (±1%); it should be among the clusters
+  assert.ok(below.some((x) => x.price >= 98 && x.price <= 100));
+  assert.equal(estimatePendingLevels([], 100).above.length, 0);
 });
 
 test("classifyFlush needs enough history and a real spike", () => {

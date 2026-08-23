@@ -50,7 +50,7 @@ async function prevCopyLeaders(env, address) {
 }
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate, runBacktest, fetchCandles, fetchFundingAt, makeFundingPctAt } from "./backtest.mjs";
-import { snapshotLiquidations, fetchLiquidations, classifyFlush } from "./liquidations.mjs";
+import { snapshotLiquidations, fetchLiquidations, classifyFlush, estimatePendingLevels } from "./liquidations.mjs";
 import { snapshotFlow, fetchBasis, fetchCvd, classifyBasis, fetchOrderbook, classifyOrderbook, fetchSkew, classifySkew } from "./flow.mjs";
 // TWAP planner/status — reuse the exec worker's tested logic (wrangler bundles the
 // cross-dir import, same as backtest.mjs). ONE planner, so start-validation and the
@@ -4246,6 +4246,31 @@ document.getElementById("btn").addEventListener("click",go);
       try { const raw = await KV.get(`liq:hist:${coin}`); hist = raw ? JSON.parse(raw) : []; } catch { /* empty */ }
       const flush = current ? classifyFlush(hist, current) : null;
       return json({ coin, current, flush, points: hist.length, history: hist.slice(-72) }, request);
+    }
+
+    // ── GET /intel/liqmap/:coin — PENDING liquidation magnets (heatmap approximation) ──
+    // Forward-looking estimate of where leveraged positions will be force-closed, projected
+    // from recent volume-weighted price zones across common leverage bands. The nearest big
+    // clusters above/below = the magnets price gets pulled toward. Estimate, not exchange
+    // truth (real pending-liq data is Coinglass-gated). Public, cached 5min, fail-soft.
+    if (parts[0] === "intel" && parts[1] === "liqmap" && parts[2] && request.method === "GET") {
+      const coin = String(parts[2]).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+      const CACHE = `liqmap:${coin}:v1`;
+      try { const c = await env.LAB_STORE.get(CACHE); if (c) return json(JSON.parse(c), request); } catch { /* ignore */ }
+      try {
+        // OKX 1H candles carry volume: [ts, o, h, l, c, vol, ...]. ~300 bars ≈ 12d.
+        const r = await fetch(`https://www.okx.com/api/v5/market/candles?instId=${coin}-USDT-SWAP&bar=1H&limit=300`);
+        const j = await r.json();
+        if (j.code !== "0" || !Array.isArray(j.data) || !j.data.length) return json({ coin, available: false }, request);
+        const candles = j.data.map((x) => ({ c: parseFloat(x[4]), h: parseFloat(x[2]), l: parseFloat(x[3]), v: parseFloat(x[5]) }));
+        const currentPrice = candles[0].c; // OKX returns newest-first
+        const { above, below } = estimatePendingLevels(candles, currentPrice);
+        const out = { coin, available: above.length > 0 || below.length > 0, currentPrice, above, below, note: "Estimated pending-liquidation magnets — projected from recent volume across common leverage bands. An approximation, not exchange data." };
+        try { await env.LAB_STORE.put(CACHE, JSON.stringify(out), { expirationTtl: 300 }); } catch { /* best-effort */ }
+        return json(out, request);
+      } catch (e) {
+        return json({ coin, available: false, error: String(e.message || e) }, request);
+      }
     }
 
     // ── GET /intel/flow/:coin — spot-perp basis + CVD (live + accrued history) ────
