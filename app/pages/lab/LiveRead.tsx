@@ -37,6 +37,19 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const [callers, setCallers] = useState<{ side: "LONG" | "SHORT"; participants: number } | null>(null);
   const [advice, setAdvice] = useState<Advice>(null);
   const [baseRate, setBaseRate] = useState<BaseRate | null>(null);
+  const [flush, setFlush] = useState<{ side: "UP" | "DOWN"; ratio: number } | null>(null);
+
+  // Live liquidation flush (OKX feed) — a cascade of forced closes. DOWN = longs
+  // capitulating (confirms a SHORT fade); UP = shorts squeezed (confirms a LONG).
+  // Activates once ~12h of liq:hist has accrued; fail-soft/hidden until then.
+  useEffect(() => {
+    if (!coin) { setFlush(null); return; }
+    let off = false;
+    fetch(`${AGENT_API}/intel/liquidations/${coin}`).then((r) => r.json())
+      .then((d) => { if (!off) setFlush(d && d.flush && (d.flush.side === "UP" || d.flush.side === "DOWN") ? d.flush : null); })
+      .catch(() => { if (!off) setFlush(null); });
+    return () => { off = true; };
+  }, [coin]);
 
   // Historical base rate for the funding-fade setup on this coin — the honest "how has
   // this actually resolved" number, computed server-side by the REAL backtest engine over
@@ -111,6 +124,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   // thing that's held up — so we gate conviction on the TALLY, and stay fully explainable
   // by listing exactly which reads confirm and which push back. Never a black-box score.
   const reads: { label: string; side: "LONG" | "SHORT" | null; ok: boolean }[] = [];
+  if (flush) { const fs = flush.side === "DOWN" ? "SHORT" : "LONG"; reads.push({ label: `liq flush ${flush.ratio}×`, side: fs, ok: fs === direction }); }
   if (fused?.crowdFade) reads.push({ label: "funding fade", side: fused.crowdFade, ok: fused.crowdFade === direction });
   if (fused?.smartSide) reads.push({ label: "smart money", side: fused.smartSide, ok: fused.smartSide === direction });
   if (callers) reads.push({ label: "graded callers", side: callers.side, ok: callers.side === direction });
@@ -124,7 +138,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const convWord = convLevel === "HIGH" ? "HIGH CONVICTION" : convLevel === "MODERATE" ? "MODERATE" : convLevel === "AGAINST" ? "READS DISAGREE" : "LOW CONVICTION";
 
   const loading = fused === undefined;
-  const nothing = fused === null && !callers && !record && !advice && !baseRate;
+  const nothing = fused === null && !callers && !record && !advice && !baseRate && !flush;
 
   // one honest synthesis line, reacting to what the user is drafting
   const synth = (() => {
@@ -186,6 +200,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
             {callers && chip("Callers", <span style={{ color: dirColor(callers.side) }}>{callers.side}<span style={{ color: FAINT, fontWeight: 400 }}> · {callers.participants}</span></span>)}
             {record && chip(`Your ${coin}`, <span style={{ color: record.net >= 0 ? POS : NEG }}>{record.net >= 0 ? "+" : "-"}${Math.abs(record.net)}<span style={{ color: FAINT, fontWeight: 400 }}> · {record.n}t · {record.wr}%</span></span>)}
             {baseRate && chip("Fade base rate", <span style={{ color: baseRate.expectancyR > 0 ? POS : WARN }}>{baseRate.hitRate}%<span style={{ color: FAINT, fontWeight: 400 }}> · {baseRate.samples}× · {baseRate.expectancyR >= 0 ? "+" : ""}{baseRate.expectancyR}R</span></span>)}
+            {flush && chip("Liq flush", <span style={{ color: flush.side === "DOWN" ? NEG : POS }}>{flush.side === "DOWN" ? "↓ longs" : "↑ shorts"}<span style={{ color: FAINT, fontWeight: 400 }}> · {flush.ratio}×</span></span>)}
           </div>
           {synth && <div style={{ fontFamily: UI, fontSize: 12.5, color: tone === POS ? "#8fdcb8" : tone, lineHeight: 1.55 }}>{synth}</div>}
 
