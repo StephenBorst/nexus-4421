@@ -25,6 +25,7 @@ import { Collapsible } from "./Collapsible";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
 import { LabStanding } from "./LabStanding";
 import { CommandPalette } from "./CommandPalette";
+import { SimCreditsBadge } from "./SimCreditsBadge";
 import { CreatorEarnings } from "./CreatorEarnings";
 import { NexusBriefing } from "./NexusBriefing";
 import { DecisionBoard } from "./DecisionBoard";
@@ -230,6 +231,7 @@ export default function TheLabPage() {
           ))}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, marginLeft: 8 }}>
+          {!isMobile && <SimCreditsBadge />}
           <span
             title="Command palette"
             onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
