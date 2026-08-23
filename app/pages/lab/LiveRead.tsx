@@ -180,20 +180,29 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const loading = fused === undefined;
   const nothing = fused === null && !callers && !record && !advice && !baseRate && !flush && !basis && !ob && !skew && !magnets && !term;
 
-  // one honest synthesis line, reacting to what the user is drafting
+  // THE SYNTHESIS — one honest "so what" line woven from the full engine: the conviction
+  // headline (from the multi-axis tally), then the context the chips don't spell out — the
+  // vol regime (does this market favor fades?), the nearest liq magnet in your direction (a
+  // natural target), and your own record here. The verdict band lists WHICH reads align; this
+  // says what it MEANS. Reacts to the direction you're drafting.
   const synth = (() => {
+    if (!reads.length) return null;
+    const px = (n: number) => (n >= 1000 ? n.toLocaleString() : String(n));
     const bits: string[] = [];
-    if (fused && boardLean) {
-      if (fused.verdict === "CONFLUENCE") bits.push(`the crowd and the smart money both point ${boardLean.toLowerCase()}`);
-      else if (fused.verdict === "SPLIT") bits.push(`positioning is split — the smart money is with the crowd`);
-      else if (fused.verdict === "CROWD") bits.push(`funding says fade ${boardLean.toLowerCase()}`);
-      else bits.push(`the smart money is ${boardLean.toLowerCase()}`);
-    }
+    if (term) bits.push(term.structure === "backwardation"
+      ? "options are backwardated — the volatile, mean-reverting regime fades work best in"
+      : term.structure === "contango"
+      ? "vol is calm — a trend regime, so fades are lower-odds"
+      : "vol curve is neutral");
+    const mag = magnets && (direction === "SHORT" ? magnets.below?.[0] : magnets.above?.[0]);
+    if (mag) bits.push(`a liquidation magnet sits at $${px(mag.price)} ${direction === "SHORT" ? "below" : "above"} — a natural target`);
     if (record?.side) bits.push(`your ${direction.toLowerCase()} record on ${coin} is ${record.side.net >= 0 ? "+" : "-"}$${Math.abs(record.side.net)} over ${record.side.n} (${record.side.wr}%)`);
     else if (record) bits.push(`your ${coin} record is ${record.net >= 0 ? "+" : "-"}$${Math.abs(record.net)} over ${record.n}`);
-    const head = aligned ? `Your ${direction} lines up:` : against ? `Heads up — you're drafting ${direction}, but ` : `On ${coin}:`;
-    if (!bits.length) return null;
-    return `${head} ${bits.join("; ")}.`;
+    const head = convLevel === "HIGH" ? `◆ High-conviction ${direction} — ${agree} of ${reads.length} independent reads align.`
+      : convLevel === "AGAINST" ? `Heads up — the reads lean against your ${direction} (${pushback} push back).`
+      : convLevel === "MODERATE" ? `Moderate ${direction} — ${agree} of ${reads.length} reads align.`
+      : `Thin read on ${coin} — trust your own thesis.`;
+    return bits.length ? `${head} ${bits.join("; ")}.` : head;
   })();
 
   const tone = aligned ? POS : against ? WARN : FOG;
@@ -240,7 +249,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
               </div>
             </>
           )}
-          {synth && <div style={{ fontFamily: UI, fontSize: 12.5, color: tone === POS ? "#8fdcb8" : tone, lineHeight: 1.55 }}>{synth}</div>}
+          {synth && <div style={{ fontFamily: UI, fontSize: 12.5, color: convColor === POS ? "#8fdcb8" : convColor, lineHeight: 1.55 }}>{synth}</div>}
 
           {/* BASE RATE — the honest historical resolution of the funding-fade setup here,
               from the same engine that grades live. Often below break-even by design; when
