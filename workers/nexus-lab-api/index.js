@@ -2118,17 +2118,28 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         // shape x402@1.2.0 expects (short network, `maxAmountRequired`, resource/mimeType).
         const NET_MAP = { "eip155:8453": "base", "eip155:84532": "base-sepolia" };
         const a = accepts[0], rsrc = challenge.resource || {};
+        const shortNet = NET_MAP[a.network] || a.network;
+        const isBaseMainnet = shortNet === "base";
+        // ⚠️ EIP-3009 domain (the 90% bug per Miroshark): the `extra` here becomes the
+        // EIP-712 domain {name, version} the exact-scheme signer uses to sign the USDC
+        // transferWithAuthorization. USDC on Base MAINNET is domain version "2" — x402@1.2.0
+        // otherwise defaults it to "1", so the facilitator's verify() silently fails and
+        // just re-emits the 402. Honor the challenge's own name/version when present, but
+        // force version "2" + the canonical USDC contract on Base mainnet.
+        const BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+        const extra = { name: "USD Coin", version: "2", ...(a.extra || {}) };
+        if (isBaseMainnet) extra.version = "2";
         const req0 = {
           scheme: a.scheme || "exact",
-          network: NET_MAP[a.network] || a.network,
+          network: shortNet,
           maxAmountRequired: String(a.amount ?? a.maxAmountRequired ?? "0"),
           resource: a.resource || rsrc.url || RUN_URL,
           description: a.description || rsrc.description || "MiroShark simulation",
           mimeType: a.mimeType || rsrc.mimeType || "application/json",
           payTo: a.payTo,
           maxTimeoutSeconds: a.maxTimeoutSeconds ?? 300,
-          asset: a.asset,
-          extra: a.extra,
+          asset: a.asset || (isBaseMainnet ? BASE_USDC : a.asset),
+          extra,
         };
         let xPayment = await createPaymentHeader(signer, 1, req0);
         // x402@1.2.0 builds a v1 envelope (network "base", x402Version 1). Miroshark's v2
