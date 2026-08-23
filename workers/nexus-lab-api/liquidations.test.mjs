@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { coinToInstFamily, aggregateLiquidations, classifyFlush } from "./liquidations.mjs";
+import { coinToInstFamily, aggregateLiquidations, classifyFlush, computeLevels } from "./liquidations.mjs";
 
 test("coinToInstFamily maps our perp coins to OKX USDT swaps", () => {
   assert.equal(coinToInstFamily("PERP_BTC_USDC"), "BTC-USDT");
@@ -20,6 +20,20 @@ test("aggregateLiquidations sums by side within the window, ignores stale/bad ro
   assert.equal(r.longMag, 1000);
   assert.equal(r.shortMag, 1000);
   assert.equal(r.count, 2);
+});
+
+test("computeLevels buckets liquidations by price, ranks by magnitude", () => {
+  const now = Date.now();
+  const details = [
+    { posSide: "long", sz: "100", bkPx: "70000", ts: now - 1000 },  // big cluster ~70k (longs → DOWN)
+    { posSide: "long", sz: "50", bkPx: "70050", ts: now - 2000 },   // same bucket (0.3% wide)
+    { posSide: "short", sz: "10", bkPx: "80000", ts: now - 3000 },  // smaller cluster ~80k (shorts → UP)
+    { posSide: "long", sz: "1", bkPx: "70000", ts: now - 999999999 }, // stale → ignored
+  ];
+  const levels = computeLevels(details, now - 60000, 0.3, 4);
+  assert.ok(levels.length >= 2);
+  assert.equal(levels[0].side, "DOWN");       // biggest cluster is the 70k longs
+  assert.ok(levels[0].mag > levels[1].mag);   // ranked by magnitude
 });
 
 test("classifyFlush needs enough history and a real spike", () => {

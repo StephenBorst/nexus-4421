@@ -43,6 +43,27 @@ export function aggregateLiquidations(details, sinceMs) {
   return { longMag: round(longMag), shortMag: round(shortMag), count };
 }
 
+// Pure: cluster liquidation events by PRICE into buckets → the recent liq "levels"
+// (a heatmap-lite from real data: where forced closes actually happened). bucketPct wide
+// buckets; returns the top clusters by magnitude with their dominant side. Exported for tests.
+export function computeLevels(details, sinceMs, bucketPct = 0.3, topN = 4) {
+  const buckets = new Map();
+  for (const d of details || []) {
+    const ts = Number(d.ts ?? d.time ?? 0);
+    if (!(ts >= sinceMs)) continue;
+    const sz = Math.abs(parseFloat(d.sz || "0")), px = Math.abs(parseFloat(d.bkPx || "0"));
+    if (!sz || !px) continue;
+    const key = Math.round(px / (px * bucketPct / 100)) * (px * bucketPct / 100); // snap to bucketPct-wide grid
+    const b = buckets.get(key) || { price: 0, mag: 0, long: 0, short: 0 };
+    b.price = key; b.mag += sz * px;
+    if (d.posSide === "long") b.long += sz * px; else if (d.posSide === "short") b.short += sz * px;
+    buckets.set(key, b);
+  }
+  return [...buckets.values()]
+    .map((b) => ({ price: Math.round(b.price), mag: Math.round(b.mag), side: b.long >= b.short ? "DOWN" : "UP" }))
+    .sort((a, b) => b.mag - a.mag).slice(0, topN);
+}
+
 // Network: recent liquidations for one coin over the last `windowMs` (default ~65min).
 export async function fetchLiquidations(coin, windowMs = 65 * 60 * 1000) {
   const fam = coinToInstFamily(coin);
@@ -53,8 +74,11 @@ export async function fetchLiquidations(coin, windowMs = 65 * 60 * 1000) {
     if (j.code !== "0") return null;
     // Response: data:[{ details:[{posSide, sz, bkPx, ts}, ...] }]
     const details = (j.data || []).flatMap((row) => row.details || []);
-    const agg = aggregateLiquidations(details, Date.now() - windowMs);
-    return { coin: fam.replace("-USDT", ""), ...agg };
+    const since = Date.now() - windowMs;
+    const agg = aggregateLiquidations(details, since);
+    // Levels over a WIDER window (24h) so the clusters are meaningful, not just the last hour.
+    const levels = computeLevels(details, Date.now() - 24 * 3600 * 1000);
+    return { coin: fam.replace("-USDT", ""), ...agg, levels };
   } catch { return null; }
 }
 

@@ -37,20 +37,22 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const [advice, setAdvice] = useState<Advice>(null);
   const [baseRate, setBaseRate] = useState<BaseRate | null>(null);
   const [flush, setFlush] = useState<{ side: "UP" | "DOWN"; ratio: number } | null>(null);
+  const [liqLevels, setLiqLevels] = useState<{ price: number; mag: number; side: string }[] | null>(null);
   const [basis, setBasis] = useState<{ side: "LONG" | "SHORT"; basisPct: number } | null>(null);
   const [ob, setOb] = useState<{ side: "LONG" | "SHORT"; imbalance: number } | null>(null);
   const [skew, setSkew] = useState<{ side: "LONG" | "SHORT"; dev: number } | null>(null);
+  const [rawBasis, setRawBasis] = useState<number | null>(null);
 
   // Spot-perp basis + order-book imbalance + options skew (one fetch). Basis: perp premium
   // (>0) = froth → SHORT, discount → LONG. OB: bid-heavy = support → LONG, ask-heavy → SHORT.
   // Skew (BTC/ETH/SOL): more put-fear than usual = capitulation → LONG, more call-greed → SHORT.
   useEffect(() => {
-    if (!coin) { setBasis(null); setOb(null); setSkew(null); return; }
+    if (!coin) { setBasis(null); setOb(null); setSkew(null); setRawBasis(null); return; }
     let off = false;
     const sideOf = (s: { side?: string } | null | undefined) => (s && (s.side === "LONG" || s.side === "SHORT") ? s : null);
     fetch(`${AGENT_API}/intel/flow/${coin}`).then((r) => r.json())
-      .then((d) => { if (off) return; setBasis((sideOf(d?.basisSignal) as typeof basis) ?? null); setOb((sideOf(d?.obSignal) as typeof ob) ?? null); setSkew((sideOf(d?.skewSignal) as typeof skew) ?? null); })
-      .catch(() => { if (!off) { setBasis(null); setOb(null); setSkew(null); } });
+      .then((d) => { if (off) return; setBasis((sideOf(d?.basisSignal) as typeof basis) ?? null); setOb((sideOf(d?.obSignal) as typeof ob) ?? null); setSkew((sideOf(d?.skewSignal) as typeof skew) ?? null); setRawBasis(typeof d?.basis?.basisPct === "number" ? d.basis.basisPct : null); })
+      .catch(() => { if (!off) { setBasis(null); setOb(null); setSkew(null); setRawBasis(null); } });
     return () => { off = true; };
   }, [coin]);
 
@@ -58,11 +60,11 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   // capitulating (confirms a SHORT fade); UP = shorts squeezed (confirms a LONG).
   // Activates once ~12h of liq:hist has accrued; fail-soft/hidden until then.
   useEffect(() => {
-    if (!coin) { setFlush(null); return; }
+    if (!coin) { setFlush(null); setLiqLevels(null); return; }
     let off = false;
     fetch(`${AGENT_API}/intel/liquidations/${coin}`).then((r) => r.json())
-      .then((d) => { if (!off) setFlush(d && d.flush && (d.flush.side === "UP" || d.flush.side === "DOWN") ? d.flush : null); })
-      .catch(() => { if (!off) setFlush(null); });
+      .then((d) => { if (off) return; setFlush(d && d.flush && (d.flush.side === "UP" || d.flush.side === "DOWN") ? d.flush : null); setLiqLevels(Array.isArray(d?.current?.levels) && d.current.levels.length ? d.current.levels : null); })
+      .catch(() => { if (!off) { setFlush(null); setLiqLevels(null); } });
     return () => { off = true; };
   }, [coin]);
 
@@ -146,6 +148,13 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   if (baseRate) reads.push({ label: "base rate", val: `${baseRate.hitRate}% · ${baseRate.expectancyR >= 0 ? "+" : ""}${baseRate.expectancyR}R`, side: boardLean, ok: baseRate.expectancyR > 0 && boardLean === direction });
   if (flush) { const fs = flush.side === "DOWN" ? "SHORT" : "LONG"; reads.push({ label: "liq flush", val: `${flush.ratio}× ${flush.side === "DOWN" ? "↓longs" : "↑shorts"}`, side: fs, ok: fs === direction }); }
   if (basis) reads.push({ label: "spot-perp basis", val: `${basis.basisPct > 0 ? "+" : ""}${basis.basisPct}% ${basis.basisPct > 0 ? "prem" : "disc"}`, side: basis.side, ok: basis.side === direction });
+  // funding × basis divergence: funding says the crowd is one-sided, but the live perp premium
+  // has already flipped the other way → the froth is unwinding → a mean-reversion bounce toward
+  // the crowd's side is the tell (fade the fade). Only when funding is genuinely stretched.
+  if (fused?.crowdFade && fused.fundingAnnualPct != null && rawBasis != null && Math.abs(fused.fundingAnnualPct) >= 10) {
+    const crowdLong = fused.fundingAnnualPct > 0;
+    if (crowdLong !== rawBasis > 0) { const bounce = crowdLong ? "LONG" : "SHORT"; reads.push({ label: "funding×basis", val: "premium fading", side: bounce, ok: bounce === direction }); }
+  }
   if (ob) reads.push({ label: "order book", val: `${ob.imbalance > 0 ? "bid" : "ask"}-heavy`, side: ob.side, ok: ob.side === direction });
   if (skew) reads.push({ label: "options skew", val: `${skew.dev > 0 ? "fear" : "greed"} ${skew.dev > 0 ? "+" : ""}${skew.dev}`, side: skew.side, ok: skew.side === direction });
   if (record?.side) reads.push({ label: `your ${coin}`, val: `${record.side.net >= 0 ? "+" : "-"}$${Math.abs(record.side.net)} · ${record.side.n}t · ${record.side.wr}%`, side: record.side.net >= 0 ? direction : null, ok: record.side.net > 0 });
@@ -157,7 +166,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const convWord = convLevel === "HIGH" ? "HIGH CONVICTION" : convLevel === "MODERATE" ? "MODERATE" : convLevel === "AGAINST" ? "READS DISAGREE" : "LOW CONVICTION";
 
   const loading = fused === undefined;
-  const nothing = fused === null && !callers && !record && !advice && !baseRate && !flush && !basis && !ob && !skew;
+  const nothing = fused === null && !callers && !record && !advice && !baseRate && !flush && !basis && !ob && !skew && !liqLevels;
 
   // one honest synthesis line, reacting to what the user is drafting
   const synth = (() => {
@@ -229,6 +238,22 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
               <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED }}>BASE RATE · </span>
               the funding-fade on {coin} resolved to target <b style={{ color: baseRate.expectancyR > 0 ? POS : WARN }}>{baseRate.hitRate}%</b> over {baseRate.samples} stretched-funding instances ({baseRate.windowDays}d), {baseRate.expectancyR >= 0 ? "+" : ""}{baseRate.expectancyR}R avg.{" "}
               <span style={{ color: MUTED }}>{baseRate.expectancyR > 0 ? "A real edge here — still size for variance." : "This setup has bled here — lean on your own thesis, not the fade."}</span>
+            </div>
+          )}
+
+          {/* LIQUIDATION LEVELS — where forced closes actually clustered recently (real OKX
+              data, heatmap-lite). The magnets/cleared zones price tends to react around. */}
+          {liqLevels && liqLevels.length > 0 && (
+            <div style={{ marginTop: 8, fontFamily: UI, fontSize: 11.5, color: FOG, lineHeight: 1.5 }}>
+              <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED }}>LIQ ZONES · </span>
+              recent forced closes clustered at{" "}
+              {liqLevels.slice(0, 3).map((l, i) => (
+                <span key={l.price}>
+                  {i > 0 ? ", " : ""}<b style={{ color: l.side === "DOWN" ? NEG : POS }}>${l.price >= 1000 ? l.price.toLocaleString() : l.price}</b>
+                  <span style={{ color: FAINT }}> ({l.side === "DOWN" ? "↓longs" : "↑shorts"})</span>
+                </span>
+              ))}
+              <span style={{ color: MUTED }}> — magnets price reacts around.</span>
             </div>
           )}
 
