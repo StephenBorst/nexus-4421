@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { fusePositioning, positioningRead } from "@/lib/positioning.mjs";
 import { fetchDeribitTerm } from "@/lib/deribit.mjs";
+import { Simulate } from "./Simulate";
 import type { ProcessedTrade } from "./types";
 import { C } from "@/config/theme";
 
@@ -317,6 +318,16 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
               )}
             </div>
           )}
+
+          {/* PRESSURE-TEST — run the Miroshark sim on this exact trade: 25 agents react over
+              10 rounds, surfacing the bull/bear case + where consensus lands. The decision-
+              moment stress test, right in the read. */}
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${BORDER}` }}>
+            <Simulate
+              label="◆ Pressure-test this trade →"
+              body={{ kind: "thesis", coin, direction, notes: synth || `${direction} ${coin} — ${convWord}, ${agree}/${reads.length} reads align.` }}
+            />
+          </div>
 
           <div style={{ fontFamily: MONO, fontSize: 8, color: FAINT, marginTop: 8, lineHeight: 1.5 }}>A read, not a green light — it tightens the odds, it doesn't guarantee them.</div>
         </>
