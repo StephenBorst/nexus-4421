@@ -18,3 +18,16 @@ export async function okxJson(url, tries = 2) {
   }
   return last;
 }
+
+// Same one-retry hardening for Deribit (options skew / DVOL term structure) — its CF→Deribit
+// egress hiccups the same way. Success = a non-empty `result` array. Returns [] on failure.
+export async function deribitResult(url, tries = 2) {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(url);
+      const j = await r.json();
+      if (j && Array.isArray(j.result) && j.result.length) return j.result;
+    } catch { /* retry */ }
+  }
+  return [];
+}

@@ -15,7 +15,7 @@
 // Both accumulate hourly (basis:hist / cvd:hist) — same pattern as oi:hist / liq:hist.
 // OKX is CF-accessible (unlike Binance). Magnitudes are notional-ish (consistent per symbol).
 
-import { okxJson } from "./okx.mjs";
+import { okxJson, deribitResult } from "./okx.mjs";
 
 export const OKX_TICKER = "https://www.okx.com/api/v5/market/ticker";
 export const OKX_TRADES = "https://www.okx.com/api/v5/market/trades";
@@ -183,9 +183,8 @@ export async function fetchSkew(coin) {
   const c = String(coin || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
   if (!DERIBIT_CCYS.has(c)) return null;
   try {
-    const r = await fetch(`https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=${c}&kind=option`);
-    const j = await r.json();
-    const rows = (j.result || []).map((x) => {
+    const result = await deribitResult(`https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=${c}&kind=option`);
+    const rows = result.map((x) => {
       const p = parseDeribitInstrument(x.instrument_name);
       return p ? { ...p, iv: parseFloat(x.mark_iv), underlying: parseFloat(x.underlying_price) } : null;
     });
