@@ -4261,7 +4261,10 @@ document.getElementById("btn").addEventListener("click",go);
       if (!cur) {
         const [basis, cvd, ob, skew] = await Promise.all([fetchBasis(coin), fetchCvd(coin), fetchOrderbook(coin), fetchSkew(coin)]);
         cur = { basis, cvd, ob, skew };
-        if (basis || cvd || ob || skew) { try { await env.LAB_STORE.put(CUR, JSON.stringify(cur), { expirationTtl: 60 }); } catch { /* best-effort */ } }
+        // Only cache a snapshot that actually captured basis (the primary read) — a transient
+        // OKX ticker hiccup otherwise pins a null basis for 60s. Non-core coins (no Deribit skew)
+        // still cache on basis alone.
+        if (basis) { try { await env.LAB_STORE.put(CUR, JSON.stringify(cur), { expirationTtl: 60 }); } catch { /* best-effort */ } }
       }
       const basisSignal = cur?.basis ? classifyBasis(cur.basis.basisPct) : null;
       const obSignal = cur?.ob ? classifyOrderbook(cur.ob.imbalance) : null;
