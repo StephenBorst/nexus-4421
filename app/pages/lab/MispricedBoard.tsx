@@ -24,6 +24,7 @@ import { AGENT_API } from "./agentTypes";
 import { useIsMobile } from "./useIsMobile";
 import { SectionHeader } from "./components";
 import { Simulate } from "./Simulate";
+import { ProjectionBand } from "@/components/ProjectionBand";
 
 type EdgeQuality = { tier: "PROVEN" | "TRAP" | "MIXED" | "UNPROVEN"; revertedPct: number | null; samples: number };
 // The SYNTHESIS input — where the graded top Orderly traders (the sharp capital) actually
@@ -465,6 +466,11 @@ export function MispricedBoard() {
               </div>
               <SynthChart points={pos?.points ?? []} price={price ?? []} direction={m.direction}
                 smartMoney={m.smartMoney} markPrice={m.markPrice} fundingAnnualPct={m.fundingAnnualPct} maxEdge={maxEdge} m={m} />
+            </div>
+
+            {/* PROJECTION — the expected-move cone + this fade's directional target. */}
+            <div style={{ marginTop: 14 }}>
+              <ProjectionBand symbol={m.coin} />
             </div>
 
             <p style={{ fontFamily: UI, fontSize: 13, lineHeight: 1.55, color: C.text.fog, marginTop: 14, padding: "11px 12px", background: "rgba(237,237,240,0.03)", border: `1px solid ${C.border}`, borderRadius: RADIUS.md }}>

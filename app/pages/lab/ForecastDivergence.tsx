@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
 import { C } from "@/config/theme";
+import { ProjectionBand } from "@/components/ProjectionBand";
 
 // ── Forecast Divergence card (the prediction-market lens) ────────────────────
 // Quotient-informed sibling of the Mispriced Board: reads the FORECASTING crowd
@@ -210,6 +211,11 @@ function DivergentCard({ m, onDraft }: { m: ForecastMarket; onDraft: (m: Forecas
       <div style={{ color: FOG, fontSize: 12, lineHeight: 1.45, marginBottom: 8 }}>{m.question}</div>
       <ForecastChart coin={m.coin} markPrice={m.markPrice} target={m.target} forecastLean={m.forecastLean} forecastProbPct={m.forecastProbPct} />
       <ForecastProbLine token={m.clobTokenId} lean={m.forecastLean} question={m.question} />
+      {/* PROJECTION — the expected-move cone, a third independent forward lens next to the
+          prediction-market forecast + the crypto tape. */}
+      <div style={{ margin: "8px 0" }}>
+        <ProjectionBand symbol={m.coin} height={196} />
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontFamily: "var(--nx-font-mono)", fontSize: 10 }}>
         <span style={{ color: DIM }}>forecast <b style={{ color: BONE }}>{m.forecastProbPct}%</b> → lean <b style={{ color: leanColor(m.forecastLean) }}>{m.forecastLean}</b></span>
         <span style={{ color: DIM }}>tape (funding) <b style={{ color: leanColor(m.fundingLean) }}>{m.fundingLean}</b></span>
