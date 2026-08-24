@@ -29,6 +29,30 @@ type Advice = { regime: Regime | null; alignment: string | null; warnings: Warni
 type Levels = { entryPrice: number; stopLoss: number; takeProfit1: number };
 type BaseRate = { available: boolean; hitRate: number; samples: number; expectancyR: number; windowDays: number; setup?: string };
 
+// ── MARKET BREADTH / BETA GATE — the tape a single-name read is posted INTO. A short on
+// one alt can be right about the coin and wrong about the market: when the whole book's
+// crowd is leaning the same way, systemic squeezes drag every name. We read the SAME
+// mispriced board already fetched and tally how many markets the crowd is net-long vs
+// net-short (funding sign per market). Broadly long funding = risk-on froth (a market-wide
+// fade-SHORT backdrop); broadly negative = capitulation (a fade-LONG backdrop). Delivered
+// as CONTEXT, never a conviction vote — it's the backdrop, not a per-coin signal, so it
+// can't inflate the tally. Orthogonal to the single-coin funding fade and pure-client.
+type Breadth = { crowdLong: number; crowdShort: number; total: number; lean: "LONG" | "SHORT" | null; sharePct: number };
+function computeBreadth(markets: { fundingAnnualPct?: number }[]): Breadth | null {
+  let crowdLong = 0, crowdShort = 0;
+  for (const m of markets || []) {
+    const f = Number(m.fundingAnnualPct);
+    if (!Number.isFinite(f) || Math.abs(f) < 1) continue; // ignore near-flat funding (noise)
+    if (f > 0) crowdLong++; else crowdShort++;            // +funding = crowd pays to be long
+  }
+  const total = crowdLong + crowdShort;
+  if (total < 8) return null; // too few markets to call a backdrop
+  const share = Math.max(crowdLong, crowdShort) / total;
+  // ≥65% one-sided = a real broad tilt; the market-wide FADE lean is the contrarian side.
+  const lean: "LONG" | "SHORT" | null = share >= 0.65 ? (crowdLong > crowdShort ? "SHORT" : "LONG") : null;
+  return { crowdLong, crowdShort, total, lean, sharePct: Math.round(share * 100) };
+}
+
 const TREND_WORD: Record<string, string> = { TREND_UP: "uptrend", TREND_DOWN: "downtrend", CHOP: "chop" };
 const VOL_WORD: Record<string, string> = { CALM: "calm", NORMAL: "normal vol", VOLATILE: "volatile" };
 
@@ -36,6 +60,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const coin = bare(symbol);
   const [fused, setFused] = useState<Fused | null | undefined>(undefined); // undefined=loading, null=no read
   const [callers, setCallers] = useState<{ side: "LONG" | "SHORT"; participants: number } | null>(null);
+  const [breadth, setBreadth] = useState<Breadth | null>(null);
   const [advice, setAdvice] = useState<Advice>(null);
   const [baseRate, setBaseRate] = useState<BaseRate | null>(null);
   const [flush, setFlush] = useState<{ side: "UP" | "DOWN"; ratio: number } | null>(null);
@@ -129,6 +154,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
       setFused(rows.find((r) => r.coin === coin) ?? null);
       const l = cons?.consensus?.[coin];
       setCallers(l && (l.side === "LONG" || l.side === "SHORT") ? { side: l.side, participants: Number(l.participants) || 0 } : null);
+      setBreadth(computeBreadth(mp?.markets ?? []));
     }).catch(() => { if (!off) setFused(null); });
     return () => { off = true; };
   }, [coin]);
@@ -186,6 +212,20 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const convColor = convLevel === "HIGH" ? POS : convLevel === "MODERATE" ? "#8fdcb8" : convLevel === "AGAINST" ? NEG : WARN;
   const convWord = convLevel === "HIGH" ? "HIGH CONVICTION" : convLevel === "MODERATE" ? "MODERATE" : convLevel === "AGAINST" ? "READS DISAGREE" : "LOW CONVICTION";
 
+  // ── PROVEN-EDGE PATTERN — not "more reads agree," but the SPECIFIC orthogonal stack the
+  // backtests + live grading actually validated: the funding-fade CONDITIONED on smart-money
+  // agreement AND a positive historical base rate, all on the side you're drafting. Every
+  // exhaustive sweep found the naive funding/OI dials net-negative; the ONE door that stayed
+  // open was conditioning the fade on the orthogonal smart-money signal. This detects exactly
+  // that configuration. It fires rarely by design — a positive base rate is the exception, not
+  // the rule — and that scarcity IS the honesty. When it lights up we name it distinctly, so a
+  // 4-of-8 tally of soft reads is never mistaken for the confluence that has actually held up.
+  const provenEdge = !!(
+    fused && fused.crowdFade === direction && fused.smartSide === direction &&
+    fused.fundingAnnualPct != null && Math.abs(fused.fundingAnnualPct) >= 10 &&
+    baseRate && baseRate.expectancyR > 0
+  );
+
   const loading = fused === undefined;
   const nothing = fused === null && !callers && !record && !advice && !baseRate && !flush && !basis && !ob && !magnets && !term;
 
@@ -207,7 +247,8 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
     if (mag) bits.push(`a liquidation magnet sits at $${px(mag.price)} ${direction === "SHORT" ? "below" : "above"} — a natural target`);
     if (record?.side) bits.push(`your ${direction.toLowerCase()} record on ${coin} is ${record.side.net >= 0 ? "+" : "-"}$${Math.abs(record.side.net)} over ${record.side.n} (${record.side.wr}%)`);
     else if (record) bits.push(`your ${coin} record is ${record.net >= 0 ? "+" : "-"}$${Math.abs(record.net)} over ${record.n}`);
-    const head = convLevel === "HIGH" ? `◆ High-conviction ${direction} — ${agree} of ${reads.length} independent reads align.`
+    const head = provenEdge ? `◆ Proven-edge setup — the funding-fade ${direction} on ${coin}, confirmed by smart money and a +${baseRate!.expectancyR}R base rate. The one confluence that's held up in testing.`
+      : convLevel === "HIGH" ? `◆ High-conviction ${direction} — ${agree} of ${reads.length} independent reads align.`
       : convLevel === "AGAINST" ? `Heads up — the reads lean against your ${direction} (${pushback} push back).`
       : convLevel === "MODERATE" ? `Moderate ${direction} — ${agree} of ${reads.length} reads align.`
       : `Thin read on ${coin} — trust your own thesis.`;
@@ -238,6 +279,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
               <div style={{ marginBottom: 10, padding: "10px 12px", borderRadius: 8, background: `${convColor}12`, border: `1px solid ${convColor}33` }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
                   <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: convColor }}>◆ {convWord}</span>
+                  {provenEdge && <span title="Funding-fade + smart-money + a positive base rate all align — the one configuration that survived backtesting" style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.1em", color: POS, border: `1px solid ${POS}55`, borderRadius: 3, padding: "1px 6px" }}>◆ PROVEN-EDGE SETUP</span>}
                   <span style={{ fontFamily: MONO, fontSize: 10.5, color: FOG }}>{agree}/{reads.length} reads align {direction}{pushback > 0 ? ` · ${pushback} against` : ""}</span>
                 </div>
               </div>
@@ -290,6 +332,18 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
               <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED }}>VOL REGIME · </span>
               options are in <b style={{ color: term.structure === "backwardation" ? WARN : term.structure === "contango" ? POS : FOG }}>{term.structure}</b> ({term.frontIv}v front / {term.backIv}v back).{" "}
               <span style={{ color: MUTED }}>{term.structure === "backwardation" ? "Acute near-term stress — fades work best here, but size for the move." : term.structure === "contango" ? "Calm/complacent — trends over fades." : "Neutral vol curve."}</span>
+            </div>
+          )}
+
+          {/* MARKET BACKDROP — breadth/beta gate: the tape this single-name read is posted
+              into. Broad one-sided funding = a market-wide fade lean that drags every name. */}
+          {breadth && (
+            <div style={{ marginTop: 8, fontFamily: UI, fontSize: 11.5, color: FOG, lineHeight: 1.5 }}>
+              <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED }}>MARKET BACKDROP · </span>
+              {breadth.crowdLong >= breadth.crowdShort ? breadth.crowdLong : breadth.crowdShort} of {breadth.total} markets have crowds leaning <b style={{ color: breadth.crowdLong >= breadth.crowdShort ? POS : NEG }}>{breadth.crowdLong >= breadth.crowdShort ? "long" : "short"}</b>
+              {breadth.lean
+                ? <> — <b style={{ color: breadth.lean === "LONG" ? POS : WARN }}>{breadth.lean === "SHORT" ? "risk-on froth" : "broad capitulation"}</b>, a market-wide fade-{breadth.lean.toLowerCase()} backdrop. <span style={{ color: breadth.lean === direction ? POS : WARN }}>Your {direction.toLowerCase()} runs {breadth.lean === direction ? "with" : "against"} the tape.</span></>
+                : <span style={{ color: MUTED }}> — mixed, no broad tilt to fight or ride.</span>}
             </div>
           )}
 

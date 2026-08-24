@@ -10,6 +10,7 @@ import { useLivePrices, calcUnrealizedPnl, distancePct } from "@/hooks/useLivePr
 import { useIsMobile } from "./useIsMobile";
 import type { ThesisTrade, ThesisStatus, ProcessedTrade } from "./types";
 import { LiveRead } from "./LiveRead";
+import { SimComposer } from "./SimComposer";
 import { cardStyle, labelStyle, navBtnStyle, inputStyle, fieldLabelStyle, STATUS_CONFIG, CLOSED_STATUSES } from "./styles";
 import { deployToAgent, thesisToAgentConfig, thesisAgentNotice, deployDirectiveFromThesis } from "@/utils/agentPrefill";
 import { formatPnl, chartImageSrc, chartImageList, effectiveStatus, resolveSuggestion, CHART_HOST_HINT, MAX_CHARTS } from "./helpers";
@@ -1404,6 +1405,18 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
                   <div style={{ marginTop: 12 }}>
                     <LiveRead symbol={form.symbol} direction={form.direction} trades={realizedTrades}
                       levels={built ? { entryPrice: entryN, stopLoss: stopN, takeProfit1: tpN } : undefined} wallet={wallet} />
+                  </div>
+                )}
+
+                {/* WAR-GAME — pressure-test this thesis (or any scenario) with Miroshark.
+                    Seeded from the draft; fully editable, so you can sim whatever you want. */}
+                {form.symbol && (
+                  <div style={{ marginTop: 12 }}>
+                    <SimComposer wallet={wallet ?? null} seed={{
+                      coin: form.symbol, direction: form.direction,
+                      entry: built && entryN > 0 ? String(entryN) : form.entryPrice || undefined,
+                      target: built && tpN > 0 ? String(tpN) : form.takeProfit1 || undefined,
+                    }} />
                   </div>
                 )}
 
