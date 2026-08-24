@@ -598,8 +598,10 @@ The cold-start/distribution weapon: a slim Nexus surface native to Warpcast, whe
 - Aesthetic: monospace terminal / green (#00ff88). Keep it — it's an ownable brand, don't "SaaS-ify".
 - Commit trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`. Commit/push when asked.
 - Env is **Windows PowerShell** — no `&&` chaining; use `;`. `gh` CLI is NOT installed.
-- Pre-existing `tsc --noEmit` baseline ≈ 18 error lines in OTHER files (walletConnector, useNav,
-  useSpanDEX, intel) — not from our work. Verify our files add 0 new errors.
+- `tsc --noEmit` baseline is now **0 errors** (cleaned up 2026-08-24 — the old walletConnector
+  `EvmInitialProps` mismatch fixed via a `walletConfig` appMetadata.name fallback; useNav
+  `RouteOption` now imported from `@orderly.network/types`). Keep it at 0 — any error you see is
+  yours to fix, not pre-existing noise.
 
 ## // NEXUS AI — floating AI copilot (Session 2026-06-05, on main)
 Terminal-wide floating ◆ assistant; flagship "make-you-a-better-trader" feature. **BYOK, client-side
