@@ -18,7 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ThesisAdvisor } from "./ThesisAdvisor";
 import { useOrderEntry, useLeverage, useMaxLeverage, useCollateral, useAccount, usePositionStream, usePositionClose, useMarkets, MarketsType } from "@orderly.network/hooks";
 import { OrderSide, OrderType } from "@orderly.network/types";
-import { MiniPriceChart } from "@/components/MiniPriceChart";
+import { TradeChart } from "@/components/TradeChart";
 import { SimComposer } from "./SimComposer";
 
 /**
@@ -276,7 +276,13 @@ export function QuickTrade() {
           {totalCollateral != null && <span style={{ marginLeft: 14 }} title="Total account value — all collateral marked to USDC (matches the DEX header)">TOTAL VALUE: ${Number(totalCollateral).toFixed(2)}</span>}
         </div>
         <div style={{ marginTop: 10 }}>
-          <MiniPriceChart symbol={symbol} height={132} />
+          <TradeChart symbol={symbol} height={232} positionEntry={(() => {
+            const p = openPositions.find((x) => String((x as { symbol?: string }).symbol) === symbol);
+            if (!p) return null;
+            const q = Number((p as { position_qty?: number }).position_qty) || 0;
+            const e = Number((p as { average_open_price?: number }).average_open_price) || 0;
+            return e > 0 ? { entry: e, side: (q >= 0 ? "LONG" : "SHORT") as "LONG" | "SHORT" } : null;
+          })()} />
         </div>
         <div style={{ marginTop: 8, textAlign: "right" }}>
           <a href={`/perp/${symbol}`} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#71717a", textDecoration: "none" }}>
