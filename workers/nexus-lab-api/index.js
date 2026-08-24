@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, simCreditsFor, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, deriveSetupMomentum, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, simCreditsFor, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, deriveSetupMomentum, computeBeta, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -4280,6 +4280,23 @@ document.getElementById("btn").addEventListener("click",go);
       let series = [];
       try { const raw = await AGENT_KV.get(`oi:hist:${symbol}`); series = raw ? JSON.parse(raw) : []; } catch { /* absent → thin */ }
       const out = { coin, ...deriveSetupMomentum(series) };
+      try { await env.LAB_STORE.put(CACHE, JSON.stringify(out), { expirationTtl: 1800 }); } catch { /* best-effort */ }
+      return json(out, request);
+    }
+
+    // ── GET /intel/beta/:coin — BTC beta (idiosyncratic vs market-driven) ─────────
+    // A meta-read: how much of this coin's move is just BTC beta? Regresses the coin's
+    // hourly returns on BTC's from the recorded oi:hist price series. Cached 30m. BTC→skip.
+    if (parts[0] === "intel" && parts[1] === "beta" && parts[2] && request.method === "GET") {
+      const coin = String(parts[2]).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+      if (coin === "BTC") return json({ coin, available: false, self: true }, request);
+      const CACHE = `beta:${coin}:v1`;
+      try { const c = await env.LAB_STORE.get(CACHE); if (c) return json(JSON.parse(c), request); } catch { /* ignore */ }
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+      let cs = [], bs = [];
+      try { const r = await AGENT_KV.get(`oi:hist:PERP_${coin}_USDC`); cs = r ? JSON.parse(r) : []; } catch { /* thin */ }
+      try { const r = await AGENT_KV.get(`oi:hist:PERP_BTC_USDC`); bs = r ? JSON.parse(r) : []; } catch { /* thin */ }
+      const out = { coin, ...computeBeta(cs, bs) };
       try { await env.LAB_STORE.put(CACHE, JSON.stringify(out), { expirationTtl: 1800 }); } catch { /* best-effort */ }
       return json(out, request);
     }

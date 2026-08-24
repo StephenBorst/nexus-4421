@@ -54,6 +54,35 @@ function computeBreadth(markets: { fundingAnnualPct?: number }[]): Breadth | nul
   return { crowdLong, crowdShort, total, lean, sharePct: Math.round(share * 100) };
 }
 
+type Magnet = { price: number; side: string; mag?: number };
+type Magnets = { below: Magnet[]; above: Magnet[]; currentPrice: number };
+type Beta = { available: boolean; beta: number; correlation: number; drivenPct: number; verdict: "BTC_DRIVEN" | "IDIOSYNCRATIC" | "MIXED" };
+
+// ── LIQ-MAGNET PULL — the directional read from the liquidation heatmap. Long-liq
+// clusters BELOW pull price down; short-liq clusters ABOVE pull it up. For your drafted
+// direction one side is a TARGET (tailwind), the other a COUNTER (headwind). We score each
+// magnet by strength ÷ distance (a near, heavy cluster pulls hardest) and compare the best
+// tailwind to the best headwind. A clear tailwind = a natural target in your favor; a
+// closer/heavier counter = price likely pulled against you first. Directional → it votes.
+function magnetPull(m: Magnets | null, direction: "LONG" | "SHORT"): { side: "LONG" | "SHORT"; targetPrice: number; distPct: number } | null {
+  if (!m || !(m.currentPrice > 0)) return null;
+  const px = m.currentPrice;
+  const score = (mag: Magnet) => {
+    const distPct = Math.abs(mag.price - px) / px * 100;
+    if (!(distPct > 0.05)) return 0;
+    return (Number(mag.mag) || 1) / distPct;
+  };
+  const best = (arr: Magnet[]) => arr.reduce((b, x) => (score(x) > score(b || x) ? x : (b || x)), null as Magnet | null);
+  const tailArr = direction === "SHORT" ? m.below : m.above; // target side
+  const headArr = direction === "SHORT" ? m.above : m.below; // counter side
+  const tail = best(tailArr), head = best(headArr);
+  const ts = tail ? score(tail) : 0, hs = head ? score(head) : 0;
+  if (ts <= 0) return null;
+  if (ts >= hs * 1.3 && tail) return { side: direction, targetPrice: tail.price, distPct: Math.round(Math.abs(tail.price - px) / px * 1000) / 10 };
+  if (hs >= ts * 1.3 && head) return { side: direction === "SHORT" ? "LONG" : "SHORT", targetPrice: head.price, distPct: Math.round(Math.abs(head.price - px) / px * 1000) / 10 };
+  return null; // no decisive gradient
+}
+
 const TREND_WORD: Record<string, string> = { TREND_UP: "uptrend", TREND_DOWN: "downtrend", CHOP: "chop" };
 const VOL_WORD: Record<string, string> = { CALM: "calm", NORMAL: "normal vol", VOLATILE: "volatile" };
 
@@ -66,7 +95,18 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const [advice, setAdvice] = useState<Advice>(null);
   const [baseRate, setBaseRate] = useState<BaseRate | null>(null);
   const [flush, setFlush] = useState<{ side: "UP" | "DOWN"; ratio: number } | null>(null);
-  const [magnets, setMagnets] = useState<{ below: { price: number; side: string }[]; above: { price: number; side: string }[] } | null>(null);
+  const [magnets, setMagnets] = useState<Magnets | null>(null);
+  const [beta, setBeta] = useState<Beta | null>(null);
+
+  // BTC beta — how much of this coin's move is just market beta (skip for BTC itself).
+  useEffect(() => {
+    if (!coin || coin === "BTC") { setBeta(null); return; }
+    let off = false;
+    fetch(`${AGENT_API}/intel/beta/${coin}`).then((r) => r.json())
+      .then((d) => { if (!off) setBeta(d && d.available ? d : null); })
+      .catch(() => { if (!off) setBeta(null); });
+    return () => { off = true; };
+  }, [coin]);
 
   // Pending liquidation magnets (estimated heatmap) — where leveraged positions will be
   // force-closed = where price tends to get pulled. Forward-looking; fail-soft. Cached.
@@ -74,7 +114,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
     if (!coin) { setMagnets(null); return; }
     let off = false;
     fetch(`${AGENT_API}/intel/liqmap/${coin}`).then((r) => r.json())
-      .then((d) => { if (!off) setMagnets(d && d.available ? { below: d.below || [], above: d.above || [] } : null); })
+      .then((d) => { if (!off) setMagnets(d && d.available ? { below: d.below || [], above: d.above || [], currentPrice: Number(d.currentPrice) || 0 } : null); })
       .catch(() => { if (!off) setMagnets(null); });
     return () => { off = true; };
   }, [coin]);
@@ -218,6 +258,8 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
     if (crowdLong !== rawBasis > 0) { const bounce = crowdLong ? "LONG" : "SHORT"; reads.push({ label: "funding×basis", val: "premium fading", side: bounce, ok: bounce === direction }); }
   }
   if (cvd) reads.push({ label: "CVD flow", val: cvd.kind === "distribution" ? "sold into" : "bought up", side: cvd.side, ok: cvd.side === direction });
+  const pull = magnetPull(magnets, direction);
+  if (pull) reads.push({ label: "liq pull", val: `${pull.distPct}% ${pull.side === direction ? "target" : "counter"}`, side: pull.side, ok: pull.side === direction });
   if (ob) reads.push({ label: "order book", val: `${ob.imbalance > 0 ? "bid" : "ask"}-heavy`, side: ob.side, ok: ob.side === direction });
   if (record?.side) reads.push({ label: `your ${coin}`, val: `${record.side.net >= 0 ? "+" : "-"}$${Math.abs(record.side.net)} · ${record.side.n}t · ${record.side.wr}%`, side: record.side.net >= 0 ? direction : null, ok: record.side.net > 0 });
   else if (record) reads.push({ label: `your ${coin}`, val: `${record.net >= 0 ? "+" : "-"}$${Math.abs(record.net)} · ${record.n}t`, side: record.net >= 0 ? direction : null, ok: record.net > 0 });
@@ -377,6 +419,20 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
               {breadth.lean
                 ? <> — <b style={{ color: breadth.lean === "LONG" ? POS : WARN }}>{breadth.lean === "SHORT" ? "risk-on froth" : "broad capitulation"}</b>, a market-wide fade-{breadth.lean.toLowerCase()} backdrop. <span style={{ color: breadth.lean === direction ? POS : WARN }}>Your {direction.toLowerCase()} runs {breadth.lean === direction ? "with" : "against"} the tape.</span></>
                 : <span style={{ color: MUTED }}> — mixed, no broad tilt to fight or ride.</span>}
+            </div>
+          )}
+
+          {/* BTC BETA — is this move the coin's own, or just market beta? Modulates how much
+              the single-name reads mean; never votes a side. Skipped for BTC itself. */}
+          {beta && (
+            <div style={{ marginTop: 8, fontFamily: UI, fontSize: 11.5, color: FOG, lineHeight: 1.5 }}>
+              <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED }}>BTC BETA · </span>
+              {coin}'s move is <b style={{ color: beta.verdict === "BTC_DRIVEN" ? WARN : beta.verdict === "IDIOSYNCRATIC" ? POS : FOG }}>{beta.drivenPct}% BTC-driven</b> (β {beta.beta}).{" "}
+              <span style={{ color: MUTED }}>{beta.verdict === "BTC_DRIVEN"
+                ? `A ${direction.toLowerCase()} here is largely a BTC bet — the ${coin}-specific reads mean less; check BTC first.`
+                : beta.verdict === "IDIOSYNCRATIC"
+                ? `Trading on its own — this is a real ${coin}-specific read, not market beta.`
+                : "Part market beta, part its own move."}</span>
             </div>
           )}
 

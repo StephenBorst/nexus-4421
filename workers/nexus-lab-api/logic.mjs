@@ -1306,6 +1306,45 @@ export function deriveSetupMomentum(series, { windowHours = 8, minSamples = 6 } 
   };
 }
 
+// ── BTC BETA (idiosyncratic vs market-driven) ────────────────────────────────
+// A meta-read, not a directional vote: is this alt's move its OWN, or just BTC beta?
+// A lone SHORT on a high-beta alt while BTC rips is really a bet against BTC — so a
+// single-name read means less the more the coin is BTC-driven. We regress the coin's
+// hourly returns on BTC's (from the recorded oi:hist price series) → beta + r² (the
+// share of the move BTC explains). It MODULATES trust in the other axes; it never
+// votes a side. Pure + tested; fed by data we already log. (For BTC itself: skip.)
+export function computeBeta(coinSeries, btcSeries, { minSamples = 12 } = {}) {
+  const hour = (t) => Math.round(Number(t) / 3600000);
+  const cm = new Map(), bm = new Map();
+  for (const p of coinSeries || []) if (p && Number.isFinite(p.price)) cm.set(hour(p.t), p.price);
+  for (const p of btcSeries || []) if (p && Number.isFinite(p.price)) bm.set(hour(p.t), p.price);
+  const hours = [...cm.keys()].filter((h) => bm.has(h)).sort((a, b) => a - b);
+  if (hours.length < minSamples + 1) return { available: false, samples: hours.length };
+  const cr = [], br = [];
+  for (let i = 1; i < hours.length; i++) {
+    const c0 = cm.get(hours[i - 1]), c1 = cm.get(hours[i]);
+    const b0 = bm.get(hours[i - 1]), b1 = bm.get(hours[i]);
+    if (c0 > 0 && b0 > 0) { cr.push((c1 - c0) / c0); br.push((b1 - b0) / b0); }
+  }
+  if (cr.length < minSamples) return { available: false, samples: cr.length };
+  const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
+  const mc = mean(cr), mb = mean(br);
+  let cov = 0, vb = 0, vc = 0;
+  for (let i = 0; i < cr.length; i++) { cov += (cr[i] - mc) * (br[i] - mb); vb += (br[i] - mb) ** 2; vc += (cr[i] - mc) ** 2; }
+  cov /= cr.length; vb /= cr.length; vc /= cr.length;
+  const beta = vb > 0 ? cov / vb : 0;
+  const corr = vb > 0 && vc > 0 ? cov / Math.sqrt(vb * vc) : 0;
+  const r2 = corr * corr;
+  const verdict = r2 >= 0.5 ? "BTC_DRIVEN" : r2 <= 0.2 ? "IDIOSYNCRATIC" : "MIXED";
+  return {
+    available: true, samples: cr.length,
+    beta: Math.round(beta * 100) / 100,
+    correlation: Math.round(corr * 100) / 100,
+    drivenPct: Math.round(r2 * 100),
+    verdict,
+  };
+}
+
 // ── Agent leaderboard eligibility + score ────────────────────────────────────
 // Shared by /agents/leaderboard (the public ranking) and /agents/standing/:addr
 // (a single agent's "why am I / am I not ranked" readout) so the two can never

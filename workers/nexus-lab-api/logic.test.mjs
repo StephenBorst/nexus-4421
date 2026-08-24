@@ -1879,3 +1879,30 @@ test("deriveSetupMomentum: near-flat funding → FLAT (no crowded setup)", () =>
   assert.equal(r.state, "FLAT");
   assert.equal(r.crowded, false);
 });
+
+import { computeBeta } from "./logic.mjs";
+// price series {t, price} hourly, oldest→newest.
+const mkPrice = (arr) => arr.map((price, i) => ({ t: 1_000_000_000_000 + i * HR, price }));
+
+test("computeBeta: coin that exactly tracks BTC → beta≈1, ~100% driven", () => {
+  const btc = mkPrice([100, 102, 101, 103, 104, 102, 105, 106, 104, 107, 108, 106, 109, 110]);
+  const coin = mkPrice(btc.map((p) => p.price * 2)); // 2x price, same returns
+  const r = computeBeta(coin, btc);
+  assert.equal(r.available, true);
+  assert.ok(Math.abs(r.beta - 1) < 0.01);
+  assert.ok(r.drivenPct >= 95);
+  assert.equal(r.verdict, "BTC_DRIVEN");
+});
+
+test("computeBeta: uncorrelated coin → low drivenPct, IDIOSYNCRATIC", () => {
+  const btc = mkPrice([100, 101, 100, 101, 100, 101, 100, 101, 100, 101, 100, 101, 100, 101]);
+  const coin = mkPrice([50, 50, 52, 51, 53, 50, 54, 49, 55, 51, 48, 53, 47, 54]); // unrelated wobble
+  const r = computeBeta(coin, btc);
+  assert.equal(r.available, true);
+  assert.ok(r.drivenPct <= 25);
+  assert.equal(r.verdict, "IDIOSYNCRATIC");
+});
+
+test("computeBeta: thin overlap → unavailable", () => {
+  assert.equal(computeBeta(mkPrice([100, 101]), mkPrice([100, 101])).available, false);
+});
