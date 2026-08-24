@@ -17,7 +17,7 @@ const BONE = "#ededf0", BRIGHT = "#f4f4f5", FOG = "#a1a1aa", MUTED = "#71717a", 
 const POS = "#3ecf8e", NEG = "#f7525f";
 const BORDER = "#232327", SURFACE_ALT = "#0f0f11", INSET = "#08080a";
 
-type Filter = "all" | "callers" | "agents" | "arena" | "desks";
+type Filter = "all" | "callers" | "agents" | "arena" | "desks" | "signals";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const usd = (n: number) => `${n < 0 ? "-" : "+"}$${Math.abs(n) >= 1000 ? `${(Math.abs(n) / 1000).toFixed(1)}K` : Math.abs(n).toFixed(2)}`;
@@ -37,6 +37,39 @@ type ProofCard = {
   regimeTrend?: string | null; planScore?: number | null;
 };
 type ProofOfEdge = { cards: ProofCard[]; summary?: { resolved: number; wins: number; hitRate: number; avgR: number } };
+type AxisRow = { name: string; label: string; verdict: string; best: { h: number; samples: number; hitRate: number; meanBps: number; stable: boolean } | null };
+type Scorecard = { axes: AxisRow[]; config?: { minSamples: number; coins: string[]; horizonsHours: number[] }; note?: string; asOf?: string };
+
+// Verdict tone — green ONLY for a proven-predictive signal; NOISE/INSUFFICIENT stay
+// muted (no edge ≠ a loss), PROMISING is neutral-bone (positive but unconfirmed).
+const VERDICT: Record<string, { color: string; label: string }> = {
+  PREDICTIVE: { color: POS, label: "◆ PREDICTIVE" },
+  PROMISING: { color: BONE, label: "PROMISING" },
+  NOISE: { color: MUTED, label: "NOISE" },
+  INSUFFICIENT: { color: FAINT, label: "ACCRUING" },
+};
+
+// One row per candidate signal — our OWN reads, graded by forward returns.
+function SignalRow({ a }: { a: AxisRow }) {
+  const v = VERDICT[a.verdict] || VERDICT.INSUFFICIENT;
+  return (
+    <div style={{ ...rowStyle(false), alignItems: "center" }}>
+      <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: BRIGHT, flexShrink: 0, minWidth: 150 }}>{a.label}</span>
+      <span style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: v.color, border: `1px solid ${v.color}55`, borderRadius: 3, padding: "1px 6px", flexShrink: 0 }}>{v.label}</span>
+      {a.best && a.verdict !== "INSUFFICIENT" ? (
+        <span style={{ ...statCell, marginLeft: "auto", display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <span>{a.best.h}h</span>
+          <span>{a.best.hitRate}% hit</span>
+          <span style={{ color: a.best.meanBps >= 0 ? POS : NEG }}>{a.best.meanBps >= 0 ? "+" : ""}{a.best.meanBps}bps</span>
+          <span style={{ color: FAINT }}>{a.best.samples} obs</span>
+          {a.best.stable && <span style={{ color: POS }} title="First half vs second half agree in sign">✓ stable</span>}
+        </span>
+      ) : (
+        <span style={{ ...statCell, marginLeft: "auto", color: FAINT }}>accruing — validation Sept 14</span>
+      )}
+    </div>
+  );
+}
 
 function BoardShell({ title, count, children }: { title: string; count?: number | null; children: React.ReactNode }) {
   return (
@@ -130,6 +163,7 @@ export default function ProofPage() {
   const [desks, setDesks] = useState<Desk[] | null>(null);
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [proof, setProof] = useState<ProofOfEdge | null>(null);
+  const [scorecard, setScorecard] = useState<Scorecard | null>(null);
 
   const load = useCallback(() => {
     fetch(`${API}/theses/leaderboard`).then((r) => r.json()).then((d) => setCallers(Array.isArray(d?.leaderboard) ? d.leaderboard : [])).catch(() => setCallers([]));
@@ -138,6 +172,7 @@ export default function ProofPage() {
     fetch(`${API}/desks`).then((r) => r.json()).then((d) => setDesks(Array.isArray(d?.desks) ? d.desks : [])).catch(() => setDesks([]));
     fetch(`${API}/agents/ledger`).then((r) => r.json()).then(setLedger).catch(() => setLedger(null));
     fetch(`${API}/theses/proof-of-edge`).then((r) => r.json()).then((d) => setProof({ cards: Array.isArray(d?.cards) ? d.cards : [], summary: d?.summary })).catch(() => setProof({ cards: [] }));
+    fetch(`${API}/intel/axis-backtest`).then((r) => r.json()).then((d) => setScorecard(Array.isArray(d?.axes) ? d : { axes: [] })).catch(() => setScorecard({ axes: [] }));
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -153,6 +188,7 @@ export default function ProofPage() {
     { id: "agents", label: "AGENTS" },
     { id: "arena", label: "ARENA" },
     { id: "desks", label: "DESKS" },
+    { id: "signals", label: "SIGNALS" },
   ];
 
   return (
@@ -308,6 +344,27 @@ export default function ProofPage() {
               ))}
             </div>
           )}
+        </BoardShell>
+      )}
+
+      {/* SIGNALS — we grade our OWN reads by the same trustless standard. The part nobody
+          else does: publishing which of our signals work and which don't, walk-forward. */}
+      {show("signals") && (
+        <BoardShell title="◆ SIGNAL SCOREBOARD — OUR OWN READS, GRADED" count={scorecard?.axes?.length}>
+          <div style={{ fontFamily: UI, fontSize: 12.5, color: FOG, lineHeight: 1.6, maxWidth: 660, marginBottom: 12 }}>
+            Every read in the engine, scored the way we grade traders — <b style={{ color: BRIGHT }}>forward returns, no lookahead</b>, pooled across the core markets, with a walk-forward stability check.
+            A read is not an edge until it's <span style={{ color: POS }}>◆ PREDICTIVE</span> here. Most sit at <span style={{ color: FAINT }}>ACCRUING</span> until the self-logged history matures — validation day is <b style={{ color: BRIGHT }}>Sept 14</b>.
+          </div>
+          {scorecard === null ? empty("loading…") : !scorecard.axes?.length ? empty("scorecard warming up…") : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {scorecard.axes.map((a) => <SignalRow key={a.name} a={a} />)}
+            </div>
+          )}
+          <div style={{ fontFamily: MONO, fontSize: 8.5, color: FAINT, marginTop: 10, lineHeight: 1.5 }}>
+            {scorecard?.config?.coins?.length ? `pooled across ${scorecard.config.coins.length} markets · min ${scorecard.config.minSamples} obs to rate` : "self-graded · walk-forward"}
+            {scorecard?.asOf ? ` · updated ${new Date(scorecard.asOf).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : ""}
+            {" "}· we publish the misses too — that's the point.
+          </div>
         </BoardShell>
       )}
 

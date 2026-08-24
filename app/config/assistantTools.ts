@@ -357,7 +357,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "get_read",
     description:
-      "Get THE READ — the full multi-axis synthesis for ONE coin, the same engine the Lab shows at the decision. Fuses every orthogonal axis into a conviction verdict for a fade: the funding fade + on-chain smart money + graded callers + the historical base rate + spot-perp basis + the pending liquidation magnets (price targets) + the options vol regime (backwardation = fades favored). Use for 'give me the full read on BTC', 'should I fade X', 'break down the setup on SOL', or any deep single-coin question — this is THE tool for one coin (get_conviction is the market-wide triage). Returns which reads CONFIRM vs push back, so you can narrate the honest verdict. Not advice; when the reads are thin say so.",
+      "Get THE READ — the full multi-axis synthesis for ONE coin, the same engine the Lab shows at the decision. Fuses every orthogonal axis into a conviction verdict for a fade: funding fade + on-chain smart money + graded callers + historical base rate + spot-perp basis + CVD aggressor-flow divergence + order-book imbalance + liq-magnet pull (target vs counter) + the pending liquidation magnets + the options vol regime. PLUS two meta-reads that modulate trust: setup MOMENTUM (is the setup still BUILDING → you're early, or UNWINDING → you're late) and BTC BETA (how much of the move is just market beta — a high-beta single-name read is really a BTC bet). Use for 'give me the full read on BTC', 'should I fade X', 'break down the setup on SOL', or any deep single-coin question — this is THE tool for one coin (get_conviction is the market-wide triage). Returns which reads CONFIRM vs push back. Not advice; when the reads are thin say so.",
     input_schema: {
       type: "object",
       properties: { symbol: { type: "string", description: "Ticker (BTC, ETH, SOL…)." }, direction: { type: "string", enum: ["LONG", "SHORT"], description: "Optional — the direction being weighed; defaults to the funding-fade side." } },
@@ -366,7 +366,7 @@ export const TOOLS: ToolDef[] = [
     run: async (args) => {
       const coin = shortTicker(String(args.symbol ?? ""));
       if (!coin) return JSON.stringify({ error: "pass a symbol (BTC, ETH, SOL…)" });
-      const [mp, sm, cons, br, flow, lm, term] = await Promise.all([
+      const [mp, sm, cons, br, flow, lm, term, mom, beta] = await Promise.all([
         fetch(`${AGENT_API}/intel/mispriced`).then((r) => r.json()).catch(() => null),
         fetch(`${AGENT_API}/smart/consensus`).then((r) => r.json()).catch(() => null),
         fetch(`${AGENT_API}/theses/consensus`).then((r) => r.json()).catch(() => null),
@@ -374,6 +374,8 @@ export const TOOLS: ToolDef[] = [
         fetch(`${AGENT_API}/intel/flow/${coin}`).then((r) => r.json()).catch(() => null),
         fetch(`${AGENT_API}/intel/liqmap/${coin}`).then((r) => r.json()).catch(() => null),
         fetchDeribitTerm(coin).catch(() => null),
+        fetch(`${AGENT_API}/intel/persistence/${coin}`).then((r) => r.json()).catch(() => null),
+        fetch(`${AGENT_API}/intel/beta/${coin}`).then((r) => r.json()).catch(() => null),
       ]);
       const mkt = (mp?.markets || []).find((m: { coin?: string }) => String(m.coin).toUpperCase() === coin);
       const fadeDir = mkt?.direction === "LONG" || mkt?.direction === "SHORT" ? mkt.direction : null;
@@ -384,8 +386,26 @@ export const TOOLS: ToolDef[] = [
       if (fadeDir) (fadeDir === dir ? confirm : against).push("funding fade");
       tag("smart money", smSide); tag("graded callers", cSide);
       if (br?.available) (br.expectancyR > 0 && fadeDir === dir ? confirm : against).push(`base rate ${br.hitRate}%/${br.expectancyR >= 0 ? "+" : ""}${br.expectancyR}R`);
+      // New orthogonal axes (votes): CVD flow, order book, liq-magnet pull.
+      tag("CVD flow", flow?.cvdSignal?.side);
+      tag("order book", flow?.obSignal?.side);
+      // liq-magnet pull — strength ÷ distance, tailwind (target) vs headwind (counter).
+      let liqPull: { side: string; targetPrice: number } | null = null;
+      if (lm?.available && lm.currentPrice > 0 && dir) {
+        const px = lm.currentPrice;
+        const scoreM = (m: { price: number; mag?: number }) => { const d = Math.abs(m.price - px) / px * 100; return d > 0.05 ? (Number(m.mag) || 1) / d : 0; };
+        const bestOf = (arr: { price: number; mag?: number }[]) => (arr || []).reduce((b: { price: number; mag?: number } | null, x) => (scoreM(x) > (b ? scoreM(b) : 0) ? x : b), null);
+        const tail = bestOf(dir === "SHORT" ? lm.below : lm.above), head = bestOf(dir === "SHORT" ? lm.above : lm.below);
+        const ts = tail ? scoreM(tail) : 0, hs = head ? scoreM(head) : 0;
+        if (ts >= hs * 1.3 && tail) liqPull = { side: dir, targetPrice: tail.price };
+        else if (hs >= ts * 1.3 && head) liqPull = { side: dir === "SHORT" ? "LONG" : "SHORT", targetPrice: head.price };
+        if (liqPull) (liqPull.side === dir ? confirm : against).push("liq pull");
+      }
       const net = confirm.length - against.length;
-      const conviction = !dir ? "N/A" : net >= 3 ? "HIGH" : net === 2 ? "MODERATE" : against.length > confirm.length ? "AGAINST" : "LOW";
+      const conviction = !dir ? "N/A" : net >= 4 ? "HIGH" : net >= 2 ? "MODERATE" : against.length > confirm.length ? "AGAINST" : "LOW";
+      // Meta/context (NOT votes) — setup momentum (early vs late) + BTC beta (idiosyncratic vs market).
+      const momentum = mom?.available && mom.state !== "FLAT" ? { state: mom.state, note: mom.headline } : null;
+      const btcBeta = beta?.available ? { driven_pct: beta.drivenPct, verdict: beta.verdict, beta: beta.beta } : null;
       return JSON.stringify({
         coin, direction: dir || "(no funding extreme — pick a side)", conviction,
         confirming: confirm, pushing_back: against,
@@ -393,9 +413,14 @@ export const TOOLS: ToolDef[] = [
         smart_money: smSide || "n/a", graded_callers: cSide || "n/a",
         base_rate: br?.available ? { hit_rate_pct: br.hitRate, expectancy_r: br.expectancyR, samples: br.samples } : "insufficient history",
         spot_perp_basis_pct: flow?.basis?.basisPct ?? null,
+        cvd_flow: flow?.cvdSignal ? { side: flow.cvdSignal.side, kind: flow.cvdSignal.kind } : "no divergence",
+        order_book: flow?.obSignal?.side || "balanced",
+        liq_pull: liqPull ? { side: liqPull.side, target: liqPull.targetPrice, is_target: liqPull.side === dir } : "no decisive gradient",
+        setup_momentum: momentum || "flat / n/a",
+        btc_beta: btcBeta || "n/a (BTC or thin history)",
         vol_regime: term?.structure || "n/a (BTC/ETH/SOL only)",
         liq_magnets: lm?.available ? { downside_pull: lm.below?.[0]?.price ?? null, upside_pull: lm.above?.[0]?.price ?? null } : "n/a",
-        note: "Agreement across uncorrelated axes is the signal; a below-break-even base rate means 'trust your own thesis, not the fade.' A read, not advice. Offer to draft_thesis or open_symbol.",
+        note: "Agreement across uncorrelated axes is the signal. Momentum tells you EARLY (building) vs LATE (unwinding); high BTC-beta means a single-name read is really a BTC bet. A below-break-even base rate = 'trust your own thesis, not the fade.' A read, not advice. Offer to draft_thesis or open_symbol.",
       });
     },
   },
@@ -421,6 +446,27 @@ export const TOOLS: ToolDef[] = [
           funding_annual_pct: r.fundingAnnualPct,
         })),
         note: "Ranked by how many independent reads (funding + smart money + graded callers) confirm the fade. HIGH = 2+ confirm. Agreement across uncorrelated sources is the signal — but it's triage, not advice. The full ~12-axis breakdown for one coin is in THE READ.",
+      });
+    },
+  },
+  {
+    name: "get_signal_scoreboard",
+    description:
+      "Get the SIGNAL SCOREBOARD — how our OWN reads perform when graded by the same trustless standard we grade traders: forward returns, no lookahead, pooled across the core markets, with a walk-forward stability check (first half vs second half must agree). Each axis gets a verdict: PREDICTIVE (a real, stable edge), PROMISING (positive but unconfirmed), NOISE (no edge), or INSUFFICIENT/ACCRUING (not enough self-logged history yet). Use for 'do your signals actually work', 'which reads have an edge', 'is the funding fade profitable', 'how's the backtest looking'. IMPORTANT framing: most axes read ACCRUING right now — the self-logged history matures around Sept 14, which is validation day. Be honest that a read is NOT an edge until it's PREDICTIVE here — publishing the misses is the whole point (radical transparency). Not advice.",
+    input_schema: { type: "object", properties: {} },
+    run: async () => {
+      const sc = await fetch(`${AGENT_API}/intel/axis-backtest`).then((r) => r.json()).catch(() => null);
+      if (!sc?.axes?.length) return JSON.stringify({ error: "scorecard warming up — check back" });
+      type Ax = { name: string; label: string; verdict: string; best: { h: number; hitRate: number; meanBps: number; samples: number; stable: boolean } | null };
+      return JSON.stringify({
+        as_of: sc.asOf, pooled_markets: sc.config?.coins?.length ?? null, min_samples_to_rate: sc.config?.minSamples ?? null,
+        axes: (sc.axes as Ax[]).map((a) => ({
+          signal: a.label, verdict: a.verdict,
+          best: a.best && a.verdict !== "INSUFFICIENT"
+            ? { horizon_h: a.best.h, hit_rate_pct: a.best.hitRate, mean_forward_bps: a.best.meanBps, observations: a.best.samples, walk_forward_stable: a.best.stable }
+            : "accruing — validation Sept 14",
+        })),
+        note: "Forward-return event study, no lookahead. A read is not an edge until it's PREDICTIVE + stable. We publish the misses too — that's the standard. Validation day is Sept 14.",
       });
     },
   },
