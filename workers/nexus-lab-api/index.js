@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, simCreditsFor, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, simCreditsFor, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, deriveSetupMomentum, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -4265,6 +4265,23 @@ document.getElementById("btn").addEventListener("click",go);
       const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
       const raw = await AGENT_KV.get(`oi:hist:${parts[2]}`);
       return json({ symbol: parts[2], points: raw ? JSON.parse(raw) : [] }, request);
+    }
+
+    // ── GET /intel/persistence/:coin — SETUP MOMENTUM (persistence / decay) ───────
+    // The one TIME-DERIVATIVE read: from the recorded oi:hist series, is the crowded
+    // funding-fade still BUILDING (funding + OI both rising → you're early) or UNWINDING
+    // (both falling → the squeeze fired → you're late)? Pure fn, tested. Cached 30m.
+    if (parts[0] === "intel" && parts[1] === "persistence" && parts[2] && request.method === "GET") {
+      const coin = String(parts[2]).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+      const symbol = `PERP_${coin}_USDC`;
+      const CACHE = `persist:${coin}:v1`;
+      try { const c = await env.LAB_STORE.get(CACHE); if (c) return json(JSON.parse(c), request); } catch { /* ignore */ }
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+      let series = [];
+      try { const raw = await AGENT_KV.get(`oi:hist:${symbol}`); series = raw ? JSON.parse(raw) : []; } catch { /* absent → thin */ }
+      const out = { coin, ...deriveSetupMomentum(series) };
+      try { await env.LAB_STORE.put(CACHE, JSON.stringify(out), { expirationTtl: 1800 }); } catch { /* best-effort */ }
+      return json(out, request);
     }
 
     // ── GET /intel/baserate/:symbol — the honest "base rate at the decision" ──────

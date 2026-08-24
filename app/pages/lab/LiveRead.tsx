@@ -38,6 +38,7 @@ type BaseRate = { available: boolean; hitRate: number; samples: number; expectan
 // as CONTEXT, never a conviction vote — it's the backdrop, not a per-coin signal, so it
 // can't inflate the tally. Orthogonal to the single-coin funding fade and pure-client.
 type Breadth = { crowdLong: number; crowdShort: number; total: number; lean: "LONG" | "SHORT" | null; sharePct: number };
+type Momentum = { available: boolean; state: "BUILDING" | "UNWINDING" | "PEAKING" | "RESET" | "STABLE" | "FLAT"; windowHours: number; fundingChangePct: number; oiChangePct: number; headline: string };
 function computeBreadth(markets: { fundingAnnualPct?: number }[]): Breadth | null {
   let crowdLong = 0, crowdShort = 0;
   for (const m of markets || []) {
@@ -61,6 +62,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   const [fused, setFused] = useState<Fused | null | undefined>(undefined); // undefined=loading, null=no read
   const [callers, setCallers] = useState<{ side: "LONG" | "SHORT"; participants: number } | null>(null);
   const [breadth, setBreadth] = useState<Breadth | null>(null);
+  const [momentum, setMomentum] = useState<Momentum | null>(null);
   const [advice, setAdvice] = useState<Advice>(null);
   const [baseRate, setBaseRate] = useState<BaseRate | null>(null);
   const [flush, setFlush] = useState<{ side: "UP" | "DOWN"; ratio: number } | null>(null);
@@ -124,6 +126,17 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
     fetch(`${AGENT_API}/intel/baserate/${coin}`).then((r) => r.json())
       .then((d) => { if (!off) setBaseRate(d && d.available ? d : null); })
       .catch(() => { if (!off) setBaseRate(null); });
+    return () => { off = true; };
+  }, [coin]);
+
+  // SETUP MOMENTUM (persistence / decay) — the one time-derivative: is the funding-fade
+  // still building (early) or unwinding (late)? Server computes it from the recorded oi:hist.
+  useEffect(() => {
+    if (!coin) { setMomentum(null); return; }
+    let off = false;
+    fetch(`${AGENT_API}/intel/persistence/${coin}`).then((r) => r.json())
+      .then((d) => { if (!off) setMomentum(d && d.available ? d : null); })
+      .catch(() => { if (!off) setMomentum(null); });
     return () => { off = true; };
   }, [coin]);
 
@@ -301,6 +314,24 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
             </>
           )}
           {synth && <div style={{ fontFamily: UI, fontSize: 12.5, color: convColor === POS ? "#8fdcb8" : convColor, lineHeight: 1.55 }}>{synth}</div>}
+
+          {/* SETUP MOMENTUM — persistence/decay: the ONLY time-derivative read. Is the crowded
+              funding-fade still building (early) or already unwinding (late)? From oi:hist. */}
+          {momentum && momentum.state !== "FLAT" && (() => {
+            const s = momentum.state;
+            const col = s === "BUILDING" ? POS : s === "UNWINDING" ? NEG : WARN;
+            const tag = s === "BUILDING" ? "▲ BUILDING" : s === "UNWINDING" ? "▼ UNWINDING" : s === "PEAKING" ? "◆ PEAKING" : s === "RESET" ? "↻ RESET" : "= STABLE";
+            return (
+              <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                <span style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: col, border: `1px solid ${col}55`, borderRadius: 3, padding: "1px 6px", flexShrink: 0 }}>{tag}</span>
+                <span style={{ fontFamily: UI, fontSize: 11.5, color: FOG, lineHeight: 1.5, flex: 1, minWidth: 180 }}>
+                  <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED }}>SETUP MOMENTUM · </span>
+                  {momentum.headline}
+                  <span style={{ color: FAINT }}> {momentum.fundingChangePct >= 0 ? "+" : ""}{momentum.fundingChangePct}% funding / {momentum.oiChangePct >= 0 ? "+" : ""}{momentum.oiChangePct}% OI over {momentum.windowHours}h.</span>
+                </span>
+              </div>
+            );
+          })()}
 
           {/* BASE RATE — the honest historical resolution of the funding-fade setup here,
               from the same engine that grades live. Often below break-even by design; when

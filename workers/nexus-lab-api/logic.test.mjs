@@ -1835,3 +1835,47 @@ test("creatorEarnings: empty → zeros", () => {
   const e = creatorEarnings([]);
   assert.equal(e.trades, 0); assert.equal(e.earnedUsd, 0);
 });
+
+import { deriveSetupMomentum } from "./logic.mjs";
+const HR = 3600 * 1000;
+// helper: build an oi:hist series from [funding, oi] pairs, oldest→newest, hourly.
+const mkSeries = (pairs) => pairs.map(([funding, oi], i) => ({ t: 1_000_000_000_000 + i * HR, price: 100, oi, funding }));
+
+test("deriveSetupMomentum: thin history → unavailable", () => {
+  const r = deriveSetupMomentum(mkSeries([[0.001, 100], [0.001, 100]]));
+  assert.equal(r.available, false);
+  assert.equal(r.samples, 2);
+});
+
+test("deriveSetupMomentum: rising funding + rising OI → BUILDING (early)", () => {
+  const r = deriveSetupMomentum(mkSeries([
+    [0.0004, 100], [0.0004, 102], [0.0005, 104], [0.0007, 110], [0.0009, 118], [0.0011, 126], [0.0013, 134],
+  ]));
+  assert.equal(r.available, true);
+  assert.equal(r.state, "BUILDING");
+  assert.ok(r.fundingChangePct > 0 && r.oiChangePct > 0);
+});
+
+test("deriveSetupMomentum: falling funding + falling OI → UNWINDING (late)", () => {
+  const r = deriveSetupMomentum(mkSeries([
+    [0.0013, 140], [0.0012, 136], [0.0011, 130], [0.0009, 122], [0.0007, 114], [0.0005, 106], [0.0004, 100],
+  ]));
+  assert.equal(r.state, "UNWINDING");
+  assert.ok(r.fundingChangePct < 0 && r.oiChangePct < 0);
+});
+
+test("deriveSetupMomentum: funding flips sign → RESET", () => {
+  const r = deriveSetupMomentum(mkSeries([
+    [0.0009, 120], [0.0006, 118], [0.0003, 116], [-0.0002, 115], [-0.0005, 116], [-0.0008, 118], [-0.0011, 120],
+  ]));
+  assert.equal(r.state, "RESET");
+  assert.equal(r.flipped, true);
+});
+
+test("deriveSetupMomentum: near-flat funding → FLAT (no crowded setup)", () => {
+  const r = deriveSetupMomentum(mkSeries([
+    [0.000005, 100], [0.000006, 100], [0.000004, 101], [0.000005, 100], [0.000006, 101], [0.000005, 100], [0.000004, 100],
+  ]));
+  assert.equal(r.state, "FLAT");
+  assert.equal(r.crowded, false);
+});

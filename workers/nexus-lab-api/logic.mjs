@@ -1259,6 +1259,53 @@ export function oiStats(series, minSamples = 12) {
   };
 }
 
+// ── SETUP MOMENTUM (persistence / decay) — is the funding-fade BUILDING or FADING? ──
+// THE READ's other axes are all LEVELS (funding now, smart money now, callers now). This is
+// the ONLY time-derivative: reading the brain's oi:hist:{symbol} series ({t,price,oi,funding})
+// it asks whether the crowded setup is still ACCUMULATING (funding stretch + OI both rising →
+// crowd piling in, you're EARLY) or UNWINDING (both falling → the squeeze already fired, you're
+// LATE). A fresh, building confluence is a different trade than a stale one — and nothing else
+// in the engine sees the trajectory. Direction-agnostic (the fade side is opposite the crowd);
+// it grades the setup's AGE, not its side. Pure + tested; fed entirely by data we already log.
+export function deriveSetupMomentum(series, { windowHours = 8, minSamples = 6 } = {}) {
+  const rows = (Array.isArray(series) ? series : [])
+    .filter((p) => p && Number.isFinite(p.funding) && Number.isFinite(p.oi))
+    .sort((a, b) => (a.t || 0) - (b.t || 0));
+  if (rows.length < minSamples) return { available: false, samples: rows.length };
+  const now = rows[rows.length - 1].t || 0;
+  // Window = the last `windowHours` hours if timestamps allow, else the last N samples.
+  let win = now ? rows.filter((p) => (now - (p.t || 0)) <= windowHours * 3600 * 1000) : rows.slice(-(windowHours + 1));
+  if (win.length < 4) win = rows.slice(-Math.max(4, Math.min(rows.length, windowHours + 1)));
+  const head = win.slice(0, Math.min(3, win.length - 1)); // oldest in window (denoised)
+  const tail = win.slice(-3);                             // newest (denoised)
+  const avg = (arr, k) => arr.reduce((s, p) => s + p[k], 0) / arr.length;
+  const fThen = avg(head, "funding"), fNow = avg(tail, "funding");
+  const oiThen = avg(head, "oi"), oiNow = avg(tail, "oi");
+  const absThen = Math.abs(fThen), absNow = Math.abs(fNow);
+  const flipped = fThen !== 0 && fNow !== 0 && Math.sign(fThen) !== Math.sign(fNow) && absNow > 0.00002;
+  const fundingChangePct = absThen > 1e-9 ? (absNow - absThen) / absThen : 0;
+  const oiChangePct = oiThen > 0 ? (oiNow - oiThen) / oiThen : 0;
+  const crowded = absNow >= 0.00003; // a real funding lean exists (else no setup to build/decay)
+  const spanH = win.length && win[0].t ? Math.max(1, Math.round((now - win[0].t) / 3600000)) : windowHours;
+
+  const fRising = fundingChangePct > 0.12, fFalling = fundingChangePct < -0.12;
+  const oiRising = oiChangePct > 0.02, oiFalling = oiChangePct < -0.02;
+  let state, headline;
+  if (!crowded) { state = "FLAT"; headline = "no crowded funding lean — no fade setup to build or decay here."; }
+  else if (flipped) { state = "RESET"; headline = "funding just flipped side — the prior crowd already unwound; this is a fresh setup, not a mature one."; }
+  else if (fRising && oiRising) { state = "BUILDING"; headline = "funding stretch and open interest are BOTH rising — the crowd is still piling in. The fade is building; you're early."; }
+  else if (fFalling && oiFalling) { state = "UNWINDING"; headline = "funding and open interest are BOTH falling — the crowded side is being closed. The squeeze may have already fired; you're late."; }
+  else if (fRising && oiFalling) { state = "PEAKING"; headline = "funding is stretching but leverage is leaving — extended without new positioning. Near exhaustion."; }
+  else { state = "STABLE"; headline = "the setup is holding steady — no clear build or decay this window."; }
+
+  return {
+    available: true, samples: rows.length, windowHours: spanH, state, crowded, flipped,
+    fundingChangePct: Math.round(fundingChangePct * 100),
+    oiChangePct: Math.round(oiChangePct * 100),
+    headline,
+  };
+}
+
 // ── Agent leaderboard eligibility + score ────────────────────────────────────
 // Shared by /agents/leaderboard (the public ranking) and /agents/standing/:addr
 // (a single agent's "why am I / am I not ranked" readout) so the two can never
