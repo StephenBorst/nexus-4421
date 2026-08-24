@@ -1,0 +1,80 @@
+// Tests for the axis backtest harness (event-study, no-lookahead, walk-forward).
+// Run: node --test workers/nexus-lab-api/axisbt.test.mjs
+import test from "node:test";
+import assert from "node:assert/strict";
+import { hourBucket, priceByHour, forwardReturn, callPnl, fundingFadeEvents, cvdDivergenceEvents, scoreEvents, runScorecard } from "./axisbt.mjs";
+
+const HR = 3600 * 1000;
+const BASE = 1_000_000_000_000;
+const mkOi = (prices, funding = 0.0003) => prices.map((price, i) => ({ t: BASE + i * HR, price, oi: 1000 + i, funding }));
+const rising = Array.from({ length: 60 }, (_, i) => 100 + i); // 100..159 monotonic
+
+test("hourBucket: consecutive hourly timestamps step by exactly 1", () => {
+  assert.equal(hourBucket(BASE + HR) - hourBucket(BASE), 1);
+});
+
+test("forwardReturn: strictly future, null on gaps (no lookahead)", () => {
+  const pmap = priceByHour(mkOi([100, 110, 121]));
+  assert.ok(Math.abs(forwardReturn(pmap, BASE, 1) - 0.1) < 1e-9);
+  assert.ok(Math.abs(forwardReturn(pmap, BASE, 2) - 0.21) < 1e-9);
+  assert.equal(forwardReturn(pmap, BASE, 5), null); // beyond the series → null, never guessed
+});
+
+test("callPnl: SHORT inverts the forward return", () => {
+  assert.equal(callPnl(0.05, "LONG"), 0.05);
+  assert.equal(callPnl(0.05, "SHORT"), -0.05);
+});
+
+test("fundingFadeEvents: positive funding → SHORT, negative → LONG, flat → skipped", () => {
+  const cs = { oiHist: [
+    { t: BASE, price: 100, funding: 0.0005 },
+    { t: BASE + HR, price: 101, funding: -0.0005 },
+    { t: BASE + 2 * HR, price: 102, funding: 0.00001 },
+  ] };
+  const ev = fundingFadeEvents(cs, null);
+  assert.equal(ev.length, 2);
+  assert.equal(ev[0].side, "SHORT");
+  assert.equal(ev[1].side, "LONG");
+});
+
+test("cvdDivergenceEvents: price up on sell-flow → SHORT event", () => {
+  const cs = {
+    oiHist: mkOi([100, 101, 102.5]), // +~1.5% into hour 2
+    cvdHist: [{ t: BASE + 2 * HR, cvd: -500000, buy: 250000, sell: 750000 }],
+  };
+  const ev = cvdDivergenceEvents(cs, priceByHour(cs.oiHist));
+  assert.equal(ev.length, 1);
+  assert.equal(ev[0].side, "SHORT");
+});
+
+test("scoreEvents: a signal that always aligns with a rising tape → PREDICTIVE", () => {
+  const coinSets = [{ oiHist: mkOi(rising) }];
+  const gen = (cs) => cs.oiHist.slice(0, 34).map((p) => ({ t: p.t, side: "LONG" })); // room for h=24
+  const r = scoreEvents(coinSets, gen, { horizons: [4, 12, 24], minSamples: 20 });
+  assert.ok(r.bestHorizon.meanBps > 0);
+  assert.equal(r.bestHorizon.hitRate, 100);
+  assert.equal(r.verdict, "PREDICTIVE");
+});
+
+test("scoreEvents: the same signal shorting a rising tape → NOISE", () => {
+  const coinSets = [{ oiHist: mkOi(rising) }];
+  const gen = (cs) => cs.oiHist.slice(0, 34).map((p) => ({ t: p.t, side: "SHORT" }));
+  const r = scoreEvents(coinSets, gen, { horizons: [4, 12, 24], minSamples: 20 });
+  assert.ok(r.bestHorizon.meanBps < 0);
+  assert.equal(r.verdict, "NOISE");
+});
+
+test("scoreEvents: too few samples → INSUFFICIENT (never overclaims on thin data)", () => {
+  const coinSets = [{ oiHist: mkOi(rising) }];
+  const gen = (cs) => cs.oiHist.slice(0, 3).map((p) => ({ t: p.t, side: "LONG" }));
+  const r = scoreEvents(coinSets, gen, { horizons: [4], minSamples: 20 });
+  assert.equal(r.verdict, "INSUFFICIENT");
+});
+
+test("runScorecard: returns every axis, ranked, with a coin count", () => {
+  const coinSets = [{ oiHist: mkOi(rising), cvdHist: [], smHist: [] }];
+  const sc = runScorecard(coinSets, { horizons: [4, 12], minSamples: 20 });
+  assert.equal(sc.coins, 1);
+  assert.equal(sc.axes.length, 4);
+  assert.ok(sc.axes.every((a) => typeof a.verdict === "string"));
+});

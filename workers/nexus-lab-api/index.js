@@ -52,6 +52,7 @@ async function prevCopyLeaders(env, address) {
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate, runBacktest, fetchCandles, fetchFundingAt, makeFundingPctAt } from "./backtest.mjs";
 import { snapshotLiquidations, fetchLiquidations, classifyFlush, estimatePendingLevels } from "./liquidations.mjs";
 import { snapshotFlow, fetchBasis, fetchCvd, classifyBasis, classifyCvdDivergence, fetchOrderbook, classifyOrderbook } from "./flow.mjs";
+import { runScorecard } from "./axisbt.mjs";
 import { okxJson } from "./okx.mjs";
 // TWAP planner/status — reuse the exec worker's tested logic (wrangler bundles the
 // cross-dir import, same as backtest.mjs). ONE planner, so start-validation and the
@@ -4298,6 +4299,39 @@ document.getElementById("btn").addEventListener("click",go);
       try { const r = await AGENT_KV.get(`oi:hist:PERP_BTC_USDC`); bs = r ? JSON.parse(r) : []; } catch { /* thin */ }
       const out = { coin, ...computeBeta(cs, bs) };
       try { await env.LAB_STORE.put(CACHE, JSON.stringify(out), { expirationTtl: 1800 }); } catch { /* best-effort */ }
+      return json(out, request);
+    }
+
+    // ── GET /intel/axis-backtest — the AXIS SCORECARD (walk-forward event study) ──
+    // For each candidate read, pool every hour it fired across the core coins and measure
+    // the FORWARD return (no lookahead) + walk-forward stability → PREDICTIVE / PROMISING /
+    // NOISE / INSUFFICIENT. Reads only the self-logged series (oi/cvd/sm:hist), so it stays
+    // INSUFFICIENT until that history matures (~Sept 14) — by design. Cached 1h; heavy KV.
+    if (parts[0] === "intel" && parts[1] === "axis-backtest" && request.method === "GET") {
+      const url2 = new URL(request.url);
+      const min = Math.max(8, Math.min(200, parseInt(url2.searchParams.get("min") || "20", 10) || 20));
+      const CACHE = `axisbt:v1:min${min}`;
+      try { const c = await env.LAB_STORE.get(CACHE); if (c) return json(JSON.parse(c), request); } catch { /* ignore */ }
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+      const COINS = ["BTC", "ETH", "SOL", "XRP", "DOGE", "BNB", "ARB", "AVAX", "LINK", "HYPE", "SUI", "WLD"];
+      const readJson = async (kv, key) => { try { const r = await kv.get(key); return r ? JSON.parse(r) : []; } catch { return []; } };
+      const coinSets = [];
+      for (const coin of COINS) {
+        const [oiHist, cvdHist, smHist] = await Promise.all([
+          readJson(AGENT_KV, `oi:hist:PERP_${coin}_USDC`),
+          readJson(AGENT_KV, `cvd:hist:${coin}`),
+          readJson(AGENT_KV, `sm:hist:${coin}`),
+        ]);
+        if ((oiHist || []).length >= 2) coinSets.push({ coin, oiHist, cvdHist, smHist });
+      }
+      const scorecard = runScorecard(coinSets, { horizons: [4, 12, 24], minSamples: min });
+      const out = {
+        asOf: new Date().toISOString(),
+        config: { horizonsHours: [4, 12, 24], minSamples: min, coins: coinSets.map((c) => c.coin) },
+        ...scorecard,
+        note: "Walk-forward event study on self-logged history — forward returns, no lookahead, first/second-half stability. INSUFFICIENT until the series matures (~Sept 14). A read is not an edge until it's PREDICTIVE here.",
+      };
+      try { await env.LAB_STORE.put(CACHE, JSON.stringify(out), { expirationTtl: 3600 }); } catch { /* best-effort */ }
       return json(out, request);
     }
 
