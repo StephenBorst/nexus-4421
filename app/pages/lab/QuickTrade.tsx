@@ -19,6 +19,7 @@ import { ThesisAdvisor } from "./ThesisAdvisor";
 import { useOrderEntry, useLeverage, useMaxLeverage, useCollateral, useAccount, usePositionStream, usePositionClose, useMarkets, MarketsType } from "@orderly.network/hooks";
 import { OrderSide, OrderType } from "@orderly.network/types";
 import { TradeChart } from "@/components/TradeChart";
+import { ProjectionBand } from "@/components/ProjectionBand";
 import { SimComposer } from "./SimComposer";
 
 /**
@@ -283,6 +284,9 @@ export function QuickTrade() {
             const e = Number((p as { average_open_price?: number }).average_open_price) || 0;
             return e > 0 ? { entry: e, side: (q >= 0 ? "LONG" : "SHORT") as "LONG" | "SHORT" } : null;
           })()} />
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <ProjectionBand symbol={symbol} />
         </div>
         <div style={{ marginTop: 8, textAlign: "right" }}>
           <a href={`/perp/${symbol}`} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#71717a", textDecoration: "none" }}>
