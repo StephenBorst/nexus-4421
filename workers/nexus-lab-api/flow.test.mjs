@@ -1,6 +1,28 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { coinToSpot, computeBasisPct, aggregateCvd, classifyBasis, computeImbalance, classifyOrderbook, parseDeribitInstrument, computeSkew, classifySkew, computeTermStructure } from "./flow.mjs";
+import { coinToSpot, computeBasisPct, aggregateCvd, classifyBasis, classifyCvdDivergence, computeImbalance, classifyOrderbook, parseDeribitInstrument, computeSkew, classifySkew, computeTermStructure } from "./flow.mjs";
+
+test("classifyCvdDivergence: price up + sell flow = distribution → SHORT", () => {
+  const r = classifyCvdDivergence(0.8, { cvd: -400000, buy: 300000, sell: 700000 });
+  assert.equal(r.side, "SHORT");
+  assert.equal(r.kind, "distribution");
+});
+
+test("classifyCvdDivergence: price down + buy flow = accumulation → LONG", () => {
+  const r = classifyCvdDivergence(-0.9, { cvd: 500000, buy: 750000, sell: 250000 });
+  assert.equal(r.side, "LONG");
+  assert.equal(r.kind, "accumulation");
+});
+
+test("classifyCvdDivergence: agreement (price up + buy flow) = trend, not a tell → null", () => {
+  assert.equal(classifyCvdDivergence(0.8, { cvd: 400000, buy: 700000, sell: 300000 }), null);
+});
+
+test("classifyCvdDivergence: tiny move or flat tilt → null", () => {
+  assert.equal(classifyCvdDivergence(0.1, { cvd: -400000, buy: 300000, sell: 700000 }), null); // move too small
+  assert.equal(classifyCvdDivergence(0.8, { cvd: 20000, buy: 490000, sell: 510000 }), null);   // tilt too flat
+  assert.equal(classifyCvdDivergence(0.8, null), null);
+});
 
 test("coinToSpot maps to OKX USDT spot", () => {
   assert.equal(coinToSpot("PERP_BTC_USDC"), "BTC-USDT");

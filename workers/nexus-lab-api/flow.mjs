@@ -110,6 +110,31 @@ export function classifyOrderbook(imbalance) {
 
 // Live basis → a directional QUALITY read for the fade, or null if too flat to matter.
 // side = which fade direction the basis supports; |basis| must clear PREMIUM to count.
+// ── CVD DIVERGENCE (aggressor flow vs price) ─────────────────────────────────
+// The orthogonal flow read: a price PUSH on the WRONG aggressor flow is the tell.
+// Price up but net CVD negative = the move is being SOLD into (distribution) → a
+// SHORT-side fade; price down but CVD positive = being BOUGHT (accumulation) → LONG.
+// We surface ONLY divergence — confirmation (price and flow agree) is trend, not an
+// edge, so it stays silent. Pure; the endpoint supplies the price move + live CVD.
+// cvd:hist is logging so this becomes backtestable as the series matures.
+export const CVD_MIN_MOVE = 0.25; // % price move over the window to call a direction
+export const CVD_MIN_TILT = 0.08; // |cvd|/(buy+sell) floor — a real aggressor tilt
+export function classifyCvdDivergence(priceChangePct, cvdObj) {
+  if (!cvdObj || !Number.isFinite(priceChangePct)) return null;
+  const total = (Number(cvdObj.buy) || 0) + (Number(cvdObj.sell) || 0);
+  if (total <= 0) return null;
+  const tilt = (Number(cvdObj.cvd) || 0) / total; // -1..1 net aggressor lean
+  if (Math.abs(priceChangePct) < CVD_MIN_MOVE || Math.abs(tilt) < CVD_MIN_TILT) return null;
+  const priceUp = priceChangePct > 0, flowUp = tilt > 0;
+  if (priceUp === flowUp) return null; // agreement = trend, not a fade tell
+  return {
+    side: priceUp ? "SHORT" : "LONG",
+    kind: priceUp ? "distribution" : "accumulation",
+    tilt: Math.round(tilt * 100) / 100,
+    priceChangePct: Math.round(priceChangePct * 100) / 100,
+  };
+}
+
 export function classifyBasis(basisPct) {
   const PREMIUM = 0.03; // % — below this the perp is priced with spot, no froth signal
   if (basisPct == null || Math.abs(basisPct) < PREMIUM) return null;

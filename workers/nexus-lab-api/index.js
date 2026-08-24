@@ -51,7 +51,7 @@ async function prevCopyLeaders(env, address) {
 
 import { backtestConfig, runSweep, oiSeriesInfo, walkForwardValidate, runBacktest, fetchCandles, fetchFundingAt, makeFundingPctAt } from "./backtest.mjs";
 import { snapshotLiquidations, fetchLiquidations, classifyFlush, estimatePendingLevels } from "./liquidations.mjs";
-import { snapshotFlow, fetchBasis, fetchCvd, classifyBasis, fetchOrderbook, classifyOrderbook } from "./flow.mjs";
+import { snapshotFlow, fetchBasis, fetchCvd, classifyBasis, classifyCvdDivergence, fetchOrderbook, classifyOrderbook } from "./flow.mjs";
 import { okxJson } from "./okx.mjs";
 // TWAP planner/status — reuse the exec worker's tested logic (wrangler bundles the
 // cross-dir import, same as backtest.mjs). ONE planner, so start-validation and the
@@ -4381,10 +4381,23 @@ document.getElementById("btn").addEventListener("click",go);
       }
       const basisSignal = cur?.basis ? classifyBasis(cur.basis.basisPct) : null;
       const obSignal = cur?.ob ? classifyOrderbook(cur.ob.imbalance) : null;
+      // CVD DIVERGENCE — pair live aggressor flow with the ~1h price move (matches the
+      // CVD window). Price up on sell-flow = distribution (SHORT tell), and vice-versa.
+      let cvdSignal = null;
+      if (cur?.cvd) {
+        try {
+          const nowS = Math.floor(Date.now() / 1000);
+          const tv = await fetch(`https://api-evm.orderly.org/tv/history?symbol=PERP_${coin}_USDC&resolution=15&from=${nowS - 90 * 60}&to=${nowS}`).then((r) => r.json());
+          if (tv?.s === "ok" && Array.isArray(tv.c) && tv.c.length >= 2) {
+            const o0 = Number(tv.o[0]), cN = Number(tv.c[tv.c.length - 1]);
+            if (o0 > 0) cvdSignal = classifyCvdDivergence(((cN - o0) / o0) * 100, cur.cvd);
+          }
+        } catch { /* fail-soft — no cvdSignal */ }
+      }
       let bHist = [], cHist = [];
       try { const r = await KV.get(`basis:hist:${coin}`); bHist = r ? JSON.parse(r) : []; } catch { /* empty */ }
       try { const r = await KV.get(`cvd:hist:${coin}`); cHist = r ? JSON.parse(r) : []; } catch { /* empty */ }
-      return json({ coin, basis: cur?.basis || null, cvd: cur?.cvd || null, ob: cur?.ob || null, basisSignal, obSignal, basisPoints: bHist.length, cvdPoints: cHist.length, basisHistory: bHist.slice(-72), cvdHistory: cHist.slice(-72) }, request);
+      return json({ coin, basis: cur?.basis || null, cvd: cur?.cvd || null, ob: cur?.ob || null, basisSignal, obSignal, cvdSignal, basisPoints: bHist.length, cvdPoints: cHist.length, basisHistory: bHist.slice(-72), cvdHistory: cHist.slice(-72) }, request);
     }
 
     // ── POST /agent/hook/:token — TradingView / external signal webhook ──────

@@ -80,6 +80,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   }, [coin]);
   const [basis, setBasis] = useState<{ side: "LONG" | "SHORT"; basisPct: number } | null>(null);
   const [ob, setOb] = useState<{ side: "LONG" | "SHORT"; imbalance: number } | null>(null);
+  const [cvd, setCvd] = useState<{ side: "LONG" | "SHORT"; kind: string } | null>(null);
   const [rawBasis, setRawBasis] = useState<number | null>(null);
   const [term, setTerm] = useState<{ structure: string; ratio: number; frontIv: number; backIv: number } | null>(null);
 
@@ -87,12 +88,12 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   // (>0) = froth → SHORT, discount → LONG. OB: bid-heavy = support → LONG, ask-heavy → SHORT.
   // Skew (BTC/ETH/SOL): more put-fear than usual = capitulation → LONG, more call-greed → SHORT.
   useEffect(() => {
-    if (!coin) { setBasis(null); setOb(null); setRawBasis(null); return; }
+    if (!coin) { setBasis(null); setOb(null); setCvd(null); setRawBasis(null); return; }
     let off = false;
     const sideOf = (s: { side?: string } | null | undefined) => (s && (s.side === "LONG" || s.side === "SHORT") ? s : null);
     fetch(`${AGENT_API}/intel/flow/${coin}`).then((r) => r.json())
-      .then((d) => { if (off) return; setBasis((sideOf(d?.basisSignal) as typeof basis) ?? null); setOb((sideOf(d?.obSignal) as typeof ob) ?? null); setRawBasis(typeof d?.basis?.basisPct === "number" ? d.basis.basisPct : null); })
-      .catch(() => { if (!off) { setBasis(null); setOb(null); setRawBasis(null); } });
+      .then((d) => { if (off) return; setBasis((sideOf(d?.basisSignal) as typeof basis) ?? null); setOb((sideOf(d?.obSignal) as typeof ob) ?? null); setCvd((sideOf(d?.cvdSignal) as typeof cvd) ?? null); setRawBasis(typeof d?.basis?.basisPct === "number" ? d.basis.basisPct : null); })
+      .catch(() => { if (!off) { setBasis(null); setOb(null); setCvd(null); setRawBasis(null); } });
     return () => { off = true; };
   }, [coin]);
 
@@ -216,6 +217,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
     const crowdLong = fused.fundingAnnualPct > 0;
     if (crowdLong !== rawBasis > 0) { const bounce = crowdLong ? "LONG" : "SHORT"; reads.push({ label: "funding×basis", val: "premium fading", side: bounce, ok: bounce === direction }); }
   }
+  if (cvd) reads.push({ label: "CVD flow", val: cvd.kind === "distribution" ? "sold into" : "bought up", side: cvd.side, ok: cvd.side === direction });
   if (ob) reads.push({ label: "order book", val: `${ob.imbalance > 0 ? "bid" : "ask"}-heavy`, side: ob.side, ok: ob.side === direction });
   if (record?.side) reads.push({ label: `your ${coin}`, val: `${record.side.net >= 0 ? "+" : "-"}$${Math.abs(record.side.net)} · ${record.side.n}t · ${record.side.wr}%`, side: record.side.net >= 0 ? direction : null, ok: record.side.net > 0 });
   else if (record) reads.push({ label: `your ${coin}`, val: `${record.net >= 0 ? "+" : "-"}$${Math.abs(record.net)} · ${record.n}t`, side: record.net >= 0 ? direction : null, ok: record.net > 0 });
