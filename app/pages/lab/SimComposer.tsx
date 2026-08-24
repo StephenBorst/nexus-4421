@@ -1,5 +1,5 @@
-// ── SIM COMPOSER — set up ANY trade or scenario, then war-game it ─────────────
-// The featured premium surface for the Miroshark war-game. Unlike a fixed "test THIS
+// ── SIM COMPOSER — set up ANY trade or scenario, then simulate it ─────────────
+// The featured premium surface for the Miroshark sim. Unlike a fixed "test THIS
 // coin" button, this lets a trader compose whatever they want to pressure-test: a
 // structured trade setup (coin / direction / entry / target / notes) OR a totally
 // free-form scenario ("BTC reclaims 80k and ETH ETF inflows spike"). It builds the
@@ -47,7 +47,7 @@ export function SimComposer({ wallet, seed, compact = false }: { wallet: string 
   return (
     <div style={{ border: `1px solid #2b2740`, borderLeft: `2px solid ${ACCENT}`, borderRadius: 8, background: "linear-gradient(180deg,#15131c,#111015)", padding: compact ? "12px 14px" : "14px 16px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-        <span style={{ fontFamily: MF, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.12em", color: "#c7bdf0" }}>◆ WAR-GAME</span>
+        <span style={{ fontFamily: MF, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.12em", color: "#c7bdf0" }}>◆ SIM</span>
         <span style={{ fontFamily: MF, fontSize: 8, letterSpacing: "0.14em", color: ACCENT, border: `1px solid #3a3358`, borderRadius: 3, padding: "1px 6px" }}>PREMIUM</span>
         <span style={{ marginLeft: "auto", fontFamily: MF, fontSize: 8.5, color: "#6f6a86" }}>powered by Miroshark</span>
       </div>
@@ -112,17 +112,17 @@ export function SimComposer({ wallet, seed, compact = false }: { wallet: string 
         <div style={{ marginBottom: 11 }}>
           <div style={miniLabel}>SCENARIO</div>
           <textarea value={query} onChange={(e) => setQuery(e.target.value.slice(0, 500))} rows={3} spellCheck={false}
-            placeholder="Describe anything to war-game — e.g. “BTC reclaims 80k on ETF inflows while funding stays negative — do alts follow or does BTC dominance rip?”"
+            placeholder="Describe anything to simulate — e.g. “BTC reclaims 80k on ETF inflows while funding stays negative — do alts follow or does BTC dominance rip?”"
             style={{ ...fieldStyle, resize: "vertical", lineHeight: 1.45 }} />
         </div>
       )}
 
       {canRun ? (
         <Simulate key={`${mode}:${mode === "trade" ? `${c}:${direction}` : "free"}`}
-          label="◆ Run the war-game →" wallet={wallet} body={body} />
+          label="◆ Run the sim →" wallet={wallet} body={body} />
       ) : (
         <div style={{ fontFamily: MF, fontSize: 9.5, color: C.text.faint, lineHeight: 1.5 }}>
-          {mode === "trade" ? "Enter an asset to run the war-game." : "Describe the scenario (a sentence or two) to run the war-game."}
+          {mode === "trade" ? "Enter an asset to run the simulation." : "Describe the scenario (a sentence or two) to run the simulation."}
         </div>
       )}
     </div>

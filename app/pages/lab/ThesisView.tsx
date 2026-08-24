@@ -1408,7 +1408,7 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
                   </div>
                 )}
 
-                {/* WAR-GAME — pressure-test this thesis (or any scenario) with Miroshark.
+                {/* SIM — pressure-test this thesis (or any scenario) with Miroshark.
                     Seeded from the draft; fully editable, so you can sim whatever you want. */}
                 {form.symbol && (
                   <div style={{ marginTop: 12 }}>

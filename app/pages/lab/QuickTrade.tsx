@@ -10,7 +10,7 @@
  * "A few taps" polish: per-SYMBOL max leverage (BTC 100x, small-caps 20x — not a
  * flat cap), typeable leverage + preset chips, one-tap size chips (incl. MAX off
  * free collateral × leverage), the DEX's OWN favorites (same store as the trading
- * page — star here, it shows there), and a featured Miroshark war-game to pressure-
+ * page — star here, it shows there), and a featured Miroshark sim to pressure-
  * test the exact trade before you fire.
  */
 
@@ -362,7 +362,7 @@ export function QuickTrade() {
           is deliberately not passed (no side chosen yet, so no alignment claim). */}
       <ThesisAdvisor symbol={symbol} wallet={walletAddress} compact />
 
-      {/* Featured premium: set up ANY trade or scenario and war-game it (seeded from the
+      {/* Featured premium: set up ANY trade or scenario and simulate it (seeded from the
           current market for convenience, fully editable — sim whatever you want). */}
       <SimComposer wallet={walletAddress} seed={{ coin: tk(symbol) }} />
 
