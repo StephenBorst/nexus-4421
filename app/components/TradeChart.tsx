@@ -27,6 +27,7 @@ const TFS = [
   { k: "1D", res: "15", hours: 24 },
   { k: "3D", res: "60", hours: 72 },
   { k: "1W", res: "60", hours: 168 },
+  { k: "1M", res: "60", hours: 720 },
 ] as const;
 const MIN_CANDLES = 12;
 

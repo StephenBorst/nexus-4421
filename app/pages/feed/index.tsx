@@ -1769,28 +1769,29 @@ export default function FeedPage() {
                 failed to load feed — check connection
               </div>
             )}
-            {/* Bridge to the unified Proof hub — these boards are the social slice;
-                /proof is every trustless record (callers, agents, arena, desks) under
-                the on-chain ledger, in one place. */}
+            {/* VERIFIED CALLERS is the headline of this tab — the ranked, publicly-graded
+                callers. It leads so the eye flows straight from a Feed call to WHO ranks.
+                Everything below is supporting ecosystem context. */}
             {!loading && !error && (
-              <div onClick={() => navigate("/proof")} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "#0f0f11", border: "1px solid #232327", borderLeft: "2px solid #ededf0", borderRadius: 6, padding: "10px 12px", marginBottom: 14, cursor: "pointer" }}>
+              <LeaderboardView feed={feed} walletAddress={walletAddress} onCopy={setCopyTarget} />
+            )}
+            {/* Bridge to the unified Proof hub — /proof is every trustless record (callers,
+                agents, arena, desks) under the on-chain ledger, in one place. */}
+            {!loading && !error && (
+              <div onClick={() => navigate("/proof")} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "#0f0f11", border: "1px solid #232327", borderLeft: "2px solid #ededf0", borderRadius: 6, padding: "10px 12px", margin: "14px 0", cursor: "pointer" }}>
                 <span style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: 12, color: "#a1a1aa", lineHeight: 1.5 }}>
                   <b style={{ color: "#f4f4f5" }}>The Proof</b> — every track record on Nexus (callers, agents, Arena, desks) under the on-chain ledger, in one place.
                 </span>
                 <span style={{ flexShrink: 0, fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.06em", color: "#ededf0", background: "#1a1a1e", border: "1px solid #33333a", borderRadius: 4, padding: "5px 10px" }}>OPEN PROOF →</span>
               </div>
             )}
-            {/* Ecosystem context — relocated out of the feed's tail so the feed is
-                pure calls. RANKS is the natural home: live positions, the just-resolved
-                grade tape, and the pulse stats all describe the caller ecosystem. */}
+            {/* Ecosystem context below the ranking — the just-resolved grade tape (proof of
+                the ranking), live positions, the pulse stats, and the secondary boards. */}
             {!loading && !error && <FeedPulse feed={feed} />}
-            {!loading && !error && <LiveNow />}
             {!loading && !error && <Resolved events={resolutions} />}
+            {!loading && !error && <LiveNow />}
             {!loading && !error && <Contested />}
             {!loading && !error && <Contrarians />}
-            {!loading && !error && (
-              <LeaderboardView feed={feed} walletAddress={walletAddress} onCopy={setCopyTarget} />
-            )}
             {!loading && !error && <Desks walletAddress={walletAddress} />}
             {!loading && !error && <ArenaStrip />}
             {!loading && !error && <LeakReport />}

@@ -21,6 +21,7 @@ import { OrderSide, OrderType } from "@orderly.network/types";
 import { TradeChart } from "@/components/TradeChart";
 import { ProjectionBand } from "@/components/ProjectionBand";
 import { SimComposer } from "./SimComposer";
+import { useIsMobile } from "./useIsMobile";
 
 /**
  * One open position + a one-tap CLOSE (market, full size). Rendered only when a
@@ -91,6 +92,7 @@ function MktChip({ s, sel, onPick }: { s: string; sel: boolean; onPick: () => vo
 }
 
 export function QuickTrade() {
+  const isMobile = useIsMobile();
   const { state: accountState } = useAccount();
   const walletAddress = (accountState as { address?: string })?.address ?? null;
   const connected = !!walletAddress;
@@ -220,158 +222,148 @@ export function QuickTrade() {
 
   const px = (n: number) => (n >= 1000 ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : n.toLocaleString(undefined, { maximumFractionDigits: 4 }));
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 460, margin: "0 auto" }}>
-      <div>
-        <div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>Trade</div>
-        <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 24, fontWeight: 700, color: "#f4f4f5", lineHeight: 1.1, letterSpacing: "-0.01em" }}>Quick Trade <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, fontWeight: 400, color: "#52525b" }}>· one-tap market order</span></div>
+  const positionEntry = (() => {
+    const p = openPositions.find((x) => String((x as { symbol?: string }).symbol) === symbol);
+    if (!p) return null;
+    const q = Number((p as { position_qty?: number }).position_qty) || 0;
+    const e = Number((p as { average_open_price?: number }).average_open_price) || 0;
+    return e > 0 ? { entry: e, side: (q >= 0 ? "LONG" : "SHORT") as "LONG" | "SHORT" } : null;
+  })();
+
+  // ── render blocks — arranged stacked (mobile) or as a 3-col terminal (desktop:
+  //    projection left · chart center · size/leverage + sim right, no scroll). ──
+  const header = (
+    <div>
+      <div style={{ fontSize: 9, color: "#71717a", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>Trade</div>
+      <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 24, fontWeight: 700, color: "#f4f4f5", lineHeight: 1.1, letterSpacing: "-0.01em" }}>Quick Trade <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 10, fontWeight: 400, color: "#52525b" }}>· one-tap market order</span></div>
+    </div>
+  );
+
+  const marketBar = (
+    <div style={card}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={label}>MARKET</div>
+        <button onClick={() => toggleFav(symbol)} title={curFav ? "Remove from your DEX favorites" : "Add to your DEX favorites"} style={{
+          marginLeft: "auto", background: "transparent", border: "none", cursor: "pointer", padding: 0,
+          fontFamily: "var(--nx-font-mono)", fontSize: 13, color: curFav ? "#e0a458" : "#52525b", lineHeight: 1,
+        }}>{curFav ? "★" : "☆"} <span style={{ fontSize: 9, letterSpacing: "0.08em" }}>{curFav ? "FAVORITED" : "FAVORITE"}</span></button>
       </div>
-
-      {/* Market selector */}
-      <div style={card}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={label}>MARKET</div>
-          <button onClick={() => toggleFav(symbol)} title={curFav ? "Remove from your DEX favorites" : "Add to your DEX favorites"} style={{
-            marginLeft: "auto", background: "transparent", border: "none", cursor: "pointer", padding: 0,
-            fontFamily: "var(--nx-font-mono)", fontSize: 13, color: curFav ? "#e0a458" : "#52525b", lineHeight: 1,
-          }}>{curFav ? "★" : "☆"} <span style={{ fontSize: 9, letterSpacing: "0.08em" }}>{curFav ? "FAVORITED" : "FAVORITE"}</span></button>
-        </div>
-
-        {/* Your DEX favorites — the same starred markets as the trading page */}
-        {favSymbols.length > 0 && (
-          <div style={{ marginTop: 8 }}>
-            <div style={{ ...label, color: "#e0a458", marginBottom: 5 }}>★ FAVORITES</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {favSymbols.map((s) => <MktChip key={s} s={s} sel={s === symbol} onPick={() => { setSymbol(s); setMsg(null); }} />)}
-            </div>
+      {favSymbols.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ ...label, color: "#e0a458", marginBottom: 5 }}>★ FAVORITES</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {favSymbols.map((s) => <MktChip key={s} s={s} sel={s === symbol} onPick={() => { setSymbol(s); setMsg(null); }} />)}
           </div>
-        )}
-
-        <div style={{ ...label, marginTop: favSymbols.length > 0 ? 10 : 8, marginBottom: 5, color: "#52525b" }}>POPULAR</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {/* Popular quick-chips + the active market if it's outside the popular set */}
-          {(SYMBOLS.includes(symbol) ? SYMBOLS : [symbol, ...SYMBOLS]).map((s) => (
-            <MktChip key={s} s={s} sel={s === symbol} onPick={() => { setSymbol(s); setMsg(null); }} />
-          ))}
         </div>
-        {/* Search across ALL markets (mirrors the mini app picker) */}
-        <input
-          value={mktSearch}
-          onChange={(e) => setMktSearch(e.target.value.toUpperCase())}
-          placeholder={allMarkets.length ? `🔍 search ${allMarkets.length} markets…` : "loading markets…"}
-          style={{ ...input, marginTop: 8, fontSize: 12 }}
-        />
-        {mktSearch && allMarkets.length > 0 && (() => {
-          const hits = allMarkets.filter((s) => tk(s).includes(mktSearch));
-          return (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, maxHeight: 128, overflowY: "auto" }}>
-              {hits.slice(0, 48).map((s) => (
-                <MktChip key={s} s={s} sel={s === symbol} onPick={() => { setSymbol(s); setMktSearch(""); setMsg(null); }} />
-              ))}
-              {hits.length === 0 && <span style={{ ...label, color: "#71717a" }}>no market matches &ldquo;{mktSearch}&rdquo;</span>}
-            </div>
-          );
-        })()}
-        <div style={{ ...label, marginTop: 10, color: "#a1a1aa" }}>
-          MARK: {markPrice ? `$${px(mark)}` : "—"}
-          {totalCollateral != null && <span style={{ marginLeft: 14 }} title="Total account value — all collateral marked to USDC (matches the DEX header)">TOTAL VALUE: ${Number(totalCollateral).toFixed(2)}</span>}
-        </div>
-        <div style={{ marginTop: 10 }}>
-          <TradeChart symbol={symbol} height={232} positionEntry={(() => {
-            const p = openPositions.find((x) => String((x as { symbol?: string }).symbol) === symbol);
-            if (!p) return null;
-            const q = Number((p as { position_qty?: number }).position_qty) || 0;
-            const e = Number((p as { average_open_price?: number }).average_open_price) || 0;
-            return e > 0 ? { entry: e, side: (q >= 0 ? "LONG" : "SHORT") as "LONG" | "SHORT" } : null;
-          })()} />
-        </div>
-        <div style={{ marginTop: 10 }}>
-          <ProjectionBand symbol={symbol} />
-        </div>
-        <div style={{ marginTop: 8, textAlign: "right" }}>
-          <a href={`/perp/${symbol}`} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#71717a", textDecoration: "none" }}>
-            Open full chart →
-          </a>
-        </div>
+      )}
+      <div style={{ ...label, marginTop: favSymbols.length > 0 ? 10 : 8, marginBottom: 5, color: "#52525b" }}>POPULAR</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {(SYMBOLS.includes(symbol) ? SYMBOLS : [symbol, ...SYMBOLS]).map((s) => (
+          <MktChip key={s} s={s} sel={s === symbol} onPick={() => { setSymbol(s); setMsg(null); }} />
+        ))}
       </div>
-
-      {/* Size + leverage */}
-      <div style={card}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div>
-            <div style={label}>SIZE (USDC NOTIONAL)</div>
-            <input style={{ ...input, marginTop: 6 }} type="number" min={0} step={10} value={notional}
-              onChange={(e) => setNotional(Math.max(0, parseFloat(e.target.value) || 0))} />
-            {/* One-tap size chips */}
-            <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-              {[25, 100, 500].map((v) => (
-                <button key={v} onClick={() => setNotional(v)} style={{
-                  background: notional === v ? "#ededf015" : "transparent", border: `1px solid ${notional === v ? "#ededf060" : "#232327"}`,
-                  borderRadius: 3, padding: "3px 9px", cursor: "pointer", color: notional === v ? "#ededf0" : "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10,
-                }}>${v}</button>
-              ))}
-              <button onClick={() => maxNotional > 0 && setNotional(maxNotional)} disabled={maxNotional <= 0} title={`Max on ${levClamped}x from free collateral`} style={{
-                background: "transparent", border: `1px solid ${maxNotional > 0 ? "#3a3320" : "#232327"}`, borderRadius: 3,
-                padding: "3px 9px", cursor: maxNotional > 0 ? "pointer" : "not-allowed", color: maxNotional > 0 ? "#e0a458" : "#3f3f46", fontFamily: "var(--nx-font-mono)", fontSize: 10,
-              }}>MAX</button>
-            </div>
+      <input
+        value={mktSearch}
+        onChange={(e) => setMktSearch(e.target.value.toUpperCase())}
+        placeholder={allMarkets.length ? `🔍 search ${allMarkets.length} markets…` : "loading markets…"}
+        style={{ ...input, marginTop: 8, fontSize: 12 }}
+      />
+      {mktSearch && allMarkets.length > 0 && (() => {
+        const hits = allMarkets.filter((s) => tk(s).includes(mktSearch));
+        return (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, maxHeight: 128, overflowY: "auto" }}>
+            {hits.slice(0, 48).map((s) => (
+              <MktChip key={s} s={s} sel={s === symbol} onPick={() => { setSymbol(s); setMktSearch(""); setMsg(null); }} />
+            ))}
+            {hits.length === 0 && <span style={{ ...label, color: "#71717a" }}>no market matches &ldquo;{mktSearch}&rdquo;</span>}
           </div>
-          <div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-              <div style={label}>LEVERAGE</div>
-              <input type="number" min={1} max={cap} value={lev}
-                onChange={(e) => { const v = parseInt(e.target.value, 10); setLev(Number.isFinite(v) ? Math.min(Math.max(1, v), cap) : 1); }}
-                style={{ width: 52, background: "#0a0a0b", border: "1px solid #232327", borderRadius: 3, color: "#f4f4f5", fontFamily: "var(--nx-font-mono)", fontSize: 12, padding: "2px 6px", textAlign: "center" }} />
-              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#f4f4f5", fontWeight: 700 }}>{levClamped}x</span>
-              <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", marginLeft: "auto" }}>max {cap}x</span>
-            </div>
-            <input style={{ marginTop: 10, width: "100%" }} type="range" min={1} max={cap} step={1} value={levClamped}
-              onChange={(e) => setLev(parseInt(e.target.value, 10))} />
-            <div style={{ display: "flex", gap: 5, marginTop: 6, flexWrap: "wrap" }}>
-              {levPresets.map((v) => (
-                <button key={v} onClick={() => setLev(v)} style={{
-                  background: levClamped === v ? "#ededf015" : "transparent", border: `1px solid ${levClamped === v ? "#ededf060" : "#232327"}`,
-                  borderRadius: 3, padding: "2px 8px", cursor: "pointer", color: levClamped === v ? "#ededf0" : "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 9.5,
-                }}>{v === cap ? "MAX" : `${v}x`}</button>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 18, marginTop: 12, flexWrap: "wrap" }}>
-          {[
-            { l: "NOTIONAL", v: `$${notional.toFixed(0)}` },
-            { l: "MARGIN", v: `$${margin.toFixed(2)}` },
-            { l: "EST. QTY", v: qty > 0 ? `${qty} ${tk(symbol)}` : "—" },
-          ].map(({ l, v }) => (
-            <div key={l}><div style={label}>{l}</div><div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, color: "#f4f4f5", fontWeight: 600 }}>{v}</div></div>
-          ))}
-        </div>
-        {/* Est. liquidation gauge — approximate, both directions (no side chosen yet). */}
-        {mark > 0 && qty > 0 && (
-          <div style={{ ...label, marginTop: 10, color: "#71717a", display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <span>EST. LIQ · <span style={{ color: "#3ecf8e" }}>LONG ${px(liqLong)}</span></span>
-            <span><span style={{ color: "#f7525f" }}>SHORT ${px(liqShort)}</span></span>
-            <span style={{ color: "#3f3f46" }}>≈{(liqDistPct * 100).toFixed(1)}% away</span>
-          </div>
-        )}
-        {tooSmall && notional > 0 && (
-          <div style={{ ...label, color: "#fbbf24", marginTop: 8 }}>
-            Below this market's minimum size{minNotional ? ` ($${minNotional} notional)` : ""}.
-          </div>
-        )}
+        );
+      })()}
+      <div style={{ ...label, marginTop: 10, color: "#a1a1aa" }}>
+        MARK: {markPrice ? `$${px(mark)}` : "—"}
+        {totalCollateral != null && <span style={{ marginLeft: 14 }} title="Total account value — all collateral marked to USDC (matches the DEX header)">TOTAL VALUE: ${Number(totalCollateral).toFixed(2)}</span>}
       </div>
+    </div>
+  );
 
-      {/* Context before a one-tap market order. Quick Trade is where the impulsive
-          decisions happen, so it's where the record is most worth seeing — direction
-          is deliberately not passed (no side chosen yet, so no alignment claim). */}
-      <ThesisAdvisor symbol={symbol} wallet={walletAddress} compact />
+  const chartBlock = (
+    <div style={card}>
+      <TradeChart symbol={symbol} height={isMobile ? 232 : 430} positionEntry={positionEntry} />
+      <div style={{ marginTop: 8, textAlign: "right" }}>
+        <a href={`/perp/${symbol}`} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#71717a", textDecoration: "none" }}>
+          Open full chart →
+        </a>
+      </div>
+    </div>
+  );
 
-      {/* Featured premium: set up ANY trade or scenario and simulate it (seeded from the
-          current market for convenience, fully editable — sim whatever you want). */}
-      <SimComposer wallet={walletAddress} seed={{ coin: tk(symbol) }} />
+  const projectionBlock = <div style={card}><ProjectionBand symbol={symbol} height={isMobile ? 216 : 248} /></div>;
 
-      {/* One-tap LONG / SHORT */}
+  const sizeLevBlock = (
+    <div style={card}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div>
+          <div style={label}>SIZE (USDC NOTIONAL)</div>
+          <input style={{ ...input, marginTop: 6 }} type="number" min={0} step={10} value={notional}
+            onChange={(e) => setNotional(Math.max(0, parseFloat(e.target.value) || 0))} />
+          <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+            {[25, 100, 500].map((v) => (
+              <button key={v} onClick={() => setNotional(v)} style={{
+                background: notional === v ? "#ededf015" : "transparent", border: `1px solid ${notional === v ? "#ededf060" : "#232327"}`,
+                borderRadius: 3, padding: "3px 9px", cursor: "pointer", color: notional === v ? "#ededf0" : "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 10,
+              }}>${v}</button>
+            ))}
+            <button onClick={() => maxNotional > 0 && setNotional(maxNotional)} disabled={maxNotional <= 0} title={`Max on ${levClamped}x from free collateral`} style={{
+              background: "transparent", border: `1px solid ${maxNotional > 0 ? "#3a3320" : "#232327"}`, borderRadius: 3,
+              padding: "3px 9px", cursor: maxNotional > 0 ? "pointer" : "not-allowed", color: maxNotional > 0 ? "#e0a458" : "#3f3f46", fontFamily: "var(--nx-font-mono)", fontSize: 10,
+            }}>MAX</button>
+          </div>
+        </div>
+        <div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+            <div style={label}>LEVERAGE</div>
+            <input type="number" min={1} max={cap} value={lev}
+              onChange={(e) => { const v = parseInt(e.target.value, 10); setLev(Number.isFinite(v) ? Math.min(Math.max(1, v), cap) : 1); }}
+              style={{ width: 52, background: "#0a0a0b", border: "1px solid #232327", borderRadius: 3, color: "#f4f4f5", fontFamily: "var(--nx-font-mono)", fontSize: 12, padding: "2px 6px", textAlign: "center" }} />
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#f4f4f5", fontWeight: 700 }}>{levClamped}x</span>
+            <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#71717a", marginLeft: "auto" }}>max {cap}x</span>
+          </div>
+          <input style={{ marginTop: 10, width: "100%" }} type="range" min={1} max={cap} step={1} value={levClamped}
+            onChange={(e) => setLev(parseInt(e.target.value, 10))} />
+          <div style={{ display: "flex", gap: 5, marginTop: 6, flexWrap: "wrap" }}>
+            {levPresets.map((v) => (
+              <button key={v} onClick={() => setLev(v)} style={{
+                background: levClamped === v ? "#ededf015" : "transparent", border: `1px solid ${levClamped === v ? "#ededf060" : "#232327"}`,
+                borderRadius: 3, padding: "2px 8px", cursor: "pointer", color: levClamped === v ? "#ededf0" : "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 9.5,
+              }}>{v === cap ? "MAX" : `${v}x`}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 18, marginTop: 12, flexWrap: "wrap" }}>
+        {[
+          { l: "NOTIONAL", v: `$${notional.toFixed(0)}` },
+          { l: "MARGIN", v: `$${margin.toFixed(2)}` },
+          { l: "EST. QTY", v: qty > 0 ? `${qty} ${tk(symbol)}` : "—" },
+        ].map(({ l, v }) => (
+          <div key={l}><div style={label}>{l}</div><div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, color: "#f4f4f5", fontWeight: 600 }}>{v}</div></div>
+        ))}
+      </div>
+      {mark > 0 && qty > 0 && (
+        <div style={{ ...label, marginTop: 10, color: "#71717a", display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <span>EST. LIQ · <span style={{ color: "#3ecf8e" }}>LONG ${px(liqLong)}</span></span>
+          <span><span style={{ color: "#f7525f" }}>SHORT ${px(liqShort)}</span></span>
+          <span style={{ color: "#3f3f46" }}>≈{(liqDistPct * 100).toFixed(1)}% away</span>
+        </div>
+      )}
+      {tooSmall && notional > 0 && (
+        <div style={{ ...label, color: "#fbbf24", marginTop: 8 }}>
+          Below this market's minimum size{minNotional ? ` ($${minNotional} notional)` : ""}.
+        </div>
+      )}
+      {/* One-tap LONG / SHORT — kept in the same card as size/leverage so the whole
+          ticket sits above the fold on desktop. */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 14 }}>
         <button onClick={() => tap("BUY")} disabled={tooSmall || !!busy || isMutating} style={{
           background: tooSmall ? "#1a1a1e" : "#ededf0", color: tooSmall ? "#71717a" : "#141416", border: "1px solid #ededf0",
           borderRadius: 4, padding: "14px 0", cursor: tooSmall ? "not-allowed" : "pointer", fontFamily: "var(--nx-font-mono)",
@@ -383,24 +375,49 @@ export function QuickTrade() {
           fontSize: 14, fontWeight: "bold", letterSpacing: "0.08em", opacity: busy === "BUY" ? 0.4 : 1,
         }}>{busy === "SELL" ? "PLACING…" : confirmSide === "SELL" ? "TAP TO CONFIRM ✓" : "↓ SHORT"}</button>
       </div>
-
       {msg && (
-        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: msg.ok ? "#3ecf8e" : "#f7525f", textAlign: "center" }}>{msg.text}</div>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: msg.ok ? "#3ecf8e" : "#f7525f", textAlign: "center", marginTop: 10 }}>{msg.text}</div>
       )}
+    </div>
+  );
 
-      {/* Open positions — close any without leaving the tab (full loop) */}
-      {openPositions.length > 0 && (
-        <div style={{ ...card, display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={label}>OPEN POSITIONS</div>
-          {openPositions.map((p, i) => (
-            <PositionRow key={String((p as { symbol?: string }).symbol) || i} position={p as unknown as Record<string, unknown>} />
-          ))}
-        </div>
-      )}
+  const adviceBlock = <ThesisAdvisor symbol={symbol} wallet={walletAddress} compact />;
+  const simBlock = <SimComposer wallet={walletAddress} seed={{ coin: tk(symbol) }} />;
+  const positionsBlock = openPositions.length > 0 ? (
+    <div style={{ ...card, display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={label}>OPEN POSITIONS</div>
+      {openPositions.map((p, i) => (
+        <PositionRow key={String((p as { symbol?: string }).symbol) || i} position={p as unknown as Record<string, unknown>} />
+      ))}
+    </div>
+  ) : null;
+  const footer = (
+    <div style={{ ...label, textAlign: "center", color: "#33333a" }}>
+      Real market order on Orderly · for limit / TP-SL use the full trade page
+    </div>
+  );
 
-      <div style={{ ...label, textAlign: "center", color: "#33333a" }}>
-        Real market order on Orderly · for limit / TP-SL use the full trade page
+  // Mobile: single stacked column (the proven order).
+  if (isMobile) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 460, margin: "0 auto" }}>
+        {header}{marketBar}{chartBlock}{projectionBlock}{adviceBlock}{sizeLevBlock}{simBlock}{positionsBlock}{footer}
       </div>
+    );
+  }
+
+  // Desktop: pro terminal — projection left · chart center · size/leverage + sim right.
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 1440, margin: "0 auto" }}>
+      {header}
+      {marketBar}
+      <div style={{ display: "grid", gridTemplateColumns: "320px minmax(0,1fr) 360px", gap: 14, alignItems: "start" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{projectionBlock}{adviceBlock}</div>
+        <div style={{ minWidth: 0 }}>{chartBlock}</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{sizeLevBlock}{simBlock}</div>
+      </div>
+      {positionsBlock}
+      {footer}
     </div>
   );
 }

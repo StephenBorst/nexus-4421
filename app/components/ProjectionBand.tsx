@@ -46,7 +46,7 @@ export function ProjectionBand({ symbol, height = 216 }: { symbol: string; heigh
   useEffect(() => {
     let off = false; setCloses(null); setFailed(false);
     const now = Math.floor(Date.now() / 1000);
-    fetch(`${ORDERLY_API}/tv/history?symbol=${symbol}&resolution=60&from=${now - 30 * 24 * 3600}&to=${now}`, { headers: { accept: "application/json" } })
+    fetch(`${ORDERLY_API}/tv/history?symbol=PERP_${coin}_USDC&resolution=60&from=${now - 30 * 24 * 3600}&to=${now}`, { headers: { accept: "application/json" } })
       .then((r) => r.json())
       .then((j) => { if (off) return; (j?.s === "ok" && Array.isArray(j.c) && j.c.length > 24) ? setCloses(j.c.map(Number)) : setFailed(true); })
       .catch(() => { if (!off) setFailed(true); });
