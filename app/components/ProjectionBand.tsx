@@ -24,9 +24,11 @@ const Z25 = 0.6745, Z80 = 1.2816; // interquartile / 10th–90th z-scores (norma
 
 type Lean = { dir: "LONG" | "SHORT"; fundingAnnualPct: number | null } | null;
 
-export function ProjectionBand({ symbol, height = 216 }: { symbol: string; height?: number }) {
+export function ProjectionBand({ symbol, height = 216, horizonHours }: { symbol: string; height?: number; horizonHours?: number }) {
   const coin = bare(symbol);
-  const [hIdx, setHIdx] = useState(1); // 7D default
+  // Controlled horizon (Quick Trade syncs it to the chart's timeframe) or self-managed chips.
+  const controlledHz = typeof horizonHours === "number";
+  const [hIdx, setHIdx] = useState(1); // 7D default (uncontrolled)
   const [closes, setCloses] = useState<number[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [lean, setLean] = useState<Lean>(null);
@@ -74,6 +76,9 @@ export function ProjectionBand({ symbol, height = 216 }: { symbol: string; heigh
     return best ? best.price : null;
   }, [liq, lean]);
 
+  // Forward horizon in hours — controlled by the chart's timeframe, else the local chips.
+  const H = controlledHz ? Math.max(1, horizonHours as number) : HZ[hIdx].h;
+  const hLabel = controlledHz ? (H >= 24 ? `${Math.round(H / 24)}D` : `${H}h`) : HZ[hIdx].k;
   const view = useMemo(() => {
     if (!closes || closes.length < 24) return null;
     const price = closes[closes.length - 1];
@@ -83,14 +88,13 @@ export function ProjectionBand({ symbol, height = 216 }: { symbol: string; heigh
     const mean = rets.reduce((s, x) => s + x, 0) / (rets.length || 1);
     const varr = rets.reduce((s, x) => s + (x - mean) ** 2, 0) / (rets.length || 1);
     const sigmaH = Math.sqrt(varr);
-    const H = HZ[hIdx].h;
     let sigmaT = sigmaH * Math.sqrt(H);
     sigmaT = Math.min(sigmaT, 0.6); // cap the cone so a vol spike can't blow up the scale
     const band = (z: number) => ({ lo: price * Math.exp(-z * sigmaT), hi: price * Math.exp(z * sigmaT) });
     const iqr = band(Z25), wide = band(Z80);
     const tgt = target != null && Number.isFinite(target) ? target : null;
     return { price, sigmaT, iqr, wide, tgt, settle: Date.now() + H * 3600 * 1000 };
-  }, [closes, hIdx, target]);
+  }, [closes, H, target]);
 
   const box: React.CSSProperties = { width: "100%", height, background: "#0a0a0b", border: `1px solid ${BORDER}`, borderRadius: 6, position: "relative", overflow: "hidden" };
   if (failed) return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: FAINT }}>projection unavailable</div>;
@@ -123,13 +127,15 @@ export function ProjectionBand({ symbol, height = 216 }: { symbol: string; heigh
     <div ref={wrapRef} style={box}>
       {/* header: eyebrow + horizon chips */}
       <div style={{ position: "absolute", top: 7, left: 9, zIndex: 3, fontFamily: MONO, fontSize: 9, letterSpacing: "0.14em", color: MUTED }}>◆ PROJECTION · expected move</div>
-      <div style={{ position: "absolute", top: 6, right: 9, zIndex: 3, display: "flex", gap: 4 }}>
-        {HZ.map((z, i) => (
-          <button key={z.k} onClick={() => setHIdx(i)} style={{
-            background: hIdx === i ? "#ededf015" : "transparent", border: `1px solid ${hIdx === i ? "#ededf055" : BORDER}`, borderRadius: 3,
-            padding: "2px 7px", cursor: "pointer", color: hIdx === i ? BONE : MUTED, fontFamily: MONO, fontSize: 9,
-          }}>{z.k}</button>
-        ))}
+      <div style={{ position: "absolute", top: 6, right: 9, zIndex: 3, display: "flex", gap: 4, alignItems: "center" }}>
+        {controlledHz
+          ? <span style={{ fontFamily: MONO, fontSize: 9, color: MUTED, letterSpacing: "0.06em" }}>{hLabel} forward</span>
+          : HZ.map((z, i) => (
+            <button key={z.k} onClick={() => setHIdx(i)} style={{
+              background: hIdx === i ? "#ededf015" : "transparent", border: `1px solid ${hIdx === i ? "#ededf055" : BORDER}`, borderRadius: 3,
+              padding: "2px 7px", cursor: "pointer", color: hIdx === i ? BONE : MUTED, fontFamily: MONO, fontSize: 9,
+            }}>{z.k}</button>
+          ))}
       </div>
 
       <svg width={width} height={height} style={{ display: "block", position: "absolute", inset: 0 }}>
@@ -172,7 +178,7 @@ export function ProjectionBand({ symbol, height = 216 }: { symbol: string; heigh
         {dir
           ? <span style={{ flexShrink: 0 }}><b style={{ color: tgtColor }}>{dir === "SHORT" ? "▼ fade short" : "▲ fade long"}</b>{tgt != null ? <> → <b style={{ color: tgtColor }}>{fmtPx(tgt)}</b> <span style={{ color: FAINT }}>({pct(tgt)})</span></> : ""}</span>
           : <span style={{ color: MUTED, flexShrink: 0 }}>no funding lean</span>}
-        <span style={{ color: FAINT, marginLeft: "auto", flexShrink: 0 }}>{HZ[hIdx].k} range {fmtPx(wide.lo)}–{fmtPx(wide.hi)}</span>
+        <span style={{ color: FAINT, marginLeft: "auto", flexShrink: 0 }}>{hLabel} range {fmtPx(wide.lo)}–{fmtPx(wide.hi)}</span>
       </div>
     </div>
   );

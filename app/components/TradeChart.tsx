@@ -22,13 +22,18 @@ const POS = "#3ecf8e", NEG = "#f7525f", GRID = "#ffffff10", BORDER = "#232327", 
 const bare = (s: string) => String(s || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
 type Candle = { t: number; o: number; h: number; l: number; c: number; v: number };
 type Call = { wallet: string; pfp: string | null; displayName: string | null; direction: "LONG" | "SHORT"; entry: number; t: number; _coin: string };
-// Orderly's /tv/history supports resolutions 15 and 60 (NOT 240 → no_data). 1W is hourly.
-const TFS = [
-  { k: "1D", res: "15", hours: 24 },
-  { k: "3D", res: "60", hours: 72 },
-  { k: "1W", res: "60", hours: 168 },
-  { k: "1M", res: "60", hours: 720 },
+// Orderly's /tv/history supports resolutions 1, 5, 15, 30, 60, D (NOT 240 → no_data).
+// Shared with the ProjectionBand so a timeframe click drives BOTH: `hours` = the chart
+// lookback window, `projH` = the projection's forward settle horizon.
+export const CHART_TFS = [
+  { k: "5m",  res: "5",  hours: 12,  projH: 6 },
+  { k: "30m", res: "30", hours: 48,  projH: 18 },
+  { k: "1H",  res: "60", hours: 120, projH: 36 },
+  { k: "1D",  res: "15", hours: 24,  projH: 24 },
+  { k: "3D",  res: "60", hours: 72,  projH: 72 },
+  { k: "1W",  res: "60", hours: 168, projH: 168 },
 ] as const;
+const TFS = CHART_TFS;
 const MIN_CANDLES = 12;
 
 const fmtPx = (v: number) => (v >= 1000 ? `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : v >= 1 ? `$${v.toFixed(2)}` : `$${v.toPrecision(4)}`);
@@ -46,9 +51,13 @@ function CallAvatar({ pfp, name, ring, size = 20 }: { pfp: string | null; name: 
   );
 }
 
-export function TradeChart({ symbol, height = 240, positionEntry }: { symbol: string; height?: number; positionEntry?: { entry: number; side: "LONG" | "SHORT" } | null }) {
+export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf }: { symbol: string; height?: number; positionEntry?: { entry: number; side: "LONG" | "SHORT" } | null; tfIndex?: number; onTf?: (i: number) => void }) {
   const coin = bare(symbol);
-  const [tf, setTf] = useState(1); // default 3D
+  // Controlled (Quick Trade drives it to sync the projection) or self-managed.
+  const controlled = typeof tfIndex === "number";
+  const [tfState, setTfState] = useState(2); // default 1H
+  const tf = controlled ? (tfIndex as number) : tfState;
+  const setTf = (i: number) => { if (onTf) onTf(i); if (!controlled) setTfState(i); };
   const [candles, setCandles] = useState<Candle[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [allCalls, setAllCalls] = useState<Call[]>([]);

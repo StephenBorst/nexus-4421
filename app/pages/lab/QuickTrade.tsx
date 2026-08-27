@@ -18,7 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ThesisAdvisor } from "./ThesisAdvisor";
 import { useOrderEntry, useLeverage, useMaxLeverage, useCollateral, useAccount, usePositionStream, usePositionClose, useMarkets, MarketsType } from "@orderly.network/hooks";
 import { OrderSide, OrderType } from "@orderly.network/types";
-import { TradeChart } from "@/components/TradeChart";
+import { TradeChart, CHART_TFS } from "@/components/TradeChart";
 import { ProjectionBand } from "@/components/ProjectionBand";
 import { SimComposer } from "./SimComposer";
 import { useIsMobile } from "./useIsMobile";
@@ -132,6 +132,7 @@ export function QuickTrade() {
   // Per-SYMBOL max leverage (respects each market's base_imr) — BTC 100x, alts 20x.
   const symbolMaxLev = useMaxLeverage(symbol);
   const [lev, setLev] = useState<number>(5);
+  const [tfIdx, setTfIdx] = useState(2); // shared chart+projection timeframe (default 1H)
   const { totalCollateral, freeCollateral } = useCollateral();
   const [busy, setBusy] = useState<null | "BUY" | "SELL">(null);
   const [confirmSide, setConfirmSide] = useState<null | "BUY" | "SELL">(null);
@@ -154,7 +155,12 @@ export function QuickTrade() {
   const openPositions = (positionRows ?? []).filter((p) => Number((p as { position_qty?: number }).position_qty) !== 0);
 
   // Per-symbol cap (fall back to the account max, then a safe 20x). No flat 50x tax.
-  const cap = Math.max(1, Math.round(symbolMaxLev || maxLeverage || 20));
+  // Per-symbol max leverage = 1/base_imr (BTC 100x, alts 20x) — the EXCHANGE cap, reliable
+  // regardless of the account's current leverage setting (useMaxLeverage returned 1x when the
+  // account leverage was unset, which broke the slider). Fall back to the account/hook value.
+  const baseImr = Number((symbolInfo as { base_imr?: number } | undefined)?.base_imr) || 0;
+  const symMaxFromImr = baseImr > 0 ? Math.floor(1 / baseImr) : 0;
+  const cap = Math.max(1, symMaxFromImr || Math.round(symbolMaxLev || 0) || Math.round(maxLeverage || 0) || 20);
   const levClamped = Math.min(Math.max(1, lev || 1), cap);
   // If the symbol's cap dropped below the current lev (switching BTC→alt), pull it in.
   useEffect(() => { setLev((l) => Math.min(Math.max(1, l), cap)); }, [cap]);
@@ -288,7 +294,7 @@ export function QuickTrade() {
 
   const chartBlock = (
     <div style={card}>
-      <TradeChart symbol={symbol} height={isMobile ? 232 : 430} positionEntry={positionEntry} />
+      <TradeChart symbol={symbol} height={isMobile ? 232 : 600} positionEntry={positionEntry} tfIndex={tfIdx} onTf={setTfIdx} />
       <div style={{ marginTop: 8, textAlign: "right" }}>
         <a href={`/perp/${symbol}`} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#71717a", textDecoration: "none" }}>
           Open full chart →
@@ -297,7 +303,7 @@ export function QuickTrade() {
     </div>
   );
 
-  const projectionBlock = <div style={card}><ProjectionBand symbol={symbol} height={isMobile ? 216 : 248} /></div>;
+  const projectionBlock = <div style={card}><ProjectionBand symbol={symbol} height={isMobile ? 216 : 420} horizonHours={CHART_TFS[tfIdx].projH} /></div>;
 
   const sizeLevBlock = (
     <div style={card}>
@@ -411,9 +417,9 @@ export function QuickTrade() {
     <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 1440, margin: "0 auto" }}>
       {header}
       {marketBar}
-      <div style={{ display: "grid", gridTemplateColumns: "320px minmax(0,1fr) 360px", gap: 14, alignItems: "start" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{projectionBlock}{adviceBlock}</div>
-        <div style={{ minWidth: 0 }}>{chartBlock}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "340px minmax(0,1fr) 360px", gap: 14, alignItems: "start" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{projectionBlock}</div>
+        <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 14 }}>{chartBlock}{adviceBlock}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{sizeLevBlock}{simBlock}</div>
       </div>
       {positionsBlock}
