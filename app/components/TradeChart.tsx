@@ -22,6 +22,8 @@ const POS = "#3ecf8e", NEG = "#f7525f", GRID = "#ffffff10", BORDER = "#232327", 
 const bare = (s: string) => String(s || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
 type Candle = { t: number; o: number; h: number; l: number; c: number; v: number };
 type Call = { wallet: string; pfp: string | null; displayName: string | null; direction: "LONG" | "SHORT"; entry: number; t: number; _coin: string };
+// Estimated pending-liquidation cluster: price level, weighted magnitude, dominant side.
+type LiqCluster = { price: number; mag: number; side: string };
 // Orderly's /tv/history supports resolutions 1, 5, 15, 30, 60, D (NOT 240 → no_data).
 // Shared with the ProjectionBand so a timeframe click drives BOTH: `hours` = the chart
 // lookback window, `projH` = the projection's forward settle horizon.
@@ -61,6 +63,8 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf 
   const [candles, setCandles] = useState<Candle[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [allCalls, setAllCalls] = useState<Call[]>([]);
+  const [liq, setLiq] = useState<{ below: LiqCluster[]; above: LiqCluster[]; currentPrice: number } | null>(null);
+  const [showLiq, setShowLiq] = useState(true);
   const [hover, setHover] = useState<number | null>(null); // index into VISIBLE slice
   const [vp, setVp] = useState<{ lo: number; hi: number } | null>(null); // visible window into candles; null = all
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -116,6 +120,15 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf 
       .catch(() => { if (!off) setAllCalls([]); });
     return () => { off = true; };
   }, []);
+
+  // Estimated pending-liquidation clusters (same source as THE READ's liq-magnet-pull axis).
+  useEffect(() => {
+    let off = false; setLiq(null);
+    fetch(`${AGENT_API}/intel/liqmap/${coin}`).then((r) => r.json())
+      .then((d) => { if (!off && d?.available && d.currentPrice > 0) setLiq({ below: d.below || [], above: d.above || [], currentPrice: Number(d.currentPrice) }); })
+      .catch(() => { if (!off) setLiq(null); });
+    return () => { off = true; };
+  }, [coin]);
 
   // ── layout ───────────────────────────────────────────────────────────────
   const RPAD = 52, LPAD = 6, TOP = 8, TIMEH = 16, VOLH = 30, GAP = 6;
@@ -185,6 +198,17 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf 
   const hc = hover != null && hover < visible.length ? visible[hover] : null;
   const posY = positionEntry && positionEntry.entry >= min && positionEntry.entry <= max ? y(positionEntry.entry) : null;
 
+  // Liquidation clusters within the visible price range → magnitude bars from the right axis.
+  // long-liq clusters sit BELOW price (downside magnet, red); short-liq ABOVE (upside, green).
+  const liqBands = (showLiq && liq ? [
+    ...(liq.below || []).map((c) => ({ ...c, dir: "long" as const })),
+    ...(liq.above || []).map((c) => ({ ...c, dir: "short" as const })),
+  ].filter((c) => Number.isFinite(c.price) && c.price >= min && c.price <= max && (Number(c.mag) || 0) > 0) : []);
+  const maxLiqMag = Math.max(...liqBands.map((c) => Number(c.mag) || 0), 1);
+  const liqRects = liqBands.map((c) => ({ dir: c.dir, price: c.price, yy: y(c.price), w: Math.max(10, (Number(c.mag) / maxLiqMag) * plotW * 0.42) }));
+  const topLong = liqRects.filter((b) => b.dir === "long").sort((a, b) => b.w - a.w)[0];
+  const topShort = liqRects.filter((b) => b.dir === "short").sort((a, b) => b.w - a.w)[0];
+
   const timeLabels = [0, 0.34, 0.67, 1].map((f) => {
     const i = Math.round(f * (view.m - 1));
     const d = new Date(visible[i].t);
@@ -220,6 +244,7 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf 
 
       {/* zoom controls */}
       <div style={{ position: "absolute", top: 7, right: 8, zIndex: 3, display: "flex", gap: 4 }}>
+        <button title="Toggle estimated liquidation clusters" onClick={() => setShowLiq((s) => !s)} style={{ ...btn, width: "auto", padding: "0 6px", color: showLiq ? "#e0a458" : MUTED, borderColor: showLiq ? "#3a3320" : BORDER }}>⚡</button>
         <button title="Zoom in" onClick={() => applyZoom(0.7)} style={btn}>+</button>
         <button title="Zoom out" onClick={() => applyZoom(1.4)} style={btn}>−</button>
         <button title="Reset" onClick={() => setVp(null)} style={{ ...btn, fontSize: 10, opacity: vp ? 1 : 0.5 }}>⤢</button>
@@ -279,6 +304,20 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf 
           );
         })}
 
+        {/* liquidation clusters — magnitude bars anchored at the right axis + a level line */}
+        {liqRects.map((b, i) => {
+          const col = b.dir === "long" ? NEG : POS;
+          const xRight = LPAD + plotW;
+          return (
+            <g key={`liq-${i}`}>
+              <rect x={xRight - b.w} y={b.yy - 4} width={b.w} height={8} fill={col} opacity={0.13} />
+              <line x1={LPAD} x2={xRight} y1={b.yy} y2={b.yy} stroke={col} strokeWidth={0.8} strokeDasharray="2 5" opacity={0.4} />
+            </g>
+          );
+        })}
+        {topLong && <text x={LPAD + plotW - topLong.w - 5} y={topLong.yy - 4} fontFamily={MONO} fontSize={8} fill={NEG} textAnchor="end" opacity={0.85}>long-liq ▼ {fmtPx(topLong.price)}</text>}
+        {topShort && <text x={LPAD + plotW - topShort.w - 5} y={topShort.yy + 9} fontFamily={MONO} fontSize={8} fill={POS} textAnchor="end" opacity={0.85}>short-liq ▲ {fmtPx(topShort.price)}</text>}
+
         {/* your position avg-entry */}
         {posY != null && positionEntry && (
           <g>
@@ -320,10 +359,11 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf 
         </div>
       )}
 
-      {/* calls legend */}
-      {calls.length > 0 && (
-        <div style={{ position: "absolute", bottom: 2, right: 8, zIndex: 3, fontFamily: MONO, fontSize: 8, color: FAINT, letterSpacing: "0.04em" }}>
-          {calls.length} graded call{calls.length === 1 ? "" : "s"} on {coin}
+      {/* legend — graded calls + estimated liquidation clusters */}
+      {(calls.length > 0 || (showLiq && liqRects.length > 0)) && (
+        <div style={{ position: "absolute", bottom: 2, right: 8, zIndex: 3, fontFamily: MONO, fontSize: 8, color: FAINT, letterSpacing: "0.04em", display: "flex", gap: 10 }}>
+          {showLiq && liqRects.length > 0 && <span>⚡ est. liq · <span style={{ color: NEG }}>long▼</span> <span style={{ color: POS }}>short▲</span></span>}
+          {calls.length > 0 && <span>{calls.length} graded call{calls.length === 1 ? "" : "s"}</span>}
         </div>
       )}
     </div>
