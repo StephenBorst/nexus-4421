@@ -20,6 +20,7 @@ import { useOrderEntry, useLeverage, useMaxLeverage, useCollateral, useAccount, 
 import { OrderSide, OrderType } from "@orderly.network/types";
 import { TradeChart, CHART_TFS } from "@/components/TradeChart";
 import { ProjectionBand } from "@/components/ProjectionBand";
+import { MarketStatStrip } from "@/components/MarketStatStrip";
 import { SimComposer } from "./SimComposer";
 import { useIsMobile } from "./useIsMobile";
 
@@ -294,6 +295,7 @@ export function QuickTrade() {
 
   const chartBlock = (
     <div style={card}>
+      <MarketStatStrip symbol={symbol} />
       <TradeChart symbol={symbol} height={isMobile ? 232 : 600} positionEntry={positionEntry} tfIndex={tfIdx} onTf={setTfIdx} />
       <div style={{ marginTop: 8, textAlign: "right" }}>
         <a href={`/perp/${symbol}`} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#71717a", textDecoration: "none" }}>
@@ -414,10 +416,10 @@ export function QuickTrade() {
 
   // Desktop: pro terminal — projection left · chart center · size/leverage + sim right.
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 1440, margin: "0 auto" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 1680, margin: "0 auto" }}>
       {header}
       {marketBar}
-      <div style={{ display: "grid", gridTemplateColumns: "340px minmax(0,1fr) 360px", gap: 14, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "300px minmax(0,1fr) 330px", gap: 14, alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{projectionBlock}</div>
         <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 14 }}>{chartBlock}{adviceBlock}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{sizeLevBlock}{simBlock}</div>

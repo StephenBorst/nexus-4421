@@ -82,6 +82,54 @@ export function smartFollowEvents(cs) {
   return (cs.smHist || []).filter((s) => s && (s.side === "LONG" || s.side === "SHORT")).map((s) => ({ t: s.t, side: s.side }));
 }
 
+// ── RSI momentum-cooldown continuation (Stoic's H4 study, done rigorously) ────
+// EMA of a numeric series.
+export function ema(values, period) {
+  const out = []; const k = 2 / (period + 1); let prev = null;
+  for (const v of values) { prev = prev == null ? v : v * k + prev * (1 - k); out.push(prev); }
+  return out;
+}
+// Wilder's RSI(period) over closes → array aligned to closes (first `period` entries null).
+export function rsi(closes, period = 14) {
+  const out = new Array(closes.length).fill(null);
+  if (closes.length <= period) return out;
+  let gain = 0, loss = 0;
+  for (let i = 1; i <= period; i++) { const ch = closes[i] - closes[i - 1]; if (ch >= 0) gain += ch; else loss -= ch; }
+  let avgGain = gain / period, avgLoss = loss / period;
+  out[period] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  for (let i = period + 1; i < closes.length; i++) {
+    const ch = closes[i] - closes[i - 1], g = ch >= 0 ? ch : 0, l = ch < 0 ? -ch : 0;
+    avgGain = (avgGain * (period - 1) + g) / period;
+    avgLoss = (avgLoss * (period - 1) + l) / period;
+    out[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  }
+  return out;
+}
+// The community claim: in an uptrend, an RSI cooldown that HOLDS the ~45+ shelf then turns
+// up = a long continuation; a reset that plunges BELOW 45 = the floor gives way. We test it
+// with OUR discipline — the trend is measured AT the reset (price > EMA50, NO lookahead), and
+// EVERY qualifying reset is scored forward (including the ones that then failed), so there is
+// no survivorship bias (nico_quant's critique). The harness then grades it vs the null baseline.
+// `held` true = trough in [floorMin,floorMax] (the shelf); false = trough < floorMin (deep).
+export function rsiResetEvents(cs, _pmap, { emaPeriod = 50, rsiPeriod = 14, floorMin = 45, floorMax = 68, held = true } = {}) {
+  const rows = (cs.oiHist || []).filter((p) => p && Number.isFinite(p.price) && p.price > 0).sort((a, b) => (a.t || 0) - (b.t || 0));
+  if (rows.length < emaPeriod + rsiPeriod + 5) return [];
+  const closes = rows.map((r) => r.price);
+  const e = ema(closes, emaPeriod), r = rsi(closes, rsiPeriod);
+  const ev = [];
+  for (let i = 2; i < rows.length - 1; i++) {
+    const a = r[i - 2], b = r[i - 1], c = r[i];
+    if (a == null || b == null || c == null) continue;
+    if (!(a > b && c > b)) continue;                 // b is a local RSI trough turning up
+    const onShelf = b >= floorMin && b <= floorMax;
+    if (held ? !onShelf : !(b < floorMin)) continue; // held the shelf vs plunged below it
+    if (!(closes[i] > e[i])) continue;               // uptrend measured AT the reset (no lookahead)
+    ev.push({ t: rows[i].t, side: "LONG" });
+  }
+  return ev;
+}
+export function rsiResetDeepEvents(cs, pmap, cfg = {}) { return rsiResetEvents(cs, pmap, { ...cfg, held: false }); }
+
 // ── Scoring: pool events across coins, aggregate forward P&L per horizon ──────
 function agg(arr) {
   if (!arr.length) return { samples: 0, hitRate: 0, meanBps: 0 };
@@ -124,6 +172,8 @@ export const AXES = [
   { name: "cvd_divergence", label: "CVD divergence", gen: cvdDivergenceEvents },
   { name: "smart_fade", label: "Funding fade × smart money", gen: smartFadeEvents },
   { name: "smart_follow", label: "Follow smart money", gen: smartFollowEvents },
+  { name: "rsi_reset_held", label: "RSI reset held 45+ (uptrend)", gen: rsiResetEvents },
+  { name: "rsi_reset_deep", label: "RSI reset <45 (uptrend)", gen: rsiResetDeepEvents },
 ];
 
 export function runScorecard(coinSets, cfg = {}) {

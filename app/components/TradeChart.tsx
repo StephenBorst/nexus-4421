@@ -77,10 +77,14 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf 
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth || 430));
+    // getBoundingClientRect is more reliable than clientWidth (fractional widths, late
+    // layout) — a stale width left the SVG narrower than its card = blank space on the right.
+    const measure = () => { const w = el.getBoundingClientRect().width; if (w > 0) setWidth(w); };
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
-    setWidth(el.clientWidth || 430);
-    return () => ro.disconnect();
+    measure();
+    window.addEventListener("resize", measure);
+    return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
   }, []);
 
   // OHLC for the selected timeframe. Resets zoom/pan on any reload.
@@ -250,7 +254,7 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf 
         <button title="Reset" onClick={() => setVp(null)} style={{ ...btn, fontSize: 10, opacity: vp ? 1 : 0.5 }}>⤢</button>
       </div>
 
-      <svg ref={svgRef} width={width} height={height} style={{ display: "block", position: "absolute", inset: 0, cursor: dragRef.current ? "grabbing" : "crosshair" }}
+      <svg ref={svgRef} width={width} height={height} style={{ display: "block", position: "absolute", top: 0, left: 0, cursor: dragRef.current ? "grabbing" : "crosshair" }}
         onMouseDown={(e) => { dragRef.current = { startX: e.clientX, lo, hi, moved: false }; }}
         onMouseMove={(e) => {
           const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();

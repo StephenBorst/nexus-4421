@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-lab-api/axisbt.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { hourBucket, priceByHour, forwardReturn, callPnl, fundingFadeEvents, cvdDivergenceEvents, scoreEvents, runScorecard } from "./axisbt.mjs";
+import { hourBucket, priceByHour, forwardReturn, callPnl, fundingFadeEvents, cvdDivergenceEvents, scoreEvents, runScorecard, ema, rsi, rsiResetEvents } from "./axisbt.mjs";
 
 const HR = 3600 * 1000;
 const BASE = 1_000_000_000_000;
@@ -75,6 +75,33 @@ test("runScorecard: returns every axis, ranked, with a coin count", () => {
   const coinSets = [{ oiHist: mkOi(rising), cvdHist: [], smHist: [] }];
   const sc = runScorecard(coinSets, { horizons: [4, 12], minSamples: 20 });
   assert.equal(sc.coins, 1);
-  assert.equal(sc.axes.length, 4);
+  assert.equal(sc.axes.length, 6);
   assert.ok(sc.axes.every((a) => typeof a.verdict === "string"));
+});
+
+test("ema: converges toward a constant series", () => {
+  const e = ema(new Array(50).fill(100), 10);
+  assert.ok(Math.abs(e[e.length - 1] - 100) < 1e-6);
+});
+
+test("rsi: strong uptrend → high (>70), downtrend → low (<30)", () => {
+  const up = Array.from({ length: 40 }, (_, i) => 100 + i);
+  const down = Array.from({ length: 40 }, (_, i) => 100 - i);
+  const ru = rsi(up), rd = rsi(down);
+  assert.ok(ru[ru.length - 1] > 70);
+  assert.ok(rd[rd.length - 1] < 30);
+});
+
+test("rsiResetEvents: uptrend with shelf cooldowns → LONG events; pure downtrend → none", () => {
+  // rising trend (above EMA50) with gentle dips that trough RSI in the 45-68 shelf
+  const upWobble = mkOi(Array.from({ length: 260 }, (_, i) => 100 + i * 0.4 + 6 * Math.sin(i / 5)));
+  const evUp = rsiResetEvents({ oiHist: upWobble }, null);
+  assert.ok(evUp.length > 0);
+  assert.ok(evUp.every((e) => e.side === "LONG"));
+  const down = mkOi(Array.from({ length: 260 }, (_, i) => 260 - i * 0.4 + 6 * Math.sin(i / 5)));
+  assert.equal(rsiResetEvents({ oiHist: down }, null).length, 0); // no uptrend → no continuation events
+});
+
+test("rsiResetEvents: thin history → no events", () => {
+  assert.equal(rsiResetEvents({ oiHist: mkOi([100, 101, 102]) }, null).length, 0);
 });
