@@ -75,8 +75,9 @@ test("runScorecard: returns every axis, ranked, with a coin count", () => {
   const coinSets = [{ oiHist: mkOi(rising), cvdHist: [], smHist: [] }];
   const sc = runScorecard(coinSets, { horizons: [4, 12], minSamples: 20 });
   assert.equal(sc.coins, 1);
-  assert.equal(sc.axes.length, 7);
+  assert.equal(sc.axes.length, 9);
   assert.ok(sc.axes.every((a) => typeof a.verdict === "string"));
+  assert.ok(sc.axes.some((a) => a.name === "rs_value_pullback"));
 });
 
 test("slopeUp: true when price is above the lookback bar", () => {

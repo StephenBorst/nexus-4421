@@ -173,6 +173,61 @@ export function rsiResetTrendEvents(cs, _pmap, opts = {}) {
   return ev;
 }
 
+// ── Grok's D0/D1: RS + VALUE pullback in a regime, with the BTC hard-veto ─────
+// The filter stack: universe (RS>0 vs BTC, computed BEFORE the event) → regime (price >
+// EMA50 AND > a value anchor) → BTC gate (a HARD VETO — if BTC is bleeding, no alt
+// continuation prints) → value tag (a pullback that's within k×vol of the value anchor).
+// RSI is optional seasoning layered ON TOP (D1). ⚠️ oi:hist has no volume/OHLC, so the
+// "weekly VWAP" is an SMA value anchor and "ATR" is close-to-close vol — labeled proxies;
+// logging real candles is the upgrade. No lookahead: every input ends at the event bar.
+export function sma(closes, period, i) {
+  if (i < period - 1) return null;
+  let s = 0; for (let k = i - period + 1; k <= i; k++) s += closes[k];
+  return s / period;
+}
+export function volProxy(closes, period, i) {
+  if (i < period) return null;
+  let s = 0; for (let k = i - period + 1; k <= i; k++) s += Math.abs(closes[k] - closes[k - 1]);
+  return s / period; // mean absolute close-to-close move ≈ an ATR proxy
+}
+// BTC regime map (hour → {price, ema}) so an alt event can veto on BTC bleed at its own time.
+export function btcRegimeByHour(btcSeries, emaPeriod = 50) {
+  const rows = (btcSeries || []).filter((p) => p && Number.isFinite(p.price) && p.price > 0).sort((a, b) => (a.t || 0) - (b.t || 0));
+  const closes = rows.map((r) => r.price), e = ema(closes, emaPeriod), m = new Map();
+  for (let i = emaPeriod; i < rows.length; i++) m.set(hourBucket(rows[i].t), { price: closes[i], ema: e[i], bleed: closes[i] < e[i] });
+  return m;
+}
+export function rsValuePullbackEvents(cs, _pmap, ctx = {}, opts = {}) {
+  const { emaPeriod = 50, anchorPeriod = 168, volPeriod = 24, rsLookback = 168, tagK = 1.0, rsi45 = false } = opts;
+  const btcMap = ctx.btcMap, btcPrice = ctx.btcPrice; // hour→regime, hour→price
+  const rows = (cs.oiHist || []).filter((p) => p && Number.isFinite(p.price) && p.price > 0).sort((a, b) => (a.t || 0) - (b.t || 0));
+  if (!btcMap || !btcPrice || rows.length < Math.max(anchorPeriod, rsLookback) + 5) return [];
+  const closes = rows.map((r) => r.price), e = ema(closes, emaPeriod);
+  const r14 = rsi45 ? rsi(closes, 14) : null;
+  const ev = [];
+  for (let i = 2; i < rows.length - 1; i++) {
+    const anchor = sma(closes, anchorPeriod, i), vol = volProxy(closes, volPeriod, i);
+    if (anchor == null || vol == null || e[i] == null) continue;
+    // regime: above EMA50 AND above the value anchor (Grok: not one or the other)
+    if (!(closes[i] > e[i] && closes[i] > anchor)) continue;
+    // BTC hard veto — no alt continuation while BTC bleeds (or its regime is unknown)
+    const hourI = hourBucket(rows[i].t), br = btcMap.get(hourI);
+    if (!br || br.bleed) continue;
+    // RS BEFORE the event — residual vs BTC over the lookback ending at i
+    const bNow = btcPrice.get(hourI), bThen = btcPrice.get(hourI - rsLookback);
+    if (!(bNow > 0 && bThen > 0) || i - rsLookback < 0) continue;
+    const rs = ((closes[i] - closes[i - rsLookback]) / closes[i - rsLookback]) - ((bNow - bThen) / bThen);
+    if (!(rs > 0)) continue; // outperforming BTC
+    // value tag — a pullback sitting within k×vol of the value anchor
+    if (!(Math.abs(closes[i] - anchor) <= tagK * vol * 6)) continue;
+    // optional RSI seasoning (D1): the reset held the 45+ shelf
+    if (rsi45) { const b = r14[i]; if (b == null || b < 45) continue; }
+    ev.push({ t: rows[i].t, side: "LONG" });
+  }
+  return ev;
+}
+export function rsValuePullbackRsiEvents(cs, pmap, ctx, opts = {}) { return rsValuePullbackEvents(cs, pmap, ctx, { ...opts, rsi45: true }); }
+
 // ── Scoring: pool events across coins, aggregate forward P&L per horizon ──────
 function agg(arr) {
   if (!arr.length) return { samples: 0, hitRate: 0, meanBps: 0 };
@@ -182,11 +237,14 @@ function agg(arr) {
 }
 
 export function scoreEvents(coinSets, signalGen, { horizons = [4, 12, 24], minSamples = 20 } = {}) {
+  // BTC context (regime map + price map) for the RS/veto gens — built once, passed to every gen.
+  const btcCs = (coinSets || []).find((c) => String(c.coin || "").toUpperCase() === "BTC");
+  const ctx = btcCs ? { btcMap: btcRegimeByHour(btcCs.oiHist), btcPrice: priceByHour(btcCs.oiHist) } : {};
   const all = [];
   for (const cs of coinSets || []) {
     const pmap = priceByHour(cs.oiHist);
     if (pmap.size < 2) continue;
-    for (const e of signalGen(cs, pmap) || []) if (e && (e.side === "LONG" || e.side === "SHORT")) all.push({ t: e.t, side: e.side, pmap });
+    for (const e of signalGen(cs, pmap, ctx) || []) if (e && (e.side === "LONG" || e.side === "SHORT")) all.push({ t: e.t, side: e.side, pmap });
   }
   if (!all.length) return { samples: 0, horizons: horizons.map((h) => ({ h, samples: 0, hitRate: 0, meanBps: 0, stable: false, verdict: "INSUFFICIENT" })), verdict: "INSUFFICIENT", bestHorizon: null };
   const times = all.map((e) => e.t).sort((a, b) => a - b);
@@ -217,6 +275,8 @@ export const AXES = [
   { name: "smart_follow", label: "Follow smart money", gen: smartFollowEvents },
   { name: "rsi_reset_held", label: "RSI reset held 45+ (A: uptrend)", gen: rsiResetEvents },
   { name: "rsi_reset_trend", label: "RSI reset held + trend_up (B: +regime)", gen: rsiResetTrendEvents },
+  { name: "rs_value_pullback", label: "RS + value pullback, BTC-gated (D0: no RSI)", gen: rsValuePullbackEvents },
+  { name: "rs_value_pullback_rsi", label: "RS + value + RSI≥45 (D1: +RSI)", gen: rsValuePullbackRsiEvents },
   { name: "rsi_reset_deep", label: "RSI reset <45 (uptrend)", gen: rsiResetDeepEvents },
 ];
 
