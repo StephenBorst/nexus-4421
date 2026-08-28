@@ -294,10 +294,10 @@ export function QuickTrade() {
   );
 
   const chartBlock = (
-    <div style={card}>
+    <div style={{ ...card, ...(isMobile ? {} : { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }) }}>
       <MarketStatStrip symbol={symbol} />
-      <TradeChart symbol={symbol} height={isMobile ? 232 : 600} positionEntry={positionEntry} tfIndex={tfIdx} onTf={setTfIdx} />
-      <div style={{ marginTop: 8, textAlign: "right" }}>
+      <TradeChart symbol={symbol} height={isMobile ? 232 : 480} positionEntry={positionEntry} tfIndex={tfIdx} onTf={setTfIdx} fill={!isMobile} />
+      <div style={{ marginTop: 8, textAlign: "right", flexShrink: 0 }}>
         <a href={`/perp/${symbol}`} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#71717a", textDecoration: "none" }}>
           Open full chart →
         </a>
@@ -423,10 +423,10 @@ export function QuickTrade() {
       {header}
       {marketBar}
       <div style={{ display: "grid", gridTemplateColumns: "340px minmax(0,1fr) 348px", gap: 14, alignItems: "stretch" }}>
-        {/* LEFT rail — the projection card FLEX-FILLS the column height (no dead space),
-            with THE READ + positions pinned below it. */}
+        {/* LEFT rail — the projection FLEX-FILLS the column height (flex:1 on its own box, no
+            wrapper), with THE READ + positions pinned below it. No dead space by construction. */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ ...card, flex: 1, minHeight: 340, display: "flex", flexDirection: "column" }}>{projectionInner}</div>
+          <ProjectionBand fill symbol={symbol} height={340} horizonHours={CHART_TFS[tfIdx].projH} />
           {adviceBlock}{positionsBlock}
         </div>
         <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 14 }}>{chartBlock}</div>

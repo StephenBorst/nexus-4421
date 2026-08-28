@@ -53,8 +53,9 @@ function CallAvatar({ pfp, name, ring, size = 20 }: { pfp: string | null; name: 
   );
 }
 
-export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf }: { symbol: string; height?: number; positionEntry?: { entry: number; side: "LONG" | "SHORT" } | null; tfIndex?: number; onTf?: (i: number) => void }) {
+export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf, fill }: { symbol: string; height?: number; positionEntry?: { entry: number; side: "LONG" | "SHORT" } | null; tfIndex?: number; onTf?: (i: number) => void; fill?: boolean }) {
   const coin = bare(symbol);
+  const [vh, setVh] = useState(height); // measured height when fill=true (fills its flex column)
   // Controlled (Quick Trade drives it to sync the projection) or self-managed.
   const controlled = typeof tfIndex === "number";
   const [tfState, setTfState] = useState(2); // default 1H
@@ -79,7 +80,7 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf 
     if (!el) return;
     // getBoundingClientRect is more reliable than clientWidth (fractional widths, late
     // layout) — a stale width left the SVG narrower than its card = blank space on the right.
-    const measure = () => { const w = el.getBoundingClientRect().width; if (w > 0) setWidth(w); };
+    const measure = () => { const r = el.getBoundingClientRect(); if (r.width > 0) setWidth(r.width); if (r.height > 80) setVh(r.height); };
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     measure();
@@ -140,9 +141,10 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf 
   }, [coin]);
 
   // ── layout ───────────────────────────────────────────────────────────────
+  const chartH = fill ? vh : height; // draw at the measured height when filling a flex column
   const RPAD = 52, LPAD = 6, TOP = 8, TIMEH = 16, VOLH = 30, GAP = 6;
-  const priceBottom = height - TIMEH - VOLH - GAP;
-  const volTop = priceBottom + GAP, volBottom = height - TIMEH;
+  const priceBottom = chartH - TIMEH - VOLH - GAP;
+  const volTop = priceBottom + GAP, volBottom = chartH - TIMEH;
   const plotW = Math.max(60, width - LPAD - RPAD);
 
   const n = candles?.length ?? 0;
@@ -197,7 +199,7 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf 
       .sort((a, b) => a.t - b.t).slice(0, 16);
   }, [allCalls, coin, view]);
 
-  const box: React.CSSProperties = { width: "100%", height, background: "#0a0a0b", border: `1px solid ${BORDER}`, borderRadius: 6, position: "relative", overflow: "hidden", userSelect: "none" };
+  const box: React.CSSProperties = { width: "100%", background: "#0a0a0b", border: `1px solid ${BORDER}`, borderRadius: 6, position: "relative", overflow: "hidden", userSelect: "none", ...(fill ? { flex: 1, minHeight: height } : { height }) };
   if (failed) return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: FAINT }}>chart unavailable</div>;
   if (!candles || !view) return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: FAINT }}>loading chart…</div>;
 
@@ -259,7 +261,7 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf 
         <button title="Reset" onClick={() => setVp(null)} style={{ ...btn, fontSize: 10, opacity: vp ? 1 : 0.5 }}>⤢</button>
       </div>
 
-      <svg ref={svgRef} width={width} height={height} style={{ display: "block", position: "absolute", top: 0, left: 0, cursor: dragRef.current ? "grabbing" : "crosshair" }}
+      <svg ref={svgRef} width={width} height={chartH} style={{ display: "block", position: "absolute", top: 0, left: 0, cursor: dragRef.current ? "grabbing" : "crosshair" }}
         onMouseDown={(e) => { dragRef.current = { startX: e.clientX, lo, hi, moved: false }; }}
         onMouseMove={(e) => {
           const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
@@ -293,7 +295,7 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf 
         {timeLabels.map((t, i) => (
           <g key={i}>
             <line x1={t.x} x2={t.x} y1={TOP} y2={priceBottom} stroke={GRID} strokeWidth={1} />
-            <text x={t.x} y={height - 4} fontFamily={MONO} fontSize={9} fill={FAINT} textAnchor="middle">{t.lab}</text>
+            <text x={t.x} y={chartH - 4} fontFamily={MONO} fontSize={9} fill={FAINT} textAnchor="middle">{t.lab}</text>
           </g>
         ))}
 

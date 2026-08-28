@@ -24,7 +24,7 @@ const Z25 = 0.6745, Z80 = 1.2816; // interquartile / 10th–90th z-scores (norma
 
 type Lean = { dir: "LONG" | "SHORT"; fundingAnnualPct: number | null } | null;
 
-export function ProjectionBand({ symbol, height = 216, horizonHours }: { symbol: string; height?: number; horizonHours?: number }) {
+export function ProjectionBand({ symbol, height = 216, horizonHours, fill }: { symbol: string; height?: number; horizonHours?: number; fill?: boolean }) {
   const coin = bare(symbol);
   // Controlled horizon (Quick Trade syncs it to the chart's timeframe) or self-managed chips.
   const controlledHz = typeof horizonHours === "number";
@@ -99,7 +99,9 @@ export function ProjectionBand({ symbol, height = 216, horizonHours }: { symbol:
     return { price, sigmaT, iqr, wide, tgt, settle: Date.now() + H * 3600 * 1000 };
   }, [closes, H, target]);
 
-  const box: React.CSSProperties = { width: "100%", height: "100%", minHeight: height, background: "#0a0a0b", border: `1px solid ${BORDER}`, borderRadius: 6, position: "relative", overflow: "hidden" };
+  // fill = grow to the parent flex column's height (flex:1 resolves where height:100% doesn't);
+  // else a fixed pixel height. Either way the SVG is drawn at the MEASURED height (vh).
+  const box: React.CSSProperties = { width: "100%", background: "#0a0a0b", border: `1px solid ${BORDER}`, borderRadius: 6, position: "relative", overflow: "hidden", ...(fill ? { flex: 1, minHeight: height } : { height }) };
   if (failed) return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: FAINT }}>projection unavailable</div>;
   if (!closes || !view) return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: FAINT }}>modeling projection…</div>;
 
