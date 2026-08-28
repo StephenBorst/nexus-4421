@@ -305,7 +305,7 @@ export function QuickTrade() {
     </div>
   );
 
-  const projectionBlock = <div style={card}><ProjectionBand symbol={symbol} height={isMobile ? 216 : 420} horizonHours={CHART_TFS[tfIdx].projH} /></div>;
+  const projectionBlock = <div style={card}><ProjectionBand symbol={symbol} height={isMobile ? 216 : 500} horizonHours={CHART_TFS[tfIdx].projH} /></div>;
 
   const sizeLevBlock = (
     <div style={card}>
@@ -414,17 +414,18 @@ export function QuickTrade() {
     );
   }
 
-  // Desktop: pro terminal — projection left · chart center · size/leverage + sim right.
+  // Desktop: pro terminal — analysis rail left (projection + read + positions) · chart
+  // center (hero) · execution right (SIM on top, order ticket below). Each column is a
+  // filled stack so there's no dead space; the chart dominates the middle.
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 1680, margin: "0 auto" }}>
       {header}
       {marketBar}
-      <div style={{ display: "grid", gridTemplateColumns: "300px minmax(0,1fr) 330px", gap: 14, alignItems: "start" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{projectionBlock}</div>
-        <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 14 }}>{chartBlock}{adviceBlock}</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{sizeLevBlock}{simBlock}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "340px minmax(0,1fr) 348px", gap: 14, alignItems: "start" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{projectionBlock}{adviceBlock}{positionsBlock}</div>
+        <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 14 }}>{chartBlock}</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{simBlock}{sizeLevBlock}</div>
       </div>
-      {positionsBlock}
       {footer}
     </div>
   );

@@ -102,7 +102,7 @@ export function ProjectionBand({ symbol, height = 216, horizonHours }: { symbol:
 
   const { price, iqr, wide, tgt, settle } = view;
   // layout — reserve a header row, an axis row, and a bottom OUTLOOK bar (no overlap).
-  const TOP = 28, OUTLOOK_H = 28, AXIS_H = 15, LPAD = 6, RPAD = 56;
+  const TOP = 28, OUTLOOK_H = 40, AXIS_H = 15, LPAD = 6, RPAD = 56;
   const plotBottom = height - OUTLOOK_H - AXIS_H;
   const nowXFrac = 0.6; // price line occupies left 60%, projection zone the right 40%
   const nowX = LPAD + (width - LPAD - RPAD) * nowXFrac;
@@ -172,13 +172,15 @@ export function ProjectionBand({ symbol, height = 216, horizonHours }: { symbol:
         <text x={LPAD} y={plotBottom + AXIS_H - 3} fontFamily={MONO} fontSize={8.5} fill={FAINT}>30d</text>
       </svg>
 
-      {/* outlook summary bar — dedicated bottom strip, no overlap with the plot */}
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: OUTLOOK_H, zIndex: 3, display: "flex", alignItems: "center", gap: 6, padding: "0 10px", borderTop: `1px solid ${BORDER}`, background: "#0c0c0e", boxSizing: "border-box", fontFamily: UI, fontSize: 11, color: FOG, overflow: "hidden", whiteSpace: "nowrap" }}>
-        <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED, flexShrink: 0 }}>OUTLOOK</span>
-        {dir
-          ? <span style={{ flexShrink: 0 }}><b style={{ color: tgtColor }}>{dir === "SHORT" ? "▼ fade short" : "▲ fade long"}</b>{tgt != null ? <> → <b style={{ color: tgtColor }}>{fmtPx(tgt)}</b> <span style={{ color: FAINT }}>({pct(tgt)})</span></> : ""}</span>
-          : <span style={{ color: MUTED, flexShrink: 0 }}>no funding lean</span>}
-        <span style={{ color: FAINT, marginLeft: "auto", flexShrink: 0 }}>{hLabel} range {fmtPx(wide.lo)}–{fmtPx(wide.hi)}</span>
+      {/* outlook summary — two lines so nothing clips at narrow widths */}
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: OUTLOOK_H, zIndex: 3, display: "flex", flexDirection: "column", justifyContent: "center", gap: 2, padding: "0 10px", borderTop: `1px solid ${BORDER}`, background: "#0c0c0e", boxSizing: "border-box", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6, fontFamily: UI, fontSize: 11, color: FOG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED, flexShrink: 0 }}>OUTLOOK</span>
+          {dir
+            ? <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}><b style={{ color: tgtColor }}>{dir === "SHORT" ? "▼ fade short" : "▲ fade long"}</b>{tgt != null ? <> → <b style={{ color: tgtColor }}>{fmtPx(tgt)}</b> <span style={{ color: FAINT }}>({pct(tgt)})</span></> : ""}</span>
+            : <span style={{ color: MUTED }}>no funding lean</span>}
+        </div>
+        <div style={{ fontFamily: MONO, fontSize: 8.5, color: FAINT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hLabel} expected range {fmtPx(wide.lo)}–{fmtPx(wide.hi)}</div>
       </div>
     </div>
   );
