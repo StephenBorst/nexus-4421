@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, simCreditsFor, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, deriveSetupMomentum, computeBeta, catalystBoard, attachCatalystTheses, CATALYST_MARKETS, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, simCreditsFor, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, deriveSetupMomentum, computeBeta, catalystBoard, attachCatalystTheses, catalystHouseCall, CATALYST_MARKETS, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -658,6 +658,79 @@ async function generateHouseCalls(env, { dryRun = false, max = 1 } = {}) {
   return { house: houseAddr, posted: toPost.map((c) => ({ id: c.id, symbol: c.symbol, direction: c.direction, entry: c.entryPrice, tp: c.takeProfit1, sl: c.stopLoss })) };
 }
 
+// Build the Catalyst Read board fresh: liquid Polymarket macro/geo events → tradeable
+// impacts → a gradeable thesis per impact (live marks in one futures fetch). Extracted so
+// the route AND the house-call generator build it identically. Returns the response object.
+async function buildCatalystBoard(env) {
+  const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+  const pages = await Promise.all([0, 100, 200, 300].map((off) =>
+    fetch(`https://gamma-api.polymarket.com/markets?closed=false&active=true&limit=100&offset=${off}&order=volumeNum&ascending=false`, { headers: { "User-Agent": UA, "Accept": "application/json" } }).then((r) => r.json()).catch(() => [])
+  ));
+  const rows = pages.flatMap((pm) => (Array.isArray(pm) ? pm : (pm?.data || [])));
+  const board = catalystBoard(rows);
+  let markByCoin = {};
+  try {
+    const fut = await fetch("https://api-evm.orderly.org/v1/public/futures", { headers: { "User-Agent": UA, "Accept": "application/json" } }).then((r) => r.json());
+    const bySym = {};
+    for (const m of (fut?.data?.rows || [])) bySym[m.symbol] = parseFloat(m.mark_price);
+    for (const [coin, sym] of Object.entries(CATALYST_MARKETS)) { if (Number.isFinite(bySym[sym])) markByCoin[coin] = bySym[sym]; }
+    if (markByCoin.SPX != null) markByCoin.SPX500 = markByCoin.SPX;
+    if (markByCoin.NAS != null) markByCoin.NAS100 = markByCoin.NAS;
+    if (markByCoin.OIL != null) markByCoin.CL = markByCoin.OIL;
+  } catch { markByCoin = {}; }
+  return {
+    asOf: new Date().toISOString(), ...attachCatalystTheses(board, markByCoin),
+    note: "World events mapped to markets you can trade on Nexus — crowd probability shows how priced it already is. Each impact carries a GRADEABLE thesis (entry/stop/target, graded in R by the same grader as human calls). A setup to stake a graded thesis + execute here, not advice, not a signal.",
+  };
+}
+
+// ── CATALYST HOUSE CALLS — the Catalyst Read's OWN auto-graded track record ───────
+// Same DARK-by-default posture as generateHouseCalls, but on a SEPARATE identity
+// (HOUSE_CATALYST_ADDRESS → "Catalyst Read") so catalyst calls never mix into the human
+// caller leaderboard or the funding-fade record. Takes the actionable, PRICED impacts off
+// the catalyst board, dedups per symbol+direction (<24h or still-active), and posts up to
+// `max` full graded thesis records. Graded by the same public first-touch engine on the
+// next grade cron. dryRun previews WITHOUT writing.
+async function generateCatalystHouseCalls(env, { dryRun = false, max = 2 } = {}) {
+  const houseAddr = String(env.HOUSE_CATALYST_ADDRESS || "").toLowerCase();
+  if (!/^0x[0-9a-f]{40}$/.test(houseAddr)) return { skipped: "HOUSE_CATALYST_ADDRESS not set" };
+  let board = null;
+  try { const c = await env.LAB_STORE.get("intel:catalystboard:v1"); if (c) board = JSON.parse(c); } catch { /* build fresh */ }
+  if (!board || !Array.isArray(board.catalysts)) {
+    try { board = await buildCatalystBoard(env); } catch (e) { return { error: `no catalyst board available: ${e}` }; }
+  }
+  const raw = await env.LAB_STORE.get(`lab:${houseAddr}`);
+  const data = raw ? JSON.parse(raw) : { theses: [] };
+  const existing = data.theses || [];
+  const now = Date.now(), DAY = 24 * 3600 * 1000;
+  const toPost = [], seenKey = new Set();
+  for (const c of board.catalysts || []) {
+    if (toPost.length >= max) break;
+    for (const im of (c.impacts || [])) {
+      if (toPost.length >= max) break;
+      if (!im.thesis) continue; // unpriced → ungradeable
+      const key = `${im.thesis.symbol}|${im.direction}`;
+      if (seenKey.has(key)) continue; // one call per symbol+direction per run
+      // dedup vs existing house calls on this symbol+direction: recent (<24h) OR still active
+      const recent = existing.find((t) => t.symbol === im.thesis.symbol && t.direction === im.direction &&
+        ((now - (t.createdAt || 0) < DAY) || (t.status === "ACTIVE" && t.gradedOutcome !== "WIN" && t.gradedOutcome !== "LOSS")));
+      if (recent) continue;
+      const call = catalystHouseCall(im, { markPrice: im.thesis.entryPrice, question: c.question, category: c.category, now });
+      if (call) { toPost.push(call); seenKey.add(key); }
+    }
+  }
+  if (dryRun) return { dryRun: true, house: houseAddr, candidates: toPost };
+  if (!toPost.length) return { posted: [], note: "no fresh catalyst impacts (all deduped or unpriced)" };
+  data.theses = [...toPost, ...existing].slice(0, 500);
+  await env.LAB_STORE.put(`lab:${houseAddr}`, JSON.stringify(data));
+  try {
+    const pk = `profile:${houseAddr}`;
+    if (!(await env.LAB_STORE.get(pk)))
+      await env.LAB_STORE.put(pk, JSON.stringify({ displayName: env.HOUSE_CATALYST_NAME || "Catalyst Read", bio: "World events → tradeable Nexus markets. Deterministic levels, graded trustlessly from public price." }));
+  } catch { /* best-effort */ }
+  return { house: houseAddr, posted: toPost.map((c) => ({ id: c.id, symbol: c.symbol, direction: c.direction, entry: c.entryPrice, tp: c.takeProfit1, sl: c.stopLoss, catalyst: c.catalyst })) };
+}
+
 export default {
   // Cron (wrangler.toml [triggers]) — best-effort refresh of the Smart Money
   // tracked set from the live HL leaderboard. Fails safe: on error the routes
@@ -725,6 +798,15 @@ export default {
         try { const r = await generateHouseCalls(env); if (r.posted?.length) console.log(`[house] posted ${r.posted.length} signal(s)`); }
         catch (e) { console.error("[house] generation failed:", String(e)); }
       })());
+      // The Catalyst Read's own auto-graded track record — same gate, SEPARATE identity
+      // (HOUSE_CATALYST_ADDRESS). Only runs when that address is set, so it stays dark until
+      // borst opts the second producer in. Graded by the same public engine next grade cron.
+      if (env.HOUSE_CATALYST_ADDRESS) {
+        ctx.waitUntil((async () => {
+          try { const r = await generateCatalystHouseCalls(env); if (r.posted?.length) console.log(`[catalyst-house] posted ${r.posted.length} call(s)`); }
+          catch (e) { console.error("[catalyst-house] generation failed:", String(e)); }
+        })());
+      }
     }
     // 12h: refresh the Smart Money tracked set + snapshot every watched wallet's
     // Tracked Record (accrues even when nobody's viewing it).
@@ -2431,6 +2513,23 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       return new Response("method not allowed", { status: 405 });
     }
 
+    // ── /signals/catalyst-house — the Catalyst Read's OWN track record (roadmap #3) ──
+    // Same shape as /signals/house: GET = DRY preview of the catalyst calls that WOULD post
+    // (no write), POST = publish (HOUSE_SIGNALS_ADMIN-gated). Cron cadence is hourly, gated by
+    // HOUSE_SIGNALS_ENABLED="true" AND HOUSE_CATALYST_ADDRESS being set. DARK until configured.
+    if (parts[0] === "signals" && parts[1] === "catalyst-house") {
+      if (request.method === "GET") {
+        return json(await generateCatalystHouseCalls(env, { dryRun: true }), request);
+      }
+      if (request.method === "POST") {
+        const admin = String(env.HOUSE_SIGNALS_ADMIN || "");
+        let body = {}; try { body = await request.json(); } catch { /* ignore */ }
+        if (!admin || body.secret !== admin) return json({ error: "unauthorized" }, request, 401);
+        return json(await generateCatalystHouseCalls(env, { dryRun: false, max: Number(body.max) || 2 }), request);
+      }
+      return new Response("method not allowed", { status: 405 });
+    }
+
     // ── /intel/mispriced — the funding-edge board (price every market, show the gap) ──
     // Borrowed framing (Quotient): don't just list calls — price every market and surface
     // where it diverges from fair. Reads ONE Orderly public-futures snapshot (all symbols),
@@ -2697,30 +2796,10 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       const CACHE_KEY = "intel:catalystboard:v1";
       try { const c = await env.LAB_STORE.get(CACHE_KEY); if (c) return json(JSON.parse(c), request); } catch { /* recompute */ }
       try {
-        const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
-        const pages = await Promise.all([0, 100, 200, 300].map((off) =>
-          fetch(`https://gamma-api.polymarket.com/markets?closed=false&active=true&limit=100&offset=${off}&order=volumeNum&ascending=false`, { headers: { "User-Agent": UA, "Accept": "application/json" } }).then((r) => r.json()).catch(() => [])
-        ));
-        const rows = pages.flatMap((pm) => (Array.isArray(pm) ? pm : (pm?.data || [])));
-        const board = catalystBoard(rows);
-        // Roadmap #3: attach a gradeable thesis (the ONE grader's schema) to every impact,
-        // so a catalyst is a one-click GRADED call and both producers share one grader in R.
-        // Live marks for the mapped markets in a single public fetch; fail-soft → thesis:null.
-        let markByCoin = {};
-        try {
-          const fut = await fetch("https://api-evm.orderly.org/v1/public/futures", { headers: { "User-Agent": UA, "Accept": "application/json" } }).then((r) => r.json());
-          const bySym = {};
-          for (const m of (fut?.data?.rows || [])) bySym[m.symbol] = parseFloat(m.mark_price);
-          for (const [coin, sym] of Object.entries(CATALYST_MARKETS)) { if (Number.isFinite(bySym[sym])) markByCoin[coin] = bySym[sym]; }
-          // catalystImpact emits coin ids SPX500/NAS100/CL (not the CATALYST_MARKETS keys SPX/NAS/OIL) — alias them.
-          if (markByCoin.SPX != null) markByCoin.SPX500 = markByCoin.SPX;
-          if (markByCoin.NAS != null) markByCoin.NAS100 = markByCoin.NAS;
-          if (markByCoin.OIL != null) markByCoin.CL = markByCoin.OIL;
-        } catch { markByCoin = {}; }
-        const out = {
-          asOf: new Date().toISOString(), ...attachCatalystTheses(board, markByCoin),
-          note: "World events mapped to markets you can trade on Nexus — crowd probability shows how priced it already is. Each impact carries a GRADEABLE thesis (entry/stop/target, graded in R by the same grader as human calls). A setup to stake a graded thesis + execute here, not advice, not a signal.",
-        };
+        // Roadmap #3: buildCatalystBoard attaches a gradeable thesis (the ONE grader's schema)
+        // to every impact, so a catalyst is a one-click GRADED call and both producers share
+        // one grader in R. Shared with the catalyst house-call generator so they never drift.
+        const out = await buildCatalystBoard(env);
         try { await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(out), { expirationTtl: 900 }); } catch { /* best-effort */ }
         return json(out, request);
       } catch (e) {

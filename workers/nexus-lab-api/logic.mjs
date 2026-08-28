@@ -2045,6 +2045,26 @@ export function catalystToThesis(impact, { markPrice, createdAt = Date.now(), st
   };
 }
 
+// Full thesis RECORD for a PERSISTED, auto-graded HOUSE catalyst call (vs the lean stake
+// template catalystToThesis returns for the board). Same deterministic levels + the record
+// fields the grader and ThesisCard read (id, status, UI zeros, notes). source:"catalyst"
+// keeps it on its own track, distinct from the funding-fade "nexus-signal" house calls.
+export function catalystHouseCall(impact, opts = {}) {
+  const { markPrice, question = "", category = null, now = Date.now(), stopPct = 2, riskReward = 2 } = opts;
+  const base = catalystToThesis(impact, { markPrice, createdAt: now, stopPct, riskReward, question, category });
+  if (!base) return null;
+  return {
+    ...base,
+    id: `catalyst-${impact.coin}-${impact.direction}-${now}`,
+    takeProfit2: 0,
+    riskPercent: 0, accountSize: 0, fundingRate: 0, positionSize: 0, leverage: 0,
+    fundingCost8h: 0, fundingCost24h: 0, fundingCost72h: 0,
+    status: "ACTIVE",
+    actualPnl: null,
+    notes: `Catalyst Read - ${question || "world event"} → ${impact.rationale || `${impact.direction} ${impact.coin}`}. Deterministic levels (${stopPct}% risk leg, ${riskReward}R). Graded trustlessly from public price, first-touch TP vs SL. A setup, not advice, not a signal.`,
+  };
+}
+
 // Attach a gradeable thesis draft to every impact on every catalyst, using a coin→mark
 // price map (bare coin, e.g. BTC/SPX500/CL). Impacts without a live price get thesis:null
 // (ungradeable, surfaced honestly). Pure — the price fetch happens in the route.

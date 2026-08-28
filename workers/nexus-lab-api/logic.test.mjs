@@ -14,7 +14,7 @@ import {
   parsePriceTarget, forecastDivergence, FORECAST,
   classifyMacro, macroEvents,
   houseCallFromSignal, wargameScenario,
-  catalystToThesis, attachCatalystTheses,
+  catalystToThesis, attachCatalystTheses, catalystHouseCall,
 } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
@@ -1993,4 +1993,19 @@ test("attachCatalystTheses: prices every impact, counts only the gradeable ones"
   assert.equal(out.catalysts[0].impacts[0].thesis.symbol, "PERP_BTC_USDC");
   assert.equal(out.catalysts[0].impacts[1].thesis, null); // unpriced → honest null
   assert.equal(out.gradeableCount, 1);
+});
+
+test("catalystHouseCall: full graded thesis record on its own track, grades through gradeCall", () => {
+  const impact = { coin: "BTC", market: "PERP_BTC_USDC", direction: "LONG", rationale: "risk-on backdrop" };
+  const call = catalystHouseCall(impact, { markPrice: 100, question: "Fed cuts?", category: "RATES", now: t0 * 1000 });
+  assert.equal(call.source, "catalyst");     // own track, not the funding-fade "nexus-signal"
+  assert.equal(call.status, "ACTIVE");
+  assert.ok(call.id.startsWith("catalyst-BTC-LONG-"));
+  assert.equal(call.takeProfit2, 0);          // full ThesisCard shape (no partial-object crash)
+  assert.equal(call.leverage, 0);
+  const cd = series(t0, [{ h: 101, l: 99 }, { h: 105, l: 100 }]);
+  const g = gradeCall(call, cd);
+  assert.equal(g.outcome, "WIN");
+  assert.equal(g.r, 2);
+  assert.equal(catalystHouseCall({ coin: "X", market: "PERP_X_USDC", direction: "NONE" }, { markPrice: 10 }), null);
 });
