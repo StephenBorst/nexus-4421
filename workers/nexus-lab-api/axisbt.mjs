@@ -130,6 +130,49 @@ export function rsiResetEvents(cs, _pmap, { emaPeriod = 50, rsiPeriod = 14, floo
 }
 export function rsiResetDeepEvents(cs, pmap, cfg = {}) { return rsiResetEvents(cs, pmap, { ...cfg, held: false }); }
 
+// ── Grok's map: REGIME gate + RELATIVE STRENGTH (the universe) ────────────────
+// "The map is the product; RSI is optional seasoning." Continuation events should only
+// fire in a real uptrend, and only on the strong horses. These are the conditioning
+// layers to run the A/B/C/D isolation (all → +regime → +RS → +value) on Sept 14.
+
+// trend_up AT bar i, no lookahead: price > EMA50 AND a positive `slope`-bar slope.
+export function slopeUp(closes, i, slope = 20) {
+  if (i < slope) return false;
+  return closes[i] > closes[i - slope];
+}
+// Relative strength of a coin vs BTC over the aligned window = its return minus BTC's
+// (residual). >0 = outperforming BTC (a "fast horse"). Aligns by hour, needs overlap.
+export function relStrength(coinSeries, btcSeries, { minSamples = 24 } = {}) {
+  const hour = (t) => Math.round(Number(t) / 3600000);
+  const cm = new Map(), bm = new Map();
+  for (const p of coinSeries || []) if (p && Number.isFinite(p.price) && p.price > 0) cm.set(hour(p.t), p.price);
+  for (const p of btcSeries || []) if (p && Number.isFinite(p.price) && p.price > 0) bm.set(hour(p.t), p.price);
+  const hrs = [...cm.keys()].filter((h) => bm.has(h)).sort((a, b) => a - b);
+  if (hrs.length < minSamples) return null;
+  const c0 = cm.get(hrs[0]), c1 = cm.get(hrs[hrs.length - 1]);
+  const b0 = bm.get(hrs[0]), b1 = bm.get(hrs[hrs.length - 1]);
+  if (!(c0 > 0 && b0 > 0)) return null;
+  return Math.round((((c1 - c0) / c0) - ((b1 - b0) / b0)) * 1000) / 1000; // residual return
+}
+
+// RSI reset held + REGIME gate (trend_up = price>EMA50 AND 20-bar slope up). Grok's "B".
+export function rsiResetTrendEvents(cs, _pmap, opts = {}) {
+  const { emaPeriod = 50, rsiPeriod = 14, floorMin = 45, floorMax = 68, slope = 20 } = opts;
+  const rows = (cs.oiHist || []).filter((p) => p && Number.isFinite(p.price) && p.price > 0).sort((a, b) => (a.t || 0) - (b.t || 0));
+  if (rows.length < emaPeriod + rsiPeriod + slope + 5) return [];
+  const closes = rows.map((r) => r.price);
+  const e = ema(closes, emaPeriod), r = rsi(closes, rsiPeriod);
+  const ev = [];
+  for (let i = 2; i < rows.length - 1; i++) {
+    const a = r[i - 2], b = r[i - 1], c = r[i];
+    if (a == null || b == null || c == null) continue;
+    if (!(a > b && c > b) || !(b >= floorMin && b <= floorMax)) continue;
+    if (!(closes[i] > e[i]) || !slopeUp(closes, i, slope)) continue; // regime: EMA50 + slope up
+    ev.push({ t: rows[i].t, side: "LONG" });
+  }
+  return ev;
+}
+
 // ── Scoring: pool events across coins, aggregate forward P&L per horizon ──────
 function agg(arr) {
   if (!arr.length) return { samples: 0, hitRate: 0, meanBps: 0 };
@@ -172,7 +215,8 @@ export const AXES = [
   { name: "cvd_divergence", label: "CVD divergence", gen: cvdDivergenceEvents },
   { name: "smart_fade", label: "Funding fade × smart money", gen: smartFadeEvents },
   { name: "smart_follow", label: "Follow smart money", gen: smartFollowEvents },
-  { name: "rsi_reset_held", label: "RSI reset held 45+ (uptrend)", gen: rsiResetEvents },
+  { name: "rsi_reset_held", label: "RSI reset held 45+ (A: uptrend)", gen: rsiResetEvents },
+  { name: "rsi_reset_trend", label: "RSI reset held + trend_up (B: +regime)", gen: rsiResetTrendEvents },
   { name: "rsi_reset_deep", label: "RSI reset <45 (uptrend)", gen: rsiResetDeepEvents },
 ];
 
@@ -184,5 +228,11 @@ export function runScorecard(coinSets, cfg = {}) {
   // rank: PREDICTIVE > PROMISING > NOISE > INSUFFICIENT, then by best meanBps
   const RANK = { PREDICTIVE: 3, PROMISING: 2, NOISE: 1, INSUFFICIENT: 0 };
   axes.sort((x, y) => (RANK[y.verdict] - RANK[x.verdict]) || ((y.best ? y.best.meanBps : -1e9) - (x.best ? x.best.meanBps : -1e9)));
-  return { axes, coins: coinSets.length };
+  // UNIVERSE — rank the coins by relative strength vs BTC (Grok's "fastest horses").
+  // Surfaced so the RS filter (the C/D isolation) can be applied + shown; the map is the product.
+  const btc = (coinSets || []).find((c) => String(c.coin || "").toUpperCase() === "BTC");
+  const universe = btc
+    ? coinSets.filter((c) => c !== btc).map((c) => ({ coin: c.coin, rs: relStrength(c.oiHist, btc.oiHist) })).filter((x) => x.rs != null).sort((a, b) => b.rs - a.rs)
+    : [];
+  return { axes, coins: coinSets.length, universe };
 }

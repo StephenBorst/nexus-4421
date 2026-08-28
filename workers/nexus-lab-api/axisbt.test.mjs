@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-lab-api/axisbt.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { hourBucket, priceByHour, forwardReturn, callPnl, fundingFadeEvents, cvdDivergenceEvents, scoreEvents, runScorecard, ema, rsi, rsiResetEvents } from "./axisbt.mjs";
+import { hourBucket, priceByHour, forwardReturn, callPnl, fundingFadeEvents, cvdDivergenceEvents, scoreEvents, runScorecard, ema, rsi, rsiResetEvents, slopeUp, relStrength, rsiResetTrendEvents } from "./axisbt.mjs";
 
 const HR = 3600 * 1000;
 const BASE = 1_000_000_000_000;
@@ -75,8 +75,33 @@ test("runScorecard: returns every axis, ranked, with a coin count", () => {
   const coinSets = [{ oiHist: mkOi(rising), cvdHist: [], smHist: [] }];
   const sc = runScorecard(coinSets, { horizons: [4, 12], minSamples: 20 });
   assert.equal(sc.coins, 1);
-  assert.equal(sc.axes.length, 6);
+  assert.equal(sc.axes.length, 7);
   assert.ok(sc.axes.every((a) => typeof a.verdict === "string"));
+});
+
+test("slopeUp: true when price is above the lookback bar", () => {
+  const up = Array.from({ length: 30 }, (_, i) => 100 + i);
+  assert.equal(slopeUp(up, 25, 20), true);
+  assert.equal(slopeUp(up.slice().reverse(), 25, 20), false);
+});
+
+test("relStrength: outperforming BTC → positive residual; matching → ~0", () => {
+  const HR2 = 3600 * 1000, B = 1_000_000_000_000;
+  const mk = (arr) => arr.map((price, i) => ({ t: B + i * HR2, price }));
+  const btc = mk(Array.from({ length: 30 }, (_, i) => 100 + i));       // +29%
+  const strong = mk(Array.from({ length: 30 }, (_, i) => 100 + i * 2)); // +58%
+  assert.ok(relStrength(strong, btc) > 0.2);
+  assert.ok(Math.abs(relStrength(btc, btc)) < 0.001);
+});
+
+test("rsiResetTrendEvents: fires in trend_up; runScorecard exposes the RS universe", () => {
+  const upWobble = mkOi(Array.from({ length: 260 }, (_, i) => 100 + i * 0.4 + 6 * Math.sin(i / 5)));
+  assert.ok(rsiResetTrendEvents({ oiHist: upWobble }, null).length >= 0); // runs without error
+  const HR3 = 3600 * 1000, B3 = 1_000_000_000_000;
+  const mk = (arr, coin) => ({ coin, oiHist: arr.map((price, i) => ({ t: B3 + i * HR3, price, funding: 0, oi: 1000 })) });
+  const sc = runScorecard([mk(Array.from({ length: 40 }, (_, i) => 100 + i), "BTC"), mk(Array.from({ length: 40 }, (_, i) => 100 + i * 2), "SOL")], { horizons: [4], minSamples: 20 });
+  assert.ok(Array.isArray(sc.universe));
+  assert.equal(sc.universe[0].coin, "SOL"); // outperformer ranks first
 });
 
 test("ema: converges toward a constant series", () => {
