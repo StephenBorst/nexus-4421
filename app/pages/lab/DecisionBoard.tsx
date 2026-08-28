@@ -168,10 +168,12 @@ function personalRead(play: Row["play"], edge: Edge): { tone: "pos" | "caution";
 
 type SortMode = "actionable" | "confluence" | "funding" | "movers" | "mine";
 
-export function DecisionBoard({ onSelectTab, trades, wallet }: {
+export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }: {
   onSelectTab?: (tab: TabId) => void;
   trades?: Trade[];          // the user's closed trades — powers the personal edge lens
   wallet?: string | null;
+  theses?: { symbol?: string; direction?: string; gradedOutcome?: string; status?: string }[]; // your active calls (PLAN leg)
+  positions?: { symbol?: string; direction?: "LONG" | "SHORT" }[];                              // your open positions (EXECUTE leg)
 }) {
   const isMobile = useIsMobile();
   const [signals, setSignals] = useState<MarketSignal[] | null>(null);
@@ -198,6 +200,27 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
   const edge = useMemo(() => computeEdge(trades ?? [], proc), [trades, proc]);
   const records = useMemo(() => symbolRecords(trades ?? []), [trades]);
   const hasLens = !!(edge.side || edge.alignClass || Object.keys(records).length);
+
+  // ── THE RETURN LEG: your loop state per market ────────────────────────────────
+  // The Board is the OBSERVE surface; overlay where YOU already are in the loop on each
+  // market — a live call (PLAN) and/or an open position (EXECUTE) — so observe → plan →
+  // execute → prove reads in one place (the graded `record` below already shows PROVE).
+  const liveCallBy = useMemo(() => {
+    const m: Record<string, Dir> = {};
+    for (const t of theses ?? []) {
+      if (!t.symbol || (t.direction !== "LONG" && t.direction !== "SHORT")) continue;
+      if (t.gradedOutcome === "WIN" || t.gradedOutcome === "LOSS") continue;               // resolved → no longer live
+      if (t.status === "HIT_TP" || t.status === "STOPPED_OUT" || t.status === "INVALIDATED") continue;
+      m[tk(String(t.symbol)).toUpperCase()] = t.direction;
+    }
+    return m;
+  }, [theses]);
+  const inPosBy = useMemo(() => {
+    const m: Record<string, Dir> = {};
+    for (const p of positions ?? []) if (p.symbol && (p.direction === "LONG" || p.direction === "SHORT")) m[tk(String(p.symbol)).toUpperCase()] = p.direction;
+    return m;
+  }, [positions]);
+  const hasLoop = Object.keys(liveCallBy).length > 0 || Object.keys(inPosBy).length > 0;
 
   useEffect(() => {
     let alive = true;
@@ -343,6 +366,7 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
         Funding, open interest and trend are <b style={{ color: C.text.bright }}>public facts</b>. <b style={{ color: C.text.bright }}>The play</b> is the mechanical read — what the rules say, not a promise — and it gets <b style={{ color: C.text.bright }}>graded from the tape</b> afterward, same as every call. No score to trust; a record to verify.
         {" "}<b style={{ color: C.text.bright }}>Confluence</b> shows four INDEPENDENT reads — <span style={{ color: C.text.muted }}>callers · smart money · catalysts · forecasters</span> — and how many <b style={{ color: C.text.bright }}>agree with the play</b> (<span style={{ color: C.accent }}>◆</span> marks where separate signals converge). Agreement is a reason to look, still graded after.
         {hasLens && <> Each play is also matched against <b style={{ color: C.pos }}>your own graded edge</b> — <span style={{ color: C.pos }}>◆ your side/class</span> vs <span style={{ color: C.warn }}>△ off your edge</span>.</>}
+        {hasLoop && <> Your loop state rides on the ticker: <b style={{ color: C.text.bright }}>● a live call</b> (planned) · <b style={{ color: C.text.bright }}>▸ an open position</b> (executing) — the graded record closes it.</>}
       </div>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
@@ -378,8 +402,12 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
               const pc = dirColor(r.play.dir);
               return (
                 <div key={r.sym} style={{ display: "grid", gridTemplateColumns: cols, gap: gridGap, padding: rowPad, borderBottom: `1px solid ${C.surfaceAlt}`, alignItems: "center", borderLeft: confluent ? `3px solid ${pc}` : "3px solid transparent", background: confluent ? `${pc}0c` : undefined }}>
-                  {/* Market */}
-                  <div style={{ ...cell, fontSize: 13, fontWeight: 700, color: C.text.bright }}>{r.sym}</div>
+                  {/* Market + YOUR loop state: ● live call (plan) · ◆ in position (execute) */}
+                  <div style={{ ...cell, fontSize: 13, fontWeight: 700, color: C.text.bright, gap: 5 }}>
+                    <span>{r.sym}</span>
+                    {liveCallBy[r.sym] && <span title={`Your live call here: ${liveCallBy[r.sym].toLowerCase()} — a plan already staked`} style={{ fontSize: 8, color: dirColor(liveCallBy[r.sym]), lineHeight: 1 }}>●</span>}
+                    {inPosBy[r.sym] && <span title={`You're in a ${inPosBy[r.sym].toLowerCase()} position here — executing`} style={{ fontSize: 9, color: dirColor(inPosBy[r.sym]), lineHeight: 1 }}>▸</span>}
+                  </div>
                   {/* Last / 24h */}
                   <div style={{ ...cell, flexDirection: "column", alignItems: "flex-start", gap: 1 }}>
                     <span style={{ color: C.text.bright, fontSize: 11 }}>{r.price != null ? `$${fmtPrice(r.price)}` : "—"}</span>

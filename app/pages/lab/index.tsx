@@ -317,7 +317,7 @@ export default function TheLabPage() {
           // The Board (every market, one verifiable read) sits between the narrative
           // Briefing and the deep Market Intel — scan the whole book at a glance. Shown
           // to everyone; it's market-level, no wallet needed.
-          const board = <DecisionBoard onSelectTab={setActiveTab} trades={connected ? processedTrades : undefined} wallet={rootWalletAddress} />;
+          const board = <DecisionBoard onSelectTab={setActiveTab} trades={connected ? processedTrades : undefined} wallet={rootWalletAddress} theses={connected ? theses : undefined} positions={connected ? briefingPositions : undefined} />;
           // Lead with the synthesis (Briefing narrative → the Board's one-line-per-market
           // read); the deep Market Intel (news, movers, OI, long/short) collapses so the
           // tab opens as a read, not a wall of rows.
