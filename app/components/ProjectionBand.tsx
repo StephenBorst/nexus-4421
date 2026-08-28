@@ -102,104 +102,118 @@ export function ProjectionBand({ symbol, height = 216, horizonHours, fill }: { s
   // fill = grow to the parent flex column's height (flex:1 resolves where height:100% doesn't);
   // else a fixed pixel height. Either way the SVG is drawn at the MEASURED height (vh).
   const box: React.CSSProperties = { width: "100%", background: "#0a0a0b", border: `1px solid ${BORDER}`, borderRadius: 6, position: "relative", overflow: "hidden", ...(fill ? { flex: 1, minHeight: height } : { height }) };
-  if (failed) return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: FAINT }}>projection unavailable</div>;
-  if (!closes || !view) return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: FAINT }}>modeling projection…</div>;
+  const centerMsg: React.CSSProperties = { position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: FAINT };
 
-  const { price, iqr, wide, tgt, settle } = view;
-  // layout — reserve a header row, an axis row, and a bottom OUTLOOK bar (no overlap).
-  const TOP = 28, OUTLOOK_H = 40, AXIS_H = 15, LPAD = 6, RPAD = 52;
-  const plotBottom = vh - OUTLOOK_H - AXIS_H;
-  const nowXFrac = 0.6; // price line occupies left 60%, projection zone the right 40%
-  const nowX = LPAD + (width - LPAD - RPAD) * nowXFrac;
-  const settleX = width - RPAD;
-  // y-scale spans the price history AND the projection cone — but NOT a far-off
-  // directional target. A liq magnet 10%+ away would otherwise blow up the domain
-  // and crush the price line + cone into a thin strip, leaving the lower half of the
-  // band empty (the recurring "dead space" bug). Scale to the data, then clamp the
-  // target's LINE into the frame (its label still shows the true price).
-  const dataLo = Math.min(Math.min(...closes), wide.lo);
-  const dataHi = Math.max(Math.max(...closes), wide.hi);
-  const dataSpan = dataHi - dataLo || 1;
-  // A target may nudge the domain out by at most ~15% of the data range — enough to
-  // stay visible on-scale when it's near, never enough to dominate when it's far.
-  const tgtBoundLo = dataLo - dataSpan * 0.15;
-  const tgtBoundHi = dataHi + dataSpan * 0.15;
-  const tgtInFrame = tgt != null ? Math.min(tgtBoundHi, Math.max(tgtBoundLo, tgt)) : null;
-  const tgtOffScale = tgt != null && tgtInFrame != null && Math.abs(tgtInFrame - tgt) > 1e-9;
-  const lo = Math.min(dataLo, tgtInFrame ?? Infinity);
-  const hi = Math.max(dataHi, tgtInFrame ?? -Infinity);
-  const pad = (hi - lo) * 0.08 || 1;
-  const yMin = lo - pad, yMax = hi + pad, span = yMax - yMin || 1;
-  const y = (v: number) => TOP + (1 - (v - yMin) / span) * (plotBottom - TOP);
-  // price line (downsampled to ~90 pts across the left zone)
-  const step = Math.max(1, Math.floor(closes.length / 90));
-  const pts = closes.filter((_, i) => i % step === 0);
-  const lineW = nowX - LPAD;
-  const path = pts.map((c, i) => `${i === 0 ? "M" : "L"}${(LPAD + (i / (pts.length - 1)) * lineW).toFixed(1)},${y(c).toFixed(1)}`).join(" ");
-  const dir = lean?.dir;
-  const tgtColor = dir === "LONG" ? POS : dir === "SHORT" ? NEG : BONE;
-  const settleStr = new Date(settle).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  const pct = (v: number) => `${v >= price ? "+" : ""}${(((v - price) / price) * 100).toFixed(1)}%`;
-
+  // The measured wrapper ALWAYS mounts (even while loading / failed) so the
+  // ResizeObserver attaches on the FIRST render and tracks the flex-grown height.
+  // Previously the loading placeholder had no ref, so the observer bailed on mount
+  // and never re-ran — vh froze at its initial value and the SVG under-filled a
+  // taller column, leaving a black strip below the plot (the dead-space bug).
   return (
     <div ref={wrapRef} style={box}>
-      {/* header: eyebrow + horizon chips */}
-      <div style={{ position: "absolute", top: 7, left: 9, zIndex: 3, fontFamily: MONO, fontSize: 9, letterSpacing: "0.14em", color: MUTED }}>◆ PROJECTION · expected move</div>
-      <div style={{ position: "absolute", top: 6, right: 9, zIndex: 3, display: "flex", gap: 4, alignItems: "center" }}>
-        {controlledHz
-          ? <span style={{ fontFamily: MONO, fontSize: 9, color: MUTED, letterSpacing: "0.06em" }}>{hLabel} forward</span>
-          : HZ.map((z, i) => (
-            <button key={z.k} onClick={() => setHIdx(i)} style={{
-              background: hIdx === i ? "#ededf015" : "transparent", border: `1px solid ${hIdx === i ? "#ededf055" : BORDER}`, borderRadius: 3,
-              padding: "2px 7px", cursor: "pointer", color: hIdx === i ? BONE : MUTED, fontFamily: MONO, fontSize: 9,
-            }}>{z.k}</button>
-          ))}
-      </div>
+      {failed ? (
+        <div style={centerMsg}>projection unavailable</div>
+      ) : !closes || !view ? (
+        <div style={centerMsg}>modeling projection…</div>
+      ) : (() => {
+        const { price, iqr, wide, tgt, settle } = view;
+        // layout — reserve a header row, an axis row, and a bottom OUTLOOK bar (no overlap).
+        const TOP = 28, OUTLOOK_H = 40, AXIS_H = 15, LPAD = 6, RPAD = 52;
+        const plotBottom = vh - OUTLOOK_H - AXIS_H;
+        const nowXFrac = 0.6; // price line occupies left 60%, projection zone the right 40%
+        const nowX = LPAD + (width - LPAD - RPAD) * nowXFrac;
+        const settleX = width - RPAD;
+        // y-scale spans the price history AND the projection cone — but NOT a far-off
+        // directional target. A liq magnet 10%+ away would otherwise blow up the domain
+        // and crush the price line + cone into a thin strip, leaving the lower half of the
+        // band empty (the recurring "dead space" bug). Scale to the data, then clamp the
+        // target's LINE into the frame (its label still shows the true price).
+        const dataLo = Math.min(Math.min(...closes), wide.lo);
+        const dataHi = Math.max(Math.max(...closes), wide.hi);
+        const dataSpan = dataHi - dataLo || 1;
+        // A target may nudge the domain out by at most ~15% of the data range — enough to
+        // stay visible on-scale when it's near, never enough to dominate when it's far.
+        const tgtBoundLo = dataLo - dataSpan * 0.15;
+        const tgtBoundHi = dataHi + dataSpan * 0.15;
+        const tgtInFrame = tgt != null ? Math.min(tgtBoundHi, Math.max(tgtBoundLo, tgt)) : null;
+        const tgtOffScale = tgt != null && tgtInFrame != null && Math.abs(tgtInFrame - tgt) > 1e-9;
+        const lo = Math.min(dataLo, tgtInFrame ?? Infinity);
+        const hi = Math.max(dataHi, tgtInFrame ?? -Infinity);
+        const pad = (hi - lo) * 0.08 || 1;
+        const yMin = lo - pad, yMax = hi + pad, span = yMax - yMin || 1;
+        const y = (v: number) => TOP + (1 - (v - yMin) / span) * (plotBottom - TOP);
+        // price line (downsampled to ~90 pts across the left zone)
+        const step = Math.max(1, Math.floor(closes.length / 90));
+        const pts = closes.filter((_, i) => i % step === 0);
+        const lineW = nowX - LPAD;
+        const path = pts.map((c, i) => `${i === 0 ? "M" : "L"}${(LPAD + (i / (pts.length - 1)) * lineW).toFixed(1)},${y(c).toFixed(1)}`).join(" ");
+        const dir = lean?.dir;
+        const tgtColor = dir === "LONG" ? POS : dir === "SHORT" ? NEG : BONE;
+        const settleStr = new Date(settle).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        const pct = (v: number) => `${v >= price ? "+" : ""}${(((v - price) / price) * 100).toFixed(1)}%`;
 
-      <svg width={width} height={vh} style={{ display: "block", position: "absolute", top: 0, left: 0 }}>
-        {/* projection zone bg */}
-        <rect x={nowX} y={TOP} width={settleX - nowX} height={plotBottom - TOP} fill="#ededf006" />
-        {/* 10th–90th faint band */}
-        <rect x={nowX} y={y(wide.hi)} width={settleX - nowX} height={Math.max(1, y(wide.lo) - y(wide.hi))} fill="#ededf008" />
-        {/* interquartile box — the "space of opportunity" */}
-        <rect x={nowX} y={y(iqr.hi)} width={settleX - nowX} height={Math.max(1, y(iqr.lo) - y(iqr.hi))}
-          fill="#ededf012" stroke="#ededf033" strokeWidth={1} strokeDasharray="3 3" />
-        {/* median (= current price) dashed across the cone */}
-        <line x1={LPAD} x2={settleX} y1={y(price)} y2={y(price)} stroke={BONE} strokeWidth={1} strokeDasharray="5 4" opacity={0.5} />
-        {/* target line (directional), if the read has a lean + magnet */}
-        {tgt != null && tgtInFrame != null && (
+        return (
           <>
-            <line x1={nowX} x2={settleX} y1={y(tgtInFrame)} y2={y(tgtInFrame)} stroke={tgtColor} strokeWidth={1.3} strokeDasharray="4 3" opacity={tgtOffScale ? 0.7 : 1} />
-            <rect x={settleX} y={y(tgtInFrame) - 8} width={RPAD} height={16} fill={tgtColor} />
-            <text x={settleX + RPAD / 2} y={y(tgtInFrame) + 3.5} fontFamily={MONO} fontSize={8.5} fontWeight={700} fill="#0a0a0b" textAnchor="middle">{tgtOffScale ? (dir === "SHORT" ? "▼" : "▲") : "TGT"} {fmtPx(tgt)}</text>
-          </>
-        )}
-        {/* price history line */}
-        <path d={path} fill="none" stroke={BRIGHT} strokeWidth={1.6} strokeLinejoin="round" />
-        {/* NOW marker */}
-        <circle cx={nowX} cy={y(price)} r={3.5} fill={BONE} />
-        <line x1={nowX} x2={nowX} y1={TOP} y2={plotBottom} stroke="#ffffff" strokeWidth={0.6} strokeDasharray="2 3" opacity={0.25} />
-        {/* current price tag */}
-        <rect x={settleX} y={y(price) - 8} width={RPAD} height={16} fill={BONE} />
-        <text x={settleX + RPAD / 2} y={y(price) + 3.5} fontFamily={MONO} fontSize={9} fontWeight={700} fill="#0a0a0b" textAnchor="middle">{fmtPx(price)}</text>
-        {/* iqr edge labels */}
-        <text x={settleX - 4} y={y(iqr.hi) - 3} fontFamily={MONO} fontSize={8} fill={FAINT} textAnchor="end">75th {fmtPx(iqr.hi)}</text>
-        <text x={settleX - 4} y={y(iqr.lo) + 9} fontFamily={MONO} fontSize={8} fill={FAINT} textAnchor="end">25th {fmtPx(iqr.lo)}</text>
-        {/* axis labels (own row, above the outlook bar) */}
-        <text x={nowX + (settleX - nowX) / 2} y={plotBottom + AXIS_H - 3} fontFamily={MONO} fontSize={8.5} fill={MUTED} textAnchor="middle">{settleStr} settle</text>
-        <text x={LPAD} y={plotBottom + AXIS_H - 3} fontFamily={MONO} fontSize={8.5} fill={FAINT}>30d</text>
-      </svg>
+            {/* header: eyebrow + horizon chips */}
+            <div style={{ position: "absolute", top: 7, left: 9, zIndex: 3, fontFamily: MONO, fontSize: 9, letterSpacing: "0.14em", color: MUTED }}>◆ PROJECTION · expected move</div>
+            <div style={{ position: "absolute", top: 6, right: 9, zIndex: 3, display: "flex", gap: 4, alignItems: "center" }}>
+              {controlledHz
+                ? <span style={{ fontFamily: MONO, fontSize: 9, color: MUTED, letterSpacing: "0.06em" }}>{hLabel} forward</span>
+                : HZ.map((z, i) => (
+                  <button key={z.k} onClick={() => setHIdx(i)} style={{
+                    background: hIdx === i ? "#ededf015" : "transparent", border: `1px solid ${hIdx === i ? "#ededf055" : BORDER}`, borderRadius: 3,
+                    padding: "2px 7px", cursor: "pointer", color: hIdx === i ? BONE : MUTED, fontFamily: MONO, fontSize: 9,
+                  }}>{z.k}</button>
+                ))}
+            </div>
 
-      {/* outlook summary — two lines so nothing clips at narrow widths */}
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: OUTLOOK_H, zIndex: 3, display: "flex", flexDirection: "column", justifyContent: "center", gap: 2, padding: "0 10px", borderTop: `1px solid ${BORDER}`, background: "#0c0c0e", boxSizing: "border-box", overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 6, fontFamily: UI, fontSize: 11, color: FOG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED, flexShrink: 0 }}>OUTLOOK</span>
-          {dir
-            ? <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}><b style={{ color: tgtColor }}>{dir === "SHORT" ? "▼ fade short" : "▲ fade long"}</b>{tgt != null ? <> → <b style={{ color: tgtColor }}>{fmtPx(tgt)}</b> <span style={{ color: FAINT }}>({pct(tgt)})</span></> : ""}</span>
-            : <span style={{ color: MUTED }}>no funding lean</span>}
-        </div>
-        <div style={{ fontFamily: MONO, fontSize: 8.5, color: FAINT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hLabel} expected range {fmtPx(wide.lo)}–{fmtPx(wide.hi)}</div>
-      </div>
+            <svg width={width} height={vh} style={{ display: "block", position: "absolute", top: 0, left: 0 }}>
+              {/* projection zone bg */}
+              <rect x={nowX} y={TOP} width={settleX - nowX} height={plotBottom - TOP} fill="#ededf006" />
+              {/* 10th–90th faint band */}
+              <rect x={nowX} y={y(wide.hi)} width={settleX - nowX} height={Math.max(1, y(wide.lo) - y(wide.hi))} fill="#ededf008" />
+              {/* interquartile box — the "space of opportunity" */}
+              <rect x={nowX} y={y(iqr.hi)} width={settleX - nowX} height={Math.max(1, y(iqr.lo) - y(iqr.hi))}
+                fill="#ededf012" stroke="#ededf033" strokeWidth={1} strokeDasharray="3 3" />
+              {/* median (= current price) dashed across the cone */}
+              <line x1={LPAD} x2={settleX} y1={y(price)} y2={y(price)} stroke={BONE} strokeWidth={1} strokeDasharray="5 4" opacity={0.5} />
+              {/* target line (directional), if the read has a lean + magnet */}
+              {tgt != null && tgtInFrame != null && (
+                <>
+                  <line x1={nowX} x2={settleX} y1={y(tgtInFrame)} y2={y(tgtInFrame)} stroke={tgtColor} strokeWidth={1.3} strokeDasharray="4 3" opacity={tgtOffScale ? 0.7 : 1} />
+                  <rect x={settleX} y={y(tgtInFrame) - 8} width={RPAD} height={16} fill={tgtColor} />
+                  <text x={settleX + RPAD / 2} y={y(tgtInFrame) + 3.5} fontFamily={MONO} fontSize={8.5} fontWeight={700} fill="#0a0a0b" textAnchor="middle">{tgtOffScale ? (dir === "SHORT" ? "▼" : "▲") : "TGT"} {fmtPx(tgt)}</text>
+                </>
+              )}
+              {/* price history line */}
+              <path d={path} fill="none" stroke={BRIGHT} strokeWidth={1.6} strokeLinejoin="round" />
+              {/* NOW marker */}
+              <circle cx={nowX} cy={y(price)} r={3.5} fill={BONE} />
+              <line x1={nowX} x2={nowX} y1={TOP} y2={plotBottom} stroke="#ffffff" strokeWidth={0.6} strokeDasharray="2 3" opacity={0.25} />
+              {/* current price tag */}
+              <rect x={settleX} y={y(price) - 8} width={RPAD} height={16} fill={BONE} />
+              <text x={settleX + RPAD / 2} y={y(price) + 3.5} fontFamily={MONO} fontSize={9} fontWeight={700} fill="#0a0a0b" textAnchor="middle">{fmtPx(price)}</text>
+              {/* iqr edge labels */}
+              <text x={settleX - 4} y={y(iqr.hi) - 3} fontFamily={MONO} fontSize={8} fill={FAINT} textAnchor="end">75th {fmtPx(iqr.hi)}</text>
+              <text x={settleX - 4} y={y(iqr.lo) + 9} fontFamily={MONO} fontSize={8} fill={FAINT} textAnchor="end">25th {fmtPx(iqr.lo)}</text>
+              {/* axis labels (own row, above the outlook bar) */}
+              <text x={nowX + (settleX - nowX) / 2} y={plotBottom + AXIS_H - 3} fontFamily={MONO} fontSize={8.5} fill={MUTED} textAnchor="middle">{settleStr} settle</text>
+              <text x={LPAD} y={plotBottom + AXIS_H - 3} fontFamily={MONO} fontSize={8.5} fill={FAINT}>30d</text>
+            </svg>
+
+            {/* outlook summary — two lines so nothing clips at narrow widths */}
+            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: OUTLOOK_H, zIndex: 3, display: "flex", flexDirection: "column", justifyContent: "center", gap: 2, padding: "0 10px", borderTop: `1px solid ${BORDER}`, background: "#0c0c0e", boxSizing: "border-box", overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6, fontFamily: UI, fontSize: 11, color: FOG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED, flexShrink: 0 }}>OUTLOOK</span>
+                {dir
+                  ? <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}><b style={{ color: tgtColor }}>{dir === "SHORT" ? "▼ fade short" : "▲ fade long"}</b>{tgt != null ? <> → <b style={{ color: tgtColor }}>{fmtPx(tgt)}</b> <span style={{ color: FAINT }}>({pct(tgt)})</span></> : ""}</span>
+                  : <span style={{ color: MUTED }}>no funding lean</span>}
+              </div>
+              <div style={{ fontFamily: MONO, fontSize: 8.5, color: FAINT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hLabel} expected range {fmtPx(wide.lo)}–{fmtPx(wide.hi)}</div>
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }
