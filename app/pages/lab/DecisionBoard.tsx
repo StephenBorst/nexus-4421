@@ -37,9 +37,41 @@ interface Row {
   trendOi: number | null;
   consensus: { side: "LONG" | "SHORT" | "SPLIT"; participants: number } | null;
   play: { klass: "CONFLUENCE" | "FADE" | "TREND" | "LEAN" | null; dir: Dir | null; label: string; strong: boolean };
+  // The independent-lens strip: four PUBLIC reads that either confirm or contradict the
+  // mechanical play — graded callers, smart money, catalysts, forecasters. agree = how many
+  // point the SAME way as the play (the "agreement = signal" fusion, kept explainable).
+  lens: { callers: Dir | null; smart: Dir | null; catalyst: Dir | null; forecast: Dir | null };
+  agree: number;
   score: number;
   mine: { tone: "pos" | "caution"; text: string } | null;
   record: { net: number; n: number; wr: number } | null;   // your graded record on THIS market
+}
+
+// Catalyst board → per-coin directional lean (dominant impact side across its events).
+function catalystLeans(catalysts: { impacts?: { coin?: string; direction?: string }[] }[]): Record<string, Dir> {
+  const tally: Record<string, { L: number; S: number }> = {};
+  for (const c of catalysts || []) for (const im of c.impacts || []) {
+    const coin = String(im.coin || "").toUpperCase(); if (!coin) continue;
+    const t = tally[coin] || (tally[coin] = { L: 0, S: 0 });
+    if (im.direction === "LONG") t.L++; else if (im.direction === "SHORT") t.S++;
+  }
+  const out: Record<string, Dir> = {};
+  for (const [coin, t] of Object.entries(tally)) { if (t.L > t.S) out[coin] = "LONG"; else if (t.S > t.L) out[coin] = "SHORT"; }
+  return out;
+}
+// Forecast board → per-coin lean (dominant near-money forecast direction; UP = LONG).
+// Tradable-only (markPrice present) so it matches the our-markets-only Forecast lens.
+function forecastLeans(markets: { coin?: string; forecastLean?: string; markPrice?: number | null }[]): Record<string, Dir> {
+  const tally: Record<string, { L: number; S: number }> = {};
+  for (const m of markets || []) {
+    if (m.markPrice == null) continue;
+    const coin = String(m.coin || "").toUpperCase(); if (!coin || !m.forecastLean) continue;
+    const t = tally[coin] || (tally[coin] = { L: 0, S: 0 });
+    if (m.forecastLean === "UP") t.L++; else if (m.forecastLean === "DOWN") t.S++;
+  }
+  const out: Record<string, Dir> = {};
+  for (const [coin, t] of Object.entries(tally)) { if (t.L > t.S) out[coin] = "LONG"; else if (t.S > t.L) out[coin] = "SHORT"; }
+  return out;
 }
 
 const tk = (s: string) => s.replace("PERP_", "").replace("_USDC", "");
@@ -134,7 +166,7 @@ function personalRead(play: Row["play"], edge: Edge): { tone: "pos" | "caution";
   return null;
 }
 
-type SortMode = "actionable" | "funding" | "movers" | "mine";
+type SortMode = "actionable" | "confluence" | "funding" | "movers" | "mine";
 
 export function DecisionBoard({ onSelectTab, trades, wallet }: {
   onSelectTab?: (tab: TabId) => void;
@@ -145,6 +177,9 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
   const [signals, setSignals] = useState<MarketSignal[] | null>(null);
   const [tape, setTape] = useState<Record<string, { price: number; change: number }>>({});
   const [consensus, setConsensus] = useState<Consensus | null>(null);
+  const [smart, setSmart] = useState<Record<string, Dir>>({});       // smart-money lean per coin
+  const [catalyst, setCatalyst] = useState<Record<string, Dir>>({}); // catalyst lean per coin
+  const [forecast, setForecast] = useState<Record<string, Dir>>({}); // forecaster lean per coin
   const [proc, setProc] = useState<ProcessEdge>(null);
   const [sort, setSort] = useState<SortMode>("actionable");
 
@@ -169,6 +204,18 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
     const load = () => {
       fetch(`${AGENT_API}/signals`).then((r) => r.json()).then((j) => { if (alive) setSignals(Array.isArray(j?.signals) ? j.signals : []); }).catch(() => alive && setSignals([]));
       fetch(`${AGENT_API}/theses/consensus`).then((r) => r.json()).then((j) => { if (alive) setConsensus(j?.consensus ?? null); }).catch(() => { /* no crowd lean */ });
+      // Three more INDEPENDENT lenses to fuse into the read — smart money, catalysts,
+      // forecasters. Each fail-soft (an absent lens just shows "·", never blocks the board).
+      fetch(`${AGENT_API}/smart/consensus`).then((r) => r.json()).then((j) => {
+        if (!alive) return;
+        const m: Record<string, Dir> = {};
+        for (const [k, v] of Object.entries((j?.consensus ?? {}) as Record<string, { side?: string }>)) {
+          if (v && (v.side === "LONG" || v.side === "SHORT")) m[k.toUpperCase()] = v.side;
+        }
+        setSmart(m);
+      }).catch(() => { /* smart lens dim */ });
+      fetch(`${AGENT_API}/intel/catalysts-board`).then((r) => r.json()).then((j) => { if (alive) setCatalyst(catalystLeans(j?.catalysts ?? [])); }).catch(() => { /* catalyst lens dim */ });
+      fetch(`${AGENT_API}/intel/forecasts`).then((r) => r.json()).then((j) => { if (alive) setForecast(forecastLeans(j?.markets ?? [])); }).catch(() => { /* forecast lens dim */ });
       fetch(FUTURES).then((r) => r.json()).then((j) => {
         if (!alive) return;
         const map: Record<string, { price: number; change: number }> = {};
@@ -191,6 +238,15 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
       const play = derivePlay(s);
       const t = tape[s.symbol] || null;
       const c = consensus?.[s.symbol];
+      const coin = String(s.symbol).toUpperCase();
+      const lens: Row["lens"] = {
+        callers: c && c.side !== "SPLIT" ? c.side : null,
+        smart: smart[coin] ?? null,
+        catalyst: catalyst[coin] ?? null,
+        forecast: forecast[coin] ?? null,
+      };
+      // agreement = independent lenses pointing the SAME way as the mechanical play.
+      const agree = play.dir ? (Object.values(lens).filter((v) => v === play.dir).length) : 0;
       return {
         sym: s.symbol,
         price: t?.price ?? null,
@@ -202,21 +258,28 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
         trendOi: s.trend_oi_pct ?? null,
         consensus: c ? { side: c.side, participants: c.participants } : null,
         play,
-        score: scoreOf(play, s.funding_rate_8h),
+        lens,
+        agree,
+        // Confluence NUDGES actionability (more independent reads agree → look here first),
+        // but only for real setups — a lean with agreement is still just a lean.
+        score: scoreOf(play, s.funding_rate_8h) + (play.strong ? agree * 25 : 0),
         mine: personalRead(play, edge),
         record: (() => { const rec = records[s.symbol]; return rec && rec.n >= 2 ? { net: rec.net, n: rec.n, wr: Math.round((rec.wins / rec.n) * 100) } : null; })(),
       } as Row;
     });
     // "mine" ranks your-edge plays first, then any market you have a record on, then the rest.
     const mineRank = (r: Row) => (r.mine?.tone === "pos" ? 0 : r.record ? 1 : r.mine?.tone === "caution" ? 2 : 3);
+    // "confluence" ranks the most-confirmed real setups first (agreement = signal).
+    const confRank = (r: Row) => (r.play.strong ? r.agree : -1);
     const cmp: Record<SortMode, (a: Row, b: Row) => number> = {
       actionable: (a, b) => b.score - a.score,
+      confluence: (a, b) => (confRank(b) - confRank(a)) || (b.score - a.score),
       funding: (a, b) => Math.abs(b.funding) - Math.abs(a.funding),
       movers: (a, b) => Math.abs(b.change24h ?? 0) - Math.abs(a.change24h ?? 0),
       mine: (a, b) => (mineRank(a) - mineRank(b)) || (b.score - a.score),
     };
     return out.sort(cmp[sort]);
-  }, [signals, tape, consensus, sort, edge, records]);
+  }, [signals, tape, consensus, smart, catalyst, forecast, sort, edge, records]);
 
   // OBSERVE → PLAN handoff: a clean read is a thesis waiting to be written. Draft the
   // play into the Thesis Engine (same contract the Mispriced board + copilot use).
@@ -250,7 +313,7 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
     }}>{label}</button>
   );
 
-  const cols = "minmax(64px,0.9fr) minmax(78px,1fr) minmax(88px,1.1fr) 64px minmax(74px,0.9fr) minmax(76px,0.9fr) minmax(120px,1.3fr) 40px";
+  const cols = "minmax(60px,0.85fr) minmax(76px,1fr) minmax(84px,1.05fr) 54px minmax(66px,0.8fr) minmax(140px,1.6fr) minmax(118px,1.25fr) 34px";
   const cell: React.CSSProperties = { fontFamily: MONO, fontSize: 11, display: "flex", alignItems: "center", minWidth: 0 };
   const head: React.CSSProperties = { fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", textTransform: "uppercase", color: C.text.faint, display: "flex", alignItems: "center" };
   // Tighter grid on phones — less column gap + row padding so the dense table doesn't
@@ -264,19 +327,21 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
       <SectionHeader
         eyebrow="THE BOARD"
         title="Every market, one read"
-        note={<span>{signals ? `${rows.length} markets` : "loading…"} · every column verifiable</span>}
+        note={<span>{signals ? `${rows.length} markets` : "loading…"}{signals && rows.some((r) => r.play.strong && r.agree >= 3) ? ` · ${rows.filter((r) => r.play.strong && r.agree >= 3).length} in confluence` : ""} · every column verifiable</span>}
       />
 
       {/* Honesty framing — the whole point of the moat. */}
       <div style={{ fontFamily: UI, fontSize: 11, lineHeight: 1.5, color: C.text.muted, marginTop: -8, marginBottom: 14 }}>
         Funding, open interest and trend are <b style={{ color: C.text.bright }}>public facts</b>. <b style={{ color: C.text.bright }}>The play</b> is the mechanical read — what the rules say, not a promise — and it gets <b style={{ color: C.text.bright }}>graded from the tape</b> afterward, same as every call. No score to trust; a record to verify.
-        {hasLens && <> Each play is matched against <b style={{ color: C.pos }}>your own graded edge</b> — <span style={{ color: C.pos }}>◆ your side/class</span> vs <span style={{ color: C.warn }}>△ off your edge</span>.</>}
+        {" "}<b style={{ color: C.text.bright }}>Confluence</b> shows four INDEPENDENT reads — <span style={{ color: C.text.muted }}>callers · smart money · catalysts · forecasters</span> — and how many <b style={{ color: C.text.bright }}>agree with the play</b> (<span style={{ color: C.accent }}>◆</span> marks where separate signals converge). Agreement is a reason to look, still graded after.
+        {hasLens && <> Each play is also matched against <b style={{ color: C.pos }}>your own graded edge</b> — <span style={{ color: C.pos }}>◆ your side/class</span> vs <span style={{ color: C.warn }}>△ off your edge</span>.</>}
       </div>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
         <span style={{ fontFamily: MONO, fontSize: 9, color: C.text.faint, alignSelf: "center", letterSpacing: "0.06em" }}>SORT</span>
         {hasLens && sortBtn("mine", "◆ MINE")}
         {sortBtn("actionable", "ACTIONABLE")}
+        {sortBtn("confluence", "◆ CONFLUENCE")}
         {sortBtn("funding", "FUNDING")}
         {sortBtn("movers", "MOVERS")}
       </div>
@@ -285,7 +350,7 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
         <div style={{ fontFamily: MONO, fontSize: 11, color: C.text.faint, padding: "18px 4px" }}>loading the board…</div>
       ) : (
         <div style={{ overflowX: "auto" }}>
-          <div style={{ minWidth: 640 }}>
+          <div style={{ minWidth: 720 }}>
             {/* header row */}
             <div style={{ display: "grid", gridTemplateColumns: cols, gap: gridGap, padding: headPad, borderBottom: `1px solid ${C.border}` }}>
               <div style={head}>Market</div>
@@ -293,14 +358,18 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
               <div style={head}>Funding /8h</div>
               <div style={head}>OI Δ</div>
               <div style={head}>Trend</div>
-              <div style={head}>Callers</div>
+              <div style={head}>Confluence</div>
               <div style={head}>The play</div>
               <div style={head} />
             </div>
             {rows.map((r) => {
               const fundHot = Math.abs(r.funding) >= CROWDED;
+              // A confirmed setup = a real play with ≥3 independent lenses agreeing. The whole
+              // moat in one glance: not one indicator, but where separate verifiable reads converge.
+              const confluent = r.play.strong && !!r.play.dir && r.agree >= 3;
+              const pc = dirColor(r.play.dir);
               return (
-                <div key={r.sym} style={{ display: "grid", gridTemplateColumns: cols, gap: gridGap, padding: rowPad, borderBottom: `1px solid ${C.surfaceAlt}`, alignItems: "center" }}>
+                <div key={r.sym} style={{ display: "grid", gridTemplateColumns: cols, gap: gridGap, padding: rowPad, borderBottom: `1px solid ${C.surfaceAlt}`, alignItems: "center", borderLeft: confluent ? `3px solid ${pc}` : "3px solid transparent", background: confluent ? `${pc}0c` : undefined }}>
                   {/* Market */}
                   <div style={{ ...cell, fontSize: 13, fontWeight: 700, color: C.text.bright }}>{r.sym}</div>
                   {/* Last / 24h */}
@@ -320,11 +389,26 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
                     : r.trend === "TREND_DOWN" ? <span style={{ color: C.neg }}>↓ dn{r.trendMove != null ? ` ${Math.abs(r.trendMove).toFixed(1)}%` : ""}</span>
                     : <span style={{ color: C.text.faint }}>chop</span>}
                   </div>
-                  {/* Callers (graded consensus) */}
-                  <div style={{ ...cell, fontSize: 10 }}>
-                    {r.consensus && r.consensus.side !== "SPLIT"
-                      ? <span style={{ color: r.consensus.side === "LONG" ? C.pos : C.neg }}>{r.consensus.side === "LONG" ? "long" : "short"} <span style={{ color: C.text.faint }}>{r.consensus.participants}</span></span>
-                      : <span style={{ color: C.text.faint }}>{r.consensus ? "split" : "—"}</span>}
+                  {/* CONFLUENCE — the four INDEPENDENT reads (callers · smart · catalyst ·
+                      forecast), each a verifiable public fact, + how many confirm the play. */}
+                  <div style={{ ...cell, gap: 5, flexWrap: "wrap" }}>
+                    {([
+                      { k: "Ca", v: r.lens.callers, t: `Graded callers${r.consensus ? ` (${r.consensus.participants})` : ""}` },
+                      { k: "Sm", v: r.lens.smart, t: "Smart money" },
+                      { k: "Ct", v: r.lens.catalyst, t: "Catalysts" },
+                      { k: "Fc", v: r.lens.forecast, t: "Forecasters" },
+                    ] as { k: string; v: Dir | null; t: string }[]).map(({ k, v, t }) => (
+                      <span key={k} title={`${t}: ${v ? v.toLowerCase() : "no read"}`} style={{
+                        fontFamily: MONO, fontSize: 9, fontWeight: 700, whiteSpace: "nowrap",
+                        color: v === "LONG" ? C.pos : v === "SHORT" ? C.neg : C.text.faint, opacity: v ? 1 : 0.42,
+                      }}>{k}{v === "LONG" ? "↑" : v === "SHORT" ? "↓" : "·"}</span>
+                    ))}
+                    {r.play.dir && r.agree >= 2 && (
+                      <span title={`${r.agree} of 4 independent reads confirm the play`} style={{
+                        fontFamily: MONO, fontSize: 8, fontWeight: 700, color: dirColor(r.play.dir),
+                        border: `1px solid ${dirColor(r.play.dir)}66`, borderRadius: 3, padding: "0 4px", lineHeight: 1.5,
+                      }}>◆{r.agree}</span>
+                    )}
                   </div>
                   {/* THE PLAY — the mechanical read (strong = a real setup, bright; lean =
                       faint tilt, informational), + your personal edge lens below it */}
