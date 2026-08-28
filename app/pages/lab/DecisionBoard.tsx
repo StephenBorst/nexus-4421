@@ -286,13 +286,21 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
   const draftPlay = (r: Row) => {
     if (!r.play.dir) return;
     const crowd = r.play.dir === "SHORT" ? "long" : "short";
+    // Carry the FUSION into the plan: name the independent lenses that confirm this play so
+    // the drafted thesis records WHY it was a confluent read (the loop stays explainable).
+    const lensName: Record<string, string> = { callers: "graded callers", smart: "smart money", catalyst: "catalysts", forecast: "forecasters" };
+    const agreeing = (["callers", "smart", "catalyst", "forecast"] as const).filter((k) => r.lens[k] === r.play.dir);
+    const confNote = r.agree >= 2 ? ` ${r.agree} independent reads confirm this: ${agreeing.map((k) => lensName[k]).join(", ")}.` : "";
     const draft = {
       symbol: r.sym,
       direction: r.play.dir,
+      // Prefill the entry from the live mark so the read arrives one field closer to armed —
+      // the trader still sets stop + target (where the chart tells them), then deploys to the agent.
+      entryPrice: r.price != null ? String(r.price) : "",
       catalyst: `${r.play.label} · funding ${(r.funding * 100).toFixed(3)}%/8h`,
-      notes: r.play.klass === "CONFLUENCE"
-        ? `Funding and open interest agree — the crowd is offside ${crowd}. Set your own entry, stop and target; it grades from public price.`
-        : `${r.play.label} — the mechanical read, not a promise. Add your levels; it grades first-touch vs the tape.`,
+      notes: (r.play.klass === "CONFLUENCE"
+        ? `Funding and open interest agree — the crowd is offside ${crowd}. Set your stop and target; it grades from public price.`
+        : `${r.play.label} — the mechanical read, not a promise. Add your levels; it grades first-touch vs the tape.`) + confNote,
     };
     try { window.localStorage.setItem("nexus_thesis_draft", JSON.stringify(draft)); } catch { /* private mode */ }
     try {
