@@ -38,6 +38,16 @@ export const CHART_TFS = [
 const TFS = CHART_TFS;
 const MIN_CANDLES = 12;
 
+// Moving-average overlays (SMA of close). Neutral analytical tints only — brightness =
+// speed (fast MA brightest); never the reserved green/red/amber semantics. 150 is the
+// longest, so we fetch that many warmup bars BEFORE the display window (see the fetch).
+const MA_DEFS = [
+  { p: 20, c: "#ededf0" },
+  { p: 50, c: "#9aa2b4" },
+  { p: 150, c: "#646b7d" },
+] as const;
+const MA_MAX = 150;
+
 const fmtPx = (v: number) => (v >= 1000 ? `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : v >= 1 ? `$${v.toFixed(2)}` : `$${v.toPrecision(4)}`);
 
 // Small avatar with monogram fallback (mirrors the Feed avatar; no external dep).
@@ -66,6 +76,7 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf,
   const [allCalls, setAllCalls] = useState<Call[]>([]);
   const [liq, setLiq] = useState<{ below: LiqCluster[]; above: LiqCluster[]; currentPrice: number } | null>(null);
   const [showLiq, setShowLiq] = useState(true);
+  const [showMA, setShowMA] = useState(true);
   const [hover, setHover] = useState<number | null>(null); // index into VISIBLE slice
   const [vp, setVp] = useState<{ lo: number; hi: number } | null>(null); // visible window into candles; null = all
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -94,16 +105,23 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf,
     setCandles(null); setFailed(false); setHover(null); setVp(null);
     const now = Math.floor(Date.now() / 1000);
     const { res, hours } = TFS[tf];
-    fetch(`${ORDERLY_API}/tv/history?symbol=${symbol}&resolution=${res}&from=${now - hours * 3600}&to=${now}`, { headers: { accept: "application/json" } })
+    // Fetch MA_MAX extra bars of WARMUP before the display window so the long MAs (up to
+    // 150) are defined across the whole visible range; we still DEFAULT the view to the
+    // intended recent `hours`. Warmup hours = MA_MAX × the bar size, capped so we never
+    // over-fetch a fast timeframe.
+    const resHours = Number(res) / 60;
+    const warmupHours = Math.min(360, Math.round(MA_MAX * resHours));
+    const displayBars = Math.max(MIN_CANDLES, Math.round(hours / resHours));
+    fetch(`${ORDERLY_API}/tv/history?symbol=${symbol}&resolution=${res}&from=${now - (hours + warmupHours) * 3600}&to=${now}`, { headers: { accept: "application/json" } })
       .then((r) => r.json())
       .then((j) => {
         if (off) return;
         if (j?.s === "ok" && Array.isArray(j.c) && j.c.length > 1) {
           const arr = j.c.map((c: number, i: number) => ({ t: Number(j.t[i]) * 1000, o: Number(j.o[i]), h: Number(j.h[i]), l: Number(j.l[i]), c: Number(c), v: Number(j.v?.[i]) || 0 }));
           setCandles(arr);
-          // Default to the recent ~72% so there's history to DRAG back to (TradingView-style);
-          // the ⤢ reset button shows the full window. Enables grab-drag immediately.
-          const nn = arr.length, vis = Math.min(nn, Math.max(MIN_CANDLES, Math.round(nn * 0.72)));
+          // Default the viewport to the recent display window; the warmup bars sit off to the
+          // left to DRAG back to (TradingView-style). ⤢ reset shows everything incl. warmup.
+          const nn = arr.length, vis = Math.min(nn, displayBars);
           setVp(nn > vis + 2 ? { lo: nn - vis, hi: nn - 1 } : null);
         } else setFailed(true);
       })
@@ -199,6 +217,24 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf,
       .sort((a, b) => a.t - b.t).slice(0, 16);
   }, [allCalls, coin, view]);
 
+  // SMA(close) per MA period, aligned to the FULL candle array (warmup included) so each
+  // MA is defined from its period onward — a rolling sum, O(n). null before enough bars.
+  const maFull = useMemo(() => {
+    if (!candles) return null;
+    const out: Record<number, (number | null)[]> = {};
+    for (const { p } of MA_DEFS) {
+      const arr: (number | null)[] = new Array(candles.length).fill(null);
+      let sum = 0;
+      for (let i = 0; i < candles.length; i++) {
+        sum += candles[i].c;
+        if (i >= p) sum -= candles[i - p].c;
+        if (i >= p - 1) arr[i] = sum / p;
+      }
+      out[p] = arr;
+    }
+    return out;
+  }, [candles]);
+
   const box: React.CSSProperties = { width: "100%", background: "#0a0a0b", border: `1px solid ${BORDER}`, borderRadius: 6, position: "relative", overflow: "hidden", userSelect: "none", ...(fill ? { flex: 1, minHeight: height } : { height }) };
   if (failed) return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: FAINT }}>chart unavailable</div>;
   if (!candles || !view) return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: FAINT }}>loading chart…</div>;
@@ -208,6 +244,20 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf,
   const lastUp = last.c >= last.o;
   const hc = hover != null && hover < visible.length ? visible[hover] : null;
   const posY = positionEntry && positionEntry.entry >= min && positionEntry.entry <= max ? y(positionEntry.entry) : null;
+
+  // Moving-average polylines over the visible slice (value at visible i = maFull[p][lo+i]).
+  // Clipped to the price plot area so a long MA that dips below the window doesn't bleed
+  // into the volume strip. `last` = the current MA value for the legend readout.
+  const maLines = (showMA && maFull) ? MA_DEFS.map(({ p, c }) => {
+    let d = "", started = false;
+    for (let i = 0; i < visible.length; i++) {
+      const v = maFull[p][lo + i];
+      if (v == null) continue;
+      d += `${started ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`;
+      started = true;
+    }
+    return { p, c, d, last: maFull[p][hi] };
+  }).filter((m) => m.d) : [];
 
   // Liquidation clusters within the visible price range → magnitude bars from the right axis.
   // long-liq clusters sit BELOW price (downside magnet, red); short-liq ABOVE (upside, green).
@@ -255,11 +305,21 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf,
 
       {/* zoom controls */}
       <div style={{ position: "absolute", top: 7, right: 8, zIndex: 3, display: "flex", gap: 4 }}>
+        <button title="Toggle moving averages (20 / 50 / 150)" onClick={() => setShowMA((s) => !s)} style={{ ...btn, width: "auto", padding: "0 6px", fontSize: 9, color: showMA ? BONE : MUTED, borderColor: showMA ? "#ededf055" : BORDER }}>MA</button>
         <button title="Toggle estimated liquidation clusters" onClick={() => setShowLiq((s) => !s)} style={{ ...btn, width: "auto", padding: "0 6px", color: showLiq ? "#e0a458" : MUTED, borderColor: showLiq ? "#3a3320" : BORDER }}>⚡</button>
         <button title="Zoom in" onClick={() => applyZoom(0.7)} style={btn}>+</button>
         <button title="Zoom out" onClick={() => applyZoom(1.4)} style={btn}>−</button>
         <button title="Reset" onClick={() => setVp(null)} style={{ ...btn, fontSize: 10, opacity: vp ? 1 : 0.5 }}>⤢</button>
       </div>
+
+      {/* MA legend — current values (top-left, below the timeframe row). */}
+      {maLines.length > 0 && (
+        <div style={{ position: "absolute", top: 26, left: 8, zIndex: 3, display: "flex", gap: 10, fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.02em", pointerEvents: "none" }}>
+          {maLines.map((m) => (
+            <span key={m.p} style={{ color: m.c }}>MA{m.p} {m.last != null ? fmtPx(m.last) : "—"}</span>
+          ))}
+        </div>
+      )}
 
       <svg ref={svgRef} width={width} height={chartH} style={{ display: "block", position: "absolute", top: 0, left: 0, cursor: dragRef.current ? "grabbing" : "crosshair" }}
         onMouseDown={(e) => { dragRef.current = { startX: e.clientX, lo, hi, moved: false }; }}
@@ -283,6 +343,12 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf,
         }}
         onMouseUp={() => { dragRef.current = null; }}
         onMouseLeave={() => { dragRef.current = null; setHover(null); }}>
+
+        <defs>
+          <clipPath id={`price-clip-${coin}`}>
+            <rect x={LPAD} y={TOP} width={plotW} height={Math.max(0, priceBottom - TOP)} />
+          </clipPath>
+        </defs>
 
         {/* horizontal grid + price axis labels */}
         {priceLevels.map((p, i) => (
@@ -314,6 +380,15 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf,
             </g>
           );
         })}
+
+        {/* moving averages — over the candles, clipped to the price plot area */}
+        {maLines.length > 0 && (
+          <g clipPath={`url(#price-clip-${coin})`}>
+            {maLines.map((m) => (
+              <path key={m.p} d={m.d} fill="none" stroke={m.c} strokeWidth={m.p === 20 ? 1.4 : 1.1} strokeLinejoin="round" strokeLinecap="round" opacity={0.95} />
+            ))}
+          </g>
+        )}
 
         {/* liquidation clusters — magnitude bars anchored at the right axis + a level line */}
         {liqRects.map((b, i) => {
