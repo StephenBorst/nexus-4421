@@ -2011,3 +2011,50 @@ export function catalystBoard(polyMarkets, { minVolumeUsd = 20000, limit = 24 } 
   for (const r of rows) { const k = r.question.toLowerCase(); if (seen.has(k)) continue; seen.add(k); uniq.push(r); }
   return { scanned: (polyMarkets || []).length, count: uniq.length, catalysts: uniq.slice(0, limit) };
 }
+
+// ── Roadmap #3: Catalyst → the ONE gradeable thesis schema ────────────────────
+// Convert a catalyst IMPACT ({coin, market, direction, rationale}) into the exact shape
+// gradeCall() consumes, so the Catalyst producer and hand-authored theses are graded by
+// ONE grader, in R. Levels come from a symmetric risk leg (stopPct of entry) and the
+// target asymmetry (riskReward): first-touch of TP prints +riskReward R, first-touch of
+// SL prints −1R — identical to a manual call. `catalyst` carries the "why now" so the
+// macro classifier / regime attribution pick it up for free. entry defaults to the live
+// mark (the moment it's staked); pass createdAt to pin the grade window. null if unpriced.
+export function catalystToThesis(impact, { markPrice, createdAt = Date.now(), stopPct = 2, riskReward = 2, question = "", category = null } = {}) {
+  const dir = impact && impact.direction;
+  const px = Number(markPrice);
+  if ((dir !== "LONG" && dir !== "SHORT") || !(px > 0) || !impact.market) return null;
+  const rr = Number(riskReward) > 0 ? Number(riskReward) : 2;
+  const risk = px * (Math.max(0.1, Number(stopPct) || 2) / 100);
+  const stopLoss = dir === "LONG" ? px - risk : px + risk;
+  const takeProfit1 = dir === "LONG" ? px + risk * rr : px - risk * rr;
+  return {
+    source: "catalyst",
+    symbol: impact.market,          // canonical PERP id (CATALYST_MARKETS) → normalizeSymbol no-ops
+    coin: impact.coin,
+    direction: dir,
+    entryPrice: round(px, 4),
+    stopLoss: round(stopLoss, 4),
+    takeProfit1: round(takeProfit1, 4),
+    riskReward: rr,
+    createdAt,
+    catalyst: question,             // the "why now" → isMacroCall + macro-caller attribution
+    category,
+    rationale: impact.rationale || "",
+    isPublic: true,
+  };
+}
+
+// Attach a gradeable thesis draft to every impact on every catalyst, using a coin→mark
+// price map (bare coin, e.g. BTC/SPX500/CL). Impacts without a live price get thesis:null
+// (ungradeable, surfaced honestly). Pure — the price fetch happens in the route.
+export function attachCatalystTheses(board, markByCoin, opts = {}) {
+  const catalysts = (board.catalysts || []).map((c) => ({
+    ...c,
+    impacts: (c.impacts || []).map((im) => ({
+      ...im,
+      thesis: catalystToThesis(im, { ...opts, markPrice: markByCoin[im.coin], question: c.question, category: c.category }),
+    })),
+  }));
+  return { ...board, catalysts, gradeableCount: catalysts.reduce((n, c) => n + c.impacts.filter((i) => i.thesis).length, 0) };
+}

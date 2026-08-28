@@ -14,6 +14,7 @@ import {
   parsePriceTarget, forecastDivergence, FORECAST,
   classifyMacro, macroEvents,
   houseCallFromSignal, wargameScenario,
+  catalystToThesis, attachCatalystTheses,
 } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
@@ -1946,4 +1947,50 @@ test("resolveLens: negated rate question flips the lens", () => {
   assert.equal(resolveLens("RISK_ON", "Will no Fed rate cuts happen in 2026?"), "RISK_OFF"); // no cuts = hawkish
   assert.equal(resolveLens("RISK_ON", "Will the Fed cut rates in September?"), "RISK_ON");    // plain cut = dovish
   assert.equal(resolveLens("RISK_OFF", "Will there be no ceasefire?"), "RISK_ON");            // no ceasefire flips
+});
+
+// ── Roadmap #3: Catalyst → the ONE gradeable thesis schema, graded in R ────────
+test("catalystToThesis: LONG impact → gradeable levels a WIN prints at +riskReward R", () => {
+  const impact = { coin: "BTC", market: "PERP_BTC_USDC", direction: "LONG", rationale: "risk-on backdrop" };
+  const th = catalystToThesis(impact, { markPrice: 100, createdAt: t0 * 1000, stopPct: 2, riskReward: 2, question: "Fed cuts?", category: "RATES" });
+  assert.equal(th.symbol, "PERP_BTC_USDC");
+  assert.equal(th.entryPrice, 100);
+  assert.equal(th.stopLoss, 98);       // 2% risk leg
+  assert.equal(th.takeProfit1, 104);   // riskReward × risk leg
+  assert.equal(th.source, "catalyst");
+  assert.equal(th.catalyst, "Fed cuts?"); // "why now" preserved for macro attribution
+  // The whole point: it grades through the SAME grader, in R.
+  const cd = series(t0, [{ h: 101, l: 99 }, { h: 105, l: 100 }]); // TP 104 touched, SL 98 never
+  const g = gradeCall(th, cd);
+  assert.equal(g.outcome, "WIN");
+  assert.equal(g.r, 2);
+});
+
+test("catalystToThesis: SHORT impact inverts the levels + grades", () => {
+  const impact = { coin: "BTC", market: "PERP_BTC_USDC", direction: "SHORT", rationale: "risk-off" };
+  const th = catalystToThesis(impact, { markPrice: 100, createdAt: t0 * 1000, stopPct: 2, riskReward: 2 });
+  assert.equal(th.stopLoss, 102);
+  assert.equal(th.takeProfit1, 96);
+  const cd = series(t0, [{ h: 101, l: 97 }, { h: 101, l: 95 }]); // low 95 ≤ TP 96, high 101 < SL 102
+  assert.equal(gradeCall(th, cd).outcome, "WIN");
+});
+
+test("catalystToThesis: unpriced or bad direction → null (ungradeable, surfaced honestly)", () => {
+  assert.equal(catalystToThesis({ coin: "BTC", market: "PERP_BTC_USDC", direction: "LONG" }, { markPrice: 0 }), null);
+  assert.equal(catalystToThesis({ coin: "BTC", market: "PERP_BTC_USDC", direction: "FLAT" }, { markPrice: 100 }), null);
+  assert.equal(catalystToThesis({ coin: "BTC", direction: "LONG" }, { markPrice: 100 }), null); // no market
+});
+
+test("attachCatalystTheses: prices every impact, counts only the gradeable ones", () => {
+  const board = { scanned: 1, count: 1, catalysts: [{
+    question: "Rate cut?", category: "RATES", riskLens: "RISK_ON", yesProbPct: 60,
+    impacts: [
+      { coin: "BTC", market: "PERP_BTC_USDC", direction: "LONG", rationale: "risk-on" },
+      { coin: "NAS100", market: "PERP_NAS100_USDC", direction: "LONG", rationale: "lower rates lift tech" },
+    ],
+  }] };
+  const out = attachCatalystTheses(board, { BTC: 100 }); // NAS100 has no mark
+  assert.equal(out.catalysts[0].impacts[0].thesis.symbol, "PERP_BTC_USDC");
+  assert.equal(out.catalysts[0].impacts[1].thesis, null); // unpriced → honest null
+  assert.equal(out.gradeableCount, 1);
 });

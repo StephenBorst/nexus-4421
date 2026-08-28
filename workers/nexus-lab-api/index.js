@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, simCreditsFor, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, deriveSetupMomentum, computeBeta, catalystBoard, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, simCreditsFor, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, deriveSetupMomentum, computeBeta, catalystBoard, attachCatalystTheses, CATALYST_MARKETS, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -2703,9 +2703,23 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         ));
         const rows = pages.flatMap((pm) => (Array.isArray(pm) ? pm : (pm?.data || [])));
         const board = catalystBoard(rows);
+        // Roadmap #3: attach a gradeable thesis (the ONE grader's schema) to every impact,
+        // so a catalyst is a one-click GRADED call and both producers share one grader in R.
+        // Live marks for the mapped markets in a single public fetch; fail-soft → thesis:null.
+        let markByCoin = {};
+        try {
+          const fut = await fetch("https://api-evm.orderly.org/v1/public/futures", { headers: { "User-Agent": UA, "Accept": "application/json" } }).then((r) => r.json());
+          const bySym = {};
+          for (const m of (fut?.data?.rows || [])) bySym[m.symbol] = parseFloat(m.mark_price);
+          for (const [coin, sym] of Object.entries(CATALYST_MARKETS)) { if (Number.isFinite(bySym[sym])) markByCoin[coin] = bySym[sym]; }
+          // catalystImpact emits coin ids SPX500/NAS100/CL (not the CATALYST_MARKETS keys SPX/NAS/OIL) — alias them.
+          if (markByCoin.SPX != null) markByCoin.SPX500 = markByCoin.SPX;
+          if (markByCoin.NAS != null) markByCoin.NAS100 = markByCoin.NAS;
+          if (markByCoin.OIL != null) markByCoin.CL = markByCoin.OIL;
+        } catch { markByCoin = {}; }
         const out = {
-          asOf: new Date().toISOString(), ...board,
-          note: "World events mapped to markets you can trade on Nexus — crowd probability shows how priced it already is. A setup to stake a GRADED thesis + execute here, not advice, not a signal.",
+          asOf: new Date().toISOString(), ...attachCatalystTheses(board, markByCoin),
+          note: "World events mapped to markets you can trade on Nexus — crowd probability shows how priced it already is. Each impact carries a GRADEABLE thesis (entry/stop/target, graded in R by the same grader as human calls). A setup to stake a graded thesis + execute here, not advice, not a signal.",
         };
         try { await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(out), { expirationTtl: 900 }); } catch { /* best-effort */ }
         return json(out, request);
