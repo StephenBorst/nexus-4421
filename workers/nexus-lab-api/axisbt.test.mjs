@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-lab-api/axisbt.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { hourBucket, priceByHour, forwardReturn, callPnl, fundingFadeEvents, cvdDivergenceEvents, scoreEvents, runScorecard, ema, rsi, rsiResetEvents, slopeUp, relStrength, rsiResetTrendEvents, candlesByHour, vwapAt, atrPctAt, volGrowth, volumeRotatesInto, rsValuePullbackCandleEvents, rsQuartiles } from "./axisbt.mjs";
+import { hourBucket, priceByHour, forwardReturn, callPnl, fundingFadeEvents, cvdDivergenceEvents, scoreEvents, runScorecard, ema, rsi, rsiResetEvents, slopeUp, relStrength, rsiResetTrendEvents, candlesByHour, vwapAt, atrPctAt, volGrowth, volumeRotatesInto, rsValuePullbackCandleEvents, rsQuartiles, gradeEventR } from "./axisbt.mjs";
 
 const HR = 3600 * 1000;
 const BASE = 1_000_000_000_000;
@@ -196,4 +196,42 @@ test("runScorecard: candle + rotation axes registered; runs on a candle series",
   assert.ok(sc.axes.some((a) => a.name === "rs_value_pullback_candle"));
   assert.ok(sc.axes.some((a) => a.name === "rs_value_pullback_rotation"));
   assert.ok(sc.universe[0].quartile >= 1); // rs quartiles attached to the universe
+});
+
+// ── Grok #2: thesis-in-R grading at the harness (the ONE grader object) ────────
+test("gradeEventR: first-touch TP → +R, SL → −1, timeout → mark-to-market, no candles → null", () => {
+  const H0 = hourBucket(BASE);
+  // 30 flat bars: ATR = (102−98)/100 = 0.04 → risk = 100·0.04·1.2 = 4.8; 1.5R target = 107.2, stop = 95.2
+  const flat = (over = {}) => {
+    const a = Array.from({ length: 30 }, (_, i) => ({ t: BASE + i * HR, o: 100, h: 102, l: 98, c: 100, v: 1 }));
+    for (const [k, v] of Object.entries(over)) a[Number(k)] = { ...a[Number(k)], ...v };
+    return candlesByHour(a);
+  };
+  assert.equal(gradeEventR(flat({ 26: { h: 108, l: 100, c: 107 } }), H0 + 25, "LONG", 100), 1.5); // TP hit
+  assert.equal(gradeEventR(flat({ 26: { h: 101, l: 94, c: 95 } }), H0 + 25, "LONG", 100), -1);    // SL hit
+  assert.ok(Math.abs(gradeEventR(flat(), H0 + 25, "LONG", 100)) < 1e-9);                          // never touches → ~0R
+  assert.equal(gradeEventR(candlesByHour([]), H0 + 25, "LONG", 100), null);                       // no candles → null
+});
+
+test("scoreEvents: grades in R off candles — headline flips to R once enough samples", () => {
+  const N = 90;
+  const closes = Array.from({ length: N }, (_, i) => 100 + i);
+  const oiHist = closes.map((price, i) => ({ t: BASE + i * HR, price, oi: 1000, funding: 0 }));
+  const candleHist = closes.map((c, i) => ({ t: BASE + i * HR, o: c, h: c * 1.02, l: c * 0.98, c, v: 1 }));
+  const gen = (cs) => cs.oiHist.slice(25, 60).map((p) => ({ t: p.t, side: "LONG" })); // 35 events past the ATR warmup
+  const res = scoreEvents([{ coin: "SOL", oiHist, candleHist }], gen, { horizons: [4], minSamples: 20 });
+  assert.equal(res.r.available, true);
+  assert.ok(res.r.samples >= 20);
+  assert.equal(res.headline, "R");            // R is the graded object once we have the samples
+  assert.ok(Number.isFinite(res.r.meanR));
+  assert.ok(res.r.meanR > 0);                 // a rising tape long → positive expectancy in R
+});
+
+test("scoreEvents: no candles → R unavailable, headline stays bps (unchanged legacy behavior)", () => {
+  const coinSets = [{ oiHist: mkOi(rising) }];
+  const gen = (cs) => cs.oiHist.slice(0, 34).map((p) => ({ t: p.t, side: "LONG" }));
+  const res = scoreEvents(coinSets, gen, { horizons: [4, 12, 24], minSamples: 20 });
+  assert.equal(res.r.available, false);
+  assert.equal(res.headline, "bps");
+  assert.equal(res.verdict, "PREDICTIVE"); // falls back to the forward-bps verdict, same as before
 });

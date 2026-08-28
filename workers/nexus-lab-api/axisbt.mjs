@@ -334,6 +334,48 @@ function agg(arr) {
   return { samples: arr.length, hitRate: Math.round((wins / arr.length) * 100), meanBps: Math.round(mean * 100000) / 10 };
 }
 
+// ── THESIS-IN-R grading (Grok #2) — the ONE grader, at the harness ────────────
+// Forward-bps answers "did price drift our way?" — a DIFFERENT object than the R-graded
+// thesis record (gradeCall) that Catalyst + human calls use. To grade all producers on ONE
+// scale for Sept-14, grade each harness event in R: first-touch TP vs SL with a stop = 1.2×
+// true ATR (Grok's spec), target = rMultiple × risk — identical first-touch logic to gradeCall
+// (same-bar both = loss, conservative). Timeout = mark-to-market R at the last close. Needs
+// candle highs/lows → null until candle:hist matures (INSUFFICIENT by design, same as D0/D2).
+export function gradeEventR(cbh, eventHour, side, entry, { atrMult = 1.2, rMultiple = 1.5, atrPeriod = 24, maxHoldH = 168 } = {}) {
+  if (!cbh || !cbh.size || !(entry > 0)) return null;
+  const atrFrac = atrPctAt(cbh, eventHour, atrPeriod);
+  if (atrFrac == null || !(atrFrac > 0)) return null;
+  const risk = entry * atrFrac * atrMult;
+  if (!(risk > 0)) return null;
+  const long = side === "LONG";
+  const stop = long ? entry - risk : entry + risk;
+  const target = long ? entry + rMultiple * risk : entry - rMultiple * risk;
+  let lastClose = entry;
+  for (let h = eventHour + 1; h <= eventHour + maxHoldH; h++) {
+    const c = cbh.get(h); if (!c) continue;
+    lastClose = c.c;
+    if (long) {
+      const tp = c.h >= target, sl = c.l <= stop;
+      if (tp && sl) return -1;
+      if (tp) return rMultiple;
+      if (sl) return -1;
+    } else {
+      const tp = c.l <= target, sl = c.h >= stop;
+      if (tp && sl) return -1;
+      if (tp) return rMultiple;
+      if (sl) return -1;
+    }
+  }
+  const move = long ? lastClose - entry : entry - lastClose; // timeout → exit at market, in R
+  return Math.max(-1, Math.min(rMultiple, move / risk));
+}
+function aggR(arr) {
+  if (!arr.length) return { samples: 0, hitRate: 0, meanR: 0 };
+  const wins = arr.reduce((n, x) => n + (x > 0 ? 1 : 0), 0);
+  const mean = arr.reduce((s, x) => s + x, 0) / arr.length;
+  return { samples: arr.length, hitRate: Math.round((wins / arr.length) * 100), meanR: Math.round(mean * 100) / 100 };
+}
+
 export function scoreEvents(coinSets, signalGen, { horizons = [4, 12, 24], minSamples = 20 } = {}) {
   // BTC context (regime map + price map) for the RS/veto gens — built once, passed to every gen.
   const btcCs = (coinSets || []).find((c) => String(c.coin || "").toUpperCase() === "BTC");
@@ -342,9 +384,10 @@ export function scoreEvents(coinSets, signalGen, { horizons = [4, 12, 24], minSa
   for (const cs of coinSets || []) {
     const pmap = priceByHour(cs.oiHist);
     if (pmap.size < 2) continue;
-    for (const e of signalGen(cs, pmap, ctx) || []) if (e && (e.side === "LONG" || e.side === "SHORT")) all.push({ t: e.t, side: e.side, pmap });
+    const cbh = candlesByHour(cs.candleHist); // for R grading (first-touch needs highs/lows)
+    for (const e of signalGen(cs, pmap, ctx) || []) if (e && (e.side === "LONG" || e.side === "SHORT")) all.push({ t: e.t, side: e.side, pmap, cbh });
   }
-  if (!all.length) return { samples: 0, horizons: horizons.map((h) => ({ h, samples: 0, hitRate: 0, meanBps: 0, stable: false, verdict: "INSUFFICIENT" })), verdict: "INSUFFICIENT", bestHorizon: null };
+  if (!all.length) return { samples: 0, horizons: horizons.map((h) => ({ h, samples: 0, hitRate: 0, meanBps: 0, stable: false, verdict: "INSUFFICIENT" })), r: { available: false, samples: 0, hitRate: 0, meanR: 0, stable: false, verdict: "INSUFFICIENT" }, headline: "bps", verdict: "INSUFFICIENT", bestHorizon: null };
   const times = all.map((e) => e.t).sort((a, b) => a - b);
   const medT = times[Math.floor(times.length / 2)];
   const horizonsOut = horizons.map((h) => {
@@ -362,7 +405,23 @@ export function scoreEvents(coinSets, signalGen, { horizons = [4, 12, 24], minSa
     return { h, ...a, stable, verdict };
   });
   const bestHorizon = horizonsOut.reduce((b, x) => (x.meanBps > (b ? b.meanBps : -Infinity) ? x : b), null);
-  return { samples: agg(all.map(() => 0)).samples, horizons: horizonsOut, verdict: bestHorizon ? bestHorizon.verdict : "INSUFFICIENT", bestHorizon };
+  // THESIS-IN-R headline (Grok #2): grade every event first-touch in R off the logged candles.
+  const rPnls = [], rFst = [], rSnd = [];
+  for (const e of all) {
+    const entry = e.pmap.get(hourBucket(e.t));
+    const r = gradeEventR(e.cbh, hourBucket(e.t), e.side, entry);
+    if (r == null) continue;
+    rPnls.push(r); (e.t <= medT ? rFst : rSnd).push(r);
+  }
+  const rA = aggR(rPnls), rF = aggR(rFst), rS = aggR(rSnd);
+  const rStable = rF.samples >= 5 && rS.samples >= 5 && (rF.meanR > 0) === (rS.meanR > 0);
+  let rVerdict = "INSUFFICIENT";
+  if (rA.samples >= minSamples) rVerdict = rA.meanR > 0 && rStable ? "PREDICTIVE" : rA.meanR > 0 ? "PROMISING" : "NOISE";
+  const r = { available: rA.samples > 0, ...rA, stable: rStable, verdict: rVerdict };
+  // Headline = R once we have enough R-graded samples (the right object); forward-bps is the
+  // fallback until candles mature, and stays as a secondary read either way.
+  const useR = rA.samples >= minSamples;
+  return { samples: all.length, horizons: horizonsOut, r, headline: useR ? "R" : "bps", verdict: useR ? rVerdict : (bestHorizon ? bestHorizon.verdict : "INSUFFICIENT"), bestHorizon };
 }
 
 // The full scorecard across every registered axis, ranked by best-horizon mean return.
@@ -373,10 +432,13 @@ export const AXES = [
   { name: "smart_follow", label: "Follow smart money", gen: smartFollowEvents },
   { name: "rsi_reset_held", label: "RSI reset held 45+ (A: uptrend)", gen: rsiResetEvents },
   { name: "rsi_reset_trend", label: "RSI reset held + trend_up (B: +regime)", gen: rsiResetTrendEvents },
-  { name: "rs_value_pullback", label: "RS + value pullback, BTC-gated (D0: no RSI)", gen: rsValuePullbackEvents },
-  { name: "rs_value_pullback_rsi", label: "RS + value + RSI≥45 (D1: +RSI)", gen: rsValuePullbackRsiEvents },
-  { name: "rs_value_pullback_candle", label: "RS + value pullback, real VWAP/ATR (D0c: candles)", gen: rsValuePullbackCandleEvents },
-  { name: "rs_value_pullback_rotation", label: "RS + value + volume rotation (D2: +rotation veto)", gen: rsValuePullbackRotationEvents },
+  // ⚠️ Grok's catch: the SMA-anchor / close-to-close-vol versions are PROXIES for the real
+  // weekly-VWAP + true-ATR spec — labeled _proxy so the Sept-14 scorecard never mistakes a
+  // proxy row for the spec (D0/D1 = the real candle versions below; _proxy = the stand-ins).
+  { name: "rs_value_pullback", label: "D0_proxy: RS + value pullback (SMA anchor · close-vol PROXY)", gen: rsValuePullbackEvents },
+  { name: "rs_value_pullback_rsi", label: "D1_proxy: + RSI≥45 (SMA anchor · close-vol PROXY)", gen: rsValuePullbackRsiEvents },
+  { name: "rs_value_pullback_candle", label: "D0: RS + value pullback (real weekly VWAP · true ATR)", gen: rsValuePullbackCandleEvents },
+  { name: "rs_value_pullback_rotation", label: "D2: + volume rotation (real VWAP/ATR · 2nd veto)", gen: rsValuePullbackRotationEvents },
   { name: "rsi_reset_deep", label: "RSI reset <45 (uptrend)", gen: rsiResetDeepEvents },
 ];
 
@@ -390,12 +452,14 @@ export function rsQuartiles(universe) {
 
 export function runScorecard(coinSets, cfg = {}) {
   const axes = AXES.map((a) => {
-    const r = scoreEvents(coinSets, a.gen, cfg);
-    return { name: a.name, label: a.label, verdict: r.verdict, best: r.bestHorizon, horizons: r.horizons };
+    const s = scoreEvents(coinSets, a.gen, cfg);
+    return { name: a.name, label: a.label, verdict: s.verdict, headline: s.headline, r: s.r, best: s.bestHorizon, horizons: s.horizons };
   });
-  // rank: PREDICTIVE > PROMISING > NOISE > INSUFFICIENT, then by best meanBps
+  // rank: PREDICTIVE > PROMISING > NOISE > INSUFFICIENT, then by the HEADLINE metric —
+  // meanR once R-graded (the right object), else forward-bps until candles mature.
   const RANK = { PREDICTIVE: 3, PROMISING: 2, NOISE: 1, INSUFFICIENT: 0 };
-  axes.sort((x, y) => (RANK[y.verdict] - RANK[x.verdict]) || ((y.best ? y.best.meanBps : -1e9) - (x.best ? x.best.meanBps : -1e9)));
+  const metric = (a) => (a.r && a.r.available ? a.r.meanR * 1000 : (a.best ? a.best.meanBps : -1e9));
+  axes.sort((x, y) => (RANK[y.verdict] - RANK[x.verdict]) || (metric(y) - metric(x)));
   // UNIVERSE — rank the coins by relative strength vs BTC (Grok's "fastest horses").
   // Surfaced so the RS filter (the C/D isolation) can be applied + shown; the map is the product.
   const btc = (coinSets || []).find((c) => String(c.coin || "").toUpperCase() === "BTC");
