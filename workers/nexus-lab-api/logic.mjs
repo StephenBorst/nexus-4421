@@ -1932,3 +1932,72 @@ export function macroEvents(polyMarkets, cfg = MACRO) {
     events: uniq.slice(0, cfg.limit),
   };
 }
+
+// ── CATALYST READ — world events → the Nexus markets you can actually trade ───
+// The unlock: with CL (crude), SPX500 + NAS100 (indices) listed, geopolitics/macro
+// events map to a REAL tradeable impact here (e.g. Hormuz de-escalation → crude risk
+// premium unwinds → short oil). Pure rules (transparent, not a black box); the crowd
+// probability says how PRICED it already is. A setup to stake a graded thesis, never a
+// signal. Every impact names a listed Nexus market so borst's "trade it here" rule holds.
+export const CATALYST_MARKETS = {
+  BTC: "PERP_BTC_USDC", ETH: "PERP_ETH_USDC",
+  SPX: "PERP_SPX500_USDC", NAS: "PERP_NAS100_USDC", OIL: "PERP_CL_USDC",
+};
+const OIL_REGION_RX = /\b(iran|hormuz|strait|opec|saudi|russia|ukraine|middle east|israel|gaza|red sea|oil|crude|petrol|pipeline|refinery|venezuela|sanction\w*)\b/i;
+
+// Map a classified event (category + risk lens) to tradeable directional impacts.
+export function catalystImpact(category, riskLens, question) {
+  const q = String(question || "");
+  const on = riskLens === "RISK_ON", off = riskLens === "RISK_OFF";
+  const out = [];
+  if (on) {
+    out.push({ coin: "BTC", market: CATALYST_MARKETS.BTC, direction: "LONG", rationale: "risk-on backdrop" });
+    out.push({ coin: "SPX500", market: CATALYST_MARKETS.SPX, direction: "LONG", rationale: "equities bid on risk-on" });
+  } else if (off) {
+    out.push({ coin: "BTC", market: CATALYST_MARKETS.BTC, direction: "SHORT", rationale: "risk-off backdrop" });
+    out.push({ coin: "SPX500", market: CATALYST_MARKETS.SPX, direction: "SHORT", rationale: "equities offered on risk-off" });
+  }
+  if (category === "RATES") {
+    if (on) out.push({ coin: "NAS100", market: CATALYST_MARKETS.NAS, direction: "LONG", rationale: "lower rates lift tech" });
+    if (off) out.push({ coin: "NAS100", market: CATALYST_MARKETS.NAS, direction: "SHORT", rationale: "higher rates weigh on tech" });
+  }
+  if (category === "GEOPOLITICS" && OIL_REGION_RX.test(q)) {
+    if (off) out.push({ coin: "CL", market: CATALYST_MARKETS.OIL, direction: "LONG", rationale: "supply-risk premium — crude bid" });
+    if (on) out.push({ coin: "CL", market: CATALYST_MARKETS.OIL, direction: "SHORT", rationale: "de-escalation unwinds the crude risk premium" });
+  }
+  return out;
+}
+
+// Build the catalyst board from Polymarket markets: classify → keep events with a lens
+// + a LIVE probability that map to a tradeable impact → the strongest by volume first.
+export function catalystBoard(polyMarkets, { minVolumeUsd = 20000, limit = 24 } = {}) {
+  const rows = [];
+  for (const pm of polyMarkets || []) {
+    if (pm && (pm.closed === true || pm.active === false)) continue;
+    const q = pm && pm.question; if (!q) continue;
+    const klass = classifyMacro(q); if (!klass || !klass.riskLens) continue;
+    const impacts = catalystImpact(klass.category, klass.riskLens, q);
+    if (!impacts.length) continue;
+    const volume = Number(pm.volumeNum ?? pm.volume ?? 0) || 0;
+    if (volume < minVolumeUsd) continue;
+    const outcomes = parseJsonArray(pm.outcomes).map((x) => String(x).toLowerCase());
+    const prices = parseJsonArray(pm.outcomePrices).map(Number);
+    let yesProb = null; const yi = outcomes.indexOf("yes");
+    if (yi >= 0 && Number.isFinite(prices[yi])) yesProb = prices[yi];
+    else if (prices.length && Number.isFinite(prices[0])) yesProb = prices[0];
+    if (yesProb == null || !Number.isFinite(yesProb)) continue;
+    const yesProbPct = round(yesProb * 100, 1);
+    if (yesProbPct < 3 || yesProbPct > 97) continue; // a live, expressible probability
+    const clobIds = parseJsonArray(pm.clobTokenIds).map(String);
+    rows.push({
+      question: String(q), category: klass.category, riskLens: klass.riskLens,
+      yesProbPct, volumeUsd: volume, endDate: pm.endDate || pm.end_date_iso || null,
+      clobTokenId: (yi >= 0 && clobIds[yi]) ? clobIds[yi] : (clobIds[0] || null),
+      impacts,
+    });
+  }
+  rows.sort((a, b) => b.volumeUsd - a.volumeUsd);
+  const seen = new Set(), uniq = [];
+  for (const r of rows) { const k = r.question.toLowerCase(); if (seen.has(k)) continue; seen.add(k); uniq.push(r); }
+  return { scanned: (polyMarkets || []).length, count: uniq.length, catalysts: uniq.slice(0, limit) };
+}

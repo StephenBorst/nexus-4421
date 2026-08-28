@@ -1906,3 +1906,37 @@ test("computeBeta: uncorrelated coin → low drivenPct, IDIOSYNCRATIC", () => {
 test("computeBeta: thin overlap → unavailable", () => {
   assert.equal(computeBeta(mkPrice([100, 101]), mkPrice([100, 101])).available, false);
 });
+
+import { catalystImpact, catalystBoard, CATALYST_MARKETS } from "./logic.mjs";
+
+test("catalystImpact: geopolitics de-escalation in an oil region → SHORT crude", () => {
+  const im = catalystImpact("GEOPOLITICS", "RISK_ON", "Will there be a Strait of Hormuz ceasefire deal by Sept?");
+  const oil = im.find((x) => x.market === CATALYST_MARKETS.OIL);
+  assert.ok(oil && oil.direction === "SHORT");
+  assert.ok(im.some((x) => x.coin === "BTC" && x.direction === "LONG")); // risk-on lifts BTC
+});
+
+test("catalystImpact: geopolitics escalation in an oil region → LONG crude + risk-off", () => {
+  const im = catalystImpact("GEOPOLITICS", "RISK_OFF", "Will Iran attack shipping in the Strait of Hormuz?");
+  assert.ok(im.some((x) => x.market === CATALYST_MARKETS.OIL && x.direction === "LONG"));
+  assert.ok(im.some((x) => x.coin === "BTC" && x.direction === "SHORT"));
+});
+
+test("catalystImpact: rate cut → NAS long; non-oil geopolitics → no crude", () => {
+  assert.ok(catalystImpact("RATES", "RISK_ON", "Will the Fed cut rates?").some((x) => x.market === CATALYST_MARKETS.NAS && x.direction === "LONG"));
+  assert.equal(catalystImpact("GEOPOLITICS", "RISK_OFF", "Will Taiwan hold elections?").some((x) => x.market === CATALYST_MARKETS.OIL), false);
+});
+
+test("catalystBoard: keeps tradeable-mapped live events, sorts by volume, dedupes", () => {
+  const mk = (question, vol, yes) => ({ question, active: true, closed: false, volumeNum: vol, outcomes: JSON.stringify(["Yes", "No"]), outcomePrices: JSON.stringify([String(yes), String(1 - yes)]), clobTokenIds: JSON.stringify(["tok1", "tok2"]) });
+  const b = catalystBoard([
+    mk("Will Iran attack shipping in the Strait of Hormuz?", 500000, 0.35),
+    mk("Will the Fed cut rates in September?", 900000, 0.6),
+    mk("Will the Fed cut rates in September?", 900000, 0.6), // dup
+    mk("Random sports question", 800000, 0.5), // unclassified → dropped
+    mk("Will there be a ceasefire?", 100, 0.4), // below min volume → dropped
+  ], { minVolumeUsd: 20000 });
+  assert.equal(b.catalysts.length, 2);
+  assert.equal(b.catalysts[0].category, "RATES"); // highest volume first
+  assert.ok(b.catalysts.every((c) => c.impacts.length > 0));
+});

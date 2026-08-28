@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, simCreditsFor, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, deriveSetupMomentum, computeBeta, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, simCreditsFor, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, deriveSetupMomentum, computeBeta, catalystBoard, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -2685,6 +2685,32 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         return respond(payload);
       } catch (e) {
         return json({ asOf: new Date().toISOString(), scanned: 0, count: 0, events: [], error: String(e) }, request);
+      }
+    }
+
+    // ── GET /intel/catalysts-board — world events → tradeable Nexus markets ───────
+    // The Catalyst Read: liquid Polymarket macro/geopolitical events, classified with a
+    // risk lens, mapped to the LISTED markets they move here (BTC/SPX/NAS + crude CL for
+    // oil-region geopolitics — e.g. Hormuz de-escalation → short crude). Crowd probability
+    // says how priced it is. A setup to stake a graded thesis, never a signal. Cached 15m.
+    if (parts[0] === "intel" && parts[1] === "catalysts-board" && request.method === "GET") {
+      const CACHE_KEY = "intel:catalystboard:v1";
+      try { const c = await env.LAB_STORE.get(CACHE_KEY); if (c) return json(JSON.parse(c), request); } catch { /* recompute */ }
+      try {
+        const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+        const pages = await Promise.all([0, 100, 200, 300].map((off) =>
+          fetch(`https://gamma-api.polymarket.com/markets?closed=false&active=true&limit=100&offset=${off}&order=volumeNum&ascending=false`, { headers: { "User-Agent": UA, "Accept": "application/json" } }).then((r) => r.json()).catch(() => [])
+        ));
+        const rows = pages.flatMap((pm) => (Array.isArray(pm) ? pm : (pm?.data || [])));
+        const board = catalystBoard(rows);
+        const out = {
+          asOf: new Date().toISOString(), ...board,
+          note: "World events mapped to markets you can trade on Nexus — crowd probability shows how priced it already is. A setup to stake a GRADED thesis + execute here, not advice, not a signal.",
+        };
+        try { await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(out), { expirationTtl: 900 }); } catch { /* best-effort */ }
+        return json(out, request);
+      } catch (e) {
+        return json({ asOf: new Date().toISOString(), count: 0, catalysts: [], error: String(e.message || e) }, request);
       }
     }
 
