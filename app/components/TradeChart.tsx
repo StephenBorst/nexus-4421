@@ -12,7 +12,7 @@
  *   • YOUR position: the open avg-entry as a dashed line + tag.
  * Fail-soft throughout; markers/positions are optional layers.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 const AGENT_API = "https://og.nexustradinglabs.com";
@@ -79,24 +79,27 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf,
   const [showMA, setShowMA] = useState(true);
   const [hover, setHover] = useState<number | null>(null); // index into VISIBLE slice
   const [vp, setVp] = useState<{ lo: number; hi: number } | null>(null); // visible window into candles; null = all
-  const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const vpRef = useRef<{ lo: number; hi: number } | null>(null);
   const dragRef = useRef<{ startX: number; lo: number; hi: number; moved: boolean } | null>(null);
   const [width, setWidth] = useState(430);
   useEffect(() => { vpRef.current = vp; }, [vp]);
 
-  useEffect(() => {
-    const el = wrapRef.current;
+  // ⚠️ CALLBACK ref (not an effect+useRef) so the ResizeObserver attaches to whichever div
+  // is actually mounted — the loading/failed placeholders OR the real chart. The old effect
+  // ran once at mount while the "loading chart…" placeholder (which had NO ref) was showing,
+  // so wrapRef was null, the observer bailed, and width stayed frozen at its 430 default →
+  // the SVG rendered ~430px wide in a much wider card = a big black void on the right (the
+  // dead space). A callback ref fires on every mount/unmount, so measurement can never be
+  // stranded on a placeholder again. Same failure class as ProjectionBand's frozen height.
+  const roRef = useRef<ResizeObserver | null>(null);
+  const measureRef = useCallback((el: HTMLDivElement | null) => {
+    if (roRef.current) { roRef.current.disconnect(); roRef.current = null; }
     if (!el) return;
-    // getBoundingClientRect is more reliable than clientWidth (fractional widths, late
-    // layout) — a stale width left the SVG narrower than its card = blank space on the right.
     const measure = () => { const r = el.getBoundingClientRect(); if (r.width > 0) setWidth(r.width); if (r.height > 80) setVh(r.height); };
     const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    measure();
-    window.addEventListener("resize", measure);
-    return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
+    ro.observe(el); measure();
+    roRef.current = ro;
   }, []);
 
   // OHLC for the selected timeframe. Resets zoom/pan on any reload.
@@ -236,8 +239,11 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf,
   }, [candles]);
 
   const box: React.CSSProperties = { width: "100%", background: "#0a0a0b", border: `1px solid ${BORDER}`, borderRadius: 6, position: "relative", overflow: "hidden", userSelect: "none", ...(fill ? { flex: 1, minHeight: height } : { height }) };
-  if (failed) return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: FAINT }}>chart unavailable</div>;
-  if (!candles || !view) return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: FAINT }}>loading chart…</div>;
+  // ⚠️ ref={measureRef} on the placeholders TOO — so the width/height observer attaches
+  // immediately and the SVG is sized to the real card from the very first paint (no 430px
+  // default leaking through as right-side dead space).
+  if (failed) return <div ref={measureRef} style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: FAINT }}>chart unavailable</div>;
+  if (!candles || !view) return <div ref={measureRef} style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: FAINT }}>loading chart…</div>;
 
   const { min, max, x, y, vy, bodyW, last } = view;
   const priceLevels = [0, 0.25, 0.5, 0.75, 1].map((f) => min + (max - min) * f);
@@ -292,7 +298,7 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf,
   const btn: React.CSSProperties = { width: 20, height: 18, display: "flex", alignItems: "center", justifyContent: "center", background: "#0f0f11cc", border: `1px solid ${BORDER}`, borderRadius: 3, cursor: "pointer", color: MUTED, fontFamily: MONO, fontSize: 12, lineHeight: 1 };
 
   return (
-    <div ref={wrapRef} style={box}>
+    <div ref={measureRef} style={box}>
       {/* timeframe toggle */}
       <div style={{ position: "absolute", top: 7, left: 8, zIndex: 3, display: "flex", gap: 4 }}>
         {TFS.map((t, i) => (
