@@ -228,6 +228,104 @@ export function rsValuePullbackEvents(cs, _pmap, ctx = {}, opts = {}) {
 }
 export function rsValuePullbackRsiEvents(cs, pmap, ctx, opts = {}) { return rsValuePullbackEvents(cs, pmap, ctx, { ...opts, rsi45: true }); }
 
+// ── Roadmap #1: REAL candle inputs (candle:hist {t,o,h,l,c,v}) ─────────────────
+// The proxies above (SMA weekly-VWAP, close-to-close volProxy) exist only because
+// oi:hist carried no OHLC/volume. With candles now logged, compute the REAL weekly
+// VWAP and true ATR — same filter stack, better inputs. Keyed by hour so they align
+// to the oi price spine; no lookahead (every window ends AT the event bar).
+export function candlesByHour(candleHist) {
+  const m = new Map();
+  for (const c of candleHist || []) {
+    if (!c || !Number.isFinite(c.c) || !(c.c > 0)) continue;
+    m.set(hourBucket(c.t), c);
+  }
+  return m;
+}
+// Volume-weighted typical price over the `period` hours ending at `hour` (inclusive).
+// Needs ≥60% of the window present and non-zero volume; else null (caller falls back).
+export function vwapAt(cbh, hour, period) {
+  let pv = 0, vv = 0, n = 0;
+  for (let h = hour - period + 1; h <= hour; h++) {
+    const c = cbh.get(h); if (!c) continue;
+    const typ = (c.h + c.l + c.c) / 3, v = Number.isFinite(c.v) ? c.v : 0;
+    pv += typ * v; vv += v; n++;
+  }
+  if (n < period * 0.6 || !(vv > 0)) return null;
+  return pv / vv;
+}
+// True ATR as a FRACTION of the last close over `period` hours ending at `hour`. Same
+// TR = max(range, |h−prevClose|, |l−prevClose|) as the live atrPct gate. null if thin.
+export function atrPctAt(cbh, hour, period) {
+  const win = [];
+  for (let h = hour - period; h <= hour; h++) { const c = cbh.get(h); if (c) win.push(c); }
+  if (win.length < Math.max(4, period * 0.6)) return null;
+  let trSum = 0, cnt = 0;
+  for (let k = 1; k < win.length; k++) {
+    const tr = Math.max(win[k].h - win[k].l, Math.abs(win[k].h - win[k - 1].c), Math.abs(win[k].l - win[k - 1].c));
+    if (Number.isFinite(tr)) { trSum += tr; cnt++; }
+  }
+  const last = win[win.length - 1].c;
+  return cnt && last > 0 ? trSum / cnt / last : null;
+}
+
+// ── Roadmap #2: FUTURES-VOLUME ROTATION as a regime input to the BTC veto ──────
+// Is capital rotating INTO this coin vs BTC? Compare recent-half vs prior-half mean
+// hourly volume over `lookback` hours ending at `hour` (no lookahead). The alt's volume
+// must be GROWING faster than BTC's — a rotation-in regime that historically precedes
+// alt continuation. Feeds the BTC veto (bleed OR no-rotation → veto). null-safe.
+export function volGrowth(cbh, hour, lookback) {
+  const half = Math.floor(lookback / 2);
+  let recent = 0, rn = 0, prior = 0, pn = 0;
+  for (let h = hour - lookback + 1; h <= hour; h++) {
+    const c = cbh.get(h); if (!c || !Number.isFinite(c.v)) continue;
+    if (h > hour - half) { recent += c.v; rn++; } else { prior += c.v; pn++; }
+  }
+  if (rn < half * 0.5 || pn < half * 0.5 || !(prior > 0)) return null;
+  const rMean = recent / rn, pMean = prior / pn;
+  return pMean > 0 ? (rMean - pMean) / pMean : null; // fractional volume growth
+}
+export function volumeRotatesInto(coinCbh, btcCbh, hour, lookback = 48) {
+  const cg = volGrowth(coinCbh, hour, lookback), bg = volGrowth(btcCbh, hour, lookback);
+  if (cg == null || bg == null) return false; // thin data → don't claim rotation
+  return cg > bg; // alt volume growing faster than BTC's = rotation in
+}
+
+// D0c / D2: the RS + value pullback stack, but on REAL candle inputs (weekly VWAP anchor,
+// true ATR value-tag band), with the BTC hard-veto optionally EXTENDED by the volume-
+// rotation gate (requireRotation). Returns [] when candles aren't logged yet → the axis
+// reads INSUFFICIENT until the series matures (~Sept 14), by design.
+export function rsValuePullbackCandleEvents(cs, _pmap, ctx = {}, opts = {}) {
+  const { emaPeriod = 50, anchorPeriod = 168, atrPeriod = 24, rsLookback = 168, tagK = 2, rsi45 = false, requireRotation = false, rotLookback = 48 } = opts;
+  const btcMap = ctx.btcMap, btcPrice = ctx.btcPrice, btcCbh = ctx.btcCandles;
+  const cbh = candlesByHour(cs.candleHist);
+  const rows = (cs.oiHist || []).filter((p) => p && Number.isFinite(p.price) && p.price > 0).sort((a, b) => (a.t || 0) - (b.t || 0));
+  if (!cbh.size || !btcMap || !btcPrice || rows.length < Math.max(anchorPeriod, rsLookback) + 5) return [];
+  const closes = rows.map((r) => r.price), e = ema(closes, emaPeriod);
+  const r14 = rsi45 ? rsi(closes, 14) : null;
+  const ev = [];
+  for (let i = 2; i < rows.length - 1; i++) {
+    const hourI = hourBucket(rows[i].t);
+    const anchor = vwapAt(cbh, hourI, anchorPeriod);   // REAL weekly VWAP
+    const atr = atrPctAt(cbh, hourI, atrPeriod);        // REAL ATR (fraction of price)
+    if (anchor == null || atr == null || e[i] == null) continue;
+    if (!(closes[i] > e[i] && closes[i] > anchor)) continue;            // regime: EMA50 + value anchor
+    const br = btcMap.get(hourI);
+    if (!br || br.bleed) continue;                                       // BTC hard veto (price bleed)
+    if (requireRotation) {                                              // …extended by volume rotation
+      if (!btcCbh || !volumeRotatesInto(cbh, btcCbh, hourI, rotLookback)) continue;
+    }
+    const bNow = btcPrice.get(hourI), bThen = btcPrice.get(hourI - rsLookback);
+    if (!(bNow > 0 && bThen > 0) || i - rsLookback < 0) continue;
+    const rs = ((closes[i] - closes[i - rsLookback]) / closes[i - rsLookback]) - ((bNow - bThen) / bThen);
+    if (!(rs > 0)) continue;                                            // outperforming BTC (RS before the event)
+    if (!(Math.abs(closes[i] - anchor) <= tagK * atr * closes[i])) continue; // value tag: within tagK ATRs of VWAP
+    if (rsi45) { const b = r14[i]; if (b == null || b < 45) continue; }
+    ev.push({ t: rows[i].t, side: "LONG" });
+  }
+  return ev;
+}
+export function rsValuePullbackRotationEvents(cs, pmap, ctx, opts = {}) { return rsValuePullbackCandleEvents(cs, pmap, ctx, { ...opts, requireRotation: true }); }
+
 // ── Scoring: pool events across coins, aggregate forward P&L per horizon ──────
 function agg(arr) {
   if (!arr.length) return { samples: 0, hitRate: 0, meanBps: 0 };
@@ -239,7 +337,7 @@ function agg(arr) {
 export function scoreEvents(coinSets, signalGen, { horizons = [4, 12, 24], minSamples = 20 } = {}) {
   // BTC context (regime map + price map) for the RS/veto gens — built once, passed to every gen.
   const btcCs = (coinSets || []).find((c) => String(c.coin || "").toUpperCase() === "BTC");
-  const ctx = btcCs ? { btcMap: btcRegimeByHour(btcCs.oiHist), btcPrice: priceByHour(btcCs.oiHist) } : {};
+  const ctx = btcCs ? { btcMap: btcRegimeByHour(btcCs.oiHist), btcPrice: priceByHour(btcCs.oiHist), btcCandles: candlesByHour(btcCs.candleHist) } : {};
   const all = [];
   for (const cs of coinSets || []) {
     const pmap = priceByHour(cs.oiHist);
@@ -277,8 +375,18 @@ export const AXES = [
   { name: "rsi_reset_trend", label: "RSI reset held + trend_up (B: +regime)", gen: rsiResetTrendEvents },
   { name: "rs_value_pullback", label: "RS + value pullback, BTC-gated (D0: no RSI)", gen: rsValuePullbackEvents },
   { name: "rs_value_pullback_rsi", label: "RS + value + RSI≥45 (D1: +RSI)", gen: rsValuePullbackRsiEvents },
+  { name: "rs_value_pullback_candle", label: "RS + value pullback, real VWAP/ATR (D0c: candles)", gen: rsValuePullbackCandleEvents },
+  { name: "rs_value_pullback_rotation", label: "RS + value + volume rotation (D2: +rotation veto)", gen: rsValuePullbackRotationEvents },
   { name: "rsi_reset_deep", label: "RSI reset <45 (uptrend)", gen: rsiResetDeepEvents },
 ];
+
+// Bucket the RS-ranked universe into quartiles (Q1 = strongest, "fastest horses"). Lets
+// the harness condition on TOP-QUARTILE relative strength rather than a binary rs>0.
+export function rsQuartiles(universe) {
+  const n = (universe || []).length;
+  if (!n) return [];
+  return universe.map((u, idx) => ({ ...u, rsRank: idx + 1, quartile: Math.min(4, Math.floor((idx / n) * 4) + 1) }));
+}
 
 export function runScorecard(coinSets, cfg = {}) {
   const axes = AXES.map((a) => {
@@ -292,7 +400,7 @@ export function runScorecard(coinSets, cfg = {}) {
   // Surfaced so the RS filter (the C/D isolation) can be applied + shown; the map is the product.
   const btc = (coinSets || []).find((c) => String(c.coin || "").toUpperCase() === "BTC");
   const universe = btc
-    ? coinSets.filter((c) => c !== btc).map((c) => ({ coin: c.coin, rs: relStrength(c.oiHist, btc.oiHist) })).filter((x) => x.rs != null).sort((a, b) => b.rs - a.rs)
+    ? rsQuartiles(coinSets.filter((c) => c !== btc).map((c) => ({ coin: c.coin, rs: relStrength(c.oiHist, btc.oiHist) })).filter((x) => x.rs != null).sort((a, b) => b.rs - a.rs))
     : [];
   return { axes, coins: coinSets.length, universe };
 }

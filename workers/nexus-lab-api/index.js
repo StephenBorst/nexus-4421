@@ -4354,12 +4354,13 @@ document.getElementById("btn").addEventListener("click",go);
       const readJson = async (kv, key) => { try { const r = await kv.get(key); return r ? JSON.parse(r) : []; } catch { return []; } };
       const coinSets = [];
       for (const coin of COINS) {
-        const [oiHist, cvdHist, smHist] = await Promise.all([
+        const [oiHist, cvdHist, smHist, candleHist] = await Promise.all([
           readJson(AGENT_KV, `oi:hist:PERP_${coin}_USDC`),
           readJson(AGENT_KV, `cvd:hist:${coin}`),
           readJson(AGENT_KV, `sm:hist:${coin}`),
+          readJson(AGENT_KV, `candle:hist:PERP_${coin}_USDC`),
         ]);
-        if ((oiHist || []).length >= 2) coinSets.push({ coin, oiHist, cvdHist, smHist });
+        if ((oiHist || []).length >= 2) coinSets.push({ coin, oiHist, cvdHist, smHist, candleHist });
       }
       const scorecard = runScorecard(coinSets, { horizons: [4, 12, 24], minSamples: min });
       const out = {

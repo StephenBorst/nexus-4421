@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-lab-api/axisbt.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { hourBucket, priceByHour, forwardReturn, callPnl, fundingFadeEvents, cvdDivergenceEvents, scoreEvents, runScorecard, ema, rsi, rsiResetEvents, slopeUp, relStrength, rsiResetTrendEvents } from "./axisbt.mjs";
+import { hourBucket, priceByHour, forwardReturn, callPnl, fundingFadeEvents, cvdDivergenceEvents, scoreEvents, runScorecard, ema, rsi, rsiResetEvents, slopeUp, relStrength, rsiResetTrendEvents, candlesByHour, vwapAt, atrPctAt, volGrowth, volumeRotatesInto, rsValuePullbackCandleEvents, rsQuartiles } from "./axisbt.mjs";
 
 const HR = 3600 * 1000;
 const BASE = 1_000_000_000_000;
@@ -75,7 +75,7 @@ test("runScorecard: returns every axis, ranked, with a coin count", () => {
   const coinSets = [{ oiHist: mkOi(rising), cvdHist: [], smHist: [] }];
   const sc = runScorecard(coinSets, { horizons: [4, 12], minSamples: 20 });
   assert.equal(sc.coins, 1);
-  assert.equal(sc.axes.length, 9);
+  assert.equal(sc.axes.length, 11);
   assert.ok(sc.axes.every((a) => typeof a.verdict === "string"));
   assert.ok(sc.axes.some((a) => a.name === "rs_value_pullback"));
 });
@@ -130,4 +130,70 @@ test("rsiResetEvents: uptrend with shelf cooldowns → LONG events; pure downtre
 
 test("rsiResetEvents: thin history → no events", () => {
   assert.equal(rsiResetEvents({ oiHist: mkOi([100, 101, 102]) }, null).length, 0);
+});
+
+// ── Roadmap #1/#2: real candle inputs (VWAP/ATR), volume rotation, rs quartiles ──
+test("candlesByHour: buckets by hour, drops bad closes", () => {
+  const cbh = candlesByHour([
+    { t: BASE, o: 100, h: 102, l: 98, c: 101, v: 10 },
+    { t: BASE + HR, o: 101, h: 103, l: 100, c: 102, v: 20 },
+    { t: BASE + 2 * HR, o: 0, h: 0, l: 0, c: 0, v: 5 }, // bad close → dropped
+  ]);
+  assert.equal(cbh.size, 2);
+  assert.equal(cbh.get(hourBucket(BASE)).c, 101);
+});
+
+test("vwapAt: volume-weighted typical price; empty window → null", () => {
+  const cbh = candlesByHour([
+    { t: BASE, o: 100, h: 102, l: 98, c: 100, v: 10 },       // typ 100
+    { t: BASE + HR, o: 100, h: 112, l: 108, c: 110, v: 30 }, // typ 110
+  ]);
+  const h1 = hourBucket(BASE + HR);
+  assert.ok(Math.abs(vwapAt(cbh, h1, 2) - 107.5) < 1e-9); // (100·10 + 110·30)/40
+  assert.equal(vwapAt(cbh, h1 + 50, 2), null);
+});
+
+test("atrPctAt: true ATR as a fraction of close", () => {
+  const arr = Array.from({ length: 6 }, (_, i) => ({ t: BASE + i * HR, o: 100, h: 105, l: 95, c: 100, v: 1 }));
+  const cbh = candlesByHour(arr);
+  assert.ok(Math.abs(atrPctAt(cbh, hourBucket(BASE + 5 * HR), 4) - 0.1) < 1e-9); // TR 10 / close 100
+});
+
+test("volGrowth & volumeRotatesInto: alt volume rising faster than BTC → rotation in", () => {
+  const alt = candlesByHour(Array.from({ length: 8 }, (_, i) => ({ t: BASE + i * HR, o: 100, h: 101, l: 99, c: 100, v: i < 4 ? 10 : 30 })));
+  const btc = candlesByHour(Array.from({ length: 8 }, (_, i) => ({ t: BASE + i * HR, o: 100, h: 101, l: 99, c: 100, v: 20 })));
+  const h = hourBucket(BASE + 7 * HR);
+  assert.ok(volGrowth(alt, h, 8) > 0);
+  assert.ok(Math.abs(volGrowth(btc, h, 8)) < 1e-9);
+  assert.equal(volumeRotatesInto(alt, btc, h, 8), true);
+  assert.equal(volumeRotatesInto(btc, alt, h, 8), false); // BTC not rotating in vs a hot alt
+});
+
+test("rsValuePullbackCandleEvents: no candles logged yet → [] (INSUFFICIENT by design)", () => {
+  const cs = { coin: "SOL", oiHist: mkOi(rising) }; // no candleHist
+  assert.deepEqual(rsValuePullbackCandleEvents(cs, null, { btcMap: new Map(), btcPrice: new Map() }), []);
+});
+
+test("rsQuartiles: assigns rank + quartile (Q1 strongest)", () => {
+  const u = rsQuartiles([{ coin: "A", rs: 5 }, { coin: "B", rs: 4 }, { coin: "C", rs: 3 }, { coin: "D", rs: 2 }]);
+  assert.equal(u[0].rsRank, 1);
+  assert.equal(u[0].quartile, 1);
+  assert.equal(u[3].quartile, 4);
+});
+
+test("runScorecard: candle + rotation axes registered; runs on a candle series", () => {
+  const N = 200;
+  const mkCS = (coin, slope, vol) => {
+    const prices = Array.from({ length: N }, (_, i) => 100 + i * slope + 4 * Math.sin(i / 6));
+    return {
+      coin,
+      oiHist: prices.map((price, i) => ({ t: BASE + i * HR, price, oi: 1000, funding: 0 })),
+      candleHist: prices.map((c, i) => ({ t: BASE + i * HR, o: c, h: c * 1.01, l: c * 0.99, c, v: vol(i) })),
+    };
+  };
+  const sc = runScorecard([mkCS("BTC", 0.2, () => 100), mkCS("SOL", 0.5, (i) => (i > N / 2 ? 200 : 50))], { horizons: [4], minSamples: 20 });
+  assert.equal(sc.axes.length, 11);
+  assert.ok(sc.axes.some((a) => a.name === "rs_value_pullback_candle"));
+  assert.ok(sc.axes.some((a) => a.name === "rs_value_pullback_rotation"));
+  assert.ok(sc.universe[0].quartile >= 1); // rs quartiles attached to the universe
 });
