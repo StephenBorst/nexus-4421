@@ -329,30 +329,47 @@ export default function TheLabPage() {
           // CATALYSTS — the event layer: world events mapped to the markets you can trade
           // here (geopolitics → CL, rates → NAS, risk → BTC/SPX). Between the Board and the
           // deep detail; on-moat because every event resolves to a tradeable, gradeable call.
-          const catalysts = <div style={{ marginTop: 28, paddingTop: 4, borderTop: "1px solid #232327" }}><CatalystBoard /></div>;
-          // FORECAST DIVERGENCE — the prediction-market lens, restored but scoped to markets
-          // you can trade here (our-markets-only until the Quotient feed lands). Sits beside
-          // Catalysts: both read an EXTERNAL crowd (events / forecasters) and resolve it to a
-          // tradeable, gradeable call on a Nexus market. Fail-soft (renders a quiet line if sparse).
-          const forecast = <div style={{ marginTop: 8, paddingTop: 4, borderTop: "1px solid #232327" }}><ForecastDivergence /></div>;
-          return connected
-            ? <>{briefing}{board}{catalysts}{forecast}{deep}</>
-            : <><LabWelcome />{briefing}{board}{catalysts}{forecast}{deep}</>;
-        })()}
-        {activeTab === "smart" && (
-          <>
-            {/* Lead with the SYNTHESIS — the fused crowd-vs-smart read, filtered to YOUR edge.
-                The deep boards (full smart-money surface + every funding edge) live behind
-                collapses so the tab is one screen by default, not twenty. The engine surfaces
-                what matters; the raw data is one click away. */}
-            <PositioningBoard trades={connected ? processedTrades : undefined} />
-            <Collapsible title="◇ SMART MONEY · FULL BOARD" subtitle="every tracked wallet, consensus, you-vs-smart, watchlist" storageKey="nx_smart_board_open">
-              <SmartMoneyView myPositions={openPositions} />
-            </Collapsible>
-            <Collapsible title="◇ FUNDING EDGES · ALL MARKETS" subtitle="every mispriced perp + the reversion chart" storageKey="nx_funding_board_open">
+          // ── THE LENSES · the deep "why" behind The Board ──────────────────────────
+          // The one-spine fold: the intelligence layer is now a single linear funnel —
+          // READ (Briefing) → BOARD (the fused scan) → LENSES (the deep boards The Board
+          // summarizes) → TAPE (raw Market Intel). The Funding + Positioning boards moved
+          // OFF the Smart Money tab (which is now purely the wallet drill-down) to live here
+          // as the deep read behind the Board's Confluence strip — no more two competing
+          // "synthesis" tabs. Each lens is a public read that The Board folds into one line.
+          const lensesHeader = (
+            <div style={{ marginTop: 32, marginBottom: 4, paddingTop: 10, borderTop: "1px solid #232327" }}>
+              <div style={{ fontSize: 9, color: "#52525b", fontFamily: "var(--nx-font-mono)", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 3 }}>The lenses · the deep why</div>
+              <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 17, fontWeight: 700, color: "#a1a1aa", lineHeight: 1.15, letterSpacing: "-0.01em" }}>What The Board is reading</div>
+              <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 11, color: "#71717a", marginTop: 4, lineHeight: 1.5 }}>Each lens is one column on The Board, opened up. Funding &amp; positioning are the tape; catalysts &amp; forecasters are the outside crowd.</div>
+            </div>
+          );
+          const funding = (
+            <Collapsible title="◇ FUNDING EDGES · ALL MARKETS" subtitle="every mispriced perp + which fades PAID vs which were a TRAP" storageKey="nx_funding_board_open">
               <MispricedBoard />
             </Collapsible>
-          </>
+          );
+          const positioning = (
+            <Collapsible title="◇ POSITIONING · CROWD vs SMART MONEY" subtitle="where the leveraged crowd and the sharp wallets disagree — on your edge" storageKey="nx_positioning_open">
+              <PositioningBoard trades={connected ? processedTrades : undefined} />
+            </Collapsible>
+          );
+          const catalysts = <div style={{ marginTop: 14 }}><CatalystBoard /></div>;
+          // FORECAST DIVERGENCE — the prediction-market lens, restored but scoped to markets
+          // you can trade here (our-markets-only until the Quotient feed lands). A tradeable,
+          // gradeable call on a Nexus market. Fail-soft (renders a quiet line if sparse).
+          const forecast = <ForecastDivergence />;
+          const lenses = <>{lensesHeader}{funding}{positioning}{catalysts}{forecast}</>;
+          return connected
+            ? <>{briefing}{board}{lenses}{deep}</>
+            : <><LabWelcome />{briefing}{board}{lenses}{deep}</>;
+        })()}
+        {activeTab === "smart" && (
+          // Smart Money is now the DEEP WALLET DRILL-DOWN the Intel funnel's Positioning lens
+          // links into — every tracked wallet, consensus, you-vs-smart, watchlist. The
+          // crowd-vs-smart SYNTHESIS + the funding board moved into the Intel spine (the
+          // Positioning + Funding lenses), so this tab no longer competes with The Board as a
+          // second synthesis surface — it's the destination for the wallet-level detail.
+          <SmartMoneyView myPositions={openPositions} />
         )}
         {activeTab === "agent" && <AgentView />}
         {activeTab === "holders" && <HoldersRoom walletAddress={rootWalletAddress} />}

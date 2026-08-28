@@ -451,17 +451,14 @@ export function DecisionBoard({ onSelectTab, trades, wallet }: {
         </div>
       )}
 
-      {/* Scan → proof: THE BOARD is the fast read; the Mispriced/GAPS board is the deep
-          funding proof (which fades historically PAID vs which are a TRAP). Link them so
-          the two funding surfaces read as one system, not two overlapping tabs. */}
-      {signals && signals.length > 0 && onSelectTab && (
-        <button
-          onClick={() => onSelectTab("smart")}
-          style={{ marginTop: 14, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left",
-            fontFamily: UI, fontSize: 11, lineHeight: 1.5, color: C.text.muted }}
-        >
-          Want the deep read? Which of these fades are <b style={{ color: C.text.bright }}>PROVEN vs a TRAP</b> — see the reversion proof in <span style={{ fontFamily: MONO, color: C.accent }}>[ SMART MONEY ] →</span>
-        </button>
+      {/* Scan → deep read: THE BOARD is the fast confluence scan; each column opens up into
+          a lens right below (Funding = which fades PAID vs a TRAP, Positioning = crowd vs
+          smart), and the full wallet board is the Smart Money drill-down. One spine. */}
+      {signals && signals.length > 0 && (
+        <div style={{ marginTop: 14, fontFamily: UI, fontSize: 11, lineHeight: 1.5, color: C.text.muted }}>
+          The deep read is right below — <b style={{ color: C.text.bright }}>Funding Edges</b> (which fades PAID vs a TRAP) and <b style={{ color: C.text.bright }}>Positioning</b> (crowd vs smart).
+          {onSelectTab && <> The full wallet board is in <button onClick={() => onSelectTab("smart")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: MONO, color: C.accent }}>[ SMART MONEY ] →</button></>}
+        </div>
       )}
     </div>
   );
