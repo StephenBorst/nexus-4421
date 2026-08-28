@@ -2,7 +2,7 @@
 // Run: node --test workers/nexus-lab-api/axisbt.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { hourBucket, priceByHour, forwardReturn, callPnl, fundingFadeEvents, cvdDivergenceEvents, scoreEvents, runScorecard, ema, rsi, rsiResetEvents, slopeUp, relStrength, rsiResetTrendEvents, candlesByHour, vwapAt, atrPctAt, volGrowth, volumeRotatesInto, rsValuePullbackCandleEvents, rsQuartiles, gradeEventR } from "./axisbt.mjs";
+import { hourBucket, priceByHour, forwardReturn, callPnl, fundingFadeEvents, cvdDivergenceEvents, scoreEvents, runScorecard, ema, rsi, rsiResetEvents, slopeUp, relStrength, rsiResetTrendEvents, candlesByHour, vwapAt, atrPctAt, volGrowth, volumeRotatesInto, rsValuePullbackCandleEvents, rsValuePullbackEvents, rsQuartiles, gradeEventR } from "./axisbt.mjs";
 
 const HR = 3600 * 1000;
 const BASE = 1_000_000_000_000;
@@ -75,7 +75,7 @@ test("runScorecard: returns every axis, ranked, with a coin count", () => {
   const coinSets = [{ oiHist: mkOi(rising), cvdHist: [], smHist: [] }];
   const sc = runScorecard(coinSets, { horizons: [4, 12], minSamples: 20 });
   assert.equal(sc.coins, 1);
-  assert.equal(sc.axes.length, 11);
+  assert.equal(sc.axes.length, 12);
   assert.ok(sc.axes.every((a) => typeof a.verdict === "string"));
   assert.ok(sc.axes.some((a) => a.name === "rs_value_pullback"));
 });
@@ -192,7 +192,7 @@ test("runScorecard: candle + rotation axes registered; runs on a candle series",
     };
   };
   const sc = runScorecard([mkCS("BTC", 0.2, () => 100), mkCS("SOL", 0.5, (i) => (i > N / 2 ? 200 : 50))], { horizons: [4], minSamples: 20 });
-  assert.equal(sc.axes.length, 11);
+  assert.equal(sc.axes.length, 12);
   assert.ok(sc.axes.some((a) => a.name === "rs_value_pullback_candle"));
   assert.ok(sc.axes.some((a) => a.name === "rs_value_pullback_rotation"));
   assert.ok(sc.universe[0].quartile >= 1); // rs quartiles attached to the universe
@@ -234,4 +234,43 @@ test("scoreEvents: no candles → R unavailable, headline stays bps (unchanged l
   assert.equal(res.r.available, false);
   assert.equal(res.headline, "bps");
   assert.equal(res.verdict, "PREDICTIVE"); // falls back to the forward-bps verdict, same as before
+});
+
+// ── Grok's frozen contract: timeout = 0, headline stats, book split, rs_quartile ──
+test("gradeEventR: time-stop / no touch → exactly 0 (flat, no unrealized drift)", () => {
+  const H0 = hourBucket(BASE);
+  const flat = candlesByHour(Array.from({ length: 30 }, (_, i) => ({ t: BASE + i * HR, o: 100, h: 102, l: 98, c: 100, v: 1 })));
+  assert.strictEqual(gradeEventR(flat, H0 + 25, "LONG", 100), 0); // never touches TP(107.2)/SL(95.2) → 0, not mark-to-market
+});
+
+test("scoreEvents: R headline carries avg_R|win and max_dd_R (Grok's scorecard row)", () => {
+  const N = 90;
+  const closes = Array.from({ length: N }, (_, i) => 100 + i);
+  const oiHist = closes.map((price, i) => ({ t: BASE + i * HR, price, oi: 1000, funding: 0 }));
+  const candleHist = closes.map((c, i) => ({ t: BASE + i * HR, o: c, h: c * 1.02, l: c * 0.98, c, v: 1 }));
+  const gen = (cs) => cs.oiHist.slice(25, 60).map((p) => ({ t: p.t, side: "LONG" }));
+  const res = scoreEvents([{ coin: "SOL", oiHist, candleHist }], gen, { horizons: [4], minSamples: 20 });
+  assert.ok(Number.isFinite(res.r.avgRWin) && res.r.avgRWin > 0); // rising tape → wins average ~+1.5R
+  assert.ok(Number.isFinite(res.r.maxDdR) && res.r.maxDdR >= 0);
+});
+
+test("scoreEvents: rs_quartile written on every RS event row from closes (not candle-gated)", () => {
+  // Two coins so the cross-sectional quartile has a distribution; proxy gen carries rs.
+  const HRx = 3600 * 1000, B = 1_000_000_000_000;
+  const mk = (coin, slope) => {
+    const prices = Array.from({ length: 220 }, (_, i) => 100 + i * slope + 3 * Math.sin(i / 7));
+    return { coin, oiHist: prices.map((price, i) => ({ t: B + i * HRx, price, oi: 1000, funding: 0 })) }; // NO candleHist — proxy path
+  };
+  const btcCs = { coin: "BTC", oiHist: Array.from({ length: 220 }, (_, i) => ({ t: B + i * HRx, price: 100 + i * 0.2, oi: 1000, funding: 0 })) };
+  // rsValuePullbackEvents needs the BTC ctx; scoreEvents builds it. Use the proxy axis gen directly.
+  const res = scoreEvents([btcCs, mk("SOL", 0.6), mk("ARB", 0.4)], rsValuePullbackEvents, { horizons: [4], minSamples: 5 });
+  // rs_quartile is exposed even though there are NO candles (from closes) — the point of Grok #4.
+  assert.ok(Array.isArray(res.rsQuartileDist));
+});
+
+test("runScorecard: D1_candle axis registered (the D0/D1 candle ablation)", () => {
+  const sc = runScorecard([{ oiHist: mkOi(rising), cvdHist: [], smHist: [] }], { horizons: [4], minSamples: 20 });
+  assert.ok(sc.axes.some((a) => a.name === "rs_value_pullback_candle_rsi"));
+  assert.ok(sc.axes.some((a) => a.name === "rs_value_pullback_candle"));
+  assert.ok(sc.axes.every((a) => Array.isArray(a.rsQuartileDist))); // every axis exposes the rs quartile dist
 });

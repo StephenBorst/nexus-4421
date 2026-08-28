@@ -222,7 +222,7 @@ export function rsValuePullbackEvents(cs, _pmap, ctx = {}, opts = {}) {
     if (!(Math.abs(closes[i] - anchor) <= tagK * vol * 6)) continue;
     // optional RSI seasoning (D1): the reset held the 45+ shelf
     if (rsi45) { const b = r14[i]; if (b == null || b < 45) continue; }
-    ev.push({ t: rows[i].t, side: "LONG" });
+    ev.push({ t: rows[i].t, side: "LONG", rs }); // rs (residual vs BTC) from closes → per-event rs_quartile
   }
   return ev;
 }
@@ -320,11 +320,14 @@ export function rsValuePullbackCandleEvents(cs, _pmap, ctx = {}, opts = {}) {
     if (!(rs > 0)) continue;                                            // outperforming BTC (RS before the event)
     if (!(Math.abs(closes[i] - anchor) <= tagK * atr * closes[i])) continue; // value tag: within tagK ATRs of VWAP
     if (rsi45) { const b = r14[i]; if (b == null || b < 45) continue; }
-    ev.push({ t: rows[i].t, side: "LONG" });
+    ev.push({ t: rows[i].t, side: "LONG", rs }); // rs (residual vs BTC) from closes → per-event rs_quartile
   }
   return ev;
 }
 export function rsValuePullbackRotationEvents(cs, pmap, ctx, opts = {}) { return rsValuePullbackCandleEvents(cs, pmap, ctx, { ...opts, requireRotation: true }); }
+// D1_candle = D0_candle + the RSI≥45 filter — the ONLY difference from D0_candle, so the
+// A/B ablation is valid (same entry/stop/tp/time-stop, frozen in gradeEventR).
+export function rsValuePullbackCandleRsiEvents(cs, pmap, ctx, opts = {}) { return rsValuePullbackCandleEvents(cs, pmap, ctx, { ...opts, rsi45: true }); }
 
 // ── Scoring: pool events across coins, aggregate forward P&L per horizon ──────
 function agg(arr) {
@@ -341,7 +344,12 @@ function agg(arr) {
 // true ATR (Grok's spec), target = rMultiple × risk — identical first-touch logic to gradeCall
 // (same-bar both = loss, conservative). Timeout = mark-to-market R at the last close. Needs
 // candle highs/lows → null until candle:hist matures (INSUFFICIENT by design, same as D0/D2).
-export function gradeEventR(cbh, eventHour, side, entry, { atrMult = 1.2, rMultiple = 1.5, atrPeriod = 24, maxHoldH = 168 } = {}) {
+// ⚠️ FROZEN CONTRACT (Grok) — do NOT vary these or the D0/D1 ablation dies: stop = 1.2× ATR
+// (never tighter), tp = 1.5R, time-stop = 168h (7d), same-bar TP+SL = loss, time-stop / no
+// touch = 0 (flat — credit NO unrealized drift). Outcomes are exactly +tp_R, −1, or 0.
+export const R_CONTRACT = Object.freeze({ atrMult: 1.2, rMultiple: 1.5, atrPeriod: 24, maxHoldH: 168 });
+export function gradeEventR(cbh, eventHour, side, entry, opts = R_CONTRACT) {
+  const { atrMult, rMultiple, atrPeriod, maxHoldH } = { ...R_CONTRACT, ...opts };
   if (!cbh || !cbh.size || !(entry > 0)) return null;
   const atrFrac = atrPctAt(cbh, eventHour, atrPeriod);
   if (atrFrac == null || !(atrFrac > 0)) return null;
@@ -350,13 +358,11 @@ export function gradeEventR(cbh, eventHour, side, entry, { atrMult = 1.2, rMulti
   const long = side === "LONG";
   const stop = long ? entry - risk : entry + risk;
   const target = long ? entry + rMultiple * risk : entry - rMultiple * risk;
-  let lastClose = entry;
   for (let h = eventHour + 1; h <= eventHour + maxHoldH; h++) {
     const c = cbh.get(h); if (!c) continue;
-    lastClose = c.c;
     if (long) {
       const tp = c.h >= target, sl = c.l <= stop;
-      if (tp && sl) return -1;
+      if (tp && sl) return -1;      // same-bar both → loss (conservative, matches gradeCall)
       if (tp) return rMultiple;
       if (sl) return -1;
     } else {
@@ -366,8 +372,7 @@ export function gradeEventR(cbh, eventHour, side, entry, { atrMult = 1.2, rMulti
       if (sl) return -1;
     }
   }
-  const move = long ? lastClose - entry : entry - lastClose; // timeout → exit at market, in R
-  return Math.max(-1, Math.min(rMultiple, move / risk));
+  return 0; // time-stop / no touch → flat, credit no unrealized drift (frozen contract)
 }
 function aggR(arr) {
   if (!arr.length) return { samples: 0, hitRate: 0, meanR: 0 };
@@ -385,9 +390,15 @@ export function scoreEvents(coinSets, signalGen, { horizons = [4, 12, 24], minSa
     const pmap = priceByHour(cs.oiHist);
     if (pmap.size < 2) continue;
     const cbh = candlesByHour(cs.candleHist); // for R grading (first-touch needs highs/lows)
-    for (const e of signalGen(cs, pmap, ctx) || []) if (e && (e.side === "LONG" || e.side === "SHORT")) all.push({ t: e.t, side: e.side, pmap, cbh });
+    for (const e of signalGen(cs, pmap, ctx) || []) if (e && (e.side === "LONG" || e.side === "SHORT")) all.push({ t: e.t, side: e.side, pmap, cbh, rs: typeof e.rs === "number" ? e.rs : null });
   }
-  if (!all.length) return { samples: 0, horizons: horizons.map((h) => ({ h, samples: 0, hitRate: 0, meanBps: 0, stable: false, verdict: "INSUFFICIENT" })), r: { available: false, samples: 0, hitRate: 0, meanR: 0, stable: false, verdict: "INSUFFICIENT" }, headline: "bps", verdict: "INSUFFICIENT", bestHorizon: null };
+  if (!all.length) return { samples: 0, horizons: horizons.map((h) => ({ h, samples: 0, hitRate: 0, meanBps: 0, stable: false, verdict: "INSUFFICIENT" })), r: { available: false, samples: 0, hitRate: 0, meanR: 0, avgRWin: 0, maxDdR: 0, stable: false, verdict: "INSUFFICIENT" }, rsQuartileDist: [], headline: "bps", verdict: "INSUFFICIENT", bestHorizon: null };
+  // rs_quartile written on EVERY event row that carries an rs — from closes, NOT candle-gated
+  // (Grok #4). Cross-sectional rank → quartile (Q1 = strongest). Exposed so Sept-14 can
+  // condition on it; a top-quartile-only axis is a one-line follow-up once these matter.
+  const withRs = all.filter((e) => typeof e.rs === "number").sort((a, b) => b.rs - a.rs);
+  withRs.forEach((e, idx) => { e.rsQuartile = Math.min(4, Math.floor((idx / withRs.length) * 4) + 1); });
+  const rsQuartileDist = withRs.length ? [1, 2, 3, 4].map((q) => withRs.filter((e) => e.rsQuartile === q).length) : [];
   const times = all.map((e) => e.t).sort((a, b) => a - b);
   const medT = times[Math.floor(times.length / 2)];
   const horizonsOut = horizons.map((h) => {
@@ -406,22 +417,28 @@ export function scoreEvents(coinSets, signalGen, { horizons = [4, 12, 24], minSa
   });
   const bestHorizon = horizonsOut.reduce((b, x) => (x.meanBps > (b ? b.meanBps : -Infinity) ? x : b), null);
   // THESIS-IN-R headline (Grok #2): grade every event first-touch in R off the logged candles.
-  const rPnls = [], rFst = [], rSnd = [];
+  const rSamples = [], rFst = [], rSnd = [];
   for (const e of all) {
     const entry = e.pmap.get(hourBucket(e.t));
     const r = gradeEventR(e.cbh, hourBucket(e.t), e.side, entry);
     if (r == null) continue;
-    rPnls.push(r); (e.t <= medT ? rFst : rSnd).push(r);
+    rSamples.push({ t: e.t, r }); (e.t <= medT ? rFst : rSnd).push(r);
   }
+  const rPnls = rSamples.map((x) => x.r);
   const rA = aggR(rPnls), rF = aggR(rFst), rS = aggR(rSnd);
   const rStable = rF.samples >= 5 && rS.samples >= 5 && (rF.meanR > 0) === (rS.meanR > 0);
   let rVerdict = "INSUFFICIENT";
   if (rA.samples >= minSamples) rVerdict = rA.meanR > 0 && rStable ? "PREDICTIVE" : rA.meanR > 0 ? "PROMISING" : "NOISE";
-  const r = { available: rA.samples > 0, ...rA, stable: rStable, verdict: rVerdict };
+  // Grok's headline row: E[R] (meanR) · hit_rate · n · avg_R|win · max_dd_R.
+  const rWins = rPnls.filter((x) => x > 0);
+  const avgRWin = rWins.length ? Math.round((rWins.reduce((s, x) => s + x, 0) / rWins.length) * 100) / 100 : 0;
+  let cum = 0, peak = 0, maxDd = 0; // max drawdown in R over the time-ordered cumulative curve
+  for (const { r: rv } of rSamples.slice().sort((a, b) => a.t - b.t)) { cum += rv; peak = Math.max(peak, cum); maxDd = Math.max(maxDd, peak - cum); }
+  const r = { available: rA.samples > 0, ...rA, avgRWin, maxDdR: Math.round(maxDd * 100) / 100, stable: rStable, verdict: rVerdict };
   // Headline = R once we have enough R-graded samples (the right object); forward-bps is the
   // fallback until candles mature, and stays as a secondary read either way.
   const useR = rA.samples >= minSamples;
-  return { samples: all.length, horizons: horizonsOut, r, headline: useR ? "R" : "bps", verdict: useR ? rVerdict : (bestHorizon ? bestHorizon.verdict : "INSUFFICIENT"), bestHorizon };
+  return { samples: all.length, horizons: horizonsOut, r, rsQuartileDist, headline: useR ? "R" : "bps", verdict: useR ? rVerdict : (bestHorizon ? bestHorizon.verdict : "INSUFFICIENT"), bestHorizon };
 }
 
 // The full scorecard across every registered axis, ranked by best-horizon mean return.
@@ -437,7 +454,8 @@ export const AXES = [
   // proxy row for the spec (D0/D1 = the real candle versions below; _proxy = the stand-ins).
   { name: "rs_value_pullback", label: "D0_proxy: RS + value pullback (SMA anchor · close-vol PROXY)", gen: rsValuePullbackEvents },
   { name: "rs_value_pullback_rsi", label: "D1_proxy: + RSI≥45 (SMA anchor · close-vol PROXY)", gen: rsValuePullbackRsiEvents },
-  { name: "rs_value_pullback_candle", label: "D0: RS + value pullback (real weekly VWAP · true ATR)", gen: rsValuePullbackCandleEvents },
+  { name: "rs_value_pullback_candle", label: "D0_candle: RS + value pullback (real weekly VWAP · true ATR)", gen: rsValuePullbackCandleEvents },
+  { name: "rs_value_pullback_candle_rsi", label: "D1_candle: + RSI≥45 (real VWAP · true ATR)", gen: rsValuePullbackCandleRsiEvents },
   { name: "rs_value_pullback_rotation", label: "D2: + volume rotation (real VWAP/ATR · 2nd veto)", gen: rsValuePullbackRotationEvents },
   { name: "rsi_reset_deep", label: "RSI reset <45 (uptrend)", gen: rsiResetDeepEvents },
 ];
@@ -453,7 +471,7 @@ export function rsQuartiles(universe) {
 export function runScorecard(coinSets, cfg = {}) {
   const axes = AXES.map((a) => {
     const s = scoreEvents(coinSets, a.gen, cfg);
-    return { name: a.name, label: a.label, verdict: s.verdict, headline: s.headline, r: s.r, best: s.bestHorizon, horizons: s.horizons };
+    return { name: a.name, label: a.label, verdict: s.verdict, headline: s.headline, r: s.r, rsQuartileDist: s.rsQuartileDist, best: s.bestHorizon, horizons: s.horizons };
   });
   // rank: PREDICTIVE > PROMISING > NOISE > INSUFFICIENT, then by the HEADLINE metric —
   // meanR once R-graded (the right object), else forward-bps until candles mature.
