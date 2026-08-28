@@ -98,7 +98,12 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf 
       .then((j) => {
         if (off) return;
         if (j?.s === "ok" && Array.isArray(j.c) && j.c.length > 1) {
-          setCandles(j.c.map((c: number, i: number) => ({ t: Number(j.t[i]) * 1000, o: Number(j.o[i]), h: Number(j.h[i]), l: Number(j.l[i]), c: Number(c), v: Number(j.v?.[i]) || 0 })));
+          const arr = j.c.map((c: number, i: number) => ({ t: Number(j.t[i]) * 1000, o: Number(j.o[i]), h: Number(j.h[i]), l: Number(j.l[i]), c: Number(c), v: Number(j.v?.[i]) || 0 }));
+          setCandles(arr);
+          // Default to the recent ~72% so there's history to DRAG back to (TradingView-style);
+          // the ⤢ reset button shows the full window. Enables grab-drag immediately.
+          const nn = arr.length, vis = Math.min(nn, Math.max(MIN_CANDLES, Math.round(nn * 0.72)));
+          setVp(nn > vis + 2 ? { lo: nn - vis, hi: nn - 1 } : null);
         } else setFailed(true);
       })
       .catch(() => { if (!off) setFailed(true); });

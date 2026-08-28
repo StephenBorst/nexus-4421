@@ -305,7 +305,8 @@ export function QuickTrade() {
     </div>
   );
 
-  const projectionBlock = <div style={card}><ProjectionBand symbol={symbol} height={isMobile ? 216 : 500} horizonHours={CHART_TFS[tfIdx].projH} /></div>;
+  const projectionInner = <ProjectionBand symbol={symbol} height={isMobile ? 216 : 340} horizonHours={CHART_TFS[tfIdx].projH} />;
+  const projectionBlock = <div style={card}>{projectionInner}</div>; // mobile (fixed height)
 
   const sizeLevBlock = (
     <div style={card}>
@@ -421,8 +422,13 @@ export function QuickTrade() {
     <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 1680, margin: "0 auto" }}>
       {header}
       {marketBar}
-      <div style={{ display: "grid", gridTemplateColumns: "340px minmax(0,1fr) 348px", gap: 14, alignItems: "start" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{projectionBlock}{adviceBlock}{positionsBlock}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "340px minmax(0,1fr) 348px", gap: 14, alignItems: "stretch" }}>
+        {/* LEFT rail — the projection card FLEX-FILLS the column height (no dead space),
+            with THE READ + positions pinned below it. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ ...card, flex: 1, minHeight: 340, display: "flex", flexDirection: "column" }}>{projectionInner}</div>
+          {adviceBlock}{positionsBlock}
+        </div>
         <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 14 }}>{chartBlock}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{simBlock}{sizeLevBlock}</div>
       </div>

@@ -35,13 +35,16 @@ export function ProjectionBand({ symbol, height = 216, horizonHours }: { symbol:
   const [liq, setLiq] = useState<{ below: { price: number; mag?: number }[]; above: { price: number; mag?: number }[]; currentPrice: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(440);
+  const [vh, setVh] = useState(height); // measured container height → fills its column (no dead space)
 
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth || 440));
-    ro.observe(el); setWidth(el.clientWidth || 440);
-    return () => ro.disconnect();
+    const measure = () => { const r = el.getBoundingClientRect(); if (r.width > 0) setWidth(r.width); if (r.height > 40) setVh(r.height); };
+    const ro = new ResizeObserver(measure);
+    ro.observe(el); measure();
+    window.addEventListener("resize", measure);
+    return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
   }, []);
 
   // ~30d of hourly closes → realized vol + the price line.
@@ -96,14 +99,14 @@ export function ProjectionBand({ symbol, height = 216, horizonHours }: { symbol:
     return { price, sigmaT, iqr, wide, tgt, settle: Date.now() + H * 3600 * 1000 };
   }, [closes, H, target]);
 
-  const box: React.CSSProperties = { width: "100%", height, background: "#0a0a0b", border: `1px solid ${BORDER}`, borderRadius: 6, position: "relative", overflow: "hidden" };
+  const box: React.CSSProperties = { width: "100%", height: "100%", minHeight: height, background: "#0a0a0b", border: `1px solid ${BORDER}`, borderRadius: 6, position: "relative", overflow: "hidden" };
   if (failed) return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: FAINT }}>projection unavailable</div>;
   if (!closes || !view) return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: FAINT }}>modeling projection…</div>;
 
   const { price, iqr, wide, tgt, settle } = view;
   // layout — reserve a header row, an axis row, and a bottom OUTLOOK bar (no overlap).
-  const TOP = 28, OUTLOOK_H = 40, AXIS_H = 15, LPAD = 6, RPAD = 56;
-  const plotBottom = height - OUTLOOK_H - AXIS_H;
+  const TOP = 28, OUTLOOK_H = 40, AXIS_H = 15, LPAD = 6, RPAD = 52;
+  const plotBottom = vh - OUTLOOK_H - AXIS_H;
   const nowXFrac = 0.6; // price line occupies left 60%, projection zone the right 40%
   const nowX = LPAD + (width - LPAD - RPAD) * nowXFrac;
   const settleX = width - RPAD;
@@ -138,7 +141,7 @@ export function ProjectionBand({ symbol, height = 216, horizonHours }: { symbol:
           ))}
       </div>
 
-      <svg width={width} height={height} style={{ display: "block", position: "absolute", inset: 0 }}>
+      <svg width={width} height={vh} style={{ display: "block", position: "absolute", top: 0, left: 0 }}>
         {/* projection zone bg */}
         <rect x={nowX} y={TOP} width={settleX - nowX} height={plotBottom - TOP} fill="#ededf006" />
         {/* 10th–90th faint band */}
