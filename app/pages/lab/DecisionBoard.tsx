@@ -369,13 +369,27 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
         {hasLoop && <> Your loop state rides on the ticker: <b style={{ color: C.text.bright }}>● a live call</b> (planned) · <b style={{ color: C.text.bright }}>▸ an open position</b> (executing) — the graded record closes it.</>}
       </div>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center" }}>
         <span style={{ fontFamily: MONO, fontSize: 9, color: C.text.faint, alignSelf: "center", letterSpacing: "0.06em" }}>SORT</span>
         {hasLens && sortBtn("mine", "◆ MINE")}
         {sortBtn("actionable", "ACTIONABLE")}
         {sortBtn("confluence", "◆ CONFLUENCE")}
         {sortBtn("funding", "FUNDING")}
         {sortBtn("movers", "MOVERS")}
+        {/* Share the LIVE read as a branded, verifiable card that unfurls on X (the flywheel). */}
+        <button
+          onClick={() => {
+            const text = "The Board on Nexus — every market, one read, graded from public price. The mechanical play + how many independent reads confirm it:";
+            const url = "https://og.nexustradinglabs.com/share/board";
+            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, "_blank", "noopener");
+          }}
+          title="Share this live read as a card on X"
+          className="nx-press"
+          style={{
+            marginLeft: "auto", background: "none", border: `1px solid ${C.border}`, color: C.text.muted,
+            fontFamily: MONO, fontSize: 9, letterSpacing: "0.08em", padding: "4px 10px", borderRadius: RADIUS.sm, cursor: "pointer",
+          }}
+        >↗ SHARE</button>
       </div>
 
       {!signals ? (

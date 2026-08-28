@@ -1255,6 +1255,35 @@ Loading the record… <a style="color:#ededf0" href="${appUrl}">view on Nexus �
       return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=120", "Access-Control-Allow-Origin": "*" } });
     }
 
+    // ── GET /share/board — crawler-friendly OG proxy for THE BOARD share card ────
+    // Share links point HERE (not the SPA, whose OG tags are JS-injected): a JS-less crawler
+    // reads real og:image (the live confluence card) + unfurls it; humans bounce to the Lab.
+    if (parts[0] === "share" && parts[1] === "board") {
+      const appUrl = "https://trade.nexustradinglabs.com/lab?tab=intel";
+      const img = "https://og.nexustradinglabs.com/og/board.png";
+      const shareUrl = "https://og.nexustradinglabs.com/share/board";
+      const title = "The Board — every market, one read (graded from public price)";
+      const desc = "The mechanical play on funding · OI · trend, and how many independent reads confirm it. Live on Nexus, graded from the tape — not advice.";
+      const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${title}</title>
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${esc(desc)}">
+<meta property="og:image" content="${img}">
+<meta property="og:url" content="${shareUrl}">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:description" content="${esc(desc)}">
+<meta name="twitter:image" content="${img}">
+<meta http-equiv="refresh" content="0; url=${appUrl}">
+<script>location.replace(${JSON.stringify(appUrl)})</script>
+</head><body style="background:#0a0a0b;color:#a1a1aa;font-family:monospace;padding:40px">
+Loading the board… <a style="color:#ededf0" href="${appUrl}">open the Lab →</a>
+</body></html>`;
+      return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=120", "Access-Control-Allow-Origin": "*" } });
+    }
+
 
     // ── Ph22: /thesis/:wallet/:id → single thesis data ─────
     if (parts[0] === "thesis" && parts[1] && parts[2]) {
