@@ -53,6 +53,11 @@ export default {
       // Idempotent within a tick: recordOiSnapshot's 55-min gate no-ops the repeat
       // call for watchlist symbols further down.
       await recordOiForSymbols(["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC"], env);
+      // Real OHLC+volume candles (from Orderly's own tv/history) — the SAME market-
+      // data-not-per-user rationale as OI above, so it matures with zero active
+      // agents. Unlocks true VWAP/ATR + rs_rank quartiles for the harness and the
+      // futures-volume-rotation read. Hourly-gated so it only fetches once/hour.
+      await recordCandlesForSymbols(["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC"], env);
 
       const usersRaw = await env.NEXUS_AGENT.get("agent:users");
       if (!usersRaw) { console.log("[brain] no active users"); return; }
@@ -77,8 +82,9 @@ export default {
         for (const sym of config.symbols || []) symbolSet.add(sym);
       }
 
-      // Accumulate OI history independent of the (flat-only) signal path.
+      // Accumulate OI + candle history independent of the (flat-only) signal path.
       await recordOiForSymbols(oiSymbols, env);
+      await recordCandlesForSymbols(oiSymbols, env);
 
       // Evaluate each unique symbol exactly once this cycle → RAW market deltas.
       // Strategy interpretation (mode/thresholds) is applied PER USER below, so a
@@ -252,5 +258,45 @@ async function recordOiSnapshot(symbol, env, { price, oi, funding }) {
     await env.NEXUS_AGENT.put(key, JSON.stringify(hist));
   } catch (e) {
     console.error(`[brain] oi-history ${symbol} failed:`, e.message);
+  }
+}
+
+// Snapshot the last CLOSED hourly OHLC+volume candle for a set of symbols into our
+// OWN series candle:hist:{symbol} = [{t,o,h,l,c,v}]. Sourced from Orderly's tv/history
+// (real exchange OHLC + base volume), gated to one fetch per symbol per hour so it
+// costs a subrequest only when a new candle is actually due. Best-effort; never throws.
+async function recordCandlesForSymbols(symbols, env) {
+  const now = Date.now();
+  for (const symbol of symbols) {
+    try {
+      const key = `candle:hist:${symbol}`;
+      const raw = await env.NEXUS_AGENT.get(key);
+      const hist = raw ? JSON.parse(raw) : [];
+      const last = hist[hist.length - 1];
+      if (last && now - last.t < 55 * 60 * 1000) continue; // hourly — skip the fetch entirely
+
+      const nowSec = Math.floor(now / 1000);
+      const th = await orderlyPublicGet(`${ORDERLY_API}/tv/history?symbol=${symbol}&resolution=60&from=${nowSec - 3 * 3600}&to=${nowSec}`);
+      if (!th || th.s !== "ok" || !Array.isArray(th.t) || th.t.length === 0) continue;
+
+      // Prefer the last CLOSED candle (bucket start ≤ the current hour boundary) so we
+      // never persist a still-forming bar; fall back to the most recent if all are open.
+      const hourStartSec = Math.floor(nowSec / 3600) * 3600;
+      let idx = th.t.length - 1;
+      while (idx > 0 && Number(th.t[idx]) >= hourStartSec) idx--;
+      const c = {
+        t: Number(th.t[idx]) * 1000,
+        o: +th.o[idx], h: +th.h[idx], l: +th.l[idx], c: +th.c[idx],
+        v: Array.isArray(th.v) ? +th.v[idx] : 0,
+      };
+      if (![c.o, c.h, c.l, c.c].every(Number.isFinite)) continue;
+      // De-dup: if we already have this bucket (t), skip; the 55-min gate makes this rare.
+      if (last && last.t === c.t) continue;
+      hist.push(c);
+      if (hist.length > 2200) hist.splice(0, hist.length - 2200); // ~90d hourly
+      await env.NEXUS_AGENT.put(key, JSON.stringify(hist));
+    } catch (e) {
+      console.error(`[brain] candle-history ${symbol} failed:`, e.message);
+    }
   }
 }

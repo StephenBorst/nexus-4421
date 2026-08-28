@@ -4294,6 +4294,17 @@ document.getElementById("btn").addEventListener("click",go);
       return json({ symbol: parts[2], points: raw ? JSON.parse(raw) : [] }, request);
     }
 
+    // ── GET /agent/candle-history/:symbol — recorded OHLC+volume series ────────────
+    // The brain snapshots the last CLOSED hourly candle {t,o,h,l,c,v} (Orderly's own
+    // tv/history) into candle:hist:{symbol}. Exposed so the harness can compute real
+    // VWAP/ATR + rs_rank quartiles and the futures-rotation read off OUR series (no
+    // dependence on tv/history retention limits). Read-only, no secrets.
+    if (parts[0] === "agent" && parts[1] === "candle-history" && parts[2] && request.method === "GET") {
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+      const raw = await AGENT_KV.get(`candle:hist:${parts[2]}`);
+      return json({ symbol: parts[2], candles: raw ? JSON.parse(raw) : [] }, request);
+    }
+
     // ── GET /intel/persistence/:coin — SETUP MOMENTUM (persistence / decay) ───────
     // The one TIME-DERIVATIVE read: from the recorded oi:hist series, is the crowded
     // funding-fade still BUILDING (funding + OI both rising → you're early) or UNWINDING
