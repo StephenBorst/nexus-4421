@@ -21,6 +21,7 @@ import { MarketTape } from "./MarketTape";
 import { SmartMoneyView } from "./SmartMoneyView";
 import { MispricedBoard } from "./MispricedBoard";
 import { CatalystBoard } from "./CatalystBoard";
+import { ForecastDivergence } from "./ForecastDivergence";
 import { PositioningBoard } from "./PositioningBoard";
 import { Collapsible } from "./Collapsible";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
@@ -329,9 +330,14 @@ export default function TheLabPage() {
           // here (geopolitics → CL, rates → NAS, risk → BTC/SPX). Between the Board and the
           // deep detail; on-moat because every event resolves to a tradeable, gradeable call.
           const catalysts = <div style={{ marginTop: 28, paddingTop: 4, borderTop: "1px solid #232327" }}><CatalystBoard /></div>;
+          // FORECAST DIVERGENCE — the prediction-market lens, restored but scoped to markets
+          // you can trade here (our-markets-only until the Quotient feed lands). Sits beside
+          // Catalysts: both read an EXTERNAL crowd (events / forecasters) and resolve it to a
+          // tradeable, gradeable call on a Nexus market. Fail-soft (renders a quiet line if sparse).
+          const forecast = <div style={{ marginTop: 8, paddingTop: 4, borderTop: "1px solid #232327" }}><ForecastDivergence /></div>;
           return connected
-            ? <>{briefing}{board}{catalysts}{deep}</>
-            : <><LabWelcome />{briefing}{board}{catalysts}{deep}</>;
+            ? <>{briefing}{board}{catalysts}{forecast}{deep}</>
+            : <><LabWelcome />{briefing}{board}{catalysts}{forecast}{deep}</>;
         })()}
         {activeTab === "smart" && (
           <>

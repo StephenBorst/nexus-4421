@@ -271,9 +271,14 @@ export function ForecastDivergence() {
     } catch { /* SSR — ignore */ }
   };
 
-  const divergent = markets.filter((m) => m.divergence);
-  const nearOther = markets.filter((m) => m.nearMoney && !m.divergence).slice(0, 4);
-  const context = markets.filter((m) => !m.nearMoney).slice(0, 5);
+  // OUR MARKETS ONLY (until the Quotient feed lands): a forecast is only shown when it
+  // maps to a market you can actually trade on Nexus — i.e. Orderly returned a live mark
+  // (markPrice) for it. Keeps borst's "if you can't trade it here, it isn't in the UI"
+  // rule; a prediction on an unlisted coin is noise until we list it.
+  const tradable = markets.filter((m) => m.markPrice != null && m.symbol);
+  const divergent = tradable.filter((m) => m.divergence);
+  const nearOther = tradable.filter((m) => m.nearMoney && !m.divergence).slice(0, 4);
+  const context = tradable.filter((m) => !m.nearMoney).slice(0, 5);
 
   return (
     <div style={{ marginTop: 20 }}>
@@ -291,9 +296,9 @@ export function ForecastDivergence() {
       }}>
         {loading ? (
           <div style={{ color: FAINT, fontSize: 11, fontFamily: "var(--nx-font-mono)" }}>Reading prediction markets…</div>
-        ) : !markets.length ? (
+        ) : !tradable.length ? (
           <div style={{ color: DIM, fontSize: 11, fontFamily: "var(--nx-font-mono)", lineHeight: 1.6 }}>
-            No linked prediction markets right now — sparse by design (mostly BTC / ETH / SOL + major narratives).
+            No linked forecasts on a tradable market right now — sparse by design (near-money strikes on the coins listed here, mostly BTC / ETH).
           </div>
         ) : (
           <>
