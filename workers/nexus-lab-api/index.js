@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, simCreditsFor, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, deriveSetupMomentum, computeBeta, catalystBoard, attachCatalystTheses, catalystHouseCall, CATALYST_MARKETS, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, simCreditsFor, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, deriveSetupMomentum, computeBeta, catalystBoard, attachCatalystTheses, catalystHouseCall, CATALYST_MARKETS, boardCardRows, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -313,6 +313,53 @@ function buildOgSvg({ displayName, wallet, wins, losses, active, total, avgRR, w
   <line x1="48" y1="468" x2="1152" y2="468" stroke="#1a2e1a" stroke-width="1"/>
   <text x="48" y="512" fill="#2a4a3a" font-size="13" letter-spacing="1">on-chain verified · arbitrum</text>
   <text x="1152" y="512" fill="#1a3a1a" font-size="13" text-anchor="end">${esc(wallet)}</text>
+</svg>`;
+}
+
+// ── THE BOARD share card — the live confluence read, as a branded OG image ────
+// The distribution flywheel: turn the Lab's flagship read into a beautiful, verifiable,
+// shareable card that unfurls on X/Farcaster and links back. Monochrome-editorial to match
+// the app (bone accent, green=long/red=short only). Each row = a market's mechanical PLAY +
+// how many independent lenses (smart · catalysts · forecasters) confirm it. Rows already
+// ranked by boardCardRows; a strong confluence (agree≥2) gets a left accent + confirm color.
+function buildBoardOgSvg(rows, asOf, { fontFamily = "'Courier New', Courier, monospace" } = {}) {
+  const BONE = "#ededf0", MUT = "#71717a", FAINT = "#52525b", POS = "#3ecf8e", NEG = "#f7525f", BG = "#0a0a0b", BORD = "#232327";
+  const dcOf = (d) => (d === "LONG" ? POS : d === "SHORT" ? NEG : "#3a3a40");
+  const lensCol = (v) => (v === "LONG" ? POS : v === "SHORT" ? NEG : "#232327");
+  const lensCols = [{ k: "smart", x: 636 }, { k: "catalyst", x: 706 }, { k: "forecast", x: 776 }];
+  const body = (rows || []).slice(0, 6).map((r, i) => {
+    const y = 306 + i * 46;
+    const dc = dcOf(r.play.dir);
+    const strong = r.play.strong && r.agree >= 2;
+    const rects = lensCols.map(({ k, x }) => `<rect x="${x}" y="${y - 17}" width="22" height="22" rx="4" fill="${lensCol(r.lens[k])}"/>`).join("");
+    const accent = strong ? `<rect x="40" y="${y - 24}" width="4" height="36" fill="${dc}"/>` : "";
+    return `${accent}
+    <text x="60" y="${y}" fill="${BONE}" font-size="28" font-weight="bold">${esc(r.coin)}</text>
+    <circle cx="234" cy="${y - 9}" r="6" fill="${dc}"/>
+    <text x="250" y="${y}" fill="${dc}" font-size="23" font-weight="bold">${esc(r.play.label)}</text>
+    ${rects}
+    <text x="1044" y="${y}" fill="${strong ? dc : r.agree >= 1 ? BONE : FAINT}" font-size="23" font-weight="bold">${r.play.dir ? `${r.agree}/3` : "—"}</text>`;
+  }).join("");
+  return `<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+  <defs><style>text { font-family: ${fontFamily}; }</style></defs>
+  <rect width="1200" height="630" fill="${BG}"/>
+  <rect width="1200" height="4" fill="${BONE}" opacity="0.55"/>
+  <text x="60" y="54" fill="${FAINT}" font-size="15" letter-spacing="4">NEXUS TRADING LABS</text>
+  <text x="1140" y="54" fill="${FAINT}" font-size="15" text-anchor="end">trade.nexustradinglabs.com/lab</text>
+  <text x="60" y="126" fill="${MUT}" font-size="16" letter-spacing="6">THE BOARD · LIVE READ</text>
+  <text x="60" y="174" fill="${BONE}" font-size="44" font-weight="bold">Every market, one read</text>
+  <text x="60" y="210" fill="${MUT}" font-size="16">The mechanical play on funding · OI · trend — and how many independent reads confirm it.</text>
+  <text x="60" y="266" fill="${FAINT}" font-size="13" letter-spacing="2">MARKET</text>
+  <text x="250" y="266" fill="${FAINT}" font-size="13" letter-spacing="2">THE PLAY</text>
+  <text x="647" y="266" fill="${FAINT}" font-size="12" text-anchor="middle">Sm</text>
+  <text x="717" y="266" fill="${FAINT}" font-size="12" text-anchor="middle">Ct</text>
+  <text x="787" y="266" fill="${FAINT}" font-size="12" text-anchor="middle">Fc</text>
+  <text x="1044" y="266" fill="${FAINT}" font-size="13" letter-spacing="2">CONFIRM</text>
+  <line x1="60" y1="278" x2="1140" y2="278" stroke="${BORD}" stroke-width="1"/>
+  ${body}
+  <line x1="60" y1="584" x2="1140" y2="584" stroke="${BORD}" stroke-width="1"/>
+  <text x="60" y="610" fill="${FAINT}" font-size="14">Public facts. The play is mechanical, graded from the tape after — not advice.</text>
+  <text x="1140" y="610" fill="${FAINT}" font-size="14" text-anchor="end">${esc(asOf || "")}</text>
 </svg>`;
 }
 
@@ -980,6 +1027,52 @@ export default {
           "Access-Control-Allow-Origin": "*",
         },
       });
+    }
+
+    // ── /og/board(.png)? → shareable card of THE BOARD's live confluence read ─────
+    // The distribution flywheel (borst's ask). Assembles the SAME inputs as the live Board
+    // WITHOUT a Worker self-fetch: computeSignalRows(env) for the play + KV for the lenses
+    // (smart / catalyst / forecast). PNG for X/Farcaster, SVG for other crawlers. Fail-soft:
+    // any missing lens just reads dim. Cached 5 min.
+    if (parts[0] === "og" && (parts[1] === "board" || parts[1] === "board.png")) {
+      if (request.method !== "GET") return new Response("method not allowed", { status: 405 });
+      const isPng = parts[1].endsWith(".png");
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+      const domLean = (t) => (t.L > t.S ? "LONG" : t.S > t.L ? "SHORT" : null);
+      let signals = [], smart = {}, catalyst = {}, forecast = {};
+      try { signals = await computeSignalRows(env); } catch (e) { console.error("[og board] signals", String(e)); }
+      try {
+        const c = await AGENT_KV.get("sm:consensus"); const m = c ? JSON.parse(c) : {};
+        for (const [k, v] of Object.entries(m)) if (v && (v.side === "LONG" || v.side === "SHORT")) smart[k.toUpperCase()] = v.side;
+      } catch { /* smart lens dim */ }
+      try {
+        const c = await env.LAB_STORE.get("intel:catalystboard:v1"); const b = c ? JSON.parse(c) : null;
+        if (b && Array.isArray(b.catalysts)) {
+          const t = {};
+          for (const cat of b.catalysts) for (const im of (cat.impacts || [])) { const co = String(im.coin || "").toUpperCase(); if (!co) continue; t[co] = t[co] || { L: 0, S: 0 }; if (im.direction === "LONG") t[co].L++; else if (im.direction === "SHORT") t[co].S++; }
+          for (const [co, x] of Object.entries(t)) { const d = domLean(x); if (d) catalyst[co] = d; }
+        }
+      } catch { /* catalyst lens dim */ }
+      try {
+        const c = await env.LAB_STORE.get("intel:forecasts:v1"); const b = c ? JSON.parse(c) : null;
+        if (b && Array.isArray(b.markets)) {
+          const t = {};
+          for (const m of b.markets) { if (m.markPrice == null || !m.forecastLean) continue; const co = String(m.coin || "").toUpperCase(); if (!co) continue; t[co] = t[co] || { L: 0, S: 0 }; if (m.forecastLean === "UP") t[co].L++; else if (m.forecastLean === "DOWN") t[co].S++; }
+          for (const [co, x] of Object.entries(t)) { const d = domLean(x); if (d) forecast[co] = d; }
+        }
+      } catch { /* forecast lens dim */ }
+      const rows = boardCardRows({ signals, consensus: {}, smart, catalyst, forecast }, 6);
+      const asOf = new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC";
+      if (isPng) {
+        try {
+          await ensureResvg();
+          const font = await getMonoFont();
+          const svg = buildBoardOgSvg(rows, asOf, { fontFamily: "'JetBrains Mono'" });
+          const png = new Resvg(svg, { font: { loadSystemFonts: false, fontBuffers: [font], defaultFontFamily: "JetBrains Mono" } }).render().asPng();
+          return new Response(png, { headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=300, stale-while-revalidate=60", "Access-Control-Allow-Origin": "*" } });
+        } catch (e) { console.error("[og board png]", String(e)); }
+      }
+      return new Response(buildBoardOgSvg(rows, asOf), { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=300, stale-while-revalidate=60", "Access-Control-Allow-Origin": "*" } });
     }
 
     // ── Ph17: /wallets/onchain → on-chain trader discovery ─

@@ -2065,6 +2065,42 @@ export function catalystHouseCall(impact, opts = {}) {
   };
 }
 
+// ── THE BOARD share card — the top confluence reads, server-side ──────────────
+// Mirrors DecisionBoard's mechanical PLAY + 4-lens agreement so the shareable OG card
+// shows the SAME read as the live Board (no drift on the thresholds). Pure; the OG route
+// supplies the fetched inputs (signals + the four lens maps). Honesty by construction:
+// every input is a public fact, the play is the mechanical read, agreement is independent.
+const CB_CROWDED = 0.0004, CB_LEAN_MIN = 0.00003;
+export function boardCardPlay(s) {
+  const f = Number(s.funding_rate_8h) || 0;
+  if (s.confluence === "LONG" || s.confluence === "SHORT") return { dir: s.confluence, label: `Confluence ${s.confluence === "LONG" ? "long" : "short"}`, klass: "CONFLUENCE", strong: true };
+  if (Math.abs(f) >= CB_CROWDED) { const dir = f > 0 ? "SHORT" : "LONG"; return { dir, label: `Fade ${dir === "LONG" ? "long" : "short"}`, klass: "FADE", strong: true }; }
+  if ((s.trend === "TREND_UP" || s.trend === "TREND_DOWN") && (Number(s.trend_oi_pct) || 0) >= 1) { const dir = s.trend === "TREND_UP" ? "LONG" : "SHORT"; return { dir, label: `Ride ${dir === "LONG" ? "up" : "down"}`, klass: "TREND", strong: true }; }
+  if (Math.abs(f) >= CB_LEAN_MIN) { const dir = f > 0 ? "SHORT" : "LONG"; return { dir, label: `leans ${dir === "LONG" ? "long" : "short"}`, klass: "LEAN", strong: false }; }
+  return { dir: null, label: "—", klass: null, strong: false };
+}
+const cbBare = (x) => String(x || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+export function boardCardRows({ signals = [], consensus = {}, smart = {}, catalyst = {}, forecast = {} }, limit = 6) {
+  const rows = [];
+  for (const s of signals || []) {
+    const coin = cbBare(s.symbol);
+    const play = boardCardPlay(s);
+    const c = consensus[s.symbol] || consensus[coin];
+    const lens = {
+      callers: c && c.side !== "SPLIT" ? c.side : null,
+      smart: smart[coin] || null,
+      catalyst: catalyst[coin] || null,
+      forecast: forecast[coin] || null,
+    };
+    const agree = play.dir ? Object.values(lens).filter((v) => v === play.dir).length : 0;
+    const base = play.klass === "CONFLUENCE" ? 300 : play.klass === "FADE" ? 200 : play.klass === "TREND" ? 100 : play.klass === "LEAN" ? 10 : 0;
+    const score = base + (play.strong ? agree * 25 : 0);
+    rows.push({ coin, play, lens, agree, score, funding: Number(s.funding_rate_8h) || 0 });
+  }
+  rows.sort((a, b) => b.score - a.score);
+  return rows.slice(0, limit);
+}
+
 // Attach a gradeable thesis draft to every impact on every catalyst, using a coin→mark
 // price map (bare coin, e.g. BTC/SPX500/CL). Impacts without a live price get thesis:null
 // (ungradeable, surfaced honestly). Pure — the price fetch happens in the route.
