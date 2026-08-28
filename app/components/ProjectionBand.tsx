@@ -112,9 +112,22 @@ export function ProjectionBand({ symbol, height = 216, horizonHours, fill }: { s
   const nowXFrac = 0.6; // price line occupies left 60%, projection zone the right 40%
   const nowX = LPAD + (width - LPAD - RPAD) * nowXFrac;
   const settleX = width - RPAD;
-  // y-scale spans the price history AND the projection cone
-  const lo = Math.min(Math.min(...closes), wide.lo, tgt ?? Infinity);
-  const hi = Math.max(Math.max(...closes), wide.hi, tgt ?? -Infinity);
+  // y-scale spans the price history AND the projection cone — but NOT a far-off
+  // directional target. A liq magnet 10%+ away would otherwise blow up the domain
+  // and crush the price line + cone into a thin strip, leaving the lower half of the
+  // band empty (the recurring "dead space" bug). Scale to the data, then clamp the
+  // target's LINE into the frame (its label still shows the true price).
+  const dataLo = Math.min(Math.min(...closes), wide.lo);
+  const dataHi = Math.max(Math.max(...closes), wide.hi);
+  const dataSpan = dataHi - dataLo || 1;
+  // A target may nudge the domain out by at most ~15% of the data range — enough to
+  // stay visible on-scale when it's near, never enough to dominate when it's far.
+  const tgtBoundLo = dataLo - dataSpan * 0.15;
+  const tgtBoundHi = dataHi + dataSpan * 0.15;
+  const tgtInFrame = tgt != null ? Math.min(tgtBoundHi, Math.max(tgtBoundLo, tgt)) : null;
+  const tgtOffScale = tgt != null && tgtInFrame != null && Math.abs(tgtInFrame - tgt) > 1e-9;
+  const lo = Math.min(dataLo, tgtInFrame ?? Infinity);
+  const hi = Math.max(dataHi, tgtInFrame ?? -Infinity);
   const pad = (hi - lo) * 0.08 || 1;
   const yMin = lo - pad, yMax = hi + pad, span = yMax - yMin || 1;
   const y = (v: number) => TOP + (1 - (v - yMin) / span) * (plotBottom - TOP);
@@ -154,11 +167,11 @@ export function ProjectionBand({ symbol, height = 216, horizonHours, fill }: { s
         {/* median (= current price) dashed across the cone */}
         <line x1={LPAD} x2={settleX} y1={y(price)} y2={y(price)} stroke={BONE} strokeWidth={1} strokeDasharray="5 4" opacity={0.5} />
         {/* target line (directional), if the read has a lean + magnet */}
-        {tgt != null && (
+        {tgt != null && tgtInFrame != null && (
           <>
-            <line x1={nowX} x2={settleX} y1={y(tgt)} y2={y(tgt)} stroke={tgtColor} strokeWidth={1.3} strokeDasharray="4 3" />
-            <rect x={settleX} y={y(tgt) - 8} width={RPAD} height={16} fill={tgtColor} />
-            <text x={settleX + RPAD / 2} y={y(tgt) + 3.5} fontFamily={MONO} fontSize={8.5} fontWeight={700} fill="#0a0a0b" textAnchor="middle">TGT {fmtPx(tgt)}</text>
+            <line x1={nowX} x2={settleX} y1={y(tgtInFrame)} y2={y(tgtInFrame)} stroke={tgtColor} strokeWidth={1.3} strokeDasharray="4 3" opacity={tgtOffScale ? 0.7 : 1} />
+            <rect x={settleX} y={y(tgtInFrame) - 8} width={RPAD} height={16} fill={tgtColor} />
+            <text x={settleX + RPAD / 2} y={y(tgtInFrame) + 3.5} fontFamily={MONO} fontSize={8.5} fontWeight={700} fill="#0a0a0b" textAnchor="middle">{tgtOffScale ? (dir === "SHORT" ? "▼" : "▲") : "TGT"} {fmtPx(tgt)}</text>
           </>
         )}
         {/* price history line */}
