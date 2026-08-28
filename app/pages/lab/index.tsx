@@ -353,7 +353,7 @@ export default function TheLabPage() {
               <PositioningBoard trades={connected ? processedTrades : undefined} />
             </Collapsible>
           );
-          const catalysts = <div style={{ marginTop: 14 }}><CatalystBoard /></div>;
+          const catalysts = <div style={{ marginTop: 22 }}><CatalystBoard /></div>;
           // FORECAST DIVERGENCE — the prediction-market lens, restored but scoped to markets
           // you can trade here (our-markets-only until the Quotient feed lands). A tradeable,
           // gradeable call on a Nexus market. Fail-soft (renders a quiet line if sparse).

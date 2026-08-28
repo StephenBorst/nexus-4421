@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
 import { C } from "@/config/theme";
 import { ProjectionBand } from "@/components/ProjectionBand";
+import { SectionHeader } from "./components";
 
 // ── Forecast Divergence card (the prediction-market lens) ────────────────────
 // Quotient-informed sibling of the Mispriced Board: reads the FORECASTING crowd
@@ -282,14 +283,7 @@ export function ForecastDivergence() {
 
   return (
     <div style={{ marginTop: 20 }}>
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 9, color: FAINT, fontFamily: "var(--nx-font-mono)", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 5 }}>
-          Forecasters vs the tape
-        </div>
-        <div style={{ fontFamily: "var(--nx-font-serif)", fontSize: 19, fontWeight: 700, color: BONE, lineHeight: 1.1, letterSpacing: "-0.01em" }}>
-          Forecast Divergence
-        </div>
-      </div>
+      <SectionHeader eyebrow="Forecasters vs the tape" title="Forecast Divergence" note="PREDICTION CROWD vs FUNDING · OUR MARKETS" />
 
       <div style={{
         background: "#141416", border: `1px solid ${BORDER}`, borderRadius: 2, padding: "14px 16px",
