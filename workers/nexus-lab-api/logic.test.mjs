@@ -1940,3 +1940,10 @@ test("catalystBoard: keeps tradeable-mapped live events, sorts by volume, dedupe
   assert.equal(b.catalysts[0].category, "RATES"); // highest volume first
   assert.ok(b.catalysts.every((c) => c.impacts.length > 0));
 });
+
+import { resolveLens } from "./logic.mjs";
+test("resolveLens: negated rate question flips the lens", () => {
+  assert.equal(resolveLens("RISK_ON", "Will no Fed rate cuts happen in 2026?"), "RISK_OFF"); // no cuts = hawkish
+  assert.equal(resolveLens("RISK_ON", "Will the Fed cut rates in September?"), "RISK_ON");    // plain cut = dovish
+  assert.equal(resolveLens("RISK_OFF", "Will there be no ceasefire?"), "RISK_ON");            // no ceasefire flips
+});

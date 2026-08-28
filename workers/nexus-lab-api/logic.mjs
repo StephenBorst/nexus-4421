@@ -1968,6 +1968,15 @@ export function catalystImpact(category, riskLens, question) {
   return out;
 }
 
+// A NEGATED question flips the lens: "will NO rate cuts happen" resolving YES is hawkish
+// (risk-off), even though the string contains "cut". Narrow + safe — only flips when a
+// negation word sits before the move keyword. Pure; exported for tests.
+export function resolveLens(riskLens, question) {
+  if (!riskLens) return riskLens;
+  const negated = /\b(no|not|won'?t|without|zero|fail\w*|never)\b[^?]{0,40}\b(cut\w*|hike\w*|rais\w*|lower\w*|reduc\w*|increas\w*|recession\w*|approv\w*|pass\w*|deal\w*|ceasefire|peace\w*)/i.test(String(question || ""));
+  return negated ? (riskLens === "RISK_ON" ? "RISK_OFF" : "RISK_ON") : riskLens;
+}
+
 // Build the catalyst board from Polymarket markets: classify → keep events with a lens
 // + a LIVE probability that map to a tradeable impact → the strongest by volume first.
 export function catalystBoard(polyMarkets, { minVolumeUsd = 20000, limit = 24 } = {}) {
@@ -1976,7 +1985,8 @@ export function catalystBoard(polyMarkets, { minVolumeUsd = 20000, limit = 24 } 
     if (pm && (pm.closed === true || pm.active === false)) continue;
     const q = pm && pm.question; if (!q) continue;
     const klass = classifyMacro(q); if (!klass || !klass.riskLens) continue;
-    const impacts = catalystImpact(klass.category, klass.riskLens, q);
+    const lens = resolveLens(klass.riskLens, q);
+    const impacts = catalystImpact(klass.category, lens, q);
     if (!impacts.length) continue;
     const volume = Number(pm.volumeNum ?? pm.volume ?? 0) || 0;
     if (volume < minVolumeUsd) continue;
@@ -1990,7 +2000,7 @@ export function catalystBoard(polyMarkets, { minVolumeUsd = 20000, limit = 24 } 
     if (yesProbPct < 3 || yesProbPct > 97) continue; // a live, expressible probability
     const clobIds = parseJsonArray(pm.clobTokenIds).map(String);
     rows.push({
-      question: String(q), category: klass.category, riskLens: klass.riskLens,
+      question: String(q), category: klass.category, riskLens: lens,
       yesProbPct, volumeUsd: volume, endDate: pm.endDate || pm.end_date_iso || null,
       clobTokenId: (yi >= 0 && clobIds[yi]) ? clobIds[yi] : (clobIds[0] || null),
       impacts,

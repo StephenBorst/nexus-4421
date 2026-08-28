@@ -20,6 +20,7 @@ import { MarketIntelView } from "./MarketIntel";
 import { MarketTape } from "./MarketTape";
 import { SmartMoneyView } from "./SmartMoneyView";
 import { MispricedBoard } from "./MispricedBoard";
+import { CatalystBoard } from "./CatalystBoard";
 import { PositioningBoard } from "./PositioningBoard";
 import { Collapsible } from "./Collapsible";
 import { LabWelcome, OnboardingChecklist } from "./Onboarding";
@@ -324,9 +325,13 @@ export default function TheLabPage() {
               <MarketIntelView />
             </Collapsible>
           );
+          // CATALYSTS — the event layer: world events mapped to the markets you can trade
+          // here (geopolitics → CL, rates → NAS, risk → BTC/SPX). Between the Board and the
+          // deep detail; on-moat because every event resolves to a tradeable, gradeable call.
+          const catalysts = <div style={{ marginTop: 28, paddingTop: 4, borderTop: "1px solid #232327" }}><CatalystBoard /></div>;
           return connected
-            ? <>{briefing}{board}{deep}</>
-            : <><LabWelcome />{briefing}{board}{deep}</>;
+            ? <>{briefing}{board}{catalysts}{deep}</>
+            : <><LabWelcome />{briefing}{board}{catalysts}{deep}</>;
         })()}
         {activeTab === "smart" && (
           <>
