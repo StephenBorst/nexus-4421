@@ -941,6 +941,14 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
           catalyst: d.catalyst ?? f.catalyst,
           targetWindow: d.targetWindow ?? f.targetWindow,
         }));
+        // ⚠️ Contract survival (Grok): a FROZEN draft carries absolute stop/TP. The Quick Call
+        // knobs default to 2% / 2R and would DISPLAY those (and clobber the draft on a rebuild),
+        // so derive stop% and R from the drafted levels — the knobs now match the frozen stop/TP.
+        const e = parseFloat(d.entryPrice), s = parseFloat(d.stopLoss), tp = parseFloat(d.takeProfit1);
+        if (Number.isFinite(e) && Number.isFinite(s) && Number.isFinite(tp) && e > 0 && Math.abs(s - e) > 0) {
+          setQuickStopPct(Math.round((Math.abs(s - e) / e * 100) * 10) / 10);
+          setQuickTpR(Math.round((Math.abs(tp - e) / Math.abs(s - e)) * 10) / 10);
+        }
         window.localStorage.removeItem(THESIS_DRAFT_KEY);
       } catch { /* ignore malformed draft */ }
     };
