@@ -76,7 +76,11 @@ export function ProjectionBand({ symbol, height = 216, horizonHours, fill }: { s
     const arr = lean.dir === "SHORT" ? liq.below : liq.above, px = liq.currentPrice;
     const sc = (m: { price: number; mag?: number }) => { const dist = Math.abs(m.price - px) / px; return dist > 0.0005 ? (Number(m.mag) || 1) / dist : 0; };
     const best = (arr || []).reduce((b: { price: number; mag?: number } | null, x) => (sc(x) > (b ? sc(b) : 0) ? x : b), null);
-    return best ? best.price : null;
+    // ⚠️ Guard against garbage magnets on thin coins (Grok): a $0 / negative target renders
+    // as "→ $0.000 (−100%)", and a magnet >35% away isn't a reachable target inside this
+    // horizon. Reject both → the outlook shows just the lean, no bogus target price.
+    if (!best || !(best.price > 0) || Math.abs(best.price - px) / px > 0.35) return null;
+    return best.price;
   }, [liq, lean]);
 
   // Forward horizon in hours — controlled by the chart's timeframe, else the local chips.

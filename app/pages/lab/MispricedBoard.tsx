@@ -53,13 +53,30 @@ const fmtPrice = (n: number) => n >= 1000 ? n.toLocaleString(undefined, { maximu
 const stanceLabel = (dir: string) => dir === "SHORT" ? "Crowd over-long" : dir === "LONG" ? "Crowd over-short" : "Balanced";
 
 // Plain-English translation — the readability layer. A first-timer reads this; a pro
-// reads the numbers above it. Both are true, neither is dumbed down.
-const plainRead = (m: Market) => {
+// reads the numbers above it. Both are true, neither is dumbed down. verdict === "WATCH"
+// tells the truth Grok flagged: funding can be HIGH in absolute terms yet not STRETCHED
+// vs its own range — that's a watch, not a fade.
+const plainRead = (m: Market, verdict?: "FADE" | "WATCH" | "NONE") => {
   const pct = Math.abs(m.fundingAnnualPct);
-  if (m.direction === "SHORT") return `Traders are paying ${pct}%/yr to stay long ${m.coin} — the crowd is one-sided. That crowding usually unwinds, so the edge is to lean short.`;
-  if (m.direction === "LONG") return `Shorts are paying ${pct}%/yr to stay short ${m.coin} — the crowd is one-sided the other way, so the edge is to lean long.`;
+  const crowd = m.direction === "SHORT" ? "long" : "short";
+  if (verdict === "WATCH" && m.direction !== "NONE")
+    return `Funding on ${m.coin} is elevated (${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr) but sitting within its own typical range — the crowd isn't stretched right now, so there's no clean fade yet. Watch for it to pierce out of the band.`;
+  if (m.direction === "SHORT") return `Traders are paying ${pct}%/yr to stay long ${m.coin} — the crowd is stretched one-sided. That crowding usually unwinds, so the edge is to lean short.`;
+  if (m.direction === "LONG") return `Shorts are paying ${pct}%/yr to stay short ${m.coin} — the crowd is stretched one-sided the other way, so the edge is to lean long.`;
   return `${m.coin} funding is close to balanced — no clear crowd to fade right now.`;
 };
+
+// ── THE HONEST EDGE TEST (Grok) — funding is a FADE only when it's stretched vs its OWN
+// recent range (pierces p25–p75), not merely high in absolute terms. Needs enough history
+// to judge; null = can't confirm a stretch → the ticket treats it as WATCH, never FADE.
+function fundingStretched(points?: { f: number }[]): boolean | null {
+  const fs = (points || []).map((p) => p.f).filter((f) => Number.isFinite(f));
+  if (fs.length < 8) return null;
+  const srt = [...fs].sort((a, b) => a - b);
+  const q = (p: number) => srt[Math.min(srt.length - 1, Math.max(0, Math.round(p * (srt.length - 1))))];
+  const lf = fs[fs.length - 1];
+  return lf > q(0.75) || lf < q(0.25);
+}
 
 // Direction chips are POSITIONING, not P&L — kept monochrome per the design law
 // (green = profit only, red = loss only). Only the 24h price move uses pos/neg.
@@ -312,26 +329,31 @@ function LensRow({ label, value, tag, tagTone, first }: { label: string; value: 
 // CROWD (funding, fade it) · SMART $ (sharp capital, ride it) · CALLERS (graded second
 // opinion). Each shows which side it takes vs the fade; the verdict fuses crowd + smart
 // money. Explainable end to end — the inputs stay visible, the verdict just reads them.
-function SynthesisRead({ m, lean }: { m: Market; lean?: Lean }) {
+function SynthesisRead({ m, lean, active }: { m: Market; lean?: Lean; active: boolean }) {
   if (m.direction === "NONE") return null;
   const fadeDir = m.direction; // the fade side (opposite the crowd)
   const crowdSide = fadeDir === "SHORT" ? "long" : "short";
   const sm = m.smartMoney;
-  const v = synthVerdict(m);
+  const v = active ? synthVerdict(m) : null; // the fade verdict exists only when there IS a fade
   const withTag = "✓ WITH THE FADE", againstTag = "⚡ AGAINST";
   const callerSides = lean && lean.side !== "SPLIT";
+  // n=1 caller is CONTEXT, not confirmation (Grok) — need ≥2 to tag it with/against the fade.
+  const callerConfirms = !!lean && lean.side !== "SPLIT" && lean.participants >= 2;
   return (
     <div style={{ marginTop: 14, border: `1px solid ${C.border}`, borderRadius: RADIUS.md, padding: "9px 13px 11px", background: C.surfaceAlt }}>
-      <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: C.text.muted, marginBottom: 1 }}>◆ The read · three lenses</div>
-      <LensRow first label="Crowd" value={<>{m.fundingAnnualPct >= 0 ? "+" : ""}{m.fundingAnnualPct}%/yr · paying to be {crowdSide}</>} tag={`FADE ${fadeDir}`} tagTone={C.text.bright} />
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 1 }}>
+        <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: C.text.muted }}>◆ The read · three lenses</span>
+        {!active && <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, color: C.text.faint }}>current positioning · no fade yet</span>}
+      </div>
+      <LensRow first label="Crowd" value={<>{m.fundingAnnualPct >= 0 ? "+" : ""}{m.fundingAnnualPct}%/yr · paying to be {crowdSide}</>} tag={active ? `FADE ${fadeDir}` : "within range"} tagTone={active ? C.text.bright : C.text.faint} />
       <LensRow label="Smart $"
-        value={sm?.side ? `${sm.count} sharp${sm.count === 1 ? "" : "s"} ${sm.side}${sm.long != null && sm.short != null ? ` · ${sm.long}L/${sm.short}S` : ""}` : "no read yet"}
-        tag={sm?.side ? (sm.side === fadeDir ? withTag : againstTag) : undefined}
+        value={sm?.side ? `${sm.count} sharp${sm.count === 1 ? "" : "s"} ${sm.side}${sm.long != null && sm.short != null ? ` · ${sm.long}L/${sm.short}S` : ""}` : "no read"}
+        tag={active && sm?.side ? (sm.side === fadeDir ? withTag : againstTag) : undefined}
         tagTone={sm?.side ? (sm.side === fadeDir ? C.accent : C.warn) : undefined} />
       <LensRow label="Callers"
-        value={callerSides ? `betting ${lean!.side} · ${lean!.participants}` : lean ? `split · ${lean.participants}` : "no one's called it"}
-        tag={callerSides ? (lean!.side === fadeDir ? withTag : againstTag) : undefined}
-        tagTone={callerSides ? (lean!.side === fadeDir ? C.accent : C.warn) : undefined} />
+        value={callerSides ? `betting ${lean!.side} · ${lean!.participants}${lean!.participants < 2 ? " (thin)" : ""}` : lean ? `split · ${lean.participants}` : "no one's called it"}
+        tag={active && callerConfirms ? (lean!.side === fadeDir ? withTag : againstTag) : undefined}
+        tagTone={callerConfirms ? (lean!.side === fadeDir ? C.accent : C.warn) : undefined} />
       {v && (
         <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, alignItems: "flex-start" }}>
           <span style={{ flexShrink: 0, fontFamily: MONO, fontSize: 12, lineHeight: 1.2, color: v.tone === "aligned" ? C.accent : C.warn }}>{v.tone === "aligned" ? "◆" : "⚠"}</span>
@@ -427,6 +449,13 @@ export function MispricedBoard() {
     const m = selected;
     const l = lean[m.coin];
     const change = m.change24hPct;
+    // ── ONE VERDICT drives the whole ticket (Grok): a FADE requires the crowd to be
+    // STRETCHED now (funding pierces its own range), not merely elevated. Not stretched
+    // (or too little history to confirm) → WATCH; balanced → NONE. Header, copy, the read,
+    // and the Draft button all read from this — so the page can never argue with itself.
+    const stretched = fundingStretched(pos?.points);
+    const verdict: "FADE" | "WATCH" | "NONE" = m.direction === "NONE" ? "NONE" : stretched === true ? "FADE" : "WATCH";
+    const isFade = verdict === "FADE";
     return (
       <div>
         <button onClick={() => setOpenCoin(null)} className="nx-card-interactive" style={{
@@ -443,7 +472,7 @@ export function MispricedBoard() {
           <div style={{ position: "relative", border: `1px solid ${C.border}`, borderLeft: `2px solid ${C.accent}`, borderRadius: RADIUS.lg, padding: "24px 28px", background: "linear-gradient(180deg,#17171a 0%,#0d0d0f 100%)", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: MONO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: C.text.muted }}>
               <span style={{ color: C.text.fog }}>◆ Nexus · Funding edge</span>
-              <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: C.accent }}>◆ WATCHING</span>
+              <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: isFade ? C.accent : C.text.muted }}>{verdict === "NONE" ? "BALANCED" : isFade ? "◆ FADE NOW" : "◆ WATCHING"}</span>
             </div>
             <div style={{ fontFamily: UI, fontSize: 14, color: C.text.fog, marginTop: 18 }}>{m.coin} perpetual</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 1 }}>
@@ -474,7 +503,7 @@ export function MispricedBoard() {
             </div>
 
             <p style={{ fontFamily: UI, fontSize: 13, lineHeight: 1.55, color: C.text.fog, marginTop: 14, padding: "11px 12px", background: "rgba(237,237,240,0.03)", border: `1px solid ${C.border}`, borderRadius: RADIUS.md }}>
-              {plainRead(m)}
+              {plainRead(m, verdict)}
             </p>
 
             {/* Reversion proof — what happened the last times it looked this stretched. */}
@@ -487,7 +516,7 @@ export function MispricedBoard() {
 
             {/* THE READ — three-lens synthesis (crowd · smart $ · callers) + the fused verdict */}
             {m.direction !== "NONE"
-              ? <SynthesisRead m={m} lean={l} />
+              ? <SynthesisRead m={m} lean={l} active={isFade} />
               : (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, fontFamily: MONO, fontSize: 10 }}>
                   <span style={{ color: C.text.faint, textTransform: "uppercase", letterSpacing: "0.12em", fontSize: 8.5 }}>Second opinion</span>
@@ -496,11 +525,15 @@ export function MispricedBoard() {
               )}
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
-              <span style={{ fontFamily: MONO, fontSize: 9.5, color: C.text.faint }}>Live read · funding + smart money</span>
-              <button onClick={() => draftFade(m)} className="nx-card-interactive" style={{
+              <span style={{ fontFamily: MONO, fontSize: 9.5, color: C.text.faint }}>{isFade ? "Live read · funding + smart money" : "Watching · no fade edge right now"}</span>
+              {/* One primary action, and it answers the page's one question: is there a fade NOW?
+                  FADE → greenlight Draft. WATCH/NONE → Draft disabled (Simulate stays below). */}
+              <button onClick={() => isFade && draftFade(m)} disabled={!isFade} title={isFade ? "Draft this fade into the Thesis Engine" : "No fade edge right now — funding isn't stretched vs its range"} className="nx-card-interactive" style={{
                 marginLeft: "auto", fontFamily: MONO, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em",
-                color: C.accent, background: "none", border: `1px solid ${C.borderStrong}`, borderRadius: RADIUS.md, padding: "9px 15px", cursor: "pointer",
-              }}>Draft this fade →</button>
+                color: isFade ? C.accent : C.text.faint, background: "none",
+                border: `1px solid ${isFade ? C.borderStrong : C.border}`, borderRadius: RADIUS.md, padding: "9px 15px",
+                cursor: isFade ? "pointer" : "not-allowed", opacity: isFade ? 1 : 0.55,
+              }}>{isFade ? "Draft this fade →" : "No fade to draft yet"}</button>
             </div>
 
             {/* Pressure-test the fade before you take it — run it through a simulation. */}
