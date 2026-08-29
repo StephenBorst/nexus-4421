@@ -19,6 +19,12 @@ import { deriveSignal, computeRegime, atrPct } from "./logic.mjs";
 
 const ORDERLY_API = "https://api-evm.orderly.org";
 
+// The scorecard universe — the coins /intel/axis-backtest grades. We log + backfill candle:hist
+// for ALL of them (market data, every tick, zero active agents needed) so D0_candle can grade
+// across the board the moment the backfill seeds them, not just BTC/ETH/SOL. Keep in sync with
+// the COINS list in nexus-lab-api /intel/axis-backtest.
+const HARNESS_SYMBOLS = ["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC", "PERP_XRP_USDC", "PERP_DOGE_USDC", "PERP_BNB_USDC", "PERP_ARB_USDC", "PERP_AVAX_USDC", "PERP_LINK_USDC", "PERP_HYPE_USDC", "PERP_SUI_USDC", "PERP_WLD_USDC"];
+
 // Orderly sits behind Cloudflare bot-management, which intermittently serves an HTML
 // 403 challenge to header-light Worker fetches — which would starve the brain of the
 // market data it needs to emit signals. Realistic browser headers clear it; a bounded
@@ -56,8 +62,9 @@ export default {
       // Real OHLC+volume candles (from Orderly's own tv/history) — the SAME market-
       // data-not-per-user rationale as OI above, so it matures with zero active
       // agents. Unlocks true VWAP/ATR + rs_rank quartiles for the harness and the
-      // futures-volume-rotation read. Hourly-gated so it only fetches once/hour.
-      await recordCandlesForSymbols(["PERP_BTC_USDC", "PERP_ETH_USDC", "PERP_SOL_USDC"], env);
+      // futures-volume-rotation read. Hourly-gated + one-shot backfilled to ~90d, so the
+      // whole SCORECARD universe (the coins /intel/axis-backtest grades) has depth NOW.
+      await recordCandlesForSymbols(HARNESS_SYMBOLS, env);
 
       const usersRaw = await env.NEXUS_AGENT.get("agent:users");
       if (!usersRaw) { console.log("[brain] no active users"); return; }
@@ -273,6 +280,32 @@ async function recordCandlesForSymbols(symbols, env) {
       const raw = await env.NEXUS_AGENT.get(key);
       const hist = raw ? JSON.parse(raw) : [];
       const last = hist[hist.length - 1];
+
+      // ── One-shot BACKFILL (Grok: ship candle depth) ────────────────────────────────
+      // A thin series (first run, or a newly-tracked symbol) is SEEDED straight from
+      // tv/history's real hourly history (~90d, ~2160 bars) so the harness has depth NOW
+      // instead of accruing one bar/hour until mid-Sept. tv/history serves the full range
+      // (verified: 90d→2160). After seeding, the hourly-append path below maintains it.
+      // Idempotent: only fires while the series is thin (< ~a week of bars), so it costs one
+      // big fetch per symbol exactly once, then never again.
+      if (hist.length < 200) {
+        const nowSec0 = Math.floor(now / 1000);
+        const bf = await orderlyPublicGet(`${ORDERLY_API}/tv/history?symbol=${symbol}&resolution=60&from=${nowSec0 - 90 * 86400}&to=${nowSec0}`);
+        if (bf && bf.s === "ok" && Array.isArray(bf.t) && bf.t.length) {
+          const byT = new Map();
+          for (let i = 0; i < bf.t.length; i++) {
+            const cc = { t: Number(bf.t[i]) * 1000, o: +bf.o[i], h: +bf.h[i], l: +bf.l[i], c: +bf.c[i], v: Array.isArray(bf.v) ? +bf.v[i] : 0 };
+            if ([cc.o, cc.h, cc.l, cc.c].every(Number.isFinite)) byT.set(cc.t, cc);
+          }
+          for (const cc of hist) byT.set(cc.t, cc); // keep anything already stored (a newer bar)
+          const merged = [...byT.values()].sort((a, b) => a.t - b.t);
+          if (merged.length > 2200) merged.splice(0, merged.length - 2200); // ~90d cap
+          await env.NEXUS_AGENT.put(key, JSON.stringify(merged));
+          console.log(`[brain] candle-history ${symbol} BACKFILLED ${merged.length} bars`);
+          continue; // seeded this tick; the append path resumes next hour
+        }
+      }
+
       if (last && now - last.t < 55 * 60 * 1000) continue; // hourly — skip the fetch entirely
 
       const nowSec = Math.floor(now / 1000);

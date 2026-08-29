@@ -305,6 +305,15 @@ export function volumeRotatesInto(coinCbh, btcCbh, hour, lookback = 48) {
   return cg > bg; // alt volume growing faster than BTC's = rotation in
 }
 
+// The DEEPEST available hourly price series for a coin, as [{t, price}] — prefers candle:hist
+// closes (backfilled ~90d from tv/history) over oi:hist (still shallow). This is what turns the
+// candle axes on with candle DEPTH rather than oi maturity: "candle:hist depth → D0_candle on".
+export function priceSeries(cs) {
+  const fromCandle = (cs?.candleHist || []).filter((c) => c && Number.isFinite(c.c) && c.c > 0).map((c) => ({ t: c.t, price: c.c }));
+  const fromOi = (cs?.oiHist || []).filter((p) => p && Number.isFinite(p.price) && p.price > 0).map((p) => ({ t: p.t, price: p.price }));
+  return (fromCandle.length >= fromOi.length ? fromCandle : fromOi).sort((a, b) => (a.t || 0) - (b.t || 0));
+}
+
 // D0c / D2: the RS + value pullback stack, but on REAL candle inputs (weekly VWAP anchor,
 // true ATR value-tag band), with the BTC hard-veto optionally EXTENDED by the volume-
 // rotation gate (requireRotation). Returns [] when candles aren't logged yet → the axis
@@ -313,7 +322,7 @@ export function rsValuePullbackCandleEvents(cs, _pmap, ctx = {}, opts = {}) {
   const { emaPeriod = 50, anchorPeriod = 168, atrPeriod = 24, rsLookback = 168, tagK = 2, rsi45 = false, requireRotation = false, rotLookback = 48 } = opts;
   const btcMap = ctx.btcMap, btcPrice = ctx.btcPrice, btcCbh = ctx.btcCandles;
   const cbh = candlesByHour(cs.candleHist);
-  const rows = (cs.oiHist || []).filter((p) => p && Number.isFinite(p.price) && p.price > 0).sort((a, b) => (a.t || 0) - (b.t || 0));
+  const rows = priceSeries(cs); // deepest series — candle closes (backfilled) preferred over oiHist
   if (!cbh.size || !btcMap || !btcPrice || rows.length < Math.max(anchorPeriod, rsLookback) + 5) return [];
   const closes = rows.map((r) => r.price), e = ema(closes, emaPeriod);
   const r14 = rsi45 ? rsi(closes, 14) : null;
@@ -402,7 +411,10 @@ function aggR(arr) {
 export function scoreEvents(coinSets, signalGen, { horizons = [4, 12, 24], minSamples = 20 } = {}) {
   // BTC context (regime map + price map) for the RS/veto gens — built once, passed to every gen.
   const btcCs = (coinSets || []).find((c) => String(c.coin || "").toUpperCase() === "BTC");
-  const ctx = btcCs ? { btcMap: btcRegimeByHour(btcCs.oiHist), btcPrice: priceByHour(btcCs.oiHist), btcCandles: candlesByHour(btcCs.candleHist) } : {};
+  // BTC context off the DEEPEST btc series (candle closes preferred) so the RS/veto reaches
+  // back over the candle-depth lookback, not just the shallow oi window.
+  const btcSeries = btcCs ? priceSeries(btcCs) : [];
+  const ctx = btcCs ? { btcMap: btcRegimeByHour(btcSeries), btcPrice: priceByHour(btcSeries), btcCandles: candlesByHour(btcCs.candleHist) } : {};
   const all = [];
   for (const cs of coinSets || []) {
     const pmap = priceByHour(cs.oiHist);

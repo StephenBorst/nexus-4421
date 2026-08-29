@@ -3,7 +3,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { hourBucket, priceByHour, forwardReturn, callPnl, fundingFadeEvents, cvdDivergenceEvents, scoreEvents, runScorecard, ema, rsi, rsiResetEvents, slopeUp, relStrength, rsiResetTrendEvents, candlesByHour, vwapAt, atrPctAt, atrPctH4At, volGrowth, volumeRotatesInto, rsValuePullbackCandleEvents, rsValuePullbackEvents, rsQuartiles, gradeEventR } from "./axisbt.mjs";
+import { priceSeries } from "./axisbt.mjs";
 import { h4Atr14Frac } from "../../app/lib/atr.mjs";
+
+test("priceSeries: prefers deep candle:hist over shallow oi:hist (candle depth turns D0_candle on)", () => {
+  const cs = {
+    oiHist: Array.from({ length: 3 }, (_, i) => ({ t: BASE + i * HR, price: 100 + i, oi: 1000, funding: 0 })),        // shallow
+    candleHist: Array.from({ length: 200 }, (_, i) => ({ t: BASE + i * HR, o: 100 + i, h: (100 + i) * 1.01, l: (100 + i) * 0.99, c: 100 + i, v: 1 })), // deep
+  };
+  const ps = priceSeries(cs);
+  assert.equal(ps.length, 200);       // uses the deep candle series, not the 3-row oi
+  assert.equal(ps[0].price, 100);     // from candle CLOSES
+  assert.equal(ps[199].price, 299);
+  // Falls back to oi when there are no candles (proxy axes still work).
+  assert.equal(priceSeries({ oiHist: cs.oiHist }).length, 3);
+  assert.equal(priceSeries({}).length, 0);
+});
 
 const HR = 3600 * 1000;
 const BASE = 1_000_000_000_000;

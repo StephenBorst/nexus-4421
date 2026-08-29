@@ -4702,7 +4702,9 @@ document.getElementById("btn").addEventListener("click",go);
           readJson(AGENT_KV, `sm:hist:${coin}`),
           readJson(AGENT_KV, `candle:hist:PERP_${coin}_USDC`),
         ]);
-        if ((oiHist || []).length >= 2) coinSets.push({ coin, oiHist, cvdHist, smHist, candleHist });
+        // Include the coin if EITHER series has data — the candle axes grade off candle:hist
+        // depth (backfilled), so a coin with deep candles but shallow oi still belongs.
+        if ((oiHist || []).length >= 2 || (candleHist || []).length >= 2) coinSets.push({ coin, oiHist, cvdHist, smHist, candleHist });
       }
       const scorecard = runScorecard(coinSets, { horizons: [4, 12, 24], minSamples: min });
       const out = {
