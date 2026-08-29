@@ -56,9 +56,13 @@ const stanceLabel = (dir: string) => dir === "SHORT" ? "Crowd over-long" : dir =
 // reads the numbers above it. Both are true, neither is dumbed down. verdict === "WATCH"
 // tells the truth Grok flagged: funding can be HIGH in absolute terms yet not STRETCHED
 // vs its own range — that's a watch, not a fade.
-const plainRead = (m: Market, verdict?: "FADE" | "WATCH" | "NONE") => {
+const plainRead = (m: Market, verdict?: "FADE" | "WATCH" | "NONE", weakEdge?: boolean) => {
   const pct = Math.abs(m.fundingAnnualPct);
   const crowd = m.direction === "SHORT" ? "long" : "short";
+  // Stretched, but the base rate says fading it has bled — the honest "watch, don't chase"
+  // read (checked BEFORE the plain WATCH branch, which would wrongly claim it's un-stretched).
+  if (weakEdge && m.direction !== "NONE")
+    return `Funding on ${m.coin} is stretched (the crowd is one-sided ${crowd}), but the last times it ran this hot the fade mostly DIDN'T pay — historically it has underperformed here. Treat it as a watch; draft only on your own read, not the fade.`;
   if (verdict === "WATCH" && m.direction !== "NONE")
     return `Funding on ${m.coin} is elevated (${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr) but sitting within its own typical range — the crowd isn't stretched right now, so there's no clean fade yet. Watch for it to pierce out of the band.`;
   if (m.direction === "SHORT") return `Traders are paying ${pct}%/yr to stay long ${m.coin} — the crowd is stretched one-sided. That crowding usually unwinds, so the edge is to lean short.`;
@@ -495,8 +499,17 @@ export function MispricedBoard() {
     // (or too little history to confirm) → WATCH; balanced → NONE. Header, copy, the read,
     // and the Draft button all read from this — so the page can never argue with itself.
     const stretched = fundingStretched(pos?.points);
-    const verdict: "FADE" | "WATCH" | "NONE" = m.direction === "NONE" ? "NONE" : stretched === true ? "FADE" : "WATCH";
+    const q = m.edgeQuality;
+    // The historical base rate VETOES "FADE NOW" (Grok): funding can be stretched yet fading
+    // it has bled (TRAP / reverted <40% of instances). Then the ticket reads WATCH — but the
+    // Draft STAYS as "Draft anyway", because overriding a weak base rate on purpose is the
+    // honest path (same rule as the Thesis WATCH gate). A clean FADE needs BOTH a stretch AND
+    // a base rate that pays; a stretch alone, historically unproven, is a WATCH you may draft.
+    const weakEdge = !!q && (q.tier === "TRAP" || (q.revertedPct != null && q.revertedPct < 40));
+    const verdict: "FADE" | "WATCH" | "NONE" = m.direction === "NONE" ? "NONE" : (stretched === true && !weakEdge) ? "FADE" : "WATCH";
     const isFade = verdict === "FADE";
+    const draftAnyway = m.direction !== "NONE" && stretched === true && weakEdge;
+    const canDraft = isFade || draftAnyway;
     return (
       <div>
         <button onClick={() => setOpenCoin(null)} className="nx-card-interactive" style={{
@@ -513,7 +526,7 @@ export function MispricedBoard() {
           <div style={{ position: "relative", border: `1px solid ${C.border}`, borderLeft: `2px solid ${C.accent}`, borderRadius: RADIUS.lg, padding: "24px 28px", background: "linear-gradient(180deg,#17171a 0%,#0d0d0f 100%)", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: MONO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: C.text.muted }}>
               <span style={{ color: C.text.fog }}>◆ Nexus · Funding edge</span>
-              <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: isFade ? C.accent : C.text.muted }}>{verdict === "NONE" ? "BALANCED" : isFade ? "◆ FADE NOW" : "◆ WATCHING"}</span>
+              <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: isFade ? C.accent : draftAnyway ? C.warn : C.text.muted }}>{verdict === "NONE" ? "BALANCED" : isFade ? "◆ FADE NOW" : draftAnyway ? `⚠ WATCH · FADE ${q?.revertedPct}% HIST` : "◆ WATCHING"}</span>
             </div>
             <div style={{ fontFamily: UI, fontSize: 14, color: C.text.fog, marginTop: 18 }}>{m.coin} perpetual</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 1 }}>
@@ -544,7 +557,7 @@ export function MispricedBoard() {
             </div>
 
             <p style={{ fontFamily: UI, fontSize: 13, lineHeight: 1.55, color: C.text.fog, marginTop: 14, padding: "11px 12px", background: "rgba(237,237,240,0.03)", border: `1px solid ${C.border}`, borderRadius: RADIUS.md }}>
-              {plainRead(m, verdict)}
+              {plainRead(m, verdict, weakEdge)}
             </p>
 
             {/* Reversion proof — what happened the last times it looked this stretched. */}
@@ -566,12 +579,14 @@ export function MispricedBoard() {
               )}
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.border}`, flexWrap: "wrap" }}>
-              <span style={{ fontFamily: MONO, fontSize: 9.5, color: C.text.faint }}>{isFade ? "Live read · funding + smart money" : "Watching · no fade edge right now"}</span>
+              <span style={{ fontFamily: MONO, fontSize: 9.5, color: C.text.faint }}>{isFade ? "Live read · funding + smart money" : draftAnyway ? "Stretched, but the fade is historically unproven here" : "Watching · no fade edge right now"}</span>
               {/* Share the READ as a branded, verifiable card (verdict only — no fake R/stops).
                   A WATCH card shares as WATCH, a FADE as FADE; unfurls on X, links back. */}
               <button onClick={() => {
                 const text = isFade
                   ? `${m.coin} funding is stretched — the fade is ${m.direction} (${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr). A positioning read on Nexus, graded from public price:`
+                  : draftAnyway
+                  ? `${m.coin} funding is stretched (${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr) but fading it has historically underperformed — a watch, not a clean fade. The read on Nexus:`
                   : `${m.coin} funding is elevated (${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr) but within its typical range — no fade yet. The read on Nexus:`;
                 window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(`https://og.nexustradinglabs.com/share/read/${m.coin}`)}`, "_blank", "noopener");
               }} title="Share this read as a card on X" className="nx-press" style={{
@@ -580,12 +595,12 @@ export function MispricedBoard() {
               }}>↗ SHARE</button>
               {/* One primary action, and it answers the page's one question: is there a fade NOW?
                   FADE → greenlight Draft. WATCH/NONE → Draft disabled (Simulate stays below). */}
-              <button onClick={() => isFade && draftFade(m)} disabled={!isFade} title={isFade ? "Draft this fade into the Thesis Engine" : "No fade edge right now — funding isn't stretched vs its range"} className="nx-card-interactive" style={{
+              <button onClick={() => canDraft && draftFade(m)} disabled={!canDraft} title={isFade ? "Draft this fade into the Thesis Engine" : draftAnyway ? "Funding is stretched but fading it has historically underperformed — draft it anyway on your own read, not the base rate" : "No fade edge right now — funding isn't stretched vs its range"} className="nx-card-interactive" style={{
                 fontFamily: MONO, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em",
-                color: isFade ? C.accent : C.text.faint, background: "none",
-                border: `1px solid ${isFade ? C.borderStrong : C.border}`, borderRadius: RADIUS.md, padding: "9px 15px",
-                cursor: isFade ? "pointer" : "not-allowed", opacity: isFade ? 1 : 0.55,
-              }}>{isFade ? "Draft this fade →" : "No fade to draft yet"}</button>
+                color: isFade ? C.accent : draftAnyway ? C.warn : C.text.faint, background: "none",
+                border: `1px solid ${isFade ? C.borderStrong : draftAnyway ? `${C.warn}88` : C.border}`, borderRadius: RADIUS.md, padding: "9px 15px",
+                cursor: canDraft ? "pointer" : "not-allowed", opacity: canDraft ? 1 : 0.55,
+              }}>{isFade ? "Draft this fade →" : draftAnyway ? "Draft anyway →" : "No fade to draft yet"}</button>
             </div>
 
             {/* Pressure-test the fade before you take it — run it through a simulation. */}

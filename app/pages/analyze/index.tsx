@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { AnalyticsView } from "@/pages/lab/AnalyticsView";
-import { TrackedRecordCard } from "@/components/TrackedRecordCard";
+import { TrackedRecordCard, type XrayTrack } from "@/components/TrackedRecordCard";
 import { SectionHeader } from "@/pages/lab/components";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import type { ProcessedTrade } from "@/pages/lab/types";
@@ -123,6 +123,7 @@ export default function AnalyzePage() {
   const [address, setAddress] = useState<string | null>(params.get("address"));
   const [trades, setTrades] = useState<ProcessedTrade[] | null>(null);
   const [orderly, setOrderly] = useState<XrayResult | null>(null);
+  const [track, setTrack] = useState<XrayTrack | null>(null); // the graded, WATCHED record (settlement deltas over time)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [watch, setWatch] = useState<string[]>(loadWatch);
@@ -173,13 +174,20 @@ export default function AnalyzePage() {
   // allSettled and only surfaces an error when NEITHER source returned anything.
   const run = useCallback(async (addr: string) => {
     if (!isAddress(addr)) { setError("Enter a valid 0x… wallet address"); return; }
-    setLoading(true); setError(null); setTrades(null); setOrderly(null);
+    setLoading(true); setError(null); setTrades(null); setOrderly(null); setTrack(null);
     const [hl, ord] = await Promise.allSettled([fetchHLFills(addr), fetchOrderlyXray(addr)]);
 
     const t = hl.status === "fulfilled" ? fillsToTrades(hl.value) : [];
     setTrades(t);
     const ox = ord.status === "fulfilled" ? ord.value : null;
     setOrderly(ox);
+
+    // The graded WATCHED record — realized-PnL deltas over the days we've tracked this
+    // wallet. It's the HEADLINE (Grok): lifetime totals flatter; the watched number is the
+    // grade. Self-seeds on read; fail-soft (leaves the lifetime verdict as the only number).
+    fetch(`${AGENT_API}/smart/xray/history?address=${encodeURIComponent(addr)}`)
+      .then((r) => r.json()).then((x) => { if (x && x.track) setTrack(x.track as XrayTrack); })
+      .catch(() => { /* no tracked record — lifetime verdict stands */ });
 
     const hasHL = t.length > 0;
     const hasOrderly = !!ox && ox.venues.length > 0;
@@ -275,6 +283,12 @@ export default function AnalyzePage() {
         const profitablePct = orderly && orderly.venues.length
           ? Math.round(orderly.venues.reduce((a, v) => a + v.profitableMarketsPct, 0) / orderly.venues.length) : null;
         const good = combined >= 0;
+        // The WATCHED grade is the headline (Grok): realized-PnL over the days we've tracked
+        // this wallet. Lifetime flatters; the watched number is what can't be faked. When we
+        // have a real tracked window it leads and colors the whole verdict; lifetime demotes.
+        const hasWatched = !!track && !track.building && typeof track.netRealized === "number" && (track.daysTracked ?? 0) > 0;
+        const wNet = track?.netRealized ?? 0;
+        const wGood = wNet >= 0;
         const srcs = [trades && trades.length ? "Hyperliquid" : null, orderly && orderly.venues.length ? "Orderly" : null].filter(Boolean).join(" + ");
         const stats = ([
           trades && trades.length ? { l: "HL WIN RATE", v: `${winRate.toFixed(0)}%`, c: winRate >= 50 ? POS : NEG } : null,
@@ -284,16 +298,25 @@ export default function AnalyzePage() {
           { l: "OPEN NOW", v: String(openNow), c: openNow ? BRIGHT : FAINT },
         ].filter(Boolean)) as { l: string; v: string; c: string }[];
         return (
-          <div className="nx-fade-in" style={{ border: `1px solid ${BORDER}`, borderLeft: `3px solid ${good ? POS : NEG}`, borderRadius: 8, background: SURFACE_ALT, padding: "18px 20px", marginBottom: 22 }}>
+          <div className="nx-fade-in" style={{ border: `1px solid ${BORDER}`, borderLeft: `3px solid ${(hasWatched ? wGood : good) ? POS : NEG}`, borderRadius: 8, background: SURFACE_ALT, padding: "18px 20px", marginBottom: 22 }}>
             <div style={{ ...label, marginBottom: 12 }}>◆ X-RAY VERDICT · {short(address)}</div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", marginBottom: 16 }}>
-              <span style={{ fontFamily: UI, fontSize: 24, fontWeight: 700, color: good ? POS : NEG, letterSpacing: "-0.01em" }}>{good ? "Net profitable" : "Underwater"}</span>
-              <span style={{ fontFamily: MONO, fontSize: 18, fontWeight: 700, color: good ? POS : NEG }}>{usd(combined)}</span>
-              {/* Grok: name this as LIFETIME so it can't pose as the grade — the graded,
-                  watched record (net while tracked, green-day rate, consistency) is the
-                  Tracked Record card below, not this all-time total. */}
-              <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>all-time realized · {srcs}{orderly && orderly.venues.length ? " · watched grade below ↓" : ""}</span>
-            </div>
+            {hasWatched ? (
+              // Watched grade leads; lifetime is a demoted context line beneath it (Grok).
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
+                  <span style={{ fontFamily: UI, fontSize: 24, fontWeight: 700, color: wGood ? POS : NEG, letterSpacing: "-0.01em" }}>{wGood ? "Net positive while watched" : "Underwater while watched"}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 18, fontWeight: 700, color: wGood ? POS : NEG }}>{wNet >= 0 ? "+" : ""}{usd(wNet)}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>the grade · {track!.daysTracked}d tracked{track!.winWindowRate != null ? ` · ${track!.winWindowRate}% green days` : ""}</span>
+                </div>
+                <span style={{ fontFamily: MONO, fontSize: 10, color: FAINT }}>lifetime {combined >= 0 ? "+" : ""}{usd(combined)} realized · {srcs} · all-time, context only</span>
+              </div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", marginBottom: 16 }}>
+                <span style={{ fontFamily: UI, fontSize: 24, fontWeight: 700, color: good ? POS : NEG, letterSpacing: "-0.01em" }}>{good ? "Net profitable" : "Underwater"}</span>
+                <span style={{ fontFamily: MONO, fontSize: 18, fontWeight: 700, color: good ? POS : NEG }}>{usd(combined)}</span>
+                <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>all-time realized · {srcs}</span>
+              </div>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 12 }}>
               {stats.map((s) => (
                 <div key={s.l}>

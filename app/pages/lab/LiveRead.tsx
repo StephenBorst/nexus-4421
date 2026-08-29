@@ -268,6 +268,13 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onBaseRate
   const convLevel = reads.length >= 3 && agree >= 4 ? "HIGH" : agree >= 2 && agree > pushback ? "MODERATE" : pushback > agree ? "AGAINST" : "LOW";
   const convColor = convLevel === "HIGH" ? POS : convLevel === "MODERATE" ? "#8fdcb8" : convLevel === "AGAINST" ? NEG : WARN;
   const convWord = convLevel === "HIGH" ? "HIGH CONVICTION" : convLevel === "MODERATE" ? "MODERATE" : convLevel === "AGAINST" ? "READS DISAGREE" : "LOW CONVICTION";
+  // A weak historical base rate VETOES the confidence word (Grok): lenses agreeing is NOT
+  // the fade working. When the setup has bled historically (hit <40% or −EV), conviction
+  // can't read HIGH — it reads "N/M aligned · hist X%", amber, so agreement never poses as
+  // a paying edge. The base rate is the ground-truth "does this actually pay" read.
+  const weakBase = !!baseRate && (baseRate.hitRate < 40 || baseRate.expectancyR < 0);
+  const convWordFinal = weakBase ? `${agree}/${reads.length} ALIGNED · HIST ${baseRate!.hitRate}%` : convWord;
+  const convColorFinal = weakBase ? WARN : convColor;
 
   // ── PROVEN-EDGE PATTERN — not "more reads agree," but the SPECIFIC orthogonal stack the
   // backtests + live grading actually validated: the funding-fade CONDITIONED on smart-money
@@ -305,6 +312,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onBaseRate
     if (record?.side) bits.push(`your ${direction.toLowerCase()} record on ${coin} is ${record.side.net >= 0 ? "+" : "-"}$${Math.abs(record.side.net)} over ${record.side.n} (${record.side.wr}%)`);
     else if (record) bits.push(`your ${coin} record is ${record.net >= 0 ? "+" : "-"}$${Math.abs(record.net)} over ${record.n}`);
     const head = provenEdge ? `◆ Proven-edge setup — the funding-fade ${direction} on ${coin}, confirmed by smart money and a +${baseRate!.expectancyR}R base rate. The one confluence that's held up in testing.`
+      : weakBase ? `${agree} of ${reads.length} reads align ${direction}, but the base rate is weak (${baseRate!.hitRate}% · ${baseRate!.expectancyR >= 0 ? "+" : ""}${baseRate!.expectancyR}R) — aligned lenses aren't a paying edge here. Trust your own thesis, not the fade.`
       : convLevel === "HIGH" ? `◆ High-conviction ${direction} — ${agree} of ${reads.length} independent reads align.`
       : convLevel === "AGAINST" ? `Heads up — the reads lean against your ${direction} (${pushback} push back).`
       : convLevel === "MODERATE" ? `Moderate ${direction} — ${agree} of ${reads.length} reads align.`
@@ -333,9 +341,9 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onBaseRate
               neutral), colored by alignment. Never a black-box score. */}
           {reads.length > 0 && (
             <>
-              <div style={{ marginBottom: 10, padding: "10px 12px", borderRadius: 8, background: `${convColor}12`, border: `1px solid ${convColor}33` }}>
+              <div style={{ marginBottom: 10, padding: "10px 12px", borderRadius: 8, background: `${convColorFinal}12`, border: `1px solid ${convColorFinal}33` }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                  <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: convColor }}>◆ {convWord}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: convColorFinal }}>◆ {convWordFinal}</span>
                   {provenEdge && <span title="Funding-fade + smart-money + a positive base rate all align — the one configuration that survived backtesting" style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.1em", color: POS, border: `1px solid ${POS}55`, borderRadius: 3, padding: "1px 6px" }}>◆ PROVEN-EDGE SETUP</span>}
                   <span style={{ fontFamily: MONO, fontSize: 10.5, color: FOG }}>{agree}/{reads.length} reads align {direction}{pushback > 0 ? ` · ${pushback} against` : ""}</span>
                 </div>
@@ -357,7 +365,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onBaseRate
               </div>
             </>
           )}
-          {synth && <div style={{ fontFamily: UI, fontSize: 12.5, color: convColor === POS ? "#8fdcb8" : convColor, lineHeight: 1.55 }}>{synth}</div>}
+          {synth && <div style={{ fontFamily: UI, fontSize: 12.5, color: convColorFinal === POS ? "#8fdcb8" : convColorFinal, lineHeight: 1.55 }}>{synth}</div>}
 
           {/* SETUP MOMENTUM — persistence/decay: the ONLY time-derivative read. Is the crowded
               funding-fade still building (early) or already unwinding (late)? From oi:hist. */}
