@@ -3,7 +3,7 @@
 // ◆ SIGNALS bell shows (shared `buildSignals` from app/lib — one engine, zero drift) and
 // DMs the single highest-conviction one to opted-in Telegram subscribers, throttled and
 // deduped so it never spams. Opt-in via the bot `/signals on`. Requires TELEGRAM_TOKEN.
-import { confluenceSignal, consensusBySymbol, classifyRegime } from "./logic.mjs";
+import { confluenceSignal, consensusBySymbol, classifyRegime, fundingStretched, readVerdict } from "./logic.mjs";
 import { gatherStanceEntries } from "./grading.mjs";
 import { buildSignals } from "../../app/lib/signals.mjs";
 
@@ -84,9 +84,20 @@ export async function computeSignalRows(env) {
       const sig = confluenceSignal({ fundingRate: funding, priceChange, oiChange, hasPrev: !!prev });
       const bare = sym.replace("PERP_", "").replace("_USDC", "");
       const reg = JSON.parse((await KV.get(`regime:${bare}`)) || "null"); // cached trend read
+      // ── THE ONE VERDICT (Grok): the SAME funding-fade read the ticket + share card use,
+      // computed once here so The Board speaks their language. The fade side = the funding
+      // sign; FADE only when funding is STRETCHED vs its own p25–p75 range (pierce test on
+      // oi:hist), else WATCH. Funding annualized (×1095) to match the ticket's %/yr.
+      const histRaw = await KV.get(`oi:hist:${sym}`);
+      const fs = histRaw ? (JSON.parse(histRaw) || []).map((h) => Number(h.funding)).filter(Number.isFinite) : [];
+      const stretched = fundingStretched(fs);
+      const fadeDir = funding > 0 ? "SHORT" : funding < 0 ? "LONG" : "NONE";
+      const verdict = readVerdict(fadeDir, stretched); // FADE | WATCH | NONE
       return {
         symbol: bare,
         mark_price: mark, funding_rate_8h: funding, open_interest: oi,
+        funding_annual_pct: Number((funding * 1095 * 100).toFixed(2)),
+        fade_dir: fadeDir, verdict, stretched,
         price_change_pct: Number((priceChange * 100).toFixed(3)),
         oi_change_pct: Number((oiChange * 100).toFixed(3)),
         funding_signal: sig.fundingSignal, oi_signal: sig.oiSignal, confluence: sig.confluence,

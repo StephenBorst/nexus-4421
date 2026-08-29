@@ -22,7 +22,6 @@ import type { TabId } from "./types";
 const AGENT_API = "https://og.nexustradinglabs.com";
 const FUTURES = "https://api-evm.orderly.org/v1/public/futures";
 const CROWDED = 0.0004;   // |funding|/8h at/above which the crowd is extended (fade band)
-const LEAN_MIN = 0.00003; // |funding|/8h above which we show a faint directional lean (not a setup)
 
 type Consensus = Record<string, { side: "LONG" | "SHORT" | "SPLIT"; lean: number; participants: number }>;
 type Dir = "LONG" | "SHORT";
@@ -36,7 +35,8 @@ interface Row {
   trendMove: number | null;
   trendOi: number | null;
   consensus: { side: "LONG" | "SHORT" | "SPLIT"; participants: number } | null;
-  play: { klass: "CONFLUENCE" | "FADE" | "TREND" | "LEAN" | null; dir: Dir | null; label: string; strong: boolean };
+  play: { klass: "FADE" | "WATCH" | null; dir: Dir | null; label: string; strong: boolean };
+  fundingAnnual: number;                 // funding ×1095 — the ticket's %/yr language
   // The independent-lens strip: four PUBLIC reads that either confirm or contradict the
   // mechanical play — graded callers, smart money, catalysts, forecasters. agree = how many
   // point the SAME way as the play (the "agreement = signal" fusion, kept explainable).
@@ -83,35 +83,25 @@ const fmtPrice = (n: number) => (n >= 1000 ? n.toLocaleString("en-US", { maximum
 // plays (confluence/fade/trend) are real setups and render bright; below them, a
 // faint LEAN tier shows which way the crowd/tape tilts so a calm market still reads
 // as information, not a wall of "no read" — but a lean is explicitly NOT a setup.
+// THE PLAY = the ONE verdict object (Grok): FADE SHORT / FADE LONG / WATCH. No "leans."
+// The fade side is the funding sign; FADE only when funding is STRETCHED vs its own range
+// (the server verdict the ticket + share card use). Falls back to the old crowded-funding
+// read only if the server verdict is absent (older /signals payloads).
 function derivePlay(s: MarketSignal): Row["play"] {
-  if (s.confluence === "LONG" || s.confluence === "SHORT") {
-    return { klass: "CONFLUENCE", dir: s.confluence, label: `Confluence ${s.confluence === "LONG" ? "long" : "short"}`, strong: true };
-  }
-  if (Math.abs(s.funding_rate_8h) >= CROWDED) {
-    const dir: Dir = s.funding_rate_8h > 0 ? "SHORT" : "LONG";
-    return { klass: "FADE", dir, label: `Fade ${dir === "LONG" ? "long" : "short"}`, strong: true };
-  }
-  if ((s.trend === "TREND_UP" || s.trend === "TREND_DOWN") && (s.trend_oi_pct ?? 0) >= 1) {
-    const dir: Dir = s.trend === "TREND_UP" ? "LONG" : "SHORT";
-    return { klass: "TREND", dir, label: `Ride ${dir === "LONG" ? "up" : "down"}`, strong: true };
-  }
-  // ── faint leans (informational, not a setup) ──
-  if (Math.abs(s.funding_rate_8h) >= LEAN_MIN) {
-    const dir: Dir = s.funding_rate_8h > 0 ? "SHORT" : "LONG";
-    return { klass: "LEAN", dir, label: `leans ${dir === "LONG" ? "long" : "short"}`, strong: false };
-  }
-  if (s.trend === "TREND_UP" || s.trend === "TREND_DOWN") {
-    const dir: Dir = s.trend === "TREND_UP" ? "LONG" : "SHORT";
-    return { klass: "LEAN", dir, label: `${dir === "LONG" ? "up" : "down"}-trend, thin OI`, strong: false };
-  }
+  const dir: Dir | null = s.fade_dir === "SHORT" || s.fade_dir === "LONG" ? s.fade_dir : null;
+  if (s.verdict === "FADE" && dir) return { klass: "FADE", dir, label: `FADE ${dir}`, strong: true };
+  if (s.verdict === "WATCH") return { klass: "WATCH", dir, label: "WATCH", strong: false };
+  if (s.verdict === "NONE") return { klass: null, dir: null, label: "—", strong: false };
+  // legacy fallback (no server verdict): crowded funding = a fade, else no read.
+  if (Math.abs(s.funding_rate_8h) >= CROWDED) { const d: Dir = s.funding_rate_8h > 0 ? "SHORT" : "LONG"; return { klass: "FADE", dir: d, label: `FADE ${d}`, strong: true }; }
   return { klass: null, dir: null, label: "—", strong: false };
 }
 
-// Actionability: confluence beats a crowded fade beats a confirmed trend, plus the raw
-// funding magnitude as a tiebreak. Only the DEFAULT sort — the read itself isn't ranked.
-function scoreOf(play: Row["play"], funding: number): number {
-  const base = play.klass === "CONFLUENCE" ? 300 : play.klass === "FADE" ? 200 : play.klass === "TREND" ? 100 : play.klass === "LEAN" ? 10 : 0;
-  return base + Math.min(99, Math.abs(funding) * 100000);
+// Actionability (Grok): a real FADE ranks first, then rows where ≥2 independent lenses agree,
+// then everything else. Chop + empty lenses falls to the bottom (use FUNDING/MOVERS for those).
+function scoreOf(play: Row["play"], funding: number, agree: number): number {
+  const base = play.klass === "FADE" ? 300 : play.klass === "WATCH" ? (agree >= 2 ? 100 : 0) : 0;
+  return base + (play.strong ? agree * 25 : 0) + Math.min(49, Math.abs(funding) * 100000);
 }
 
 // ── The personal edge lens ───────────────────────────────────────────────────
@@ -159,9 +149,8 @@ function personalRead(play: Row["play"], edge: Edge): { tone: "pos" | "caution";
   if (edge.side && play.dir === edge.side) return { tone: "pos", text: `your side · ${edge.wr}% win` };
   if (edge.side && play.dir !== edge.side) return { tone: "caution", text: "off your side" };
   if (!edge.side && edge.alignClass) {
-    const counterTrend = play.klass === "FADE" || play.klass === "CONFLUENCE";
-    if (counterTrend && edge.alignClass === "AGAINST_TREND") return { tone: "pos", text: `your class · +${edge.alignAvgR}R counter-trend` };
-    if (play.klass === "TREND" && edge.alignClass === "WITH_TREND") return { tone: "pos", text: `your class · +${edge.alignAvgR}R with trend` };
+    // a FADE is a counter-trend setup — reward the trader whose edge is counter-trend.
+    if (play.klass === "FADE" && edge.alignClass === "AGAINST_TREND") return { tone: "pos", text: `your class · +${edge.alignAvgR}R counter-trend` };
   }
   return null;
 }
@@ -275,6 +264,7 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
         price: t?.price ?? null,
         change24h: t?.change ?? null,
         funding: s.funding_rate_8h,
+        fundingAnnual: Number(s.funding_annual_pct ?? s.funding_rate_8h * 1095 * 100),
         oiChange: s.oi_change_pct,
         trend: s.trend ?? null,
         trendMove: s.trend_move_pct ?? null,
@@ -283,9 +273,8 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
         play,
         lens,
         agree,
-        // Confluence NUDGES actionability (more independent reads agree → look here first),
-        // but only for real setups — a lean with agreement is still just a lean.
-        score: scoreOf(play, s.funding_rate_8h) + (play.strong ? agree * 25 : 0),
+        // ACTIONABLE ranks a real FADE first, then rows with ≥2 agreeing lenses (Grok).
+        score: scoreOf(play, s.funding_rate_8h, agree),
         mine: personalRead(play, edge),
         record: (() => { const rec = records[s.symbol]; return rec && rec.n >= 2 ? { net: rec.net, n: rec.n, wr: Math.round((rec.wins / rec.n) * 100) } : null; })(),
       } as Row;
@@ -320,10 +309,8 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
       // Prefill the entry from the live mark so the read arrives one field closer to armed —
       // the trader still sets stop + target (where the chart tells them), then deploys to the agent.
       entryPrice: r.price != null ? String(r.price) : "",
-      catalyst: `${r.play.label} · funding ${(r.funding * 100).toFixed(3)}%/8h`,
-      notes: (r.play.klass === "CONFLUENCE"
-        ? `Funding and open interest agree — the crowd is offside ${crowd}. Set your stop and target; it grades from public price.`
-        : `${r.play.label} — the mechanical read, not a promise. Add your levels; it grades first-touch vs the tape.`) + confNote,
+      catalyst: `${r.play.label} · funding ${r.fundingAnnual >= 0 ? "+" : ""}${r.fundingAnnual.toFixed(1)}%/yr, crowd offside ${crowd}`,
+      notes: `${r.play.label} — the crowd is stretched ${crowd}. Add your stop (≥1.2× ATR) and target; it grades first-touch vs the tape.${confNote}`,
     };
     try { window.localStorage.setItem("nexus_thesis_draft", JSON.stringify(draft)); } catch { /* private mode */ }
     try {
@@ -363,7 +350,7 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
 
       {/* Honesty framing — the whole point of the moat. */}
       <div style={{ fontFamily: UI, fontSize: 11, lineHeight: 1.5, color: C.text.muted, marginTop: -8, marginBottom: 14 }}>
-        Funding, open interest and trend are <b style={{ color: C.text.bright }}>public facts</b>. <b style={{ color: C.text.bright }}>The play</b> is the mechanical read — what the rules say, not a promise — and it gets <b style={{ color: C.text.bright }}>graded from the tape</b> afterward, same as every call. No score to trust; a record to verify.
+        Funding and positioning are <b style={{ color: C.text.bright }}>public facts</b>. <b style={{ color: C.text.bright }}>The play</b> is one verdict word — <b style={{ color: C.text.bright }}>FADE</b> only when the crowd is <b style={{ color: C.text.bright }}>stretched</b> vs its own funding range, <b style={{ color: C.text.muted }}>WATCH</b> when it's merely elevated — the SAME read as the ticket. It grades <b style={{ color: C.text.bright }}>from the tape</b> after, like every call. No score to trust; a record to verify.
         {" "}<b style={{ color: C.text.bright }}>Confluence</b> shows four INDEPENDENT reads — <span style={{ color: C.text.muted }}>callers · smart money · catalysts · forecasters</span> — and how many <b style={{ color: C.text.bright }}>agree with the play</b> (<span style={{ color: C.accent }}>◆</span> marks where separate signals converge). Agreement is a reason to look, still graded after.
         {hasLens && <> Each play is also matched against <b style={{ color: C.pos }}>your own graded edge</b> — <span style={{ color: C.pos }}>◆ your side/class</span> vs <span style={{ color: C.warn }}>△ off your edge</span>.</>}
         {hasLoop && <> Your loop state rides on the ticker: <b style={{ color: C.text.bright }}>● a live call</b> (planned) · <b style={{ color: C.text.bright }}>▸ an open position</b> (executing) — the graded record closes it.</>}
@@ -401,7 +388,7 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
             <div style={{ display: "grid", gridTemplateColumns: cols, gap: gridGap, padding: headPad, borderBottom: `1px solid ${C.border}` }}>
               <div style={head}>Market</div>
               <div style={head}>Last / 24h</div>
-              <div style={head}>Funding /8h</div>
+              <div style={head}>Funding /yr</div>
               <div style={head}>OI Δ</div>
               <div style={head}>Trend</div>
               <div style={head}>Confluence</div>
@@ -413,7 +400,7 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
               // A confirmed setup = a real play with ≥3 independent lenses agreeing. The whole
               // moat in one glance: not one indicator, but where separate verifiable reads converge.
               const confluent = r.play.strong && !!r.play.dir && r.agree >= 3;
-              const pc = dirColor(r.play.dir);
+              const pc = C.accent; // FADE highlight = bone accent (matches the ticket; green stays profit-only)
               return (
                 <div key={r.sym} style={{ display: "grid", gridTemplateColumns: cols, gap: gridGap, padding: rowPad, borderBottom: `1px solid ${C.surfaceAlt}`, alignItems: "center", borderLeft: confluent ? `3px solid ${pc}` : "3px solid transparent", background: confluent ? `${pc}0c` : undefined }}>
                   {/* Market + YOUR loop state: ● live call (plan) · ◆ in position (execute) */}
@@ -427,12 +414,12 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
                     <span style={{ color: C.text.bright, fontSize: 11 }}>{r.price != null ? `$${fmtPrice(r.price)}` : "—"}</span>
                     {r.change24h != null && <span style={{ fontSize: 9, color: r.change24h >= 0 ? C.pos : C.neg }}>{pct(r.change24h)}</span>}
                   </div>
-                  {/* Funding — colored by crowd side (positive = crowd long = amber/hot) */}
+                  {/* Funding — annualized (%/yr) to match the ticket + share card; amber when the crowd is hot */}
                   <div style={{ ...cell }}>
-                    <span style={{ color: fundHot ? C.warn : C.text.muted }}>{(r.funding * 100).toFixed(4)}%</span>
+                    <span style={{ color: fundHot ? C.warn : C.text.muted }}>{r.fundingAnnual >= 0 ? "+" : ""}{r.fundingAnnual.toFixed(1)}%</span>
                   </div>
-                  {/* OI change */}
-                  <div style={{ ...cell, color: Math.abs(r.oiChange) >= 3 ? C.text.bright : C.text.faint }}>{r.oiChange >= 0 ? "+" : ""}{r.oiChange.toFixed(1)}%</div>
+                  {/* OI change — hidden when ~0 (a dead 0.0% column looked fake); "—" until it moves */}
+                  <div style={{ ...cell, color: Math.abs(r.oiChange) >= 3 ? C.text.bright : C.text.faint }}>{Math.abs(r.oiChange) < 0.05 ? <span style={{ color: C.text.faint }}>—</span> : `${r.oiChange >= 0 ? "+" : ""}${r.oiChange.toFixed(1)}%`}</div>
                   {/* Trend */}
                   <div style={{ ...cell, fontSize: 10 }}>
                     {r.trend === "TREND_UP" ? <span style={{ color: C.pos }}>↑ up{r.trendMove != null ? ` ${r.trendMove.toFixed(1)}%` : ""}</span>
@@ -460,19 +447,19 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
                       }}>◆{r.agree}</span>
                     )}
                   </div>
-                  {/* THE PLAY — the mechanical read (strong = a real setup, bright; lean =
-                      faint tilt, informational), + your personal edge lens below it */}
+                  {/* THE PLAY — the ONE verdict word (Grok): FADE SHORT / FADE LONG / WATCH — the
+                      SAME object as the ticket + share card. FADE in bone; when smart money is
+                      offside the fade, name it (·SMART LONG) rather than pretend it's the play. */}
                   <div style={{ ...cell, flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
-                    {r.play.strong
-                      ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: dirColor(r.play.dir), flexShrink: 0 }} />
-                          <span style={{ color: dirColor(r.play.dir), fontSize: 11, fontWeight: 600 }}>{r.play.label}</span>
-                          {r.play.klass === "CONFLUENCE" && <span style={{ fontSize: 8, color: C.text.faint, border: `1px solid ${C.border}`, borderRadius: 3, padding: "0 4px" }}>◆</span>}
+                    {r.play.klass === "FADE"
+                      ? <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+                          <span style={{ color: C.text.bright, fontSize: 11.5, fontWeight: 700, letterSpacing: "0.03em" }}>{r.play.label}</span>
+                          {r.lens.smart && r.play.dir && r.lens.smart !== r.play.dir && (
+                            <span title="Smart money is positioned WITH the crowd, against the fade — not a clean fade" style={{ fontSize: 9, color: C.warn, fontWeight: 600 }}>· SMART {r.lens.smart}</span>
+                          )}
                         </span>
-                      : r.play.klass === "LEAN"
-                      ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, color: C.text.faint }}>
-                          <span style={{ color: r.play.dir === "LONG" ? C.pos : C.neg, opacity: 0.55 }}>{r.play.dir === "LONG" ? "↑" : "↓"}</span>{r.play.label}
-                        </span>
+                      : r.play.klass === "WATCH"
+                      ? <span style={{ color: C.text.muted, fontSize: 11, fontWeight: 600, letterSpacing: "0.06em" }}>WATCH</span>
                       : <span style={{ color: C.text.faint, fontSize: 11 }}>—</span>}
                     {r.mine ? (
                       <span style={{ fontSize: 8.5, letterSpacing: "0.02em", color: r.mine.tone === "pos" ? C.pos : C.warn, display: "inline-flex", alignItems: "center", gap: 4 }}>

@@ -119,6 +119,11 @@ export interface MarketSignal {
   trend?: "TREND_UP" | "TREND_DOWN" | "CHOP" | null;  // 1h regime (momentum source)
   trend_move_pct?: number | null;                     // net % move over the trend window
   trend_oi_pct?: number | null;                       // ~hourly OI change (momentum confirmation)
+  // ── THE ONE VERDICT (server-computed, shared with the ticket + share card) ──
+  funding_annual_pct?: number;                        // funding ×1095 — the ticket's %/yr language
+  fade_dir?: "LONG" | "SHORT" | "NONE";               // the fade side = the funding sign
+  verdict?: "FADE" | "WATCH" | "NONE";                // FADE only when funding is STRETCHED
+  stretched?: boolean | null;                         // pierced its own p25–p75 range
 }
 
 // A trend needs rising open interest (new money committing) to be a real momentum setup —
