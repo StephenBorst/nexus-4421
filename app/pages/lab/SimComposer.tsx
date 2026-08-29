@@ -95,11 +95,11 @@ export function SimComposer({ wallet, seed, compact = false }: { wallet: string 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
             <div>
               <div style={miniLabel}>ENTRY <span style={{ color: "#4a4658" }}>(optional)</span></div>
-              <input value={entry} onChange={(e) => setEntry(e.target.value)} placeholder="e.g. 77,000" spellCheck={false} style={fieldStyle} />
+              <input value={entry} onChange={(e) => setEntry(e.target.value)} placeholder="entry price" spellCheck={false} style={fieldStyle} />
             </div>
             <div>
               <div style={miniLabel}>TARGET <span style={{ color: "#4a4658" }}>(optional)</span></div>
-              <input value={target} onChange={(e) => setTarget(e.target.value)} placeholder="e.g. 84,000" spellCheck={false} style={fieldStyle} />
+              <input value={target} onChange={(e) => setTarget(e.target.value)} placeholder="target price" spellCheck={false} style={fieldStyle} />
             </div>
           </div>
           <div>

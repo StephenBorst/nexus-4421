@@ -402,15 +402,15 @@ export function buildFusion(input: FusionInput): Insight[] {
   const sym = pick.symbol;                                // signals use bare tickers
   const fundPct = (pick.funding_rate_8h * 100).toFixed(3);
   const setupPhrase = klass === "confluence"
-    ? "funding and open interest agree (the highest-conviction fade)"
+    ? "funding and open interest both agree"
     : `funding is stretched (${fundPct}%/8h)`;
 
   // The graded crowd's lean on this symbol (merit-weighted callers), if any.
   const lean = consensus?.[sym] || null;
   const callersAgree = !!(lean && lean.side === fadeDir);
   const callersFight = !!(lean && lean.side !== fadeDir && lean.side !== "SPLIT");
-  const callerNote = callersAgree ? " The merit-weighted callers lean the same way — the setup and the people with a track record agree."
-    : callersFight ? ` But the credible callers actually lean ${lean!.side} — a real disagreement, so treat it as lower-conviction.`
+  const callerNote = callersAgree ? ` The graded callers are ${lean!.side} too — WITH the fade.`
+    : callersFight ? ` But write it as the conflict it is: FADE ${fadeDir} · CALLERS ${lean!.side} — a real disagreement, so treat it as lower-odds.`
     : "";
 
   // ── CONVICTION drives the queue ──────────────────────────────────────────────
@@ -431,7 +431,7 @@ export function buildFusion(input: FusionInput): Insight[] {
   const tapeFavorsFade = (tapeLabel === "RISK-OFF" && fadeDir === "LONG") || (tapeLabel === "RISK-ON" && fadeDir === "SHORT");
   const tapeFadeTag = tapeFavorsFade ? `${tapeLabel} · FADE · ` : "";
   const tapeFadeNote = tapeFavorsFade ? ` The tape is ${tapeLabel}, so this stretched fade is the mean-reversion book it favors — not a chase.` : "";
-  const convTag = highConv ? "◆ HIGH CONVICTION · " : "";
+  const convTag = highConv ? "◆ " : ""; // marker only — "HIGH CONVICTION" is banned language (Grok)
   // Each aligned read lifts it; a credible caller fighting it pulls it back down.
   const convBoost = convReads * 2 - (callersFight ? 3 : 0);
   const convLine = convReads >= 2 ? ` ${convReads} independent reads align.` : "";
@@ -472,7 +472,7 @@ export function buildFusion(input: FusionInput): Insight[] {
       priority: 74,
       tone: "info",
       title: `${sym}: the signal and the graded callers both say fade ${sideWord(fadeDir)}`,
-      detail: `${setupPhrase} — the crowd is heavily ${heavy} — and the merit-weighted callers lean ${sideWord(fadeDir)} too, so the mechanical setup and the people with a track record agree.`,
+      detail: `${setupPhrase} — the crowd is heavily ${heavy} — and the graded callers are ${fadeDir} too (WITH the fade), so the mechanical setup and the people with a track record agree.`,
       action: { label: "See the read", tab: "intel" },
     });
   } else if (callersFight) {
@@ -481,7 +481,7 @@ export function buildFusion(input: FusionInput): Insight[] {
       priority: 70,
       tone: "info",
       title: `${sym}: the signal and the sharp callers disagree`,
-      detail: `Funding says fade ${sideWord(fadeDir)}, but the credible callers lean ${sideWord(lean!.side as "LONG" | "SHORT")}. Disagreement is where the information is — look before you commit.`,
+      detail: `Write it as the conflict it is: FADE ${fadeDir} · CALLERS ${lean!.side}. Funding says fade ${sideWord(fadeDir)}, the graded callers are ${sideWord(lean!.side as "LONG" | "SHORT")} — disagreement is where the information is; look before you commit.`,
       action: { label: "Smart money", tab: "smart" },
     });
   }

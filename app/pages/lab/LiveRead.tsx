@@ -282,17 +282,22 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
   const convLevel = reads.length >= 3 && agree >= 4 ? "HIGH" : agree >= 2 && agree > pushback ? "MODERATE" : pushback > agree ? "AGAINST" : "LOW";
   const convColor = convLevel === "HIGH" ? POS : convLevel === "MODERATE" ? "#8fdcb8" : convLevel === "AGAINST" ? NEG : WARN;
   const convWord = convLevel === "HIGH" ? "HIGH CONVICTION" : convLevel === "MODERATE" ? "MODERATE" : convLevel === "AGAINST" ? "READS DISAGREE" : "LOW CONVICTION";
-  // A weak base rate VETOES the confidence word (Grok): lenses agreeing is NOT the fade
-  // working. The base rate here is the REVERSION/last-N-fades hist (the ticket's clock,
-  // edgeQuality TRAP = reverted ≤42% of instances) — the ONE veto series. When the fade has
-  // bled historically, conviction can't read HIGH; it reads "N/M aligned · hist X%", amber.
+  // A weak historical result VETOES the confidence word (Grok): lenses agreeing is NOT the fade
+  // working, and "counting is doing marketing." Conviction docks if EITHER clock says it loses —
+  // the REVERSION/last-N-fades hist (edgeQuality TRAP, reverted ≤42%) OR the /intel/baserate
+  // BACKTEST E[R] (hit <40% or −EV). HYPE's reversion can be armed while its backtest is 25% /
+  // −0.88R; that still can't read "HIGH CONVICTION" — it reads "N/M ALIGNED · HIST 25% · −0.88R".
   const revPct = reversion ? reversion.revertedPct : null;
-  const weakBase = revPct != null && revPct <= 42;
-  const convWordFinal = weakBase ? `${agree}/${reads.length} ALIGNED · HIST ${revPct}%` : convWord;
+  const revWeak = revPct != null && revPct <= 42;                                        // drives the arming gate
+  const baseWeak = !!baseRate && (baseRate.hitRate < 40 || baseRate.expectancyR < 0);    // backtest E[R] weak
+  const weakBase = revWeak || baseWeak;                                                  // docks the conviction WORD
+  // Show the LOSING clock's numbers, backtest E[R] preferred (the loudest number after THE PLAY).
+  const histStr = baseWeak && baseRate ? `${baseRate.hitRate}% · ${baseRate.expectancyR >= 0 ? "+" : ""}${baseRate.expectancyR}R` : revPct != null ? `${revPct}%` : "—";
+  const convWordFinal = weakBase ? `${agree}/${reads.length} ALIGNED · HIST ${histStr}` : convWord;
   const convColorFinal = weakBase ? WARN : convColor;
-  // Feed the SAME veto up to the Thesis gate so the ticket, THE READ, and the thesis form
-  // all read one clock — no averaging, no fork.
-  useEffect(() => { onWeakEdge?.({ weak: weakBase, histPct: revPct }); }, [weakBase, revPct, onWeakEdge]);
+  // The WATCH/arming gate stays on the REVERSION clock (one clock ticket↔thesis, no fork) — a coin
+  // can ARM as FADE LONG while its backtest E[R] docks the conviction WORD to a hist line above.
+  useEffect(() => { onWeakEdge?.({ weak: revWeak, histPct: revPct }); }, [revWeak, revPct, onWeakEdge]);
   // Also surface the /intel/baserate object (hit% · expectancyR · n) so a published call can
   // FREEZE the odds it was taken against — a record, distinct from the reversion veto above.
   useEffect(() => { onBaseRate?.(baseRate ? { hitRate: baseRate.hitRate, expectancyR: baseRate.expectancyR, samples: baseRate.samples } : null); }, [baseRate, onBaseRate]);
@@ -333,7 +338,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
     if (record?.side) bits.push(`your ${direction.toLowerCase()} record on ${coin} is ${record.side.net >= 0 ? "+" : "-"}$${Math.abs(record.side.net)} over ${record.side.n} (${record.side.wr}%)`);
     else if (record) bits.push(`your ${coin} record is ${record.net >= 0 ? "+" : "-"}$${Math.abs(record.net)} over ${record.n}`);
     const head = provenEdge ? `◆ Proven-edge setup — the funding-fade ${direction} on ${coin}, confirmed by smart money and a +${baseRate!.expectancyR}R base rate. The one confluence that's held up in testing.`
-      : weakBase ? `${agree} of ${reads.length} reads align ${direction}, but the fade has bled historically here — it reverted only ${revPct}% of recent stretched-funding instances. Aligned lenses aren't a paying edge; trust your own thesis, not the fade.`
+      : weakBase ? `${agree} of ${reads.length} reads align ${direction}, but the hist says it loses — ${baseWeak && baseRate ? `${baseRate.hitRate}% hit · ${baseRate.expectancyR >= 0 ? "+" : ""}${baseRate.expectancyR}R over ${baseRate.samples}` : `it reverted only ${revPct}% of recent stretched-funding instances`}. Aligned lenses aren't a paying edge; trust your own thesis, not the fade.`
       : convLevel === "HIGH" ? `◆ High-conviction ${direction} — ${agree} of ${reads.length} independent reads align.`
       : convLevel === "AGAINST" ? `Heads up — the reads lean against your ${direction} (${pushback} push back).`
       : convLevel === "MODERATE" ? `Moderate ${direction} — ${agree} of ${reads.length} reads align.`
