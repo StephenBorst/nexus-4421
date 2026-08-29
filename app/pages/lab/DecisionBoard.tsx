@@ -444,26 +444,33 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
                     : r.trend === "TREND_DOWN" ? <span style={{ color: C.neg }}>↓ dn{r.trendMove != null ? ` ${Math.abs(r.trendMove).toFixed(1)}%` : ""}</span>
                     : <span style={{ color: C.text.faint }}>chop</span>}
                   </div>
-                  {/* CONFLUENCE — the four INDEPENDENT reads (callers · smart · catalyst ·
-                      forecast), each a verifiable public fact, + how many confirm the play. */}
-                  <div style={{ ...cell, gap: 5, flexWrap: "wrap" }}>
-                    {([
-                      { k: "Ca", v: r.lens.callers, t: `Graded callers${r.consensus ? ` (${r.consensus.participants})` : ""}` },
-                      { k: "Sm", v: r.lens.smart, t: "Smart money" },
-                      { k: "Ct", v: r.lens.catalyst, t: "Catalysts" },
-                      { k: "Fc", v: r.lens.forecast, t: "Forecasters" },
-                    ] as { k: string; v: Dir | null; t: string }[]).map(({ k, v, t }) => (
-                      <span key={k} title={`${t}: ${v ? v.toLowerCase() : "no read"}`} style={{
-                        fontFamily: MONO, fontSize: 9, fontWeight: 700, whiteSpace: "nowrap",
-                        color: v === "LONG" ? C.pos : v === "SHORT" ? C.neg : C.text.faint, opacity: v ? 1 : 0.42,
-                      }}>{k}{v === "LONG" ? "↑" : v === "SHORT" ? "↓" : "·"}</span>
-                    ))}
-                    {r.play.dir && r.agree >= 2 && (
-                      <span title={`${r.agree} of 4 independent reads confirm the play`} style={{
-                        fontFamily: MONO, fontSize: 8, fontWeight: 700, color: dirColor(r.play.dir),
-                        border: `1px solid ${dirColor(r.play.dir)}66`, borderRadius: 3, padding: "0 4px", lineHeight: 1.5,
-                      }}>◆{r.agree}</span>
-                    )}
+                  {/* CONFLUENCE — how many of the four INDEPENDENT reads (callers · smart ·
+                      catalyst · forecast) confirm THE PLAY, as a legible "2/4" — not glyph soup
+                      (Grok). A lens FIGHTING the play is named "✗ callers" so an ETH-style
+                      conflict is visible without decoding abbreviations. No E[R] in this cell. */}
+                  <div style={{ ...cell, gap: 6, flexWrap: "wrap" }}>
+                    {(() => {
+                      const lensList = [
+                        { k: "callers", v: r.lens.callers },
+                        { k: "smart", v: r.lens.smart },
+                        { k: "catalyst", v: r.lens.catalyst },
+                        { k: "forecast", v: r.lens.forecast },
+                      ] as { k: string; v: Dir | null }[];
+                      if (!r.play.dir) {
+                        const n = lensList.filter((l) => l.v).length;
+                        return <span style={{ fontFamily: MONO, fontSize: 10, color: C.text.faint }} title="No play — lenses with any read">{n ? `${n}/4 reads` : "—"}</span>;
+                      }
+                      const against = lensList.filter((l) => l.v && l.v !== r.play.dir);
+                      const col = r.agree >= 3 ? C.accent : r.agree >= 2 ? C.text.bright : C.text.muted;
+                      return (
+                        <>
+                          <span title="Independent reads confirming THE PLAY: graded callers · smart money · catalysts · forecasters" style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: col }}>{r.agree}/4</span>
+                          {against.map((l) => (
+                            <span key={l.k} title={`${l.k} is ${l.v?.toLowerCase()} — against the play`} style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 600, color: C.warn, whiteSpace: "nowrap" }}>✗ {l.k}</span>
+                          ))}
+                        </>
+                      );
+                    })()}
                   </div>
                   {/* THE PLAY — the ONE verdict word (Grok): FADE SHORT / FADE LONG / WATCH — the
                       SAME object as the ticket + share card. FADE in bone; when smart money is
