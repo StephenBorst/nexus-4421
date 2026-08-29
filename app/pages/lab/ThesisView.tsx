@@ -30,6 +30,37 @@ import { SharePoster, type PosterData } from "./SharePoster";
 const nf = (v: unknown, d: number) => (Number.isFinite(Number(v)) ? Number(v) : 0).toFixed(d);
 const priceDp = (v: unknown) => { const n = Math.abs(Number(v) || 0); return n >= 1000 ? 2 : n >= 1 ? 2 : n >= 0.01 ? 4 : 6; };
 
+// Real H4 (4-hour) ATR as a % of price (Grok item 3): Orderly's tv/history serves hourly
+// (resolution=60) but NOT H4, so aggregate hourly candles into 4h buckets and take a 14-period
+// ATR. This is the LIVE volatility a fade's stop should breathe with (default 1.2× ATR) instead
+// of a flat 2% proxy. Independent of our candle:hist maturity (that's the backtest harness's
+// path). Fail-soft → null (the caller keeps the flat-% default).
+async function h4AtrPct(coin: string): Promise<number | null> {
+  try {
+    const sym = `PERP_${coin.toUpperCase()}_USDC`;
+    const now = Math.floor(Date.now() / 1000);
+    const r = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${sym}&resolution=60&from=${now - 20 * 86400}&to=${now}`);
+    const d = await r.json();
+    if (!d || d.s !== "ok" || !Array.isArray(d.t) || d.t.length < 60) return null;
+    const buckets = new Map<number, { h: number; l: number; c: number }>();
+    for (let i = 0; i < d.t.length; i++) {
+      const b = Math.floor(Number(d.t[i]) / (4 * 3600)) * (4 * 3600);
+      const h = +d.h[i], l = +d.l[i], c = +d.c[i];
+      const cur = buckets.get(b);
+      if (!cur) buckets.set(b, { h, l, c });
+      else { cur.h = Math.max(cur.h, h); cur.l = Math.min(cur.l, l); cur.c = c; }
+    }
+    const H4 = [...buckets.keys()].sort((a, b) => a - b).map((k) => buckets.get(k)!);
+    if (H4.length < 15) return null;
+    const seg = H4.slice(-15);
+    let trSum = 0;
+    for (let i = 1; i < seg.length; i++) trSum += Math.max(seg[i].h - seg[i].l, Math.abs(seg[i].h - seg[i - 1].c), Math.abs(seg[i].l - seg[i - 1].c));
+    const atr = trSum / 14, px = H4[H4.length - 1].c;
+    if (!(px > 0) || !Number.isFinite(atr)) return null;
+    return Math.round((atr / px) * 1000) / 10; // % of price, 1dp
+  } catch { return null; }
+}
+
 function calcThesis(form: {
   entryPrice: string; stopLoss: string; takeProfit1: string; takeProfit2: string;
   riskPercent: string; accountSize: string; fundingRate: string; direction: "LONG" | "SHORT";
@@ -906,6 +937,7 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
   const [quickBusy, setQuickBusy] = useState(false);
   const [quickStopPct, setQuickStopPct] = useState(2);
   const [quickTpR, setQuickTpR] = useState(2);
+  const [atrPct, setAtrPct] = useState<number | null>(null); // live H4 ATR% for the current symbol
 
   // Full listed-markets set → validate the symbol (a typo makes an ungradeable call)
   // and power the autocomplete datalist. Fetched once, fail-soft (no list ⇒ no warning).
@@ -1023,6 +1055,18 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
   // false "not listed" while it's still fetching.
   const symbolUpper = form.symbol.trim().toUpperCase();
   const symbolListed = !marketTickers || !symbolUpper || marketTickers.includes(symbolUpper);
+
+  // Live H4 ATR for the current market — the fade's stop breathes with real volatility, not a
+  // flat 2%. Refetched per symbol; fail-soft (null → the flat-% default stands).
+  useEffect(() => {
+    setAtrPct(null);
+    if (!symbolUpper || !symbolListed) return;
+    let off = false;
+    h4AtrPct(symbolUpper).then((a) => { if (!off) setAtrPct(a); });
+    return () => { off = true; };
+  }, [symbolUpper, symbolListed]);
+  // 1.2× ATR as a stop % (Grok's structure), rounded to the knob's 0.1% granularity.
+  const atrStopPct = atrPct != null ? Math.round(1.2 * atrPct * 10) / 10 : null;
 
   // Plan geometry sanity — calcThesis uses Math.abs, so a stop on the WRONG side of
   // entry (or a target on the wrong side) still produces a "valid" size. Catch the
@@ -1487,10 +1531,12 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
                 )}
 
                 {!built ? (
-                  <button onClick={() => quickSetup(quickStopPct, quickTpR)} disabled={!canBuild || quickBusy || !dirArmed}
+                  // The stop is built from real H4 ATR when we have it (1.2× ATR), not a flat 2%
+                  // proxy — the fade breathes with the market's actual volatility (Grok item 3).
+                  <button onClick={() => { const sp = atrStopPct ?? quickStopPct; setQuickStopPct(sp); quickSetup(sp, quickTpR); }} disabled={!canBuild || quickBusy || !dirArmed}
                     style={{ marginTop: 12, width: "100%", padding: "11px 0", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", cursor: canBuild && dirArmed && !quickBusy ? "pointer" : "not-allowed", borderRadius: 4,
                       border: `1px solid ${canBuild && dirArmed ? "#33333a" : "#232327"}`, background: canBuild && dirArmed ? "#1a1a1e" : "#0a0a0b", color: canBuild && dirArmed ? "#ededf0" : "#52525b" }}>
-                    {quickBusy ? "BUILDING…" : !dirArmed ? "⚠ PICK A SIDE TO BUILD" : "⚡ BUILD IT — auto-fill from live price"}
+                    {quickBusy ? "BUILDING…" : !dirArmed ? "⚠ PICK A SIDE TO BUILD" : atrStopPct != null ? `⚡ BUILD IT — stop 1.2× H4 ATR (${atrStopPct}%)` : "⚡ BUILD IT — auto-fill from live price"}
                   </button>
                 ) : (
                   <>
@@ -1512,6 +1558,10 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
                       <span style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>STOP</span>
+                      {/* The real-ATR stop leads (1.2× live H4 ATR); the flat %s are overrides. */}
+                      {atrStopPct != null && (
+                        <button onClick={() => { setQuickStopPct(atrStopPct); rebuildLevels(atrStopPct, quickTpR); }} title={`Snap the stop to 1.2× the live H4 ATR — real volatility (${atrPct}% ATR), not a flat %`} style={knob(Math.abs(quickStopPct - atrStopPct) < 0.05, "#f7525f")}>ATR {atrStopPct}%</button>
+                      )}
                       {[1, 2, 3].map((p) => (
                         <button key={p} onClick={() => { setQuickStopPct(p); rebuildLevels(p, quickTpR); }} style={knob(Math.abs(quickStopPct - p) < 0.01, "#f7525f")}>−{p}%</button>
                       ))}

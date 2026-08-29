@@ -321,7 +321,7 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
       // the trader still sets stop + target (where the chart tells them), then deploys to the agent.
       entryPrice: r.price != null ? String(r.price) : "",
       catalyst: `${r.play.label} · funding ${r.fundingAnnual >= 0 ? "+" : ""}${r.fundingAnnual.toFixed(1)}%/yr, crowd offside ${crowd}`,
-      notes: `${r.play.label} — the crowd is stretched ${crowd}. Add your stop (≥1.2× ATR) and target; it grades first-touch vs the tape.${confNote}`,
+      notes: `${r.play.label} — the crowd is stretched ${crowd}. BUILD sets a 1.2× H4 ATR stop from live volatility; set your target, then it grades first-touch vs the tape.${confNote}`,
     };
     try { window.localStorage.setItem("nexus_thesis_draft", JSON.stringify(draft)); } catch { /* private mode */ }
     try {
