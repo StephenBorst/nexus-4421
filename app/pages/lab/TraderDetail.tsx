@@ -66,16 +66,24 @@ export function TraderDetail({ source, address, accountId, myAddress, onClose }:
 
           {source === "orderly" && d && (
             <>
-              {/* Stat tiles */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 16 }}>
-                <div><div style={label}>Realized PnL</div><div style={statVal(d.totalRealized)}>{d.totalRealized >= 0 ? "+" : ""}{usd(d.totalRealized)}</div></div>
-                <div><div style={label}>Unrealized</div><div style={statVal(d.totalUnrealized)}>{d.totalUnrealized >= 0 ? "+" : ""}{usd(d.totalUnrealized)}</div></div>
-                <div><div style={label}>Profitable Markets</div><div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: "#ededf0" }}>{d.profitableMarketsPct}%</div></div>
-                <div><div style={label}>Markets Traded</div><div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: "#ededf0" }}>{d.markets} <span style={{ fontSize: 10, color: "#52525b" }}>{d.wins}W/{d.losses}L</span></div></div>
-              </div>
-
-              {/* Tracked Record + You-vs-wallet + Copied-on-Nexus (shared surface) */}
+              {/* THE GRADE FIRST (Grok): the record earned WHILE WATCHED is the hero —
+                  watched PnL, days tracked, green-day rate, consistency. A flattering
+                  all-time number can't headline a wallet that's underwater over the window
+                  we've actually tracked; that would be the same lie as a PnL screenshot,
+                  the exact thing this product grades away. TrackedRecordCard leads. */}
               <TrackedRecordCard address={address} myAddress={myAddress} />
+
+              {/* LIFETIME — all-time settlement totals, demoted to context beneath the
+                  graded window. One quiet strip, not a green hero; the three lifetime
+                  clocks (realized · profitable-mkts · W/L) sit together here so they stop
+                  competing with the watched grade above. */}
+              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase", marginBottom: 8 }}>Lifetime · all-time, public indexer</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 10, marginBottom: 16, padding: "10px 12px", border: "1px solid #1d1d21", borderRadius: 8, background: "#0c0c0e" }}>
+                <div><div style={label}>Realized (all-time)</div><div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: 600, color: d.totalRealized >= 0 ? "#7fb89a" : "#b5727a" }}>{d.totalRealized >= 0 ? "+" : ""}{usd(d.totalRealized)}</div></div>
+                <div><div style={label}>Unrealized</div><div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: 600, color: d.totalUnrealized === 0 ? "#52525b" : d.totalUnrealized > 0 ? "#7fb89a" : "#b5727a" }}>{d.totalUnrealized >= 0 ? "+" : ""}{usd(d.totalUnrealized)}</div></div>
+                <div><div style={label}>Profitable Mkts</div><div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: 600, color: "#a1a1aa" }}>{d.profitableMarketsPct}%</div></div>
+                <div><div style={label}>Markets</div><div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 14, fontWeight: 600, color: "#a1a1aa" }}>{d.markets} <span style={{ fontSize: 10, color: "#52525b" }}>{d.wins}W/{d.losses}L</span></div></div>
+              </div>
 
               {/* By market */}
               <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase", marginBottom: 6 }}>Realized P&amp;L by market</div>
@@ -85,7 +93,7 @@ export function TraderDetail({ source, address, accountId, myAddress, onClose }:
                     <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#d4d4d8", width: 84, flexShrink: 0 }}>{s.sym}</span>
                     {s.open && s.side
                       ? <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: s.side === "LONG" ? "#3ecf8e" : "#f7525f", flexShrink: 0 }}>● {s.side} {usd(s.szUsd)}</span>
-                      : <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", flexShrink: 0 }}>flat</span>}
+                      : null /* Grok: kill "flat" — it read as "no opinion"; the realized number already says the position is closed */}
                     <span style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 600, color: s.realized >= 0 ? "#3ecf8e" : "#f7525f", flexShrink: 0 }}>{s.realized >= 0 ? "+" : ""}{usd(s.realized)}</span>
                   </div>
                 ))}

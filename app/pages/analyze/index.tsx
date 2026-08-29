@@ -289,7 +289,10 @@ export default function AnalyzePage() {
             <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", marginBottom: 16 }}>
               <span style={{ fontFamily: UI, fontSize: 24, fontWeight: 700, color: good ? POS : NEG, letterSpacing: "-0.01em" }}>{good ? "Net profitable" : "Underwater"}</span>
               <span style={{ fontFamily: MONO, fontSize: 18, fontWeight: 700, color: good ? POS : NEG }}>{usd(combined)}</span>
-              <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>realized · {srcs}</span>
+              {/* Grok: name this as LIFETIME so it can't pose as the grade — the graded,
+                  watched record (net while tracked, green-day rate, consistency) is the
+                  Tracked Record card below, not this all-time total. */}
+              <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>all-time realized · {srcs}{orderly && orderly.venues.length ? " · watched grade below ↓" : ""}</span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 12 }}>
               {stats.map((s) => (
