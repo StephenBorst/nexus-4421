@@ -194,6 +194,9 @@ function SynthChart({ points, price, direction, smartMoney, markPrice, fundingAn
 
   const smSide = smartMoney?.side;
   const MF = "ui-monospace,monospace";
+  // The caption + fade-accent highlight must follow the SAME floor as the verdict (Grok):
+  // a pierce on a trivial band is not "stretched". Pierced AND economically large → stretched.
+  const stretchedEnough = pierced && Math.abs(fundingAnnualPct) >= FADE_FUNDING_FLOOR_PCT_YR;
   return (
     <div>
       <svg viewBox={`0 0 ${VB_W} ${VB_H}`} style={{ display: "block", width: "100%", height: "auto" }} role="img" aria-label="Price over funding, time-aligned, with the smart-money marker on the live price.">
@@ -234,16 +237,20 @@ function SynthChart({ points, price, direction, smartMoney, markPrice, fundingAn
           <circle cx={lastFx} cy={lastFy} r="5.6" fill={C.accent} opacity="0.14" />
           <circle cx={lastFx} cy={lastFy} r="2.6" fill={C.accent} />
           {/* current funding value box — highlighted when pierced (stretched) */}
-          <line x1={lastFx} y1={lastFy} x2={VB_W - gutterR} y2={lastFy} stroke={pierced ? C.accent : C.borderStrong} strokeWidth="0.5" strokeDasharray="2 2" />
-          <rect x={VB_W - gutterR} y={lastFy - 8} width={boxW} height={16} rx="2" fill={C.surface} stroke={pierced ? C.accent : C.borderStrong} />
-          <text x={gx} y={lastFy + 3.4} fill={pierced ? C.accent : C.text.bright} fontFamily={MF} fontSize="8.5" fontWeight="700">{fundingAnnualPct >= 0 ? "+" : ""}{fundingAnnualPct}%</text>
+          <line x1={lastFx} y1={lastFy} x2={VB_W - gutterR} y2={lastFy} stroke={stretchedEnough ? C.accent : C.borderStrong} strokeWidth="0.5" strokeDasharray="2 2" />
+          <rect x={VB_W - gutterR} y={lastFy - 8} width={boxW} height={16} rx="2" fill={C.surface} stroke={stretchedEnough ? C.accent : C.borderStrong} />
+          <text x={gx} y={lastFy + 3.4} fill={stretchedEnough ? C.accent : C.text.bright} fontFamily={MF} fontSize="8.5" fontWeight="700">{fundingAnnualPct >= 0 ? "+" : ""}{fundingAnnualPct}%</text>
           <text x={padL + 48} y={fundBot - 1} fill={direction === "LONG" ? C.text.muted : C.text.faint} fontFamily={MF} fontSize="7">▼ fade long · crowd short</text>
         </>}
       </svg>
       {/* the read the chart is making, one line */}
       <div style={{ fontFamily: MONO, fontSize: 8.5, color: C.text.faint, marginTop: 8, lineHeight: 1.5 }}>
         {hasFunding
-          ? (pierced ? "Funding has pierced its typical range — the crowd is stretched. Watch whether price gives it back." : "Funding is within its typical range — no crowd extreme to fade right now.")
+          ? (stretchedEnough
+              ? "Funding has pierced its typical range — the crowd is stretched. Watch whether price gives it back."
+              : pierced
+              ? `Funding poked out of its range, but at ${fundingAnnualPct >= 0 ? "+" : ""}${fundingAnnualPct}%/yr the cost to hold is trivial — not stretched enough to fade.`
+              : "Funding is within its typical range — no crowd extreme to fade right now.")
           : "Price over the window. Funding history is still accumulating for this market."}
       </div>
     </div>

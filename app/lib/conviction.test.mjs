@@ -1,6 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { rankConviction, convictionLevel } from "./conviction.mjs";
+import { rankConviction, convictionLevel, FADE_FUNDING_FLOOR_PCT_YR } from "./conviction.mjs";
+
+test("rankConviction drops sub-floor funding — a trivial band is not a fade candidate", () => {
+  const markets = [
+    { coin: "HYPE", direction: "LONG", fundingAnnualPct: -27 },  // real fade
+    { coin: "ZEC", direction: "LONG", fundingAnnualPct: -0.66 }, // trivial → filtered
+    { coin: "SOL", direction: "LONG", fundingAnnualPct: -4.86 }, // under 10% → filtered
+  ];
+  const ranked = rankConviction(markets, {}, {});
+  const coins = ranked.map((r) => r.coin);
+  assert.ok(coins.includes("HYPE"));
+  assert.ok(!coins.includes("ZEC"));
+  assert.ok(!coins.includes("SOL"));
+  assert.equal(FADE_FUNDING_FLOOR_PCT_YR, 10);
+});
 
 test("rankConviction tallies agreement and ranks by net confirmation", () => {
   const markets = [

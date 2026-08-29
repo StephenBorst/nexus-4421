@@ -42,10 +42,9 @@ export interface BriefingInput {
 // Compute the market TAPE from the public futures rows — same formula as MarketTape
 // The economic floor for a FADE badge (Grok): a row must be stretched vs its OWN range AND
 // the crowd must be paying a meaningful annualized cost to hold. Below this, a "stretch" on a
-// tiny band (e.g. −0.66%/yr) is not a crowded position worth fading — every quiet name would
-// wear FADE NOW. Stretched-but-trivial → WATCH; economically large (e.g. −27%/yr) → FADE.
-// ONE shared value so the ticket and The Board can't drift on where "a real fade" begins.
-export const FADE_FUNDING_FLOOR_PCT_YR = 10;
+// tiny band (e.g. −0.66%/yr) is WATCH, not FADE. ONE literal, owned by conviction.mjs (the
+// scanner's file of truth) and re-exported here so the ticket + Board import it from one place.
+export { FADE_FUNDING_FLOOR_PCT_YR } from "@/lib/conviction.mjs";
 
 // (breadth 50% / BTC trend 40% / funding crowding 10%). Kept pure here so the
 // Briefing can read the tape without mounting the strip. Returns null on no data.

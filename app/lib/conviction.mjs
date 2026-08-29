@@ -9,9 +9,15 @@
 
 const bare = (s) => String(s || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
 
+// The economic floor for a FADE (Grok) — a stretch on a trivial funding band (−0.66%/yr) is
+// not a crowded position worth fading, so it never earns a fade badge OR a scanner rank. ONE
+// literal, the file of truth: briefing.ts re-exports THIS, and the ticket + Board import it
+// from there. Below the floor a market isn't a fade candidate at all.
+export const FADE_FUNDING_FLOOR_PCT_YR = 10;
+
 export function rankConviction(markets, smMap = {}, callerMap = {}, limit = 8) {
   const rows = (markets || [])
-    .filter((m) => m && (m.direction === "LONG" || m.direction === "SHORT"))
+    .filter((m) => m && (m.direction === "LONG" || m.direction === "SHORT") && Math.abs(Number(m.fundingAnnualPct) || 0) >= FADE_FUNDING_FLOOR_PCT_YR)
     .map((m) => {
       const coin = bare(m.coin);
       const dir = m.direction;
