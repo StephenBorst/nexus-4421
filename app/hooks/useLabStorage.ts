@@ -14,6 +14,13 @@ import type { ThesisTrade } from "@/pages/lab/types";
 const API_BASE = "https://og.nexustradinglabs.com";
 const LOCAL_THESIS_KEY = "lab_thesis_trades";
 const LOCAL_NOTES_PREFIX = "lab_note_";
+// Cross-instance sync (the return leg, Grok): the Lab mounts MULTIPLE useLabStorage instances
+// — the orchestrator one feeds The Board's live-call ● dots; ThesisView has its own and is
+// where a call is published. Plain per-instance useState meant a freshly published call never
+// reached the orchestrator's list, so it never appeared as a ● on The Board (draft→publish→
+// observe looked fake). On every theses save we broadcast this event; every instance re-reads
+// the shared localStorage cache, so all views — Board included — agree immediately.
+const THESES_EVENT = "nexus:lab-theses-updated";
 
 type LabData = {
   theses: ThesisTrade[];
@@ -62,6 +69,14 @@ export function useLabStorage(walletAddress?: string | null) {
   const hasFetchedRef = useRef(false);
 
   const addr = walletAddress?.toLowerCase().trim();
+
+  // ── Cross-instance re-sync: when ANY instance saves theses, every instance re-reads the
+  // shared localStorage cache so the Board's live-call dots reflect a just-published call.
+  useEffect(() => {
+    const resync = () => setTheses(readLocalTheses());
+    window.addEventListener(THESES_EVENT, resync);
+    return () => window.removeEventListener(THESES_EVENT, resync);
+  }, []);
 
   // ── On wallet connect: fetch from KV and merge ──────────
   useEffect(() => {
@@ -115,6 +130,8 @@ export function useLabStorage(walletAddress?: string | null) {
     (updated: ThesisTrade[]) => {
       setTheses(updated);
       writeLocalTheses(updated);
+      // Tell every other useLabStorage instance (The Board's, above all) to re-read now.
+      try { window.dispatchEvent(new Event(THESES_EVENT)); } catch { /* non-browser */ }
       pushToKV(updated, notes);
     },
     [notes, pushToKV]
