@@ -17,9 +17,12 @@ export function rankConviction(markets, smMap = {}, callerMap = {}, limit = 8) {
       const dir = m.direction;
       const reads = [{ label: "funding", ok: true }];
       const s = smMap[coin];
-      if (s && (s.side === "LONG" || s.side === "SHORT")) reads.push({ label: "smart", ok: s.side === dir });
+      // Carry each read's OWN side, not just whether it agrees — so a surface can show WHICH
+      // way a disagreeing read leans ("✗ callers LONG"), reconciling "SHORT here / LONG there"
+      // in place instead of leaving two Nexus surfaces silently contradicting each other (Grok).
+      if (s && (s.side === "LONG" || s.side === "SHORT")) reads.push({ label: "smart", ok: s.side === dir, side: s.side });
       const c = callerMap[coin];
-      if (c && (c.side === "LONG" || c.side === "SHORT")) reads.push({ label: "callers", ok: c.side === dir });
+      if (c && (c.side === "LONG" || c.side === "SHORT")) reads.push({ label: "callers", ok: c.side === dir, side: c.side });
       const extra = reads.filter((r) => r.label !== "funding" && r.ok).length;
       const against = reads.filter((r) => !r.ok).length;
       return { coin, direction: dir, fundingAnnualPct: Number(m.fundingAnnualPct) || 0, extra, against, reads };

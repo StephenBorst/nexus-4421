@@ -15,7 +15,7 @@ import { rankConviction, convictionLevel } from "@/lib/conviction.mjs";
 const AGENT_API = "https://og.nexustradinglabs.com";
 const MONO = "var(--nx-font-mono)";
 
-type Read = { label: string; ok: boolean };
+type Read = { label: string; ok: boolean; side?: "LONG" | "SHORT" };
 type Row = { coin: string; direction: "LONG" | "SHORT"; fundingAnnualPct: number; extra: number; against: number; reads: Read[] };
 
 export function ConvictionScanner() {
@@ -80,7 +80,7 @@ export function ConvictionScanner() {
               <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: conv.color, minWidth: 92 }}>◆ {conv.word}</span>
               <span style={{ display: "flex", gap: 4, flexWrap: "wrap", flex: 1 }}>
                 {r.reads.map((rd) => (
-                  <span key={rd.label} style={{ fontFamily: MONO, fontSize: 8.5, color: rd.ok ? C.pos : C.neg, border: `1px solid ${rd.ok ? "#2a3a30" : "#3a2530"}`, borderRadius: 3, padding: "1px 5px" }}>{rd.ok ? "✓" : "✗"} {rd.label}</span>
+                  <span key={rd.label} title={!rd.ok && rd.side ? `${rd.label} lean ${rd.side} — opposes this ${r.direction} fade` : undefined} style={{ fontFamily: MONO, fontSize: 8.5, color: rd.ok ? C.pos : C.neg, border: `1px solid ${rd.ok ? "#2a3a30" : "#3a2530"}`, borderRadius: 3, padding: "1px 5px" }}>{rd.ok ? "✓" : "✗"} {rd.label}{!rd.ok && rd.side ? ` ${rd.side}` : ""}</span>
                 ))}
               </span>
               <span style={{ fontFamily: MONO, fontSize: 9.5, color: C.text.fog }}>{r.fundingAnnualPct >= 0 ? "+" : ""}{r.fundingAnnualPct}%/yr</span>
