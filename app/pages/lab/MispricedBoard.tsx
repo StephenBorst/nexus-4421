@@ -426,14 +426,55 @@ export function MispricedBoard() {
   // the fade (symbol + direction + a funding catalyst) into the Thesis Engine for the
   // user to add levels + save. Reuses the assistant's draft contract (nexus_thesis_draft
   // + the tab/draft events the Lab already listens for) — no order, no auth.
-  const draftFade = (m: Market) => {
+  // ── FROZEN thesis draft (Grok — the last hole in the loop) ───────────────────
+  // Draft must emit a REAL thesis, not a vibe short: side from the verdict (the caller only
+  // fires this on FADE — WATCH never drafts), entry = live mark at click, stop = 1.2× ATR (the
+  // SAME contract as the harness's gradeEventR — 1h ATR(24) when candles exist, else a labeled
+  // ATR_proxy), TP = +1.5R, 7-day time-stop, why = stretched funding + crowd stance + smart $.
+  // ⚠️ NOT sized off funding %/yr; NOT tightened because the fade "looks clean." Same gradeCall
+  // fields (entry/stop/tp/direction) so Sept-14 doesn't grow a third object.
+  const draftFade = async (m: Market) => {
     if (m.direction === "NONE") return;
-    const crowd = m.direction === "SHORT" ? "long" : "short";
+    const isShort = m.direction === "SHORT";
+    const crowd = isShort ? "long" : "short";
+    let entry = m.markPrice, atr = 0, atrSource = "ATR_proxy (2% of price)";
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const j = await fetch(`https://api-evm.orderly.org/tv/history?symbol=PERP_${m.coin}_USDC&resolution=60&from=${now - 90 * 3600}&to=${now}`).then((r) => r.json());
+      if (j?.s === "ok" && Array.isArray(j.c) && j.c.length >= 8) {
+        const n = j.c.length;
+        if (Number(j.c[n - 1]) > 0) entry = Number(j.c[n - 1]); // live mark at click
+        // Aggregate 1h → H4 bars (Grok's H4 ATR) — a 1h ATR stop is far too tight for a
+        // multi-day fade (noise stops it instantly); H4 gives a tradeable, honest stop.
+        const h4: { h: number; l: number; c: number }[] = [];
+        for (let i = 0; i < n; i += 4) {
+          const cs = j.c.slice(i, i + 4);
+          if (!cs.length) continue;
+          h4.push({ h: Math.max(...j.h.slice(i, i + 4)), l: Math.min(...j.l.slice(i, i + 4)), c: Number(cs[cs.length - 1]) });
+        }
+        let trs = 0, cnt = 0;
+        for (let i = Math.max(1, h4.length - 14); i < h4.length; i++) {
+          const tr = Math.max(h4[i].h - h4[i].l, Math.abs(h4[i].h - h4[i - 1].c), Math.abs(h4[i].l - h4[i - 1].c));
+          if (Number.isFinite(tr) && tr > 0) { trs += tr; cnt++; }
+        }
+        if (cnt) { atr = trs / cnt; atrSource = "H4 ATR(14), Orderly"; }
+      }
+    } catch { /* fall through to the labeled proxy */ }
+    if (!(atr > 0)) atr = entry * 0.02;
+    const risk = 1.2 * atr, RR = 1.5;
+    const dp = entry >= 1000 ? 0 : entry >= 1 ? 2 : 6;
+    const round = (v: number) => Number(v.toFixed(dp));
+    const stopLoss = round(isShort ? entry + risk : entry - risk);
+    const takeProfit1 = round(isShort ? entry - RR * risk : entry + RR * risk);
     const draft = {
       symbol: m.coin,
       direction: m.direction,
-      catalyst: `Funding fade · ${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr, crowd offside ${crowd}`,
-      notes: `Funding is ${m.funding8hPct}%/8h — the book is lopsided ${crowd}. Fading the crowd for the mean-revert; set your own entry, stop and target.`,
+      entryPrice: String(round(entry)),
+      stopLoss: String(stopLoss),
+      takeProfit1: String(takeProfit1),
+      catalyst: `Funding fade · ${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr stretched, crowd offside ${crowd}`,
+      targetWindow: "7d",
+      notes: `${m.coin} funding has pierced its typical range (${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr) — the crowd is stretched ${crowd}${m.smartMoney?.side ? `; smart money ${m.smartMoney.count} ${m.smartMoney.side}` : ""}. Fading the mean-revert. Frozen levels: entry at mark, stop 1.2× ${atrSource}, TP +${RR}R, 7-day time-stop. ATR-based — NOT sized off funding.`,
     };
     try { window.localStorage.setItem("nexus_thesis_draft", JSON.stringify(draft)); } catch { /* private mode */ }
     try {
@@ -659,10 +700,12 @@ export function MispricedBoard() {
                         <span style={{ color: C.text.faint, textTransform: "uppercase", letterSpacing: "0.12em", fontSize: 8.5 }}>Top callers</span>
                         <Callers m={m} lean={l} />
                       </div>
-                      <button onClick={(e) => { e.stopPropagation(); draftFade(m); }} style={{
+                      {/* Open the ticket to draft — the Draft action is GATED on the verdict
+                          there (WATCH never drafts), so the scan card can't bypass it. */}
+                      <button onClick={(e) => { e.stopPropagation(); setOpenCoin(m.coin); }} style={{
                         marginTop: 11, width: "100%", fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
                         color: C.accent, border: `1px solid ${C.borderStrong}`, borderRadius: RADIUS.md, padding: 8, background: "transparent", cursor: "pointer",
-                      }}>→ Draft this fade as a trade</button>
+                      }}>→ Open &amp; size the fade</button>
                     </div>
                   );
                 })}
