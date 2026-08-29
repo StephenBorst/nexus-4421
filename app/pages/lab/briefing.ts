@@ -344,9 +344,20 @@ export function buildFusion(input: FusionInput): Insight[] {
     ? ` But funding is already crowded ${momDir === "LONG" ? "long" : "short"} (${(momFunding * 100).toFixed(3)}%/8h) — the trend is LATE, so tighten the stop; this is where trends snap.`
     : ` Funding isn't crowded yet (${(momFunding * 100).toFixed(3)}%/8h), so the crowd isn't all-in — room to run.`;
 
+  // ── The NARROW risk-off gate (Grok) ──────────────────────────────────────────
+  // A momentum LONG into a RISK-OFF tape (or a SHORT into RISK-ON) is the textbook
+  // "chase" — so we DON'T promote it. But the gate stays surgical: it only touches a
+  // WITH-trend momentum ride against the tape, NEVER a fade. A stretched fade-long IS
+  // the mean-reversion book that works in risk-off, so it must keep flowing through
+  // below (and gets a RISK-OFF · FADE tag), never suppressed with the chases.
+  const tapeLabel = input.tape?.label || null;
+  const momChasesTape = !!mom && ((tapeLabel === "RISK-OFF" && momDir === "LONG") || (tapeLabel === "RISK-ON" && momDir === "SHORT"));
+
   // A momentum trader + a live, OI-confirmed trend = ride it. This IS their read, so it
-  // returns early — no need to also throw a fade at a trend-rider.
-  if (mom && momDir && classWith) {
+  // returns early — no need to also throw a fade at a trend-rider. EXCEPT when the ride
+  // chases the tape: then we demote it to a caution and fall through, so the stretched
+  // fade (the book that works in this tape) can still surface as the alternative.
+  if (mom && momDir && classWith && !momChasesTape) {
     out.push({
       id: "fusion-momentum",
       priority: momExtended ? 90 : 92,
@@ -357,6 +368,18 @@ export function buildFusion(input: FusionInput): Insight[] {
       meta: { symbol: mom.symbol, direction: momDir },
     });
     return out;
+  }
+  if (mom && momDir && classWith && momChasesTape) {
+    out.push({
+      id: "fusion-momentum-chase",
+      priority: 78,   // below a real fade — a chase must never headline the briefing
+      tone: "caution",
+      title: `${mom.symbol} is trending ${sideWord(momDir)}, but the tape is ${tapeLabel} — that's a chase`,
+      detail: `${mom.symbol} is ${momDir === "LONG" ? "up" : "down"} ${momMove >= 0 ? "+" : ""}${momMove}% on rising OI — normally your class. But the broad tape is ${tapeLabel === "RISK-OFF" ? "weak" : "strong"}, against the ride, so a momentum ${sideWord(momDir)} here is chasing. Take the trend only small with a tight stop; the stretched fade below is the book that actually works in a ${tapeLabel} tape.${fundingNote}`,
+      action: { label: "Structure it", tab: "thesis" },
+      meta: { symbol: mom.symbol, direction: momDir },
+    });
+    // no early return — fall through so the fade setup surfaces as the real play
   }
 
   // ── FADE setup (may not exist) ──
@@ -396,6 +419,12 @@ export function buildFusion(input: FusionInput): Insight[] {
     (provenFader ? 1 : 0) +              // your proven crowd-fading record
     (classAgainst ? 1 : 0);             // counter-trend is your class
   const highConv = convReads >= 3;
+  // A stretched fade in the direction the tape's mean-reversion favors (long into RISK-OFF,
+  // short into RISK-ON) is the book that WORKS in that tape — surface it AS that, tagged, so
+  // the risk-off gate above reads as "suppress the chase, keep the fade," not "kill all longs."
+  const tapeFavorsFade = (tapeLabel === "RISK-OFF" && fadeDir === "LONG") || (tapeLabel === "RISK-ON" && fadeDir === "SHORT");
+  const tapeFadeTag = tapeFavorsFade ? `${tapeLabel} · FADE · ` : "";
+  const tapeFadeNote = tapeFavorsFade ? ` The tape is ${tapeLabel}, so this stretched fade is the mean-reversion book it favors — not a chase.` : "";
   const convTag = highConv ? "◆ HIGH CONVICTION · " : "";
   // Each aligned read lifts it; a credible caller fighting it pulls it back down.
   const convBoost = convReads * 2 - (callersFight ? 3 : 0);
@@ -406,8 +435,8 @@ export function buildFusion(input: FusionInput): Insight[] {
       id: "fusion-your-setup",
       priority: 92 + convBoost,
       tone: highConv ? "positive" : callersFight ? "caution" : "positive",
-      title: `${convTag}Your setup: fade the crowd ${sideWord(fadeDir)} on ${sym}`,
-      detail: `${sym}: ${setupPhrase} — the crowd is heavily ${heavy}, so the clean fade is ${sideWord(fadeDir)}, and that's your stronger side (${userWr}% win rate)${faderNote}.${classNote}${callerNote}${convLine}`,
+      title: `${tapeFadeTag}${convTag}Your setup: fade the crowd ${sideWord(fadeDir)} on ${sym}`,
+      detail: `${sym}: ${setupPhrase} — the crowd is heavily ${heavy}, so the clean fade is ${sideWord(fadeDir)}, and that's your stronger side (${userWr}% win rate)${faderNote}.${classNote}${callerNote}${convLine}${tapeFadeNote}`,
       action: { label: "Structure it", tab: "thesis" },
       meta: { symbol: sym, direction: fadeDir },
     });
@@ -417,8 +446,8 @@ export function buildFusion(input: FusionInput): Insight[] {
       id: "fusion-your-class",
       priority: 88 + convBoost,
       tone: highConv ? "positive" : callersFight ? "caution" : "positive",
-      title: `${convTag}Your kind of setup: counter-trend fade ${sideWord(fadeDir)} on ${sym}`,
-      detail: `${sym}: ${setupPhrase} — the clean fade is ${sideWord(fadeDir)}, and counter-trend fades are where your edge lives (align +${alignAvgR}R against the trend)${faderNote}.${callerNote}${convLine}`,
+      title: `${tapeFadeTag}${convTag}Your kind of setup: counter-trend fade ${sideWord(fadeDir)} on ${sym}`,
+      detail: `${sym}: ${setupPhrase} — the clean fade is ${sideWord(fadeDir)}, and counter-trend fades are where your edge lives (align +${alignAvgR}R against the trend)${faderNote}.${callerNote}${convLine}${tapeFadeNote}`,
       action: { label: "Structure it", tab: "thesis" },
       meta: { symbol: sym, direction: fadeDir },
     });
