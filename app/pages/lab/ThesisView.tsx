@@ -1530,18 +1530,6 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
                   </div>
                 )}
 
-                {/* SIM — pressure-test this thesis (or any scenario) with Miroshark.
-                    Seeded from the draft; fully editable, so you can sim whatever you want. */}
-                {form.symbol && (
-                  <div style={{ marginTop: 12 }}>
-                    <SimComposer wallet={wallet ?? null} seed={{
-                      coin: form.symbol, direction: form.direction,
-                      entry: built && entryN > 0 ? String(entryN) : form.entryPrice || undefined,
-                      target: built && tpN > 0 ? String(tpN) : form.takeProfit1 || undefined,
-                    }} />
-                  </div>
-                )}
-
                 {!built ? (
                   // The stop is built from real H4 ATR when we have it (1.2× ATR), not a flat 2%
                   // proxy — the fade breathes with the market's actual volatility (Grok item 3).
@@ -1617,6 +1605,17 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
                       Posts on-chain + public. Nexus grades it from public price — first-touch TP vs stop. You never mark it yourself.
                     </div>
                   </>
+                )}
+                {/* SIM sits BELOW the read + BUILD IT + Draft/Share (Grok): a thinking tool,
+                    never a signal. You can draft the frozen thesis without scrolling past it. */}
+                {form.symbol && (
+                  <div style={{ marginTop: 12 }}>
+                    <SimComposer wallet={wallet ?? null} seed={{
+                      coin: form.symbol, direction: form.direction,
+                      entry: built && entryN > 0 ? String(entryN) : form.entryPrice || undefined,
+                      target: built && tpN > 0 ? String(tpN) : form.takeProfit1 || undefined,
+                    }} />
+                  </div>
                 )}
                 <div style={{ borderTop: "1px solid #1a1a1e", marginTop: 12, paddingTop: 8, textAlign: "center" }}>
                   <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b" }}>want a catalyst, charts, TP2, or a live order? fine-tune below ↓</span>

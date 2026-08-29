@@ -256,30 +256,35 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
   // rate, your own realized record). Agreement across uncorrelated sources is the only
   // thing that's held up — so we gate conviction on the TALLY, and stay fully explainable
   // by listing exactly which reads confirm and which push back. Never a black-box score.
-  const reads: { label: string; val: string; side: "LONG" | "SHORT" | null; ok: boolean }[] = [];
-  if (fused?.crowdFade) reads.push({ label: "funding fade", val: fused.fundingAnnualPct != null ? `${fused.crowdFade} · ${fused.fundingAnnualPct}%/yr` : fused.crowdFade, side: fused.crowdFade, ok: fused.crowdFade === direction });
-  if (fused?.smartSide) reads.push({ label: "smart money", val: `${fused.smartSide} · ${fused.smartTraders}`, side: fused.smartSide, ok: fused.smartSide === direction });
-  if (fused && (fused.verdict === "CONFLUENCE" || fused.verdict === "SPLIT")) reads.push({ label: "positioning", val: fused.verdict === "CONFLUENCE" ? "◆ confluence" : "⚡ split", side: fused.verdict === "CONFLUENCE" ? boardLean : null, ok: fused.verdict === "CONFLUENCE" && boardLean === direction });
-  if (callers) reads.push({ label: "graded callers", val: `${callers.side} · ${callers.participants}`, side: callers.side, ok: callers.side === direction });
-  if (baseRate) reads.push({ label: "base rate", val: `${baseRate.hitRate}% · ${baseRate.expectancyR >= 0 ? "+" : ""}${baseRate.expectancyR}R`, side: boardLean, ok: baseRate.expectancyR > 0 && boardLean === direction });
-  if (flush) { const fs = flush.side === "DOWN" ? "SHORT" : "LONG"; reads.push({ label: "liq flush", val: `${flush.ratio}× ${flush.side === "DOWN" ? "↓longs" : "↑shorts"}`, side: fs, ok: fs === direction }); }
-  if (basis) reads.push({ label: "spot-perp basis", val: `${basis.basisPct > 0 ? "+" : ""}${basis.basisPct}% ${basis.basisPct > 0 ? "prem" : "disc"}`, side: basis.side, ok: basis.side === direction });
-  // funding × basis divergence: funding says the crowd is one-sided, but the live perp premium
-  // has already flipped the other way → the froth is unwinding → a mean-reversion bounce toward
-  // the crowd's side is the tell (fade the fade). Only when funding is genuinely stretched.
+  // vote=true → counts toward the N/M ALIGNED tally. The play is NOT a vote (Grok): only
+  // genuinely INDEPENDENT directional reads vote — smart money, graded callers, spot-perp
+  // basis, CVD flow, liq flush. The funding fade IS the play; positioning is a summary of the
+  // others; the base rate is a CLOCK not a side; the order book is microstructure; funding×basis
+  // is derived; the liq magnet is a target; your record is personal. Those DISPLAY as context
+  // (base rate has its own loud line below) but never increment N — "counting is doing marketing".
+  const reads: { label: string; val: string; side: "LONG" | "SHORT" | null; ok: boolean; vote: boolean }[] = [];
+  if (fused?.crowdFade) reads.push({ label: "funding fade", val: fused.fundingAnnualPct != null ? `${fused.crowdFade} · ${fused.fundingAnnualPct}%/yr` : fused.crowdFade, side: fused.crowdFade, ok: fused.crowdFade === direction, vote: false });
+  if (fused?.smartSide) reads.push({ label: "smart money", val: `${fused.smartSide} · ${fused.smartTraders}`, side: fused.smartSide, ok: fused.smartSide === direction, vote: true });
+  if (fused && (fused.verdict === "CONFLUENCE" || fused.verdict === "SPLIT")) reads.push({ label: "positioning", val: fused.verdict === "CONFLUENCE" ? "◆ confluence" : "⚡ split", side: fused.verdict === "CONFLUENCE" ? boardLean : null, ok: fused.verdict === "CONFLUENCE" && boardLean === direction, vote: false });
+  if (callers) reads.push({ label: "graded callers", val: `${callers.side} · ${callers.participants}`, side: callers.side, ok: callers.side === direction, vote: true });
+  if (baseRate) reads.push({ label: "base rate", val: `${baseRate.hitRate}% · ${baseRate.expectancyR >= 0 ? "+" : ""}${baseRate.expectancyR}R`, side: boardLean, ok: baseRate.expectancyR > 0 && boardLean === direction, vote: false });
+  if (flush) { const fs = flush.side === "DOWN" ? "SHORT" : "LONG"; reads.push({ label: "liq flush", val: `${flush.ratio}× ${flush.side === "DOWN" ? "↓longs" : "↑shorts"}`, side: fs, ok: fs === direction, vote: true }); }
+  if (basis) reads.push({ label: "spot-perp basis", val: `${basis.basisPct > 0 ? "+" : ""}${basis.basisPct}% ${basis.basisPct > 0 ? "prem" : "disc"}`, side: basis.side, ok: basis.side === direction, vote: true });
+  // funding × basis divergence: derived from funding + basis (NOT independent — no vote).
   if (fused?.crowdFade && fused.fundingAnnualPct != null && rawBasis != null && Math.abs(fused.fundingAnnualPct) >= 10) {
     const crowdLong = fused.fundingAnnualPct > 0;
-    if (crowdLong !== rawBasis > 0) { const bounce = crowdLong ? "LONG" : "SHORT"; reads.push({ label: "funding×basis", val: "premium fading", side: bounce, ok: bounce === direction }); }
+    if (crowdLong !== rawBasis > 0) { const bounce = crowdLong ? "LONG" : "SHORT"; reads.push({ label: "funding×basis", val: "premium fading", side: bounce, ok: bounce === direction, vote: false }); }
   }
-  if (cvd) reads.push({ label: "CVD flow", val: cvd.kind === "distribution" ? "sold into" : "bought up", side: cvd.side, ok: cvd.side === direction });
+  if (cvd) reads.push({ label: "CVD flow", val: cvd.kind === "distribution" ? "sold into" : "bought up", side: cvd.side, ok: cvd.side === direction, vote: true });
   const pull = magnetPull(magnets, direction);
-  if (pull) reads.push({ label: "liq pull", val: `${pull.distPct}% ${pull.side === direction ? "target" : "counter"}`, side: pull.side, ok: pull.side === direction });
-  if (ob) reads.push({ label: "order book", val: `${ob.imbalance > 0 ? "bid" : "ask"}-heavy`, side: ob.side, ok: ob.side === direction });
-  if (record?.side) reads.push({ label: `your ${coin}`, val: `${record.side.net >= 0 ? "+" : "-"}$${Math.abs(record.side.net)} · ${record.side.n}t · ${record.side.wr}%`, side: record.side.net >= 0 ? direction : null, ok: record.side.net > 0 });
-  else if (record) reads.push({ label: `your ${coin}`, val: `${record.net >= 0 ? "+" : "-"}$${Math.abs(record.net)} · ${record.n}t`, side: record.net >= 0 ? direction : null, ok: record.net > 0 });
-  const agree = reads.filter((r) => r.ok).length;
-  const pushback = reads.filter((r) => r.side && r.side !== direction).length;
-  const convLevel = reads.length >= 3 && agree >= 4 ? "HIGH" : agree >= 2 && agree > pushback ? "MODERATE" : pushback > agree ? "AGAINST" : "LOW";
+  if (pull) reads.push({ label: "liq pull", val: `${pull.distPct}% ${pull.side === direction ? "target" : "counter"}`, side: pull.side, ok: pull.side === direction, vote: false });
+  if (ob) reads.push({ label: "order book", val: `${ob.imbalance > 0 ? "bid" : "ask"}-heavy`, side: ob.side, ok: ob.side === direction, vote: false });
+  if (record?.side) reads.push({ label: `your ${coin}`, val: `${record.side.net >= 0 ? "+" : "-"}$${Math.abs(record.side.net)} · ${record.side.n}t · ${record.side.wr}%`, side: record.side.net >= 0 ? direction : null, ok: record.side.net > 0, vote: false });
+  else if (record) reads.push({ label: `your ${coin}`, val: `${record.net >= 0 ? "+" : "-"}$${Math.abs(record.net)} · ${record.n}t`, side: record.net >= 0 ? direction : null, ok: record.net > 0, vote: false });
+  const voteReads = reads.filter((r) => r.vote);
+  const agree = voteReads.filter((r) => r.ok).length;
+  const pushback = voteReads.filter((r) => r.side && r.side !== direction).length;
+  const convLevel = voteReads.length >= 3 && agree >= 3 && agree > pushback ? "HIGH" : agree >= 2 && agree > pushback ? "MODERATE" : pushback > agree ? "AGAINST" : "LOW";
   const convColor = convLevel === "HIGH" ? POS : convLevel === "MODERATE" ? "#8fdcb8" : convLevel === "AGAINST" ? NEG : WARN;
   const convWord = convLevel === "HIGH" ? "HIGH CONVICTION" : convLevel === "MODERATE" ? "MODERATE" : convLevel === "AGAINST" ? "READS DISAGREE" : "LOW CONVICTION";
   // A weak historical result VETOES the confidence word (Grok): lenses agreeing is NOT the fade
@@ -293,7 +298,7 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
   const weakBase = revWeak || baseWeak;                                                  // docks the conviction WORD
   // Show the LOSING clock's numbers, backtest E[R] preferred (the loudest number after THE PLAY).
   const histStr = baseWeak && baseRate ? `${baseRate.hitRate}% · ${baseRate.expectancyR >= 0 ? "+" : ""}${baseRate.expectancyR}R` : revPct != null ? `${revPct}%` : "—";
-  const convWordFinal = weakBase ? `${agree}/${reads.length} ALIGNED · HIST ${histStr}` : convWord;
+  const convWordFinal = weakBase ? `${agree}/${voteReads.length} ALIGNED · HIST ${histStr}` : convWord;
   const convColorFinal = weakBase ? WARN : convColor;
   // The WATCH/arming gate stays on the REVERSION clock (one clock ticket↔thesis, no fork) — a coin
   // can ARM as FADE LONG while its backtest E[R] docks the conviction WORD to a hist line above.
@@ -338,10 +343,10 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
     if (record?.side) bits.push(`your ${direction.toLowerCase()} record on ${coin} is ${record.side.net >= 0 ? "+" : "-"}$${Math.abs(record.side.net)} over ${record.side.n} (${record.side.wr}%)`);
     else if (record) bits.push(`your ${coin} record is ${record.net >= 0 ? "+" : "-"}$${Math.abs(record.net)} over ${record.n}`);
     const head = provenEdge ? `◆ Proven-edge setup — the funding-fade ${direction} on ${coin}, confirmed by smart money and a +${baseRate!.expectancyR}R base rate. The one confluence that's held up in testing.`
-      : weakBase ? `${agree} of ${reads.length} reads align ${direction}, but the hist says it loses — ${baseWeak && baseRate ? `${baseRate.hitRate}% hit · ${baseRate.expectancyR >= 0 ? "+" : ""}${baseRate.expectancyR}R over ${baseRate.samples}` : `it reverted only ${revPct}% of recent stretched-funding instances`}. Aligned lenses aren't a paying edge; trust your own thesis, not the fade.`
-      : convLevel === "HIGH" ? `◆ High-conviction ${direction} — ${agree} of ${reads.length} independent reads align.`
+      : weakBase ? `${agree} of ${voteReads.length} reads align ${direction}, but the hist says it loses — ${baseWeak && baseRate ? `${baseRate.hitRate}% hit · ${baseRate.expectancyR >= 0 ? "+" : ""}${baseRate.expectancyR}R over ${baseRate.samples}` : `it reverted only ${revPct}% of recent stretched-funding instances`}. Aligned lenses aren't a paying edge; trust your own thesis, not the fade.`
+      : convLevel === "HIGH" ? `◆ High-conviction ${direction} — ${agree} of ${voteReads.length} independent reads align.`
       : convLevel === "AGAINST" ? `Heads up — the reads lean against your ${direction} (${pushback} push back).`
-      : convLevel === "MODERATE" ? `Moderate ${direction} — ${agree} of ${reads.length} reads align.`
+      : convLevel === "MODERATE" ? `Moderate ${direction} — ${agree} of ${voteReads.length} reads align.`
       : `Thin read on ${coin} — trust your own thesis.`;
     return bits.length ? `${head} ${bits.join("; ")}.` : head;
   })();
@@ -371,11 +376,11 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
                 <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
                   <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: convColorFinal }}>◆ {convWordFinal}</span>
                   {provenEdge && <span title="Funding-fade + smart-money + a positive base rate all align — the one configuration that survived backtesting" style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.1em", color: POS, border: `1px solid ${POS}55`, borderRadius: 3, padding: "1px 6px" }}>◆ PROVEN-EDGE SETUP</span>}
-                  <span style={{ fontFamily: MONO, fontSize: 10.5, color: FOG }}>{agree}/{reads.length} reads align {direction}{pushback > 0 ? ` · ${pushback} against` : ""}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 10.5, color: FOG }}>{agree}/{voteReads.length} independent reads align {direction}{pushback > 0 ? ` · ${pushback} against` : ""}</span>
                 </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 6, marginBottom: 10 }}>
-                {reads.map((r) => {
+                {voteReads.map((r) => {
                   const c = r.ok ? POS : (r.side && r.side !== direction ? NEG : FAINT);
                   const bd = r.ok ? "#2a3a30" : (r.side && r.side !== direction ? "#3a2530" : BORDER);
                   return (
@@ -502,14 +507,14 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
               <Simulate
                 label="◆ Pressure-test this trade →"
                 wallet={wallet}
-                body={{ kind: "thesis", coin, direction, notes: synth || `${direction} ${coin} — ${convWord}, ${agree}/${reads.length} reads align.` }}
+                body={{ kind: "thesis", coin, direction, notes: synth || `${direction} ${coin} — ${convWord}, ${agree}/${voteReads.length} reads align.` }}
               />
             </div>
             {reads.length >= 2 && (() => {
               // Share the read — on-brand content ("multi-axis, graded, not advice"), pulls eyes
               // back to the Lab. Frames it as a READ, never a call/signal.
               const conf = reads.filter((r) => r.ok).map((r) => r.label).slice(0, 4).join(", ");
-              const text = `◆ Nexus read — ${convWord}, ${direction} ${coin}: ${agree}/${reads.length} independent reads align${conf ? ` (${conf})` : ""}. Multi-axis, graded on-chain, not advice. The full breakdown 👇`;
+              const text = `◆ Nexus read — ${convWord}, ${direction} ${coin}: ${agree}/${voteReads.length} independent reads align${conf ? ` (${conf})` : ""}. Multi-axis, graded on-chain, not advice. The full breakdown 👇`;
               const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent("https://trade.nexustradinglabs.com/lab")}`;
               return (
                 <a href={xUrl} target="_blank" rel="noopener noreferrer" title="Share this read on X" className="nx-press"

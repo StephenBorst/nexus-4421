@@ -208,12 +208,15 @@ export function ProjectionBand({ symbol, height = 216, horizonHours, fill }: { s
             {/* outlook summary — two lines so nothing clips at narrow widths */}
             <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: OUTLOOK_H, zIndex: 3, display: "flex", flexDirection: "column", justifyContent: "center", gap: 2, padding: "0 10px", borderTop: `1px solid ${BORDER}`, background: "#0c0c0e", boxSizing: "border-box", overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, fontFamily: UI, fontSize: 11, color: FOG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED, flexShrink: 0 }}>OUTLOOK</span>
+                {/* The RANGE is the projection, not a point target (Grok): a "→ $83 (+0.3%)"
+                    next to a 1.5R contract is a cousin of fake E[R]. The lean names the play's
+                    direction only; the expected RANGE below is the number. */}
+                <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED, flexShrink: 0 }}>LEAN</span>
                 {dir
-                  ? <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}><b style={{ color: tgtColor }}>{dir === "SHORT" ? "▼ fade short" : "▲ fade long"}</b>{tgt != null ? <> → <b style={{ color: tgtColor }}>{fmtPx(tgt)}</b> <span style={{ color: FAINT }}>({pct(tgt)})</span></> : ""}</span>
+                  ? <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}><b style={{ color: tgtColor }}>{dir === "SHORT" ? "▼ fade short" : "▲ fade long"}</b></span>
                   : <span style={{ color: MUTED }}>no funding lean</span>}
               </div>
-              <div style={{ fontFamily: MONO, fontSize: 8.5, color: FAINT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hLabel} expected range {fmtPx(wide.lo)}–{fmtPx(wide.hi)}</div>
+              <div style={{ fontFamily: MONO, fontSize: 9.5, color: FOG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><span style={{ fontSize: 8.5, letterSpacing: "0.1em", color: MUTED }}>{hLabel} EXPECTED RANGE </span><b>{fmtPx(wide.lo)}–{fmtPx(wide.hi)}</b></div>
             </div>
           </>
         );
