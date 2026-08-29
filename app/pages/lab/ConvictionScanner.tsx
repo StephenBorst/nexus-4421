@@ -20,6 +20,11 @@ type Row = { coin: string; direction: "LONG" | "SHORT"; fundingAnnualPct: number
 
 export function ConvictionScanner() {
   const [rows, setRows] = useState<Row[] | null>(null);
+  // The BACKTEST base rate per coin (/intel/baserate) — the hist series the ticket/Quick Call
+  // dock on (hit% · E[R] · n). The scanner's own edgeQuality is often UNPROVEN (reversion has
+  // no data) while the backtest DOES (HYPE n=8 · 25% · −0.88R), so we must dock on THIS too —
+  // else "♦ HIGH" survives on a −0.88R clock (Grok). Fetched for the ranked coins, cached 1h server-side.
+  const [histMap, setHistMap] = useState<Record<string, { hitRate: number; expectancyR: number } | null>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -39,6 +44,17 @@ export function ConvictionScanner() {
     const id = setInterval(load, 60000);
     return () => { off = true; clearInterval(id); };
   }, []);
+
+  // Pull the backtest base rate for whatever coins are on the board, so the diamond docks.
+  useEffect(() => {
+    if (!rows || !rows.length) return;
+    let off = false;
+    Promise.all(rows.map(async (r) => {
+      try { const d = await (await fetch(`${AGENT_API}/intel/baserate/${r.coin}`)).json(); return [r.coin, d && d.available && Number.isFinite(d.hitRate) ? { hitRate: d.hitRate, expectancyR: d.expectancyR } : null] as const; }
+      catch { return [r.coin, null] as const; }
+    })).then((entries) => { if (!off) setHistMap(Object.fromEntries(entries)); });
+    return () => { off = true; };
+  }, [rows]);
 
   const draft = (r: Row) => {
     const crowd = r.direction === "SHORT" ? "long" : "short";
@@ -73,14 +89,21 @@ export function ConvictionScanner() {
         {rows.map((r) => {
           const conv = convOf(r);
           const dc = r.direction === "LONG" ? C.pos : C.neg;
+          // Dock the diamond on EITHER hist clock (Grok): the backtest base rate (hit% · E[R])
+          // OR the reversion. The backtest is the one that has HYPE's number (25% / −0.88R) when
+          // reversion is UNPROVEN, so it's what kills "♦ HIGH" on a losing clock. Show its hit%.
+          const bw = histMap[r.coin];
+          const baseWeak = !!bw && (bw.hitRate < 40 || bw.expectancyR < 0);
+          const histPct = baseWeak && bw ? bw.hitRate : r.revertedPct;
+          const weak = baseWeak || r.histWeak;
           return (
-            <button key={r.coin} onClick={() => draft(r)} style={{ appearance: "none", WebkitAppearance: "none", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", width: "100%", textAlign: "left", cursor: "pointer", background: C.surfaceAlt, border: `1px solid ${C.border}`, borderLeft: `2px solid ${conv.color}`, borderRadius: 6, padding: "9px 12px" }}>
+            <button key={r.coin} onClick={() => draft(r)} style={{ appearance: "none", WebkitAppearance: "none", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", width: "100%", textAlign: "left", cursor: "pointer", background: C.surfaceAlt, border: `1px solid ${C.border}`, borderLeft: `2px solid ${weak ? C.warn : conv.color}`, borderRadius: 6, padding: "9px 12px" }}>
               <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: C.text.bright, minWidth: 52 }}>{r.coin}</span>
               {/* The verdict word (Grok): FADE LONG / FADE SHORT — not "↑ LONG". */}
               <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: dc, minWidth: 70 }}>{r.direction === "LONG" ? "FADE LONG" : "FADE SHORT"}</span>
-              {/* Docked on a weak reversion clock — a losing hist reads "HIST 25%", never ◆ HIGH. */}
-              {r.histWeak && r.revertedPct != null
-                ? <span title="Fading this has historically underperformed — can't read HIGH conviction" style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: C.warn, minWidth: 92 }}>HIST {r.revertedPct}%</span>
+              {/* A weak hist (backtest OR reversion) reads "HIST X%" amber, never ◆ HIGH. */}
+              {weak && histPct != null
+                ? <span title="Fading this has historically underperformed — can't read HIGH conviction" style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: C.warn, minWidth: 92 }}>HIST {histPct}%</span>
                 : <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: conv.color, minWidth: 92 }}>◆ {conv.word}</span>}
               <span style={{ display: "flex", gap: 4, flexWrap: "wrap", flex: 1 }}>
                 {r.reads.map((rd) => (

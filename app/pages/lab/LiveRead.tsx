@@ -269,7 +269,9 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
   if (callers) reads.push({ label: "graded callers", val: `${callers.side} · ${callers.participants}`, side: callers.side, ok: callers.side === direction, vote: true });
   if (baseRate) reads.push({ label: "base rate", val: `${baseRate.hitRate}% · ${baseRate.expectancyR >= 0 ? "+" : ""}${baseRate.expectancyR}R`, side: boardLean, ok: baseRate.expectancyR > 0 && boardLean === direction, vote: false });
   if (flush) { const fs = flush.side === "DOWN" ? "SHORT" : "LONG"; reads.push({ label: "liq flush", val: `${flush.ratio}× ${flush.side === "DOWN" ? "↓longs" : "↑shorts"}`, side: fs, ok: fs === direction, vote: true }); }
-  if (basis) reads.push({ label: "spot-perp basis", val: `${basis.basisPct > 0 ? "+" : ""}${basis.basisPct}% ${basis.basisPct > 0 ? "prem" : "disc"}`, side: basis.side, ok: basis.side === direction, vote: true });
+  // Basis only VOTES when the premium/discount is actually a setup — a 7 bp discount shouldn't
+  // mint a third "independent read" and bounce N every refresh (Grok). Below ~0.3% it's caption only.
+  if (basis) reads.push({ label: "spot-perp basis", val: `${basis.basisPct > 0 ? "+" : ""}${basis.basisPct}% ${basis.basisPct > 0 ? "prem" : "disc"}`, side: basis.side, ok: basis.side === direction, vote: Math.abs(basis.basisPct) >= 0.3 });
   // funding × basis divergence: derived from funding + basis (NOT independent — no vote).
   if (fused?.crowdFade && fused.fundingAnnualPct != null && rawBasis != null && Math.abs(fused.fundingAnnualPct) >= 10) {
     const crowdLong = fused.fundingAnnualPct > 0;
