@@ -387,10 +387,10 @@ function buildReadOgSvg(p, { fontFamily = "'Courier New', Courier, monospace" } 
   const smSide = p.smartMoney && (p.smartMoney.side === "LONG" || p.smartMoney.side === "SHORT") ? p.smartMoney.side : null;
   const smWith = isFade && smSide && fadeDir ? (smSide === fadeDir) : null;
   const lensCell = (x, label, val, tag, tagCol) => `
-    <rect x="${x}" y="392" width="510" height="96" rx="8" fill="#111114" stroke="${BORD}"/>
-    <text x="${x + 22}" y="426" fill="${FAINT}" font-size="14" letter-spacing="2">${esc(label)}</text>
-    <text x="${x + 22}" y="462" fill="${BONE}" font-size="24" font-weight="bold">${esc(val)}</text>
-    ${tag ? `<text x="${x + 488}" y="426" fill="${tagCol}" font-size="14" font-weight="bold" text-anchor="end">${esc(tag)}</text>` : ""}`;
+    <rect x="${x}" y="404" width="510" height="96" rx="8" fill="#111114" stroke="${BORD}"/>
+    <text x="${x + 22}" y="438" fill="${FAINT}" font-size="14" letter-spacing="2">${esc(label)}</text>
+    <text x="${x + 22}" y="474" fill="${BONE}" font-size="24" font-weight="bold">${esc(val)}</text>
+    ${tag ? `<text x="${x + 488}" y="438" fill="${tagCol}" font-size="14" font-weight="bold" text-anchor="end">${esc(tag)}</text>` : ""}`;
   return `<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
   <defs><style>text { font-family: ${fontFamily}; }</style></defs>
   <rect width="1200" height="630" fill="${BG}"/>
@@ -402,10 +402,10 @@ function buildReadOgSvg(p, { fontFamily = "'Courier New', Courier, monospace" } 
   <rect x="60" y="188" width="${16 + verdictLabel.length * 20}" height="46" rx="8" fill="${isFade ? "#ededf018" : "#71717a14"}" stroke="${accent}" stroke-opacity="0.5"/>
   <text x="80" y="219" fill="${accent}" font-size="26" font-weight="bold" letter-spacing="1">${esc(verdictLabel)}</text>
   <text x="${96 + verdictLabel.length * 20}" y="219" fill="${MUT}" font-size="20">${esc(stanceLabel)}</text>
-  <text x="60" y="300" fill="${MUT}" font-size="16" letter-spacing="4">FUNDING EDGE</text>
-  <text x="60" y="352" fill="${BONE}" font-size="46" font-weight="bold">${esc(fundingTxt)}</text>
-  <text x="${60 + fundingTxt.length * 27 + 24}" y="352" fill="${FOG}" font-size="18">${esc(stretchSub)}</text>
-  ${lensCell(60, "CROWD (FUNDING)", `paying to be ${crowdSide || "balanced"}`, fadeDir ? `FADE ${fadeDir}` : "", accent)}
+  <text x="60" y="290" fill="${MUT}" font-size="16" letter-spacing="4">FUNDING EDGE</text>
+  <text x="60" y="340" fill="${BONE}" font-size="44" font-weight="bold">${esc(fundingTxt)}</text>
+  <text x="60" y="376" fill="${FOG}" font-size="17">${esc(stretchSub)}</text>
+  ${lensCell(60, "CROWD (FUNDING)", `paying to be ${crowdSide || "balanced"}`, isFade && fadeDir ? `FADE ${fadeDir}` : "", accent)}
   ${lensCell(630, "SMART $", smSide ? `${p.smartMoney.count} sharp${p.smartMoney.count === 1 ? "" : "s"} ${smSide}` : "no read", smWith == null ? "" : (smWith ? "WITH THE FADE" : "AGAINST"), smWith ? POS : NEG)}
   <line x1="60" y1="560" x2="1140" y2="560" stroke="${BORD}" stroke-width="1"/>
   <text x="60" y="590" fill="${FAINT}" font-size="15">A positioning read from public funding — graded on Nexus. A stretched market can stay stretched. Not advice.</text>
