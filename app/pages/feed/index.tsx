@@ -85,6 +85,9 @@ type FeedThesis = {
   onChainTxHash?: string;
   copyCount?: number;
   agent?: boolean; // autonomous-agent call (surfaced from agent:feed:* by lab-api)
+  // The base rate this call was taken against, frozen at publish (rides the wholesale
+  // thesis spread from /feed) — the version other people see; weak-hist honesty made public.
+  baseRateAtEntry?: { hitRate: number; expectancyR: number; samples: number };
   // Append-only lifecycle timeline (app/lib/lifecycle.mjs). Rides the feed payload
   // via the wholesale thesis spread. Narrative only — never affects the grade.
   updates?: { at: number; kind: string; price?: number; sizePct?: number; note?: string }[];
@@ -623,6 +626,19 @@ function FeedCard({
           </div>
         ))}
       </div>
+
+      {/* Base rate at entry (Grok) — the frozen odds this call was taken against, made
+          PUBLIC: the version other people see, weak hist and all. */}
+      {thesis.baseRateAtEntry && (() => {
+        const br = thesis.baseRateAtEntry!;
+        const weak = br.hitRate < 40 || br.expectancyR < 0;
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 10, fontFamily: "var(--nx-font-mono)", fontSize: 9.5, lineHeight: 1.5 }}>
+            <span style={{ fontSize: 8, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase" }}>Base rate at entry</span>
+            <span style={{ color: weak ? "#e0a458" : "#71717a" }}>taken vs <b style={{ color: weak ? "#e0a458" : "#a1a1aa" }}>{br.hitRate}% hit · {br.expectancyR >= 0 ? "+" : ""}{br.expectancyR}R</b> · n={br.samples}{weak ? " — a weak hist, taken anyway" : ""}</span>
+          </div>
+        );
+      })()}
 
       {/* Live P&L — active theses with mark price */}
       {thesis.status === "ACTIVE" && markPrice != null && (() => {
