@@ -867,6 +867,31 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
   const walletAddress = (accountState as { address?: string })?.address ?? null;
   const { theses: trades, saveTheses } = useLabStorage(walletAddress);
   const { registerOnChain, closeOnChain } = useThesisRegistry();
+
+  // One-time backfill (Grok Shot 1): calls published just before baseRateAtEntry existed show
+  // no frozen line on the card / public feed. For the author's OWN RECENT (≤7d) ACTIVE calls
+  // missing it, stamp the current base rate once — over its 60d window the base rate barely
+  // drifts, so a recent call's current value ≈ its at-entry value. Older / resolved calls stay
+  // honestly-as-published (absent), never faked. Saving propagates to KV → the public feed.
+  const backfilledRef = useRef(false);
+  useEffect(() => {
+    if (backfilledRef.current || !walletAddress) return;
+    const WEEK = 7 * 86400 * 1000;
+    const need = trades.filter((t) => !t.baseRateAtEntry && t.status === "ACTIVE" && t.gradedOutcome !== "WIN" && t.gradedOutcome !== "LOSS" && t.symbol && (Date.now() - (t.createdAt || 0)) < WEEK);
+    if (!need.length) return;
+    backfilledRef.current = true;
+    (async () => {
+      const patch: Record<string, { hitRate: number; expectancyR: number; samples: number }> = {};
+      for (const t of need) {
+        try {
+          const coin = t.symbol.replace("PERP_", "").replace("_USDC", "").toUpperCase();
+          const d = await (await fetch(`${AGENT_API}/intel/baserate/${coin}`)).json();
+          if (d && d.available && Number.isFinite(d.hitRate) && Number.isFinite(d.expectancyR)) patch[t.id] = { hitRate: d.hitRate, expectancyR: d.expectancyR, samples: d.samples };
+        } catch { /* skip this one */ }
+      }
+      if (Object.keys(patch).length) saveTheses(trades.map((t) => (patch[t.id] ? { ...t, baseRateAtEntry: patch[t.id] } : t)));
+    })();
+  }, [trades, walletAddress, saveTheses]);
   const { availableBalance } = useCollateral();
 
   // Live prices for all active theses
@@ -1560,7 +1585,7 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
                       <span style={{ fontSize: 8, color: "#52525b", fontFamily: "var(--nx-font-mono)" }}>STOP</span>
                       {/* The real-ATR stop leads (1.2× live H4 ATR); the flat %s are overrides. */}
                       {atrStopPct != null && (
-                        <button onClick={() => { setQuickStopPct(atrStopPct); rebuildLevels(atrStopPct, quickTpR); }} title={`Snap the stop to 1.2× the live H4 ATR — real volatility (${atrPct}% ATR), not a flat %`} style={knob(Math.abs(quickStopPct - atrStopPct) < 0.05, "#f7525f")}>ATR {atrStopPct}%</button>
+                        <button onClick={() => { setQuickStopPct(atrStopPct); rebuildLevels(atrStopPct, quickTpR); }} title={`Snap the stop to 1.2× the live H4 ATR — H4 ATR is ${atrPct}%, so the stop is ${atrStopPct}% (1.2×). Real volatility, not a flat %`} style={knob(Math.abs(quickStopPct - atrStopPct) < 0.05, "#f7525f")}>1.2×ATR {atrStopPct}%</button>
                       )}
                       {[1, 2, 3].map((p) => (
                         <button key={p} onClick={() => { setQuickStopPct(p); rebuildLevels(p, quickTpR); }} style={knob(Math.abs(quickStopPct - p) < 0.01, "#f7525f")}>−{p}%</button>
