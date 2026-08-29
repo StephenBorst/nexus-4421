@@ -12,6 +12,7 @@
 // Pure + tested. Fed entirely by the self-logged series (oi/cvd/sm/stance:hist) — which is
 // why it only becomes meaningful as that history matures (~Sept 14).
 import { classifyCvdDivergence } from "./flow.mjs";
+import { h4Atr14Frac } from "../../app/lib/atr.mjs";
 
 export function hourBucket(t) { return Math.round(Number(t) / 3600000); }
 
@@ -268,6 +269,20 @@ export function atrPctAt(cbh, hour, period) {
   return cnt && last > 0 ? trSum / cnt / last : null;
 }
 
+// H4 ATR-14 fraction ending at `hour`, off candle:hist — the SAME object the Lab's live stop
+// uses (app/lib/atr.mjs), so gradeEventR places its synthetic stop/TP at exactly the distance
+// BUILD IT would have shown that hour. candle:hist stores t in ms → normalize to seconds for
+// the shared fn. Needs ~60h (15 H4 bars) of candles before `hour`; null until then (same
+// INSUFFICIENT-by-design posture as the rest of the candle path).
+export function atrPctH4At(cbh, hour, lookbackH = 80) {
+  const hourly = [];
+  for (let h = hour - lookbackH; h <= hour; h++) {
+    const c = cbh.get(h);
+    if (c) hourly.push({ t: Number(c.t) / 1000, h: c.h, l: c.l, c: c.c });
+  }
+  return h4Atr14Frac(hourly);
+}
+
 // ── Roadmap #2: FUTURES-VOLUME ROTATION as a regime input to the BTC veto ──────
 // Is capital rotating INTO this coin vs BTC? Compare recent-half vs prior-half mean
 // hourly volume over `lookback` hours ending at `hour` (no lookahead). The alt's volume
@@ -347,11 +362,14 @@ function agg(arr) {
 // ⚠️ FROZEN CONTRACT (Grok) — do NOT vary these or the D0/D1 ablation dies: stop = 1.2× ATR
 // (never tighter), tp = 1.5R, time-stop = 168h (7d), same-bar TP+SL = loss, time-stop / no
 // touch = 0 (flat — credit NO unrealized drift). Outcomes are exactly +tp_R, −1, or 0.
-export const R_CONTRACT = Object.freeze({ atrMult: 1.2, rMultiple: 1.5, atrPeriod: 24, maxHoldH: 168 });
+// The ruler is H4 ATR-14 (the ONE shared ATR); the multiples are frozen. Changing the ruler,
+// not the multiples: 1.2× ATR stop, 1.5R target, 7d hold — the SAME contract BUILD IT applies.
+// No atrPeriod knob — H4 ATR-14 has a fixed period (that's the point: one number, no wrappers).
+export const R_CONTRACT = Object.freeze({ atrMult: 1.2, rMultiple: 1.5, maxHoldH: 168 });
 export function gradeEventR(cbh, eventHour, side, entry, opts = R_CONTRACT) {
-  const { atrMult, rMultiple, atrPeriod, maxHoldH } = { ...R_CONTRACT, ...opts };
+  const { atrMult, rMultiple, maxHoldH } = { ...R_CONTRACT, ...opts };
   if (!cbh || !cbh.size || !(entry > 0)) return null;
-  const atrFrac = atrPctAt(cbh, eventHour, atrPeriod);
+  const atrFrac = atrPctH4At(cbh, eventHour);
   if (atrFrac == null || !(atrFrac > 0)) return null;
   const risk = entry * atrFrac * atrMult;
   if (!(risk > 0)) return null;

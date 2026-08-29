@@ -16,6 +16,7 @@ import { deployToAgent, thesisToAgentConfig, thesisAgentNotice, deployDirectiveF
 import { formatPnl, chartImageSrc, chartImageList, effectiveStatus, resolveSuggestion, CHART_HOST_HINT, MAX_CHARTS } from "./helpers";
 import { LOSS_REASONS, lossReason } from "@/lib/postmortem.mjs";
 import { parseThesis } from "@/lib/thesisParse.mjs";
+import { h4Atr14Frac } from "@/lib/atr.mjs";
 import { AGENT_API } from "./agentTypes";
 import { ThesisTimeline } from "./ThesisTimeline";
 import { ThesisAdvisor } from "./ThesisAdvisor";
@@ -31,33 +32,19 @@ const nf = (v: unknown, d: number) => (Number.isFinite(Number(v)) ? Number(v) : 
 const priceDp = (v: unknown) => { const n = Math.abs(Number(v) || 0); return n >= 1000 ? 2 : n >= 1 ? 2 : n >= 0.01 ? 4 : 6; };
 
 // Real H4 (4-hour) ATR as a % of price (Grok item 3): Orderly's tv/history serves hourly
-// (resolution=60) but NOT H4, so aggregate hourly candles into 4h buckets and take a 14-period
-// ATR. This is the LIVE volatility a fade's stop should breathe with (default 1.2× ATR) instead
-// of a flat 2% proxy. Independent of our candle:hist maturity (that's the backtest harness's
-// path). Fail-soft → null (the caller keeps the flat-% default).
+// (resolution=60) but NOT H4, so we fetch hourly and hand them to the ONE shared H4 ATR-14
+// function — the SAME object the research harness grades with (app/lib/atr.mjs), so the live
+// stop and the graded R can't drift. Fail-soft → null (the caller keeps the flat-% default).
 async function h4AtrPct(coin: string): Promise<number | null> {
   try {
     const sym = `PERP_${coin.toUpperCase()}_USDC`;
     const now = Math.floor(Date.now() / 1000);
     const r = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${sym}&resolution=60&from=${now - 20 * 86400}&to=${now}`);
     const d = await r.json();
-    if (!d || d.s !== "ok" || !Array.isArray(d.t) || d.t.length < 60) return null;
-    const buckets = new Map<number, { h: number; l: number; c: number }>();
-    for (let i = 0; i < d.t.length; i++) {
-      const b = Math.floor(Number(d.t[i]) / (4 * 3600)) * (4 * 3600);
-      const h = +d.h[i], l = +d.l[i], c = +d.c[i];
-      const cur = buckets.get(b);
-      if (!cur) buckets.set(b, { h, l, c });
-      else { cur.h = Math.max(cur.h, h); cur.l = Math.min(cur.l, l); cur.c = c; }
-    }
-    const H4 = [...buckets.keys()].sort((a, b) => a - b).map((k) => buckets.get(k)!);
-    if (H4.length < 15) return null;
-    const seg = H4.slice(-15);
-    let trSum = 0;
-    for (let i = 1; i < seg.length; i++) trSum += Math.max(seg[i].h - seg[i].l, Math.abs(seg[i].h - seg[i - 1].c), Math.abs(seg[i].l - seg[i - 1].c));
-    const atr = trSum / 14, px = H4[H4.length - 1].c;
-    if (!(px > 0) || !Number.isFinite(atr)) return null;
-    return Math.round((atr / px) * 1000) / 10; // % of price, 1dp
+    if (!d || d.s !== "ok" || !Array.isArray(d.t)) return null;
+    const hourly = d.t.map((t: number, i: number) => ({ t: Number(t), h: +d.h[i], l: +d.l[i], c: +d.c[i] })); // tv/history t already in seconds
+    const frac = h4Atr14Frac(hourly);
+    return frac == null ? null : Math.round(frac * 1000) / 10; // % of price, 1dp
   } catch { return null; }
 }
 

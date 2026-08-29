@@ -2,7 +2,8 @@
 // Run: node --test workers/nexus-lab-api/axisbt.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { hourBucket, priceByHour, forwardReturn, callPnl, fundingFadeEvents, cvdDivergenceEvents, scoreEvents, runScorecard, ema, rsi, rsiResetEvents, slopeUp, relStrength, rsiResetTrendEvents, candlesByHour, vwapAt, atrPctAt, volGrowth, volumeRotatesInto, rsValuePullbackCandleEvents, rsValuePullbackEvents, rsQuartiles, gradeEventR } from "./axisbt.mjs";
+import { hourBucket, priceByHour, forwardReturn, callPnl, fundingFadeEvents, cvdDivergenceEvents, scoreEvents, runScorecard, ema, rsi, rsiResetEvents, slopeUp, relStrength, rsiResetTrendEvents, candlesByHour, vwapAt, atrPctAt, atrPctH4At, volGrowth, volumeRotatesInto, rsValuePullbackCandleEvents, rsValuePullbackEvents, rsQuartiles, gradeEventR } from "./axisbt.mjs";
+import { h4Atr14Frac } from "../../app/lib/atr.mjs";
 
 const HR = 3600 * 1000;
 const BASE = 1_000_000_000_000;
@@ -201,24 +202,48 @@ test("runScorecard: candle + rotation axes registered; runs on a candle series",
 // ── Grok #2: thesis-in-R grading at the harness (the ONE grader object) ────────
 test("gradeEventR: first-touch TP → +R, SL → −1, timeout → mark-to-market, no candles → null", () => {
   const H0 = hourBucket(BASE);
-  // 30 flat bars: ATR = (102−98)/100 = 0.04 → risk = 100·0.04·1.2 = 4.8; 1.5R target = 107.2, stop = 95.2
+  // 90 flat bars → H4 ATR-14 = (102−98)/100 = 0.04 → risk = 100·0.04·1.2 = 4.8; 1.5R target = 107.2,
+  // stop = 95.2. Event at H0+70 so ≥15 H4 bars (~60h) of warmup precede it (H4 ATR needs the depth).
   const flat = (over = {}) => {
-    const a = Array.from({ length: 30 }, (_, i) => ({ t: BASE + i * HR, o: 100, h: 102, l: 98, c: 100, v: 1 }));
+    const a = Array.from({ length: 90 }, (_, i) => ({ t: BASE + i * HR, o: 100, h: 102, l: 98, c: 100, v: 1 }));
     for (const [k, v] of Object.entries(over)) a[Number(k)] = { ...a[Number(k)], ...v };
     return candlesByHour(a);
   };
-  assert.equal(gradeEventR(flat({ 26: { h: 108, l: 100, c: 107 } }), H0 + 25, "LONG", 100), 1.5); // TP hit
-  assert.equal(gradeEventR(flat({ 26: { h: 101, l: 94, c: 95 } }), H0 + 25, "LONG", 100), -1);    // SL hit
-  assert.ok(Math.abs(gradeEventR(flat(), H0 + 25, "LONG", 100)) < 1e-9);                          // never touches → ~0R
-  assert.equal(gradeEventR(candlesByHour([]), H0 + 25, "LONG", 100), null);                       // no candles → null
+  assert.equal(gradeEventR(flat({ 71: { h: 108, l: 100, c: 107 } }), H0 + 70, "LONG", 100), 1.5); // TP hit
+  assert.equal(gradeEventR(flat({ 71: { h: 101, l: 94, c: 95 } }), H0 + 70, "LONG", 100), -1);    // SL hit
+  assert.ok(Math.abs(gradeEventR(flat(), H0 + 70, "LONG", 100)) < 1e-9);                          // never touches → ~0R
+  assert.equal(gradeEventR(candlesByHour([]), H0 + 70, "LONG", 100), null);                       // no candles → null
+});
+
+// ── The ONE ATR (Grok): the Lab's live stop and the harness's grade must be the same number ──
+test("H4 ATR: client h4Atr14Frac and harness atrPctH4At agree on the same hourly series", () => {
+  // ~70 hourly bars with real ranges → ≥15 H4 bars. t stored in ms (candle:hist convention).
+  const candles = Array.from({ length: 70 }, (_, i) => { const c = 100 + Math.sin(i / 3) * 5; return { t: BASE + i * HR, o: c, h: c * 1.01, l: c * 0.99, c, v: 1 }; });
+  // Client path: h4AtrPct feeds tv/history hours (t already in SECONDS) to the shared fn.
+  const clientFrac = h4Atr14Frac(candles.map((c) => ({ t: c.t / 1000, h: c.h, l: c.l, c: c.c })));
+  // Harness path: atrPctH4At reads candle:hist (ms) and normalizes to the SAME shared fn.
+  const harnessFrac = atrPctH4At(candlesByHour(candles), hourBucket(candles[candles.length - 1].t));
+  assert.ok(clientFrac != null && harnessFrac != null);
+  assert.ok(Math.abs(clientFrac - harnessFrac) < 1e-12); // literally one number
+});
+
+test("H4 ATR: 1.2× the shared % from a mark = the Lab stop = the harness stop, within a tick", () => {
+  const candles = Array.from({ length: 70 }, (_, i) => { const c = 2400 + Math.sin(i / 4) * 40; return { t: BASE + i * HR, o: c, h: c * 1.008, l: c * 0.992, c, v: 1 }; });
+  const frac = h4Atr14Frac(candles.map((c) => ({ t: c.t / 1000, h: c.h, l: c.l, c: c.c })));
+  assert.ok(frac != null && frac > 0);
+  const mark = 2438;
+  const labStopPct = Math.round(1.2 * frac * 1000) / 10;   // the Lab rounds the 1.2× stop to 0.1%
+  const labStop = mark * (1 - labStopPct / 100);           // LONG stop below entry
+  const harnessStop = mark - mark * frac * 1.2;            // gradeEventR: entry − entry·frac·1.2
+  assert.ok(Math.abs(labStop - harnessStop) < mark * 0.001); // within ~0.1% of price (a tick)
 });
 
 test("scoreEvents: grades in R off candles — headline flips to R once enough samples", () => {
-  const N = 90;
+  const N = 200;
   const closes = Array.from({ length: N }, (_, i) => 100 + i);
   const oiHist = closes.map((price, i) => ({ t: BASE + i * HR, price, oi: 1000, funding: 0 }));
   const candleHist = closes.map((c, i) => ({ t: BASE + i * HR, o: c, h: c * 1.02, l: c * 0.98, c, v: 1 }));
-  const gen = (cs) => cs.oiHist.slice(25, 60).map((p) => ({ t: p.t, side: "LONG" })); // 35 events past the ATR warmup
+  const gen = (cs) => cs.oiHist.slice(70, 150).map((p) => ({ t: p.t, side: "LONG" })); // 80 events past the ~60h H4 warmup, with forward room
   const res = scoreEvents([{ coin: "SOL", oiHist, candleHist }], gen, { horizons: [4], minSamples: 20 });
   assert.equal(res.r.available, true);
   assert.ok(res.r.samples >= 20);
@@ -239,16 +264,16 @@ test("scoreEvents: no candles → R unavailable, headline stays bps (unchanged l
 // ── Grok's frozen contract: timeout = 0, headline stats, book split, rs_quartile ──
 test("gradeEventR: time-stop / no touch → exactly 0 (flat, no unrealized drift)", () => {
   const H0 = hourBucket(BASE);
-  const flat = candlesByHour(Array.from({ length: 30 }, (_, i) => ({ t: BASE + i * HR, o: 100, h: 102, l: 98, c: 100, v: 1 })));
-  assert.strictEqual(gradeEventR(flat, H0 + 25, "LONG", 100), 0); // never touches TP(107.2)/SL(95.2) → 0, not mark-to-market
+  const flat = candlesByHour(Array.from({ length: 90 }, (_, i) => ({ t: BASE + i * HR, o: 100, h: 102, l: 98, c: 100, v: 1 })));
+  assert.strictEqual(gradeEventR(flat, H0 + 70, "LONG", 100), 0); // never touches TP(107.2)/SL(95.2) → 0, not mark-to-market
 });
 
 test("scoreEvents: R headline carries avg_R|win and max_dd_R (Grok's scorecard row)", () => {
-  const N = 90;
+  const N = 200;
   const closes = Array.from({ length: N }, (_, i) => 100 + i);
   const oiHist = closes.map((price, i) => ({ t: BASE + i * HR, price, oi: 1000, funding: 0 }));
   const candleHist = closes.map((c, i) => ({ t: BASE + i * HR, o: c, h: c * 1.02, l: c * 0.98, c, v: 1 }));
-  const gen = (cs) => cs.oiHist.slice(25, 60).map((p) => ({ t: p.t, side: "LONG" }));
+  const gen = (cs) => cs.oiHist.slice(70, 150).map((p) => ({ t: p.t, side: "LONG" })); // past the ~60h H4 warmup
   const res = scoreEvents([{ coin: "SOL", oiHist, candleHist }], gen, { horizons: [4], minSamples: 20 });
   assert.ok(Number.isFinite(res.r.avgRWin) && res.r.avgRWin > 0); // rising tape → wins average ~+1.5R
   assert.ok(Number.isFinite(res.r.maxDdR) && res.r.maxDdR >= 0);
