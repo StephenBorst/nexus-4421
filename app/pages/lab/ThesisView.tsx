@@ -970,22 +970,24 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
   const isWalletReady = !!(accountState && (accountState as { status?: number }).status !== undefined && (accountState as { status?: number }).status !== 0);
 
   // ── Default-to-WATCH (Grok) ───────────────────────────────────────────────
-  // When a setup's OWN historical base rate is weak (hit <40% OR expectancy <0),
-  // don't pre-arm a direction. The suggested side stays VISIBLE but un-checked; the
-  // trader must pick it deliberately before we'll build or publish — "direction is
-  // visible, not pre-checked." A good OR absent base rate arms normally, so this only
-  // bites setups the tape says are coin-flips-or-worse. The base rate is the SAME
-  // /intel/baserate read THE READ already shows, lifted up via LiveRead's onBaseRate.
+  // When a setup's OWN historical base rate is weak (fading it reverted ≤42% of recent
+  // stretched-funding instances — a TRAP), don't pre-arm a direction. The suggested side
+  // stays VISIBLE but un-checked; the trader must pick it deliberately before we'll build
+  // or publish — "direction is visible, not pre-checked." A good OR absent base rate arms
+  // normally. The signal is the SAME reversion/last-N-fades clock the GAPS ticket vetoes
+  // on, lifted up via LiveRead's onWeakEdge — ONE veto series, so the two can never fork.
   const [dirArmed, setDirArmed] = useState(true);
-  const [weakBaseRate, setWeakBaseRate] = useState<{ hitRate: number; expectancyR: number } | null>(null);
+  const [weakSetup, setWeakSetup] = useState<{ histPct: number | null } | null>(null);
   const userChoseDir = useRef(false);
-  const handleBaseRate = useCallback((br: { hitRate: number; expectancyR: number } | null) => {
-    const weak = !!br && (br.hitRate < 40 || br.expectancyR < 0);
-    setWeakBaseRate(weak && br ? { hitRate: br.hitRate, expectancyR: br.expectancyR } : null);
-    if (!userChoseDir.current) setDirArmed(!weak);
+  // ONE veto clock (Grok): LiveRead feeds the SAME reversion/last-N-fades signal the GAPS
+  // ticket vetoes on — so a coin can never read WATCH on the ticket and armed here (or the
+  // reverse). No /intel/baserate here, no averaging of two series.
+  const handleWeakEdge = useCallback((w: { weak: boolean; histPct: number | null }) => {
+    setWeakSetup(w.weak ? { histPct: w.histPct } : null);
+    if (!userChoseDir.current) setDirArmed(!w.weak);
   }, []);
   // New market → forget the prior pick and re-arm until this coin's base rate is read.
-  useEffect(() => { userChoseDir.current = false; setDirArmed(true); setWeakBaseRate(null); }, [form.symbol]);
+  useEffect(() => { userChoseDir.current = false; setDirArmed(true); setWeakSetup(null); }, [form.symbol]);
 
   const calc = useMemo(() => calcThesis(form), [form]);
   // A thesis is only valid to save if it produces a real, finite, positive size
@@ -1435,9 +1437,9 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
                 )}
                 {/* WATCH gate (Grok): a weak base rate un-arms the direction so the trader
                     overrides a bad setup on purpose, not by our pre-check. Direction stays visible. */}
-                {!dirArmed && weakBaseRate && (
+                {!dirArmed && weakSetup && (
                   <div className="nx-fade-in" style={{ marginTop: 8, padding: "8px 10px", borderRadius: 4, border: "1px solid #e0a45855", background: "#1c1710", fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#e0a458", lineHeight: 1.55 }}>
-                    ⚠ WATCH — this setup&apos;s base rate is weak ({weakBaseRate.hitRate}% hit · {weakBaseRate.expectancyR >= 0 ? "+" : ""}{weakBaseRate.expectancyR}R over 60d). The {form.direction.toLowerCase()} side is shown, not pre-selected — tap it to commit.
+                    ⚠ WATCH — fading {form.symbol.toUpperCase()} has historically underperformed{weakSetup.histPct != null ? ` (reverted only ${weakSetup.histPct}% of recent stretched-funding instances)` : ""}. The {form.direction.toLowerCase()} side is shown, not pre-selected — tap it to commit.
                   </div>
                 )}
 
@@ -1447,7 +1449,7 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
                 {form.symbol && symbolListed && (
                   <div style={{ marginTop: 12 }}>
                     <LiveRead symbol={form.symbol} direction={form.direction} trades={realizedTrades}
-                      levels={built ? { entryPrice: entryN, stopLoss: stopN, takeProfit1: tpN } : undefined} wallet={wallet} onBaseRate={handleBaseRate} />
+                      levels={built ? { entryPrice: entryN, stopLoss: stopN, takeProfit1: tpN } : undefined} wallet={wallet} onWeakEdge={handleWeakEdge} />
                   </div>
                 )}
 
