@@ -2065,6 +2065,24 @@ export function catalystHouseCall(impact, opts = {}) {
   };
 }
 
+// ── FUNDING-TICKET verdict — server twin of MispricedBoard's honest edge test ─
+// Grok: a FADE requires funding to be STRETCHED vs its OWN p25–p75 range (pierces the
+// band), not merely high in absolute terms. ≥8 points needed; null = can't confirm → WATCH.
+// Kept in lockstep with the client fundingStretched (MispricedBoard.tsx) so the share card
+// can never drift from the ticket the user is looking at.
+export function fundingStretched(fundingValues) {
+  const fs = (fundingValues || []).filter((f) => Number.isFinite(f));
+  if (fs.length < 8) return null;
+  const srt = [...fs].sort((a, b) => a - b);
+  const q = (p) => srt[Math.min(srt.length - 1, Math.max(0, Math.round(p * (srt.length - 1))))];
+  const lf = fs[fs.length - 1];
+  return lf > q(0.75) || lf < q(0.25);
+}
+export function readVerdict(direction, stretched) {
+  if (direction !== "LONG" && direction !== "SHORT") return "NONE";
+  return stretched === true ? "FADE" : "WATCH";
+}
+
 // ── THE BOARD share card — the top confluence reads, server-side ──────────────
 // Mirrors DecisionBoard's mechanical PLAY + 4-lens agreement so the shareable OG card
 // shows the SAME read as the live Board (no drift on the thresholds). Pure; the OG route

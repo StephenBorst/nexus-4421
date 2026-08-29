@@ -15,7 +15,7 @@ import {
   classifyMacro, macroEvents,
   houseCallFromSignal, wargameScenario,
   catalystToThesis, attachCatalystTheses, catalystHouseCall,
-  boardCardRows, boardCardPlay,
+  boardCardRows, boardCardPlay, fundingStretched, readVerdict,
 } from "./logic.mjs";
 
 // Helper: candle series starting at t0 (sec), each 1h apart.
@@ -2037,4 +2037,16 @@ test("boardCardRows: agreement counts confirming lenses, ranks confluence first"
   assert.equal(eth.play.dir, "SHORT"); // crowded funding → fade short
   assert.equal(eth.agree, 1);          // catalyst SHORT confirms; smart LONG does not
   assert.equal(rows[0].coin, "SOL");   // confluence + agreement ranks first
+});
+
+// ── Funding-ticket verdict (Grok's honest edge test) ──────────────────────────
+test("fundingStretched + readVerdict: pierce=FADE, in-band=WATCH, thin=WATCH", () => {
+  const band = [1, 1, 1, 2, 2, 2, 3, 3, 3]; // p25≈1, p75≈3
+  assert.equal(fundingStretched([...band, 2]), false); // last inside the band
+  assert.equal(fundingStretched([...band, 5]), true);  // last pierces high
+  assert.equal(fundingStretched([1, 2, 3]), null);     // too thin to judge
+  assert.equal(readVerdict("SHORT", true), "FADE");
+  assert.equal(readVerdict("SHORT", false), "WATCH");
+  assert.equal(readVerdict("SHORT", null), "WATCH");   // can't confirm → WATCH, never FADE
+  assert.equal(readVerdict("NONE", true), "NONE");
 });

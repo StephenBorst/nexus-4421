@@ -23,7 +23,7 @@ import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { gradeCall, rankCaller, verifyErc20Payment, simCreditsFor, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, deriveSetupMomentum, computeBeta, catalystBoard, attachCatalystTheses, catalystHouseCall, CATALYST_MARKETS, boardCardRows, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
+import { gradeCall, rankCaller, verifyErc20Payment, simCreditsFor, nexusMinUnits, resolveHostedModel, resolveAiUpstream, buildChallenge, verifyV2, AUTH_V2_ACTIONS, AGENT_BOARD, aggregateAgentTrades, agentStanding, parseWebhookAlert, normalizeSymbol, percentileRank, oiStats, orderlyAccountId, safeChartUrl, symbolToQuery, diffCopyLeaders, mispricedBoard, fundingReversion, edgeQuality, EDGE_QUALITY_RANK, mergeFundingPrice, forecastDivergence, macroEvents, houseCallFromSignal, wargameScenario, deriveSetupMomentum, computeBeta, catalystBoard, attachCatalystTheses, catalystHouseCall, CATALYST_MARKETS, boardCardRows, fundingStretched, readVerdict, creatorEarnings, CREATOR_FEE } from "./logic.mjs";
 
 // ── Autocopy copiers reverse-index ───────────────────────────────────────────
 // Keep copy:copiers:{leader} = [followers] in sync when a follower's config
@@ -360,6 +360,55 @@ function buildBoardOgSvg(rows, asOf, { fontFamily = "'Courier New', Courier, mon
   <line x1="60" y1="584" x2="1140" y2="584" stroke="${BORD}" stroke-width="1"/>
   <text x="60" y="610" fill="${FAINT}" font-size="14">Public facts. The play is mechanical, graded from the tape after — not advice.</text>
   <text x="1140" y="610" fill="${FAINT}" font-size="14" text-anchor="end">${esc(asOf || "")}</text>
+</svg>`;
+}
+
+// ── FUNDING-TICKET share card — one coin's frozen verdict, as a branded image ──
+// Grok's rules: shows the READ ONLY (verdict · funding %/yr · in-band vs stretched · crowd
+// stance · lens states), NEVER E[R]/stops/edge (Draft doesn't write a real thesis yet). A
+// WATCH card must LOOK like WATCH (muted), not a soft fade. Green stays profit-only, so the
+// FADE accent is BONE, not green. Server-computed from the same p25–p75 pierce test as the
+// ticket → the card can't drift from what the user sees.
+function buildReadOgSvg(p, { fontFamily = "'Courier New', Courier, monospace" } = {}) {
+  const BONE = "#ededf0", MUT = "#71717a", FAINT = "#52525b", FOG = "#a1a1aa", BG = "#0a0a0b", BORD = "#232327", POS = "#3ecf8e", NEG = "#f7525f";
+  const isFade = p.verdict === "FADE", isWatch = p.verdict === "WATCH";
+  const accent = isFade ? BONE : MUT;                 // FADE = bone, WATCH = muted (looks like WATCH)
+  const fadeDir = p.direction === "SHORT" ? "SHORT" : p.direction === "LONG" ? "LONG" : null;
+  const crowdSide = p.direction === "SHORT" ? "long" : p.direction === "LONG" ? "short" : null;
+  const verdictLabel = p.verdict === "NONE" ? "BALANCED" : isFade ? `◆ FADE ${fadeDir}` : "◆ WATCHING";
+  const stanceLabel = p.direction === "SHORT" ? "Crowd over-long" : p.direction === "LONG" ? "Crowd over-short" : "Balanced";
+  const fundingTxt = `${p.fundingAnnualPct >= 0 ? "+" : ""}${p.fundingAnnualPct}%/yr`;
+  const stretchSub = isFade
+    ? `Funding has pierced its own typical range — the crowd is stretched ${crowdSide}.`
+    : p.verdict === "NONE"
+    ? "Funding is close to balanced — no clear crowd to fade."
+    : `Funding is elevated but within its own typical range — no crowd extreme to fade yet.`;
+  // two lens cells (Crowd + Smart$) — both from the cheap board row; empty looks empty.
+  const smSide = p.smartMoney && (p.smartMoney.side === "LONG" || p.smartMoney.side === "SHORT") ? p.smartMoney.side : null;
+  const smWith = isFade && smSide && fadeDir ? (smSide === fadeDir) : null;
+  const lensCell = (x, label, val, tag, tagCol) => `
+    <rect x="${x}" y="392" width="510" height="96" rx="8" fill="#111114" stroke="${BORD}"/>
+    <text x="${x + 22}" y="426" fill="${FAINT}" font-size="14" letter-spacing="2">${esc(label)}</text>
+    <text x="${x + 22}" y="462" fill="${BONE}" font-size="24" font-weight="bold">${esc(val)}</text>
+    ${tag ? `<text x="${x + 488}" y="426" fill="${tagCol}" font-size="14" font-weight="bold" text-anchor="end">${esc(tag)}</text>` : ""}`;
+  return `<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+  <defs><style>text { font-family: ${fontFamily}; }</style></defs>
+  <rect width="1200" height="630" fill="${BG}"/>
+  <rect width="1200" height="4" fill="${accent}" opacity="${isFade ? "0.6" : "0.3"}"/>
+  <text x="60" y="54" fill="${FAINT}" font-size="15" letter-spacing="4">NEXUS TRADING LABS · FUNDING EDGE</text>
+  <text x="1140" y="54" fill="${FAINT}" font-size="15" text-anchor="end">trade.nexustradinglabs.com/lab</text>
+  <text x="60" y="150" fill="${BONE}" font-size="64" font-weight="bold">${esc(p.coin)}</text>
+  <text x="${60 + String(p.coin).length * 42 + 20}" y="150" fill="${FOG}" font-size="30">$${esc(p.markPrice)}</text>
+  <rect x="60" y="188" width="${16 + verdictLabel.length * 20}" height="46" rx="8" fill="${isFade ? "#ededf018" : "#71717a14"}" stroke="${accent}" stroke-opacity="0.5"/>
+  <text x="80" y="219" fill="${accent}" font-size="26" font-weight="bold" letter-spacing="1">${esc(verdictLabel)}</text>
+  <text x="${96 + verdictLabel.length * 20}" y="219" fill="${MUT}" font-size="20">${esc(stanceLabel)}</text>
+  <text x="60" y="300" fill="${MUT}" font-size="16" letter-spacing="4">FUNDING EDGE</text>
+  <text x="60" y="352" fill="${BONE}" font-size="46" font-weight="bold">${esc(fundingTxt)}</text>
+  <text x="${60 + fundingTxt.length * 27 + 24}" y="352" fill="${FOG}" font-size="18">${esc(stretchSub)}</text>
+  ${lensCell(60, "CROWD (FUNDING)", `paying to be ${crowdSide || "balanced"}`, fadeDir ? `FADE ${fadeDir}` : "", accent)}
+  ${lensCell(630, "SMART $", smSide ? `${p.smartMoney.count} sharp${p.smartMoney.count === 1 ? "" : "s"} ${smSide}` : "no read", smWith == null ? "" : (smWith ? "WITH THE FADE" : "AGAINST"), smWith ? POS : NEG)}
+  <line x1="60" y1="560" x2="1140" y2="560" stroke="${BORD}" stroke-width="1"/>
+  <text x="60" y="590" fill="${FAINT}" font-size="15">A positioning read from public funding — graded on Nexus. A stretched market can stay stretched. Not advice.</text>
 </svg>`;
 }
 
@@ -1073,6 +1122,84 @@ export default {
         } catch (e) { console.error("[og board png]", String(e)); }
       }
       return new Response(buildBoardOgSvg(rows, asOf), { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=300, stale-while-revalidate=60", "Access-Control-Allow-Origin": "*" } });
+    }
+
+    // ── /og/read/:coin(.png)? → shareable card of ONE coin's frozen funding verdict ─
+    // Computed the SAME way the ticket is (mispriced board row + the p25–p75 pierce test on
+    // oi:hist funding) so the card can't drift from what the user sees. READ ONLY — no E[R]/
+    // stops/edge (Grok). Cached 5 min, fail-soft.
+    if (parts[0] === "og" && parts[1] === "read" && parts[2]) {
+      if (request.method !== "GET") return new Response("method not allowed", { status: 405 });
+      const isPng = parts[2].endsWith(".png");
+      const coin = String(isPng ? parts[2].slice(0, -4) : parts[2]).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+      const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+      // 1) the coin's board row — cache first, else one futures fetch → mispricedBoard.
+      let row = null;
+      try {
+        let markets = null;
+        const cached = await env.LAB_STORE.get("intel:mispriced:v1");
+        if (cached) { const c = JSON.parse(cached); if (Array.isArray(c?.markets)) markets = c.markets; }
+        if (!markets) {
+          const res = await fetch("https://api-evm.orderly.org/v1/public/futures", { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125 Safari/537.36", "Accept": "application/json" } });
+          markets = mispricedBoard((await res.json())?.data?.rows || []).markets;
+        }
+        row = (markets || []).find((m) => String(m.coin).toUpperCase() === coin) || null;
+      } catch { /* row stays null → NONE card */ }
+      // 2) the pierce test on recorded funding (oi:hist) → the frozen verdict.
+      let stretched = null;
+      try {
+        const raw = await AGENT_KV.get(`oi:hist:PERP_${coin}_USDC`);
+        const hist = raw ? JSON.parse(raw) : [];
+        stretched = fundingStretched((hist || []).map((h) => Number(h.funding)));
+      } catch { /* stretched null → WATCH */ }
+      const direction = row?.direction === "LONG" || row?.direction === "SHORT" ? row.direction : "NONE";
+      const verdict = readVerdict(direction, stretched);
+      const mp = Number(row?.markPrice) || 0;
+      const payload = {
+        coin,
+        markPrice: mp >= 1000 ? mp.toLocaleString("en-US", { maximumFractionDigits: 0 }) : mp >= 1 ? mp.toFixed(2) : mp ? mp.toPrecision(4) : "—",
+        verdict, direction,
+        fundingAnnualPct: Number(row?.fundingAnnualPct) || 0,
+        stretched,
+        smartMoney: row?.smartMoney || null,
+      };
+      if (isPng) {
+        try {
+          await ensureResvg();
+          const font = await getMonoFont();
+          const png = new Resvg(buildReadOgSvg(payload, { fontFamily: "'JetBrains Mono'" }), { font: { loadSystemFonts: false, fontBuffers: [font], defaultFontFamily: "JetBrains Mono" } }).render().asPng();
+          return new Response(png, { headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=300, stale-while-revalidate=60", "Access-Control-Allow-Origin": "*" } });
+        } catch (e) { console.error("[og read png]", String(e)); }
+      }
+      return new Response(buildReadOgSvg(payload), { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=300, stale-while-revalidate=60", "Access-Control-Allow-Origin": "*" } });
+    }
+
+    // ── GET /share/read/:coin — crawler-friendly OG proxy for a funding-ticket card ─
+    if (parts[0] === "share" && parts[1] === "read" && parts[2]) {
+      const coin = String(parts[2]).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+      const appUrl = "https://trade.nexustradinglabs.com/lab?tab=intel";
+      const img = `https://og.nexustradinglabs.com/og/read/${encodeURIComponent(coin)}.png`;
+      const shareUrl = `https://og.nexustradinglabs.com/share/read/${encodeURIComponent(coin)}`;
+      const title = `${coin} funding read — the crowd's positioning, graded from public price`;
+      const desc = `Is ${coin} funding stretched enough to fade, or just elevated? The verdict + the lenses, live on Nexus. A positioning read, not advice.`;
+      const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)}</title>
+<meta property="og:title" content="${esc(title)}">
+<meta property="og:description" content="${esc(desc)}">
+<meta property="og:image" content="${img}">
+<meta property="og:url" content="${shareUrl}">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${esc(title)}">
+<meta name="twitter:description" content="${esc(desc)}">
+<meta name="twitter:image" content="${img}">
+<meta http-equiv="refresh" content="0; url=${appUrl}">
+<script>location.replace(${JSON.stringify(appUrl)})</script>
+</head><body style="background:#0a0a0b;color:#a1a1aa;font-family:monospace;padding:40px">
+Loading the ${esc(coin)} read… <a style="color:#ededf0" href="${appUrl}">open the Lab →</a>
+</body></html>`;
+      return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=120", "Access-Control-Allow-Origin": "*" } });
     }
 
     // ── Ph17: /wallets/onchain → on-chain trader discovery ─

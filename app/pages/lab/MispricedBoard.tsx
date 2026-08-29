@@ -524,12 +524,23 @@ export function MispricedBoard() {
                 </div>
               )}
 
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.border}`, flexWrap: "wrap" }}>
               <span style={{ fontFamily: MONO, fontSize: 9.5, color: C.text.faint }}>{isFade ? "Live read · funding + smart money" : "Watching · no fade edge right now"}</span>
+              {/* Share the READ as a branded, verifiable card (verdict only — no fake R/stops).
+                  A WATCH card shares as WATCH, a FADE as FADE; unfurls on X, links back. */}
+              <button onClick={() => {
+                const text = isFade
+                  ? `${m.coin} funding is stretched — the fade is ${m.direction} (${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr). A positioning read on Nexus, graded from public price:`
+                  : `${m.coin} funding is elevated (${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr) but within its typical range — no fade yet. The read on Nexus:`;
+                window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(`https://og.nexustradinglabs.com/share/read/${m.coin}`)}`, "_blank", "noopener");
+              }} title="Share this read as a card on X" className="nx-press" style={{
+                marginLeft: "auto", fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.06em", color: C.text.muted,
+                background: "none", border: `1px solid ${C.border}`, borderRadius: RADIUS.sm, padding: "8px 12px", cursor: "pointer",
+              }}>↗ SHARE</button>
               {/* One primary action, and it answers the page's one question: is there a fade NOW?
                   FADE → greenlight Draft. WATCH/NONE → Draft disabled (Simulate stays below). */}
               <button onClick={() => isFade && draftFade(m)} disabled={!isFade} title={isFade ? "Draft this fade into the Thesis Engine" : "No fade edge right now — funding isn't stretched vs its range"} className="nx-card-interactive" style={{
-                marginLeft: "auto", fontFamily: MONO, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em",
+                fontFamily: MONO, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em",
                 color: isFade ? C.accent : C.text.faint, background: "none",
                 border: `1px solid ${isFade ? C.borderStrong : C.border}`, borderRadius: RADIUS.md, padding: "9px 15px",
                 cursor: isFade ? "pointer" : "not-allowed", opacity: isFade ? 1 : 0.55,
