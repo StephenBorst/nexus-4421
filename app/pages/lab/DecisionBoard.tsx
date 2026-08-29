@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { C, MONO, UI, RADIUS } from "@/config/theme";
 import { SectionHeader } from "./components";
 import { useIsMobile } from "./useIsMobile";
-import type { MarketSignal } from "./briefing";
+import { computeTape, type MarketSignal } from "./briefing";
 import type { TabId } from "./types";
 
 const AGENT_API = "https://og.nexustradinglabs.com";
@@ -167,6 +167,7 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
   const isMobile = useIsMobile();
   const [signals, setSignals] = useState<MarketSignal[] | null>(null);
   const [tape, setTape] = useState<Record<string, { price: number; change: number }>>({});
+  const [tapeRead, setTapeRead] = useState<{ score: number; label: string } | null>(null); // RISK-OFF/ON breadth — context for the fade tag
   const [consensus, setConsensus] = useState<Consensus | null>(null);
   const [smart, setSmart] = useState<Record<string, Dir>>({});       // smart-money lean per coin
   const [catalyst, setCatalyst] = useState<Record<string, Dir>>({}); // catalyst lean per coin
@@ -230,13 +231,18 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
       fetch(`${AGENT_API}/intel/forecasts`).then((r) => r.json()).then((j) => { if (alive) setForecast(forecastLeans(j?.markets ?? [])); }).catch(() => { /* forecast lens dim */ });
       fetch(FUTURES).then((r) => r.json()).then((j) => {
         if (!alive) return;
+        const rows = j?.data?.rows ?? [];
         const map: Record<string, { price: number; change: number }> = {};
-        for (const m of j?.data?.rows ?? []) {
+        for (const m of rows) {
           const price = Number(m.mark_price ?? m.index_price ?? 0);
           const open = Number(m["24h_open"] ?? 0);
           map[tk(m.symbol)] = { price, change: open ? ((price - open) / open) * 100 : 0 };
         }
         setTape(map);
+        // Breadth read (same engine as the Briefing) — so a FADE that IS the tape's mean-
+        // reversion book can be tagged RISK-OFF · FADE here, where ACTIONABLE lives (Grok).
+        setTapeRead(computeTape(rows.map((m: { symbol: string; "24h_open"?: string | number; mark_price?: string | number; index_price?: string | number; last_funding_rate?: string | number }) =>
+          ({ symbol: m.symbol, "24h_open": m["24h_open"], "24h_close": m.mark_price ?? m.index_price, last_funding_rate: m.last_funding_rate }))));
       }).catch(() => { /* price column just shows — */ });
     };
     load();
@@ -401,6 +407,13 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
               // moat in one glance: not one indicator, but where separate verifiable reads converge.
               const confluent = r.play.strong && !!r.play.dir && r.agree >= 3;
               const pc = C.accent; // FADE highlight = bone accent (matches the ticket; green stays profit-only)
+              // Is THIS fade the mean-reversion book the tape favors? (long into RISK-OFF /
+              // short into RISK-ON) — a context tag, never a vote, so the risk-off gate reads
+              // as "keep the stretched fade," not "kill longs." Only on real FADE plays.
+              const tapeFadeTag = r.play.klass === "FADE" && r.play.dir && tapeRead
+                ? (tapeRead.label === "RISK-OFF" && r.play.dir === "LONG" ? "RISK-OFF"
+                  : tapeRead.label === "RISK-ON" && r.play.dir === "SHORT" ? "RISK-ON" : null)
+                : null;
               return (
                 <div key={r.sym} style={{ display: "grid", gridTemplateColumns: cols, gap: gridGap, padding: rowPad, borderBottom: `1px solid ${C.surfaceAlt}`, alignItems: "center", borderLeft: confluent ? `3px solid ${pc}` : "3px solid transparent", background: confluent ? `${pc}0c` : undefined }}>
                   {/* Market + YOUR loop state: ● live call (plan) · ◆ in position (execute) */}
@@ -454,6 +467,9 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
                     {r.play.klass === "FADE"
                       ? <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
                           <span style={{ color: C.text.bright, fontSize: 11.5, fontWeight: 700, letterSpacing: "0.03em" }}>{r.play.label}</span>
+                          {tapeFadeTag && (
+                            <span title={`Broad tape is ${tapeFadeTag} — this stretched fade is the mean-reversion book that tape favors (context, not a vote)`} style={{ fontSize: 8, color: C.accent, border: `1px solid ${C.accent}55`, borderRadius: 3, padding: "0 4px", lineHeight: 1.6, letterSpacing: "0.04em" }}>{tapeFadeTag} · FADE</span>
+                          )}
                           {r.lens.smart && r.play.dir && r.lens.smart !== r.play.dir && (
                             <span title="Smart money is positioned WITH the crowd, against the fade — not a clean fade" style={{ fontSize: 9, color: C.warn, fontWeight: 600 }}>· SMART {r.lens.smart}</span>
                           )}
