@@ -27,6 +27,11 @@ export interface ThesisTrade {
   // free-text; they ride along in KV and surface on cards / Proof of Edge.
   catalyst?: string;      // the near-term "why now"
   targetWindow?: string;  // defined exit horizon — e.g. "7D", "48h", "by FOMC"
+  // The historical base rate of this funding-fade setup AT THE MOMENT the call was made,
+  // frozen so ticket honesty survives publish (Grok): "taken vs 25% hit · −0.88R · n=8". A
+  // truthful, un-drifting record of the odds the trader faced — from /intel/baserate. If the
+  // hist was weak, the card SAYS so, even for a call the trader chose to take anyway.
+  baseRateAtEntry?: { hitRate: number; expectancyR: number; samples: number };
   createdAt: number;
   positionSize: number;
   leverage: number;

@@ -230,6 +230,19 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
         </div>
       </div>
 
+      {/* Base rate at entry (Grok) — the frozen odds this call was taken against, so ticket
+          honesty survives publish. A weak hist you took anyway SAYS so on the card, amber. */}
+      {t.baseRateAtEntry && (() => {
+        const br = t.baseRateAtEntry!;
+        const weak = br.hitRate < 40 || br.expectancyR < 0;
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 10, fontFamily: "var(--nx-font-mono)", fontSize: 9.5, lineHeight: 1.5 }}>
+            <span style={{ fontSize: 8, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase" }}>Base rate at entry</span>
+            <span style={{ color: weak ? "#e0a458" : "#71717a" }}>taken vs <b style={{ color: weak ? "#e0a458" : "#a1a1aa" }}>{br.hitRate}% hit · {br.expectancyR >= 0 ? "+" : ""}{br.expectancyR}R</b> · n={br.samples}{weak ? " — a weak hist, taken anyway" : ""}</span>
+          </div>
+        );
+      })()}
+
       {/* Outcome — the objective grade LEADS; win/loss is never self-reported. Graded
           → an authoritative banner (the tape decided). Un-resolved → a calm "it grades
           itself" line. INVALIDATE (abandon early) is the one call the grader genuinely
@@ -986,8 +999,14 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
     setWeakSetup(w.weak ? { histPct: w.histPct } : null);
     if (!userChoseDir.current) setDirArmed(!w.weak);
   }, []);
+  // The /intel/baserate object for the current symbol, held live so publish can FREEZE it
+  // onto the call (Grok item 2): the card records the odds it was taken against, even a weak
+  // one you chose to take anyway — ticket honesty that survives publish. A ref (not state):
+  // it only needs to be read at save time, never to trigger a render.
+  const baseRateRef = useRef<{ hitRate: number; expectancyR: number; samples: number } | null>(null);
+  const handleBaseRate = useCallback((br: { hitRate: number; expectancyR: number; samples: number } | null) => { baseRateRef.current = br; }, []);
   // New market → forget the prior pick and re-arm until this coin's base rate is read.
-  useEffect(() => { userChoseDir.current = false; setDirArmed(true); setWeakSetup(null); }, [form.symbol]);
+  useEffect(() => { userChoseDir.current = false; setDirArmed(true); setWeakSetup(null); baseRateRef.current = null; }, [form.symbol]);
 
   const calc = useMemo(() => calcThesis(form), [form]);
   // A thesis is only valid to save if it produces a real, finite, positive size
@@ -1128,6 +1147,8 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
     notes: form.notes,
     catalyst: form.catalyst.trim() || undefined,
     targetWindow: form.targetWindow.trim() || undefined,
+    // Freeze the base rate the call was taken against (Grok item 2) — honesty that survives publish.
+    baseRateAtEntry: baseRateRef.current ?? undefined,
     chartUrls: (() => { const v = form.chartUrls.map((u) => u.trim()).filter(Boolean); return v.length ? v : undefined; })(),
     createdAt: Date.now(),
     positionSize: calc!.positionSize,
@@ -1449,7 +1470,7 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
                 {form.symbol && symbolListed && (
                   <div style={{ marginTop: 12 }}>
                     <LiveRead symbol={form.symbol} direction={form.direction} trades={realizedTrades}
-                      levels={built ? { entryPrice: entryN, stopLoss: stopN, takeProfit1: tpN } : undefined} wallet={wallet} onWeakEdge={handleWeakEdge} />
+                      levels={built ? { entryPrice: entryN, stopLoss: stopN, takeProfit1: tpN } : undefined} wallet={wallet} onWeakEdge={handleWeakEdge} onBaseRate={handleBaseRate} />
                   </div>
                 )}
 

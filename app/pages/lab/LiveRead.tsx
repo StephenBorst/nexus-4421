@@ -86,7 +86,7 @@ function magnetPull(m: Magnets | null, direction: "LONG" | "SHORT"): { side: "LO
 const TREND_WORD: Record<string, string> = { TREND_UP: "uptrend", TREND_DOWN: "downtrend", CHOP: "chop" };
 const VOL_WORD: Record<string, string> = { CALM: "calm", NORMAL: "normal vol", VOLATILE: "volatile" };
 
-export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge }: { symbol: string; direction: "LONG" | "SHORT"; trades?: ProcessedTrade[]; levels?: Levels; wallet?: string | null; onWeakEdge?: (w: { weak: boolean; histPct: number | null }) => void }) {
+export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge, onBaseRate }: { symbol: string; direction: "LONG" | "SHORT"; trades?: ProcessedTrade[]; levels?: Levels; wallet?: string | null; onWeakEdge?: (w: { weak: boolean; histPct: number | null }) => void; onBaseRate?: (br: { hitRate: number; expectancyR: number; samples: number } | null) => void }) {
   const coin = bare(symbol);
   const [fused, setFused] = useState<Fused | null | undefined>(undefined); // undefined=loading, null=no read
   const [callers, setCallers] = useState<{ side: "LONG" | "SHORT"; participants: number } | null>(null);
@@ -293,6 +293,9 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
   // Feed the SAME veto up to the Thesis gate so the ticket, THE READ, and the thesis form
   // all read one clock — no averaging, no fork.
   useEffect(() => { onWeakEdge?.({ weak: weakBase, histPct: revPct }); }, [weakBase, revPct, onWeakEdge]);
+  // Also surface the /intel/baserate object (hit% · expectancyR · n) so a published call can
+  // FREEZE the odds it was taken against — a record, distinct from the reversion veto above.
+  useEffect(() => { onBaseRate?.(baseRate ? { hitRate: baseRate.hitRate, expectancyR: baseRate.expectancyR, samples: baseRate.samples } : null); }, [baseRate, onBaseRate]);
 
   // ── PROVEN-EDGE PATTERN — not "more reads agree," but the SPECIFIC orthogonal stack the
   // backtests + live grading actually validated: the funding-fade CONDITIONED on smart-money
