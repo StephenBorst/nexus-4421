@@ -1,6 +1,6 @@
 // Thesis Engine tab: the thesis calculator, thesis cards, and the thesis
 // analytics (accuracy/streaks/equity). Extracted from index.tsx (god-file split).
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
 import { useAccount, useMutation, useCollateral } from "@orderly.network/hooks";
@@ -949,6 +949,10 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
           setQuickStopPct(Math.round((Math.abs(s - e) / e * 100) * 10) / 10);
           setQuickTpR(Math.round((Math.abs(tp - e) / Math.abs(s - e)) * 10) / 10);
         }
+        // A drafted direction is a SUGGESTION, not the trader's pick — let the WATCH
+        // gate re-evaluate it against the base rate (the [form.symbol] effect re-arms;
+        // this covers a re-draft of the same symbol, where that effect wouldn't fire).
+        userChoseDir.current = false;
         window.localStorage.removeItem(THESIS_DRAFT_KEY);
       } catch { /* ignore malformed draft */ }
     };
@@ -965,10 +969,30 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
   const [liveError, setLiveError] = useState<string | null>(null);
   const isWalletReady = !!(accountState && (accountState as { status?: number }).status !== undefined && (accountState as { status?: number }).status !== 0);
 
+  // ── Default-to-WATCH (Grok) ───────────────────────────────────────────────
+  // When a setup's OWN historical base rate is weak (hit <40% OR expectancy <0),
+  // don't pre-arm a direction. The suggested side stays VISIBLE but un-checked; the
+  // trader must pick it deliberately before we'll build or publish — "direction is
+  // visible, not pre-checked." A good OR absent base rate arms normally, so this only
+  // bites setups the tape says are coin-flips-or-worse. The base rate is the SAME
+  // /intel/baserate read THE READ already shows, lifted up via LiveRead's onBaseRate.
+  const [dirArmed, setDirArmed] = useState(true);
+  const [weakBaseRate, setWeakBaseRate] = useState<{ hitRate: number; expectancyR: number } | null>(null);
+  const userChoseDir = useRef(false);
+  const handleBaseRate = useCallback((br: { hitRate: number; expectancyR: number } | null) => {
+    const weak = !!br && (br.hitRate < 40 || br.expectancyR < 0);
+    setWeakBaseRate(weak && br ? { hitRate: br.hitRate, expectancyR: br.expectancyR } : null);
+    if (!userChoseDir.current) setDirArmed(!weak);
+  }, []);
+  // New market → forget the prior pick and re-arm until this coin's base rate is read.
+  useEffect(() => { userChoseDir.current = false; setDirArmed(true); setWeakBaseRate(null); }, [form.symbol]);
+
   const calc = useMemo(() => calcThesis(form), [form]);
   // A thesis is only valid to save if it produces a real, finite, positive size
-  // (catches missing fields, entry===stop, 0 risk → $0 / Infinity positions).
-  const formValid = !!form.symbol && !!calc
+  // (catches missing fields, entry===stop, 0 risk → $0 / Infinity positions) AND a
+  // direction has been committed (the WATCH gate: a weak base rate must be overridden
+  // on purpose, never by a pre-checked default).
+  const formValid = !!form.symbol && dirArmed && !!calc
     && Number.isFinite(calc.positionSize) && calc.positionSize > 0
     && Number.isFinite(calc.riskReward) && calc.riskReward > 0;
   // string | string[] — chartUrls is a list; every other field is a plain string.
@@ -1389,21 +1413,32 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
                       list="nexus-thesis-symbols" autoCapitalize="characters" autoComplete="off" onChange={(e) => set("symbol", e.target.value)} />
                   </div>
                   <div>
-                    <span style={fieldLabelStyle}>DIRECTION</span>
+                    <span style={fieldLabelStyle}>DIRECTION{!dirArmed && <span style={{ color: "#e0a458" }}> · WATCH</span>}</span>
                     <div style={{ display: "flex", gap: 4 }}>
-                      {(["LONG", "SHORT"] as const).map((d) => (
-                        <button key={d} onClick={() => { set("direction", d); if (canBuild) quickSetup(quickStopPct, quickTpR, d); }} style={{
+                      {(["LONG", "SHORT"] as const).map((d) => {
+                        const on = form.direction === d && dirArmed;          // committed side
+                        const suggested = form.direction === d && !dirArmed;  // shown, not pre-checked
+                        return (
+                        <button key={d} onClick={() => { userChoseDir.current = true; setDirArmed(true); set("direction", d); if (canBuild) quickSetup(quickStopPct, quickTpR, d); }} style={{
                           flex: 1, padding: "8px 0", fontFamily: "var(--nx-font-mono)", fontSize: 11, cursor: "pointer", borderRadius: 3, border: "1px solid",
-                          background: form.direction === d ? (d === "LONG" ? "#1a1a1e" : "#241012") : "#0f0f11",
-                          borderColor: form.direction === d ? (d === "LONG" ? "#3ecf8e" : "#f7525f") : "#232327",
-                          color: form.direction === d ? (d === "LONG" ? "#3ecf8e" : "#f7525f") : "#52525b",
+                          background: on ? (d === "LONG" ? "#1a1a1e" : "#241012") : "#0f0f11",
+                          borderColor: on ? (d === "LONG" ? "#3ecf8e" : "#f7525f") : suggested ? "#e0a45866" : "#232327",
+                          color: on ? (d === "LONG" ? "#3ecf8e" : "#f7525f") : suggested ? "#e0a458" : "#52525b",
                         }}>{d === "LONG" ? "↑ LONG" : "↓ SHORT"}</button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
                 {!symbolListed && form.symbol && (
                   <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 9.5, color: "#fbbf24", marginTop: 6 }}>⚠ Not a listed market — pick from the list so Nexus can grade it.</div>
+                )}
+                {/* WATCH gate (Grok): a weak base rate un-arms the direction so the trader
+                    overrides a bad setup on purpose, not by our pre-check. Direction stays visible. */}
+                {!dirArmed && weakBaseRate && (
+                  <div className="nx-fade-in" style={{ marginTop: 8, padding: "8px 10px", borderRadius: 4, border: "1px solid #e0a45855", background: "#1c1710", fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#e0a458", lineHeight: 1.55 }}>
+                    ⚠ WATCH — this setup&apos;s base rate is weak ({weakBaseRate.hitRate}% hit · {weakBaseRate.expectancyR >= 0 ? "+" : ""}{weakBaseRate.expectancyR}R over 60d). The {form.direction.toLowerCase()} side is shown, not pre-selected — tap it to commit.
+                  </div>
                 )}
 
                 {/* THE READ — the pre-trade fusion: positioning + funding + callers + your
@@ -1412,7 +1447,7 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
                 {form.symbol && symbolListed && (
                   <div style={{ marginTop: 12 }}>
                     <LiveRead symbol={form.symbol} direction={form.direction} trades={realizedTrades}
-                      levels={built ? { entryPrice: entryN, stopLoss: stopN, takeProfit1: tpN } : undefined} wallet={wallet} />
+                      levels={built ? { entryPrice: entryN, stopLoss: stopN, takeProfit1: tpN } : undefined} wallet={wallet} onBaseRate={handleBaseRate} />
                   </div>
                 )}
 
@@ -1429,10 +1464,10 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
                 )}
 
                 {!built ? (
-                  <button onClick={() => quickSetup(quickStopPct, quickTpR)} disabled={!canBuild || quickBusy}
-                    style={{ marginTop: 12, width: "100%", padding: "11px 0", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", cursor: canBuild && !quickBusy ? "pointer" : "not-allowed", borderRadius: 4,
-                      border: `1px solid ${canBuild ? "#33333a" : "#232327"}`, background: canBuild ? "#1a1a1e" : "#0a0a0b", color: canBuild ? "#ededf0" : "#52525b" }}>
-                    {quickBusy ? "BUILDING…" : "⚡ BUILD IT — auto-fill from live price"}
+                  <button onClick={() => quickSetup(quickStopPct, quickTpR)} disabled={!canBuild || quickBusy || !dirArmed}
+                    style={{ marginTop: 12, width: "100%", padding: "11px 0", fontFamily: "var(--nx-font-mono)", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", cursor: canBuild && dirArmed && !quickBusy ? "pointer" : "not-allowed", borderRadius: 4,
+                      border: `1px solid ${canBuild && dirArmed ? "#33333a" : "#232327"}`, background: canBuild && dirArmed ? "#1a1a1e" : "#0a0a0b", color: canBuild && dirArmed ? "#ededf0" : "#52525b" }}>
+                    {quickBusy ? "BUILDING…" : !dirArmed ? "⚠ PICK A SIDE TO BUILD" : "⚡ BUILD IT — auto-fill from live price"}
                   </button>
                 ) : (
                   <>

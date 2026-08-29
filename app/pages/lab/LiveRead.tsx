@@ -86,7 +86,7 @@ function magnetPull(m: Magnets | null, direction: "LONG" | "SHORT"): { side: "LO
 const TREND_WORD: Record<string, string> = { TREND_UP: "uptrend", TREND_DOWN: "downtrend", CHOP: "chop" };
 const VOL_WORD: Record<string, string> = { CALM: "calm", NORMAL: "normal vol", VOLATILE: "volatile" };
 
-export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol: string; direction: "LONG" | "SHORT"; trades?: ProcessedTrade[]; levels?: Levels; wallet?: string | null }) {
+export function LiveRead({ symbol, direction, trades, levels, wallet, onBaseRate }: { symbol: string; direction: "LONG" | "SHORT"; trades?: ProcessedTrade[]; levels?: Levels; wallet?: string | null; onBaseRate?: (br: BaseRate | null) => void }) {
   const coin = bare(symbol);
   const [fused, setFused] = useState<Fused | null | undefined>(undefined); // undefined=loading, null=no read
   const [callers, setCallers] = useState<{ side: "LONG" | "SHORT"; participants: number } | null>(null);
@@ -162,13 +162,13 @@ export function LiveRead({ symbol, direction, trades, levels, wallet }: { symbol
   // this actually resolved" number, computed server-side by the REAL backtest engine over
   // 60d of public funding+price (first-touch TP vs SL). Cached; fail-soft.
   useEffect(() => {
-    if (!coin) { setBaseRate(null); return; }
+    if (!coin) { setBaseRate(null); onBaseRate?.(null); return; }
     let off = false;
     fetch(`${AGENT_API}/intel/baserate/${coin}`).then((r) => r.json())
-      .then((d) => { if (!off) setBaseRate(d && d.available ? d : null); })
-      .catch(() => { if (!off) setBaseRate(null); });
+      .then((d) => { if (off) return; const br = d && d.available ? (d as BaseRate) : null; setBaseRate(br); onBaseRate?.(br); })
+      .catch(() => { if (!off) { setBaseRate(null); onBaseRate?.(null); } });
     return () => { off = true; };
-  }, [coin]);
+  }, [coin, onBaseRate]);
 
   // SETUP MOMENTUM (persistence / decay) — the one time-derivative: is the funding-fade
   // still building (early) or unwinding (late)? Server computes it from the recorded oi:hist.
