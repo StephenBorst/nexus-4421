@@ -40,6 +40,13 @@ export interface BriefingInput {
 }
 
 // Compute the market TAPE from the public futures rows — same formula as MarketTape
+// The economic floor for a FADE badge (Grok): a row must be stretched vs its OWN range AND
+// the crowd must be paying a meaningful annualized cost to hold. Below this, a "stretch" on a
+// tiny band (e.g. −0.66%/yr) is not a crowded position worth fading — every quiet name would
+// wear FADE NOW. Stretched-but-trivial → WATCH; economically large (e.g. −27%/yr) → FADE.
+// ONE shared value so the ticket and The Board can't drift on where "a real fade" begins.
+export const FADE_FUNDING_FLOOR_PCT_YR = 10;
+
 // (breadth 50% / BTC trend 40% / funding crowding 10%). Kept pure here so the
 // Briefing can read the tape without mounting the strip. Returns null on no data.
 export function computeTape(rows: { symbol: string; "24h_open"?: string | number; "24h_close"?: string | number; last_funding_rate?: string | number }[] | null) {

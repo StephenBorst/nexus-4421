@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { C, MONO, UI, RADIUS } from "@/config/theme";
 import { SectionHeader } from "./components";
 import { useIsMobile } from "./useIsMobile";
-import { computeTape, type MarketSignal } from "./briefing";
+import { computeTape, FADE_FUNDING_FLOOR_PCT_YR, type MarketSignal } from "./briefing";
 import type { TabId } from "./types";
 
 const AGENT_API = "https://og.nexustradinglabs.com";
@@ -89,7 +89,12 @@ const fmtPrice = (n: number) => (n >= 1000 ? n.toLocaleString("en-US", { maximum
 // read only if the server verdict is absent (older /signals payloads).
 function derivePlay(s: MarketSignal): Row["play"] {
   const dir: Dir | null = s.fade_dir === "SHORT" || s.fade_dir === "LONG" ? s.fade_dir : null;
-  if (s.verdict === "FADE" && dir) return { klass: "FADE", dir, label: `FADE ${dir}`, strong: true };
+  // Magnitude floor (Grok): a stretch on a trivial band isn't a crowded fade — it needs an
+  // economically large annualized cost too. A stretched-but-small server FADE reads WATCH here.
+  const annual = Math.abs(Number(s.funding_annual_pct ?? s.funding_rate_8h * 1095 * 100));
+  const bigEnough = annual >= FADE_FUNDING_FLOOR_PCT_YR;
+  if (s.verdict === "FADE" && dir && bigEnough) return { klass: "FADE", dir, label: `FADE ${dir}`, strong: true };
+  if (s.verdict === "FADE" && dir) return { klass: "WATCH", dir, label: "WATCH", strong: false };  // stretched but not economically large
   if (s.verdict === "WATCH") return { klass: "WATCH", dir, label: "WATCH", strong: false };
   if (s.verdict === "NONE") return { klass: null, dir: null, label: "—", strong: false };
   // legacy fallback (no server verdict): crowded funding = a fade, else no read.

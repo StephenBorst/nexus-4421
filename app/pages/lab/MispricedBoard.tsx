@@ -21,6 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAccount } from "@orderly.network/hooks";
 import { C, MONO, UI, RADIUS } from "@/config/theme";
 import { AGENT_API } from "./agentTypes";
+import { FADE_FUNDING_FLOOR_PCT_YR } from "./briefing";
 import { useIsMobile } from "./useIsMobile";
 import { SectionHeader } from "./components";
 import { Simulate } from "./Simulate";
@@ -56,9 +57,13 @@ const stanceLabel = (dir: string) => dir === "SHORT" ? "Crowd over-long" : dir =
 // reads the numbers above it. Both are true, neither is dumbed down. verdict === "WATCH"
 // tells the truth Grok flagged: funding can be HIGH in absolute terms yet not STRETCHED
 // vs its own range — that's a watch, not a fade.
-const plainRead = (m: Market, verdict?: "FADE" | "WATCH" | "NONE", weakEdge?: boolean) => {
+const plainRead = (m: Market, verdict?: "FADE" | "WATCH" | "NONE", weakEdge?: boolean, tooSmall?: boolean) => {
   const pct = Math.abs(m.fundingAnnualPct);
   const crowd = m.direction === "SHORT" ? "long" : "short";
+  // Poked out of its range but the annualized cost is trivial — the crowd is barely paying to
+  // hold, so there's no economically meaningful fade. Checked first: magnitude gates the badge.
+  if (tooSmall && m.direction !== "NONE")
+    return `Funding on ${m.coin} is only ${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr — even poking out of its recent range, the crowd is barely paying to hold ${crowd}, so there's no meaningful fade to take. Watch for a bigger stretch.`;
   // Stretched, but the base rate says fading it has bled — the honest "watch, don't chase"
   // read (checked BEFORE the plain WATCH branch, which would wrongly claim it's un-stretched).
   if (weakEdge && m.direction !== "NONE")
@@ -506,9 +511,13 @@ export function MispricedBoard() {
     // honest path (same rule as the Thesis WATCH gate). A clean FADE needs BOTH a stretch AND
     // a base rate that pays; a stretch alone, historically unproven, is a WATCH you may draft.
     const weakEdge = !!q && (q.tier === "TRAP" || (q.revertedPct != null && q.revertedPct < 40));
-    const verdict: "FADE" | "WATCH" | "NONE" = m.direction === "NONE" ? "NONE" : (stretched === true && !weakEdge) ? "FADE" : "WATCH";
+    // Magnitude floor (Grok): a stretch on a trivial band (−0.66%/yr) is not a crowded fade.
+    // A FADE needs a stretch AND an economically large annualized cost; else it's a WATCH.
+    const bigEnough = Math.abs(m.fundingAnnualPct) >= FADE_FUNDING_FLOOR_PCT_YR;
+    const tooSmall = stretched === true && !bigEnough;   // pierced its range, but trivially small
+    const verdict: "FADE" | "WATCH" | "NONE" = m.direction === "NONE" ? "NONE" : (stretched === true && !weakEdge && bigEnough) ? "FADE" : "WATCH";
     const isFade = verdict === "FADE";
-    const draftAnyway = m.direction !== "NONE" && stretched === true && weakEdge;
+    const draftAnyway = m.direction !== "NONE" && stretched === true && bigEnough && weakEdge;
     const canDraft = isFade || draftAnyway;
     return (
       <div>
@@ -557,7 +566,7 @@ export function MispricedBoard() {
             </div>
 
             <p style={{ fontFamily: UI, fontSize: 13, lineHeight: 1.55, color: C.text.fog, marginTop: 14, padding: "11px 12px", background: "rgba(237,237,240,0.03)", border: `1px solid ${C.border}`, borderRadius: RADIUS.md }}>
-              {plainRead(m, verdict, weakEdge)}
+              {plainRead(m, verdict, weakEdge, tooSmall)}
             </p>
 
             {/* Reversion proof — what happened the last times it looked this stretched. */}
