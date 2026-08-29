@@ -12,6 +12,7 @@ import { deployDirectiveFromThesis } from "@/utils/agentPrefill";
 import { EmptyState, Coachmark } from "./components";
 import { SharePoster, type PosterData } from "./SharePoster";
 import { TraderDetail } from "./TraderDetail";
+import type { XrayTrack } from "@/components/TrackedRecordCard";
 import { THESIS_DRAFT_KEY } from "@/config/assistantTools";
 import { ConvictionScanner } from "./ConvictionScanner";
 
@@ -48,6 +49,58 @@ const ago = (ts: number) => {
   return m < 1 ? "now" : m < 60 ? `${m}m` : m < 1440 ? `${(m / 60).toFixed(0)}h` : `${(m / 1440).toFixed(0)}d`;
 };
 
+// ── Copy confirm (Grok) — copying a wallet inherits its GRADED, WATCHED record (net over
+// days tracked, green-day rate), never its flattering lifetime PnL. A single-leader copy
+// pauses here so the trader sees exactly what track record they're about to ride. Lifetime
+// stays off the button. Fail-soft: an un-graded leader says so honestly (grading starts now).
+function CopyConfirm({ leader, sym, side, onConfirm, onCancel }: {
+  leader: string; sym: string; side: "LONG" | "SHORT"; onConfirm: () => void; onCancel: () => void;
+}) {
+  const [track, setTrack] = useState<XrayTrack | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let off = false;
+    fetch(`${AGENT_API}/smart/xray/history?address=${leader}`).then((r) => r.json())
+      .then((x) => { if (!off) setTrack(x && x.track ? x.track : null); })
+      .catch(() => { /* no record — honest empty state */ })
+      .finally(() => { if (!off) setLoading(false); });
+    return () => { off = true; };
+  }, [leader]);
+  const graded = !!track && !track.building && (track.daysTracked ?? 0) > 0;
+  const net = track?.netRealized ?? 0;
+  const sideCol = side === "LONG" ? "#3ecf8e" : "#f7525f";
+  return (
+    <div onClick={onCancel} style={{ position: "fixed", inset: 0, zIndex: 9100, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(2px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div className="nx-fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "min(420px, 96vw)", background: "#0f0f11", border: "1px solid #33333a", borderRadius: 10, padding: 18 }}>
+        <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase", marginBottom: 8 }}>Copy this move</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 14 }}>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: "#ededf0" }}>{sym}</span>
+          <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 700, color: sideCol }}>{side === "LONG" ? "↑ LONG" : "↓ SHORT"}</span>
+          <span style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a" }}>{short(leader)}</span>
+        </div>
+        {/* The GRADED, WATCHED record — the number that can't be faked, not lifetime PnL. */}
+        <div style={{ border: "1px solid #232327", borderRadius: 8, padding: "10px 12px", marginBottom: 14, background: "#0c0c0e" }}>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase", marginBottom: 6 }}>What you're tracking</div>
+          {loading ? (
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#71717a" }}>reading graded record…</div>
+          ) : graded ? (
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#a1a1aa", lineHeight: 1.6 }}>
+              watched <b style={{ color: net >= 0 ? "#3ecf8e" : "#f7525f", fontSize: 14 }}>{net >= 0 ? "+" : ""}{usd(net)}</b> · {track!.daysTracked}d tracked{track!.winWindowRate != null ? <> · <b style={{ color: "#ededf0" }}>{track!.winWindowRate}%</b> green days</> : null}
+            </div>
+          ) : (
+            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#71717a", lineHeight: 1.55 }}>No graded watched record yet — the agent grades this copy on-chain from here.</div>
+          )}
+        </div>
+        <div style={{ fontFamily: "var(--nx-font-ui)", fontSize: 11, color: "#71717a", lineHeight: 1.5, marginBottom: 14 }}>The agent enters your direction and manages the exit (PAPER-first, graded on-chain). You set the levels next. Not financial advice.</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onCancel} style={{ flex: 1, fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#a1a1aa", background: "none", border: "1px solid #232327", borderRadius: 4, padding: "9px 0", cursor: "pointer" }}>Cancel</button>
+          <button onClick={onConfirm} style={{ flex: 2, fontFamily: "var(--nx-font-mono)", fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", color: "#0a0a0b", background: "#ededf0", border: "none", borderRadius: 4, padding: "9px 0", cursor: "pointer" }}>⚡ COPY {side} {sym} →</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: string; position_qty?: number | string }[] }) {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -57,6 +110,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
   const [error, setError] = useState<string | null>(null);
   const [poster, setPoster] = useState<PosterData | null>(null);
   const [detail, setDetail] = useState<{ source: "orderly" | "hl"; address: string; accountId?: string } | null>(null);
+  const [pendingCopy, setPendingCopy] = useState<{ sym: string; side: "LONG" | "SHORT"; refPrice: number; lev: number | null; leader: string } | null>(null);
   const [watch, setWatch] = useState<string[]>(loadWatch);
   const [watchOnly, setWatchOnly] = useState(false);
   // Progressive disclosure — lead with the signal (consensus + a short feed/board),
@@ -254,7 +308,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
   // ⚡ Copy a move → directive draft (agent manages exit + grades on-chain). `sym`
   // is the Orderly-copyable coin (already gated tradeable). Default stop 3% /
   // target 6% off the observed price; user reviews + edits in the arm panel.
-  const copy = (sym: string, side: "LONG" | "SHORT", refPrice: number, lev?: number | null, leader?: string) => {
+  const doCopy = (sym: string, side: "LONG" | "SHORT", refPrice: number, lev?: number | null, leader?: string) => {
     const p = refPrice > 0 ? refPrice : 0;
     const isLong = side === "LONG";
     deployDirectiveFromThesis({
@@ -266,6 +320,14 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
       // 0x… returned Y"). Only when there's a single leader (not consensus).
       source: leader && /^0x[a-f0-9]{40}$/i.test(leader) ? leader : undefined,
     }, navigate);
+  };
+
+  // A single-leader copy pauses on a confirm that shows the leader's GRADED WATCHED record
+  // (Grok) — you see what track record you're inheriting, never their lifetime green. A
+  // consensus copy (no single wallet) has no watched record to show, so it deploys directly.
+  const copy = (sym: string, side: "LONG" | "SHORT", refPrice: number, lev?: number | null, leader?: string) => {
+    if (leader && /^0x[a-f0-9]{40}$/i.test(leader)) { setPendingCopy({ sym, side, refPrice, lev: lev ?? null, leader }); return; }
+    doCopy(sym, side, refPrice, lev, leader);
   };
 
   const tradeBtn = (onClick: () => void) => (
@@ -295,6 +357,11 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
     <div style={{ maxWidth: 1180, margin: "0 auto" }}>
       {poster && <SharePoster data={poster} onClose={() => setPoster(null)} />}
       {detail && <TraderDetail source={detail.source} address={detail.address} accountId={detail.accountId} myAddress={wallet ?? undefined} onClose={() => setDetail(null)} />}
+      {pendingCopy && (
+        <CopyConfirm leader={pendingCopy.leader} sym={pendingCopy.sym} side={pendingCopy.side}
+          onCancel={() => setPendingCopy(null)}
+          onConfirm={() => { const c = pendingCopy; setPendingCopy(null); doCopy(c.sym, c.side, c.refPrice, c.lev, c.leader); }} />
+      )}
       {toast && (
         <div className="nx-fade-in" style={{ position: "fixed", bottom: 20, left: 20, zIndex: 8000, background: "#0f0f11", border: "1px solid #33333a", borderLeft: `3px solid ${TRACKED}`, borderRadius: 6, padding: "10px 14px", fontFamily: "var(--nx-font-mono)", fontSize: 11, color: TRACKED, boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>
           {toast}
