@@ -16,7 +16,7 @@ const AGENT_API = "https://og.nexustradinglabs.com";
 const MONO = "var(--nx-font-mono)";
 
 type Read = { label: string; ok: boolean; side?: "LONG" | "SHORT" };
-type Row = { coin: string; direction: "LONG" | "SHORT"; fundingAnnualPct: number; extra: number; against: number; reads: Read[] };
+type Row = { coin: string; direction: "LONG" | "SHORT"; fundingAnnualPct: number; extra: number; against: number; reads: Read[]; revertedPct: number | null; histWeak: boolean };
 
 export function ConvictionScanner() {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -76,8 +76,12 @@ export function ConvictionScanner() {
           return (
             <button key={r.coin} onClick={() => draft(r)} style={{ appearance: "none", WebkitAppearance: "none", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", width: "100%", textAlign: "left", cursor: "pointer", background: C.surfaceAlt, border: `1px solid ${C.border}`, borderLeft: `2px solid ${conv.color}`, borderRadius: 6, padding: "9px 12px" }}>
               <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: C.text.bright, minWidth: 52 }}>{r.coin}</span>
-              <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: dc, minWidth: 54 }}>{r.direction === "LONG" ? "↑ LONG" : "↓ SHORT"}</span>
-              <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: conv.color, minWidth: 92 }}>◆ {conv.word}</span>
+              {/* The verdict word (Grok): FADE LONG / FADE SHORT — not "↑ LONG". */}
+              <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: dc, minWidth: 70 }}>{r.direction === "LONG" ? "FADE LONG" : "FADE SHORT"}</span>
+              {/* Docked on a weak reversion clock — a losing hist reads "HIST 25%", never ◆ HIGH. */}
+              {r.histWeak && r.revertedPct != null
+                ? <span title="Fading this has historically underperformed — can't read HIGH conviction" style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: C.warn, minWidth: 92 }}>HIST {r.revertedPct}%</span>
+                : <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: conv.color, minWidth: 92 }}>◆ {conv.word}</span>}
               <span style={{ display: "flex", gap: 4, flexWrap: "wrap", flex: 1 }}>
                 {r.reads.map((rd) => (
                   <span key={rd.label} title={!rd.ok && rd.side ? `${rd.label} lean ${rd.side} — opposes this ${r.direction} fade` : undefined} style={{ fontFamily: MONO, fontSize: 8.5, color: rd.ok ? C.pos : C.neg, border: `1px solid ${rd.ok ? "#2a3a30" : "#3a2530"}`, borderRadius: 3, padding: "1px 5px" }}>{rd.ok ? "✓" : "✗"} {rd.label}{!rd.ok && rd.side ? ` ${rd.side}` : ""}</span>
@@ -89,7 +93,7 @@ export function ConvictionScanner() {
           );
         })}
       </div>
-      <div style={{ fontFamily: MONO, fontSize: 8, color: C.text.faint, marginTop: 7, lineHeight: 1.5 }}>Ranked by how many independent reads confirm the fade — open THE READ for the full ~12-axis breakdown. Not advice.</div>
+      <div style={{ fontFamily: MONO, fontSize: 8, color: C.text.faint, marginTop: 7, lineHeight: 1.5 }}>Ranked by how many independent reads confirm the fade — open THE READ for the full breakdown. Not advice.</div>
     </div>
   );
 }

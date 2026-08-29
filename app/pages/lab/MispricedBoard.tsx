@@ -57,21 +57,23 @@ const stanceLabel = (dir: string) => dir === "SHORT" ? "Crowd over-long" : dir =
 // reads the numbers above it. Both are true, neither is dumbed down. verdict === "WATCH"
 // tells the truth Grok flagged: funding can be HIGH in absolute terms yet not STRETCHED
 // vs its own range — that's a watch, not a fade.
-const plainRead = (m: Market, verdict?: "FADE" | "WATCH" | "NONE", weakEdge?: boolean, tooSmall?: boolean) => {
+const plainRead = (m: Market, verdict?: "FADE" | "WATCH" | "NONE", weakEdge?: boolean, tooSmall?: boolean, stretched?: boolean | null) => {
   const pct = Math.abs(m.fundingAnnualPct);
   const crowd = m.direction === "SHORT" ? "long" : "short";
-  // Poked out of its range but the annualized cost is trivial — the crowd is barely paying to
-  // hold, so there's no economically meaningful fade. Checked first: magnitude gates the badge.
+  // The pierce is NECESSARY (Grok / the ZEC rule): NOT pierced its own band → no fade, no matter
+  // the magnitude or edge. The badge stays WATCHING and we NEVER also call it "stretched" — the
+  // "within range" vs "stretched" contradiction on one scroll was the ORDER bug.
+  if (stretched !== true && m.direction !== "NONE")
+    return `Funding on ${m.coin} is ${pct >= 10 ? "elevated" : "modest"} (${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr) but sitting within its own typical range — the crowd isn't stretched right now, so there's no clean fade yet. Watch for it to pierce out of the band.`;
+  // Pierced, but the annualized cost is trivial — the crowd is barely paying to hold.
   if (tooSmall && m.direction !== "NONE")
     return `Funding on ${m.coin} is only ${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr — even poking out of its recent range, the crowd is barely paying to hold ${crowd}, so there's no meaningful fade to take. Watch for a bigger stretch.`;
-  // Stretched, but the base rate says fading it has bled — the honest "watch, don't chase"
-  // read (checked BEFORE the plain WATCH branch, which would wrongly claim it's un-stretched).
+  // Pierced + large, but the reversion clock says fading it has bled.
   if (weakEdge && m.direction !== "NONE")
     return `Funding on ${m.coin} is stretched (the crowd is one-sided ${crowd}), but the last times it ran this hot the fade mostly DIDN'T pay — historically it has underperformed here. Treat it as a watch; draft only on your own read, not the fade.`;
-  if (verdict === "WATCH" && m.direction !== "NONE")
-    return `Funding on ${m.coin} is elevated (${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr) but sitting within its own typical range — the crowd isn't stretched right now, so there's no clean fade yet. Watch for it to pierce out of the band.`;
-  if (m.direction === "SHORT") return `Traders are paying ${pct}%/yr to stay long ${m.coin} — the crowd is stretched one-sided. That crowding usually unwinds, so the edge is to lean short.`;
-  if (m.direction === "LONG") return `Shorts are paying ${pct}%/yr to stay short ${m.coin} — the crowd is stretched one-sided the other way, so the edge is to lean long.`;
+  // Pierced + large + not weak → the clean fade. The PLAY word, not "lean" (banned).
+  if (m.direction === "SHORT") return `Traders are paying ${pct}%/yr to stay long ${m.coin} — the crowd is stretched one-sided; that crowding usually unwinds, so the play is FADE SHORT.`;
+  if (m.direction === "LONG") return `Shorts are paying ${pct}%/yr to stay short ${m.coin} — the crowd is stretched one-sided the other way, so the play is FADE LONG.`;
   return `${m.coin} funding is close to balanced — no clear crowd to fade right now.`;
 };
 
@@ -264,7 +266,7 @@ function synthVerdict(m: Market): { tone: "aligned" | "conflict"; text: string }
   const sm = m.smartMoney;
   if (m.direction === "NONE" || !sm || !sm.side) return null;
   if (sm.side === m.direction)
-    return { tone: "aligned", text: `The crowd is offside and the sharp money is already positioned ${sm.side.toLowerCase()} — the smart money is fading it with you. Higher-conviction fade.` };
+    return { tone: "aligned", text: `The crowd is offside and the sharp money is already positioned ${sm.side.toLowerCase()} — the smart money is fading it with you.` };
   return { tone: "conflict", text: `The crowd is offside, but the sharp money is riding ${sm.side.toLowerCase()} WITH them. Not a clean fade — the real money is on the crowd's side here.` };
 }
 
@@ -573,7 +575,7 @@ export function MispricedBoard() {
             </div>
 
             <p style={{ fontFamily: UI, fontSize: 13, lineHeight: 1.55, color: C.text.fog, marginTop: 14, padding: "11px 12px", background: "rgba(237,237,240,0.03)", border: `1px solid ${C.border}`, borderRadius: RADIUS.md }}>
-              {plainRead(m, verdict, weakEdge, tooSmall)}
+              {plainRead(m, verdict, weakEdge, tooSmall, stretched)}
             </p>
 
             {/* Reversion proof — what happened the last times it looked this stretched. */}

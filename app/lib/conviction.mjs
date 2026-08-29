@@ -31,7 +31,12 @@ export function rankConviction(markets, smMap = {}, callerMap = {}, limit = 8) {
       if (c && (c.side === "LONG" || c.side === "SHORT")) reads.push({ label: "callers", ok: c.side === dir, side: c.side });
       const extra = reads.filter((r) => r.label !== "funding" && r.ok).length;
       const against = reads.filter((r) => !r.ok).length;
-      return { coin, direction: dir, fundingAnnualPct: Number(m.fundingAnnualPct) || 0, extra, against, reads };
+      // Carry the reversion hist (edgeQuality) so the scanner can DOCK its conviction the same
+      // way the ticket does — a weak clock (TRAP / reverted ≤42%) can't read HIGH (Grok).
+      const eq = m.edgeQuality;
+      const revertedPct = eq && Number.isFinite(eq.revertedPct) ? eq.revertedPct : null;
+      const histWeak = !!eq && (eq.tier === "TRAP" || (revertedPct != null && revertedPct <= 42));
+      return { coin, direction: dir, fundingAnnualPct: Number(m.fundingAnnualPct) || 0, extra, against, reads, revertedPct, histWeak };
     });
   rows.sort((a, b) => (b.extra - b.against) - (a.extra - a.against) || Math.abs(b.fundingAnnualPct) - Math.abs(a.fundingAnnualPct));
   return rows.slice(0, limit);
@@ -39,6 +44,9 @@ export function rankConviction(markets, smMap = {}, callerMap = {}, limit = 8) {
 
 // The conviction label for a ranked row (net confirmations).
 export function convictionLevel(row) {
+  // A weak reversion clock DOCKS conviction — aligned lenses over a losing hist can't read
+  // HIGH/MODERATE (Grok: "if hist hit <40% or E[R] <0, it cannot say HIGH").
+  if (row && row.histWeak) return (row.against || 0) > (row.extra || 0) ? "CONFLICTED" : "FUNDING_ONLY";
   const net = row.extra - row.against;
   if (net >= 2) return "HIGH";
   if (net === 1) return "MODERATE";
