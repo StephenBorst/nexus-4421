@@ -65,7 +65,11 @@ export default function OnboardingModal({ onComplete, onSkip }) {
   useEffect(() => { if (visible && modalRef.current) modalRef.current.focus(); }, [visible]);
   useEffect(() => { if (step !== 1) return; const interval = setInterval(() => setChainIdx((i) => (i + 1) % CHAINS.length), 1200); return () => clearInterval(interval); }, [step]);
 
-  const handleClose = useCallback(() => { setExiting(true); setTimeout(() => onSkip?.(), 400); }, [onSkip]);
+  // Skip / X must dismiss in ONE tap — no 400ms fade window where an automated
+  // (or impatient) client screenshots the still-visible modal and never taps again.
+  // onSkip persists the flag and unmounts us synchronously, so the board is revealed
+  // immediately. (handleNext keeps its fade for the deliberate "Launch App" path.)
+  const handleClose = useCallback(() => { onSkip?.(); }, [onSkip]);
   const handleNext = useCallback(() => {
     if (step === 1) { setExiting(true); setTimeout(() => { onComplete?.(); highlightDepositButton(); }, 400); return; }
     if (step === STEPS.length - 1) { setExiting(true); setTimeout(() => onComplete?.(), 400); return; }

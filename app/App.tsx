@@ -9,17 +9,43 @@ import LiveAlerts from "@/components/LiveAlerts";
 import AmbientTexture from "@/components/AmbientTexture";
 import { withBasePath } from "./utils/base-path";
 import { getSEOConfig, getUserLanguage } from "./utils/seo";
+
+// ── Guest Lab ──────────────────────────────────────────────────────────────
+// The map is the product; the marketing funnel must not stand in front of it.
+// `?guest=1` (a documented read-only preview flag) — or a prior visit that already
+// set `ntl_onboarded` — lets an agent or a first-time visitor land straight on The
+// Board: no Connect-Wallet funnel, and no Orderly service disclaimer blocking the
+// read. Guest is READ-ONLY — COPY / TRADE / PUBLISH / ARM LIVE still require a wallet
+// (those gates live in their own components and are untouched here).
+//
+// Runs at MODULE LOAD, before React renders, so the flags are set before the
+// OrderlyProvider subtree — and its disclaimer dialog's mount effect — read them.
+// A parent effect would fire too late (child effects run first).
+const guestParam = (() => {
+  try { return new URLSearchParams(window.location.search).get("guest") === "1"; }
+  catch { return false; }
+})();
+if (guestParam) {
+  try {
+    // Persist so internal SPA navs (e.g. /lab?tab=intel) that drop the param stay clean.
+    localStorage.setItem("ntl_onboarded", "true");
+    // Read-only preview shouldn't be blocked by the informational service disclaimer
+    // either. Real (non-guest) visitors still see it once, unchanged.
+    localStorage.setItem("orderly_service_disclaimer_accepted", "true");
+  } catch { /* private mode / storage disabled — the modal is still one-tap skippable */ }
+}
+const isOnboarded = () => {
+  try { return localStorage.getItem("ntl_onboarded") === "true"; }
+  catch { return false; }
+};
+
 export default function App() {
   const seoConfig = getSEOConfig();
   const defaultLanguage = getUserLanguage();
-  const [showOnboarding, setShowOnboarding] = useState(
-    !localStorage.getItem('ntl_onboarded')
-  );
+  // Honor the guest/onboarded flags BEFORE the onboarding modal mounts.
+  const [showOnboarding, setShowOnboarding] = useState(() => !(guestParam || isOnboarded()));
   useEffect(() => {
-    const hasOnboarded = localStorage.getItem('ntl_onboarded');
-    if (hasOnboarded === 'true') {
-      setShowOnboarding(false);
-    }
+    if (isOnboarded()) setShowOnboarding(false);
   }, []);
 
   // Reset scroll to the top on every route change. SPA navigations otherwise carry
