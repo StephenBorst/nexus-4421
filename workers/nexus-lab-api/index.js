@@ -2817,26 +2817,31 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         const fromS = nowS - 45 * 86400;
         const flagged = board.markets.filter((m) => m.status === "MISPRICED");
         await Promise.all(flagged.map(async (m) => {
+          // ── THE ONE PIERCE (Grok #1) — stamped from oi:hist INDEPENDENTLY of the reversion
+          // fetch, so an Orderly fetch failure can NEVER clear stretched/verdict. (It did: when
+          // funding_rate_history/tv-history 403'd for a symbol, the whole row fell to the catch →
+          // stretched:null · WATCH, while /signals still read FADE off the same oi:hist. The pierce
+          // must not depend on a fetch that can fail.) SAME source + test as /signals
+          // (computeSignalRows → fundingStretched → readVerdict). Public funding is only a fallback
+          // for long-tail names oi:hist doesn't record — filled in from the reversion fetch below.
+          let fvals = [];
+          try { const oh = await (env.NEXUS_AGENT || env.LAB_STORE).get(`oi:hist:${m.symbol}`); if (oh) fvals = (JSON.parse(oh) || []).map((h) => Number(h.funding)).filter(Number.isFinite); } catch { /* public fallback below */ }
+          // The board REVERSION object (→ edgeQuality) — its own try, so a fetch failure nulls ONLY
+          // the reversion, never the pierce. Also yields the public-funding pierce fallback.
           try {
             const [fh, ph] = await Promise.all([
               fetch(`https://api-evm.orderly.org/v1/public/funding_rate_history?symbol=${m.symbol}&page=1&size=100`, { headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" } }).then((r) => r.json()),
               fetch(`https://api-evm.orderly.org/tv/history?symbol=${m.symbol}&resolution=60&from=${fromS}&to=${nowS}`).then((r) => r.json()),
             ]);
-            const series = mergeFundingPrice(fh?.data?.rows || [], (ph && ph.s === "ok" && Array.isArray(ph.t)) ? { t: ph.t, c: ph.c } : null);
+            const rows = fh?.data?.rows || [];
+            const series = mergeFundingPrice(rows, (ph && ph.s === "ok" && Array.isArray(ph.t)) ? { t: ph.t, c: ph.c } : null);
             const rev = fundingReversion(series);
             m.reversion = rev ? { revertedPct: rev.revertedPct, avgReversionPct: rev.avgReversionPct, samples: rev.samples, horizonDays: rev.horizonDays } : null;
-            // ── THE ONE PIERCE (Grok #1): the SAME funding-stretch test THE BOARD's /signals
-            // uses (computeSignalRows → fundingStretched → readVerdict), stamped onto the board
-            // row so a market can never read FADE on the Board and "within range · WATCHING" on
-            // the card right below it. Prefer the recorded oi:hist funding (IDENTICAL source to
-            // /signals) for the core symbols; fall back to Orderly's public funding history for
-            // the long-tail markets /signals never lists. One verdict object, do not split the flag.
-            let fvals = [];
-            try { const oh = await (env.NEXUS_AGENT || env.LAB_STORE).get(`oi:hist:${m.symbol}`); if (oh) fvals = (JSON.parse(oh) || []).map((h) => Number(h.funding)).filter(Number.isFinite); } catch { /* fall back to public history */ }
-            if (fvals.length < 8) fvals = (fh?.data?.rows || []).map((r) => Number(r.funding_rate)).filter(Number.isFinite);
-            m.stretched = fundingStretched(fvals);
-            m.verdict = readVerdict(m.direction, m.stretched);
-          } catch { m.reversion = null; m.stretched = null; m.verdict = readVerdict(m.direction, null); }
+            if (fvals.length < 8) fvals = rows.map((r) => Number(r.funding_rate)).filter(Number.isFinite);
+          } catch { m.reversion = null; }
+          // Pierce + verdict ALWAYS stamped (oi:hist-first), regardless of the reversion fetch.
+          m.stretched = fundingStretched(fvals);
+          m.verdict = readVerdict(m.direction, m.stretched);
           m.edgeQuality = edgeQuality(m.reversion);
         }));
         flagged.sort((a, b) => (EDGE_QUALITY_RANK[a.edgeQuality.tier] - EDGE_QUALITY_RANK[b.edgeQuality.tier]) || (b.edge - a.edge));
