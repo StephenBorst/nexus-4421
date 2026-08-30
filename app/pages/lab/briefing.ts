@@ -44,7 +44,9 @@ export interface BriefingInput {
 // the crowd must be paying a meaningful annualized cost to hold. Below this, a "stretch" on a
 // tiny band (e.g. −0.66%/yr) is WATCH, not FADE. ONE literal, owned by conviction.mjs (the
 // scanner's file of truth) and re-exported here so the ticket + Board import it from one place.
-export { FADE_FUNDING_FLOOR_PCT_YR } from "@/lib/conviction.mjs";
+// Imported locally too (the briefing rows gate their FADE/WATCH word on it — one floor).
+import { FADE_FUNDING_FLOOR_PCT_YR } from "@/lib/conviction.mjs";
+export { FADE_FUNDING_FLOOR_PCT_YR };
 
 // (breadth 50% / BTC trend 40% / funding crowding 10%). Kept pure here so the
 // Briefing can read the tape without mounting the strip. Returns null on no data.
@@ -144,6 +146,9 @@ export interface MarketReadInput {
   signals: MarketSignal[] | null;
   liveAgents: number | null;
   tape: { label: string; score: number } | null;
+  // The graded-caller lean per symbol — so a briefing row can name a caller crowd that FIGHTS
+  // the fade ("FADE X · CALLERS Y"), the conflict grammar (Grok). Optional/fail-soft.
+  consensus?: Record<string, { side: "LONG" | "SHORT" | "SPLIT"; lean: number; participants: number }> | null;
 }
 
 const pctChange = (o?: string | number, c?: string | number) => {
@@ -154,7 +159,7 @@ const pctChange = (o?: string | number, c?: string | number) => {
 };
 
 export function buildMarketRead(input: MarketReadInput): Insight[] {
-  const { rows, signals, liveAgents, tape } = input;
+  const { rows, signals, liveAgents, tape, consensus } = input;
   const out: Insight[] = [];
 
   // 1 — Tape headline: the BREADTH lens (what setups the tape favors) — NOT a second
@@ -176,16 +181,29 @@ export function buildMarketRead(input: MarketReadInput): Insight[] {
     });
   }
 
-  // 2 — Confluence setup: the agent's highest-conviction read, surfaced for humans.
+  // 2 — The confluence read, as a BOARD-OBJECT row (Grok #2): the ONE verdict word
+  // (FADE X / WATCH) + the annualized funding + caller CONFLICT grammar ("FADE X · CALLERS Y").
+  // Never "LONG HYPE", "strongest setup", "highest-conviction", or "exactly what the agent
+  // fades" — the loudest word on the row must be the GRADED verdict, not a flattering one.
   const conf = (signals || []).find((s) => s.confluence !== "NONE");
   if (conf) {
+    const dir = conf.fade_dir === "LONG" || conf.fade_dir === "SHORT" ? conf.fade_dir : conf.confluence;
+    const annual = Number(conf.funding_annual_pct ?? conf.funding_rate_8h * 1095 * 100);
+    // FADE only when the server says STRETCHED and the band is economically large — the SAME
+    // gate THE BOARD's THE PLAY applies; a confluence that isn't stretched reads WATCH, not a setup.
+    const isFade = conf.verdict === "FADE" && Math.abs(annual) >= FADE_FUNDING_FLOOR_PCT_YR && (dir === "LONG" || dir === "SHORT");
+    const play = isFade ? `FADE ${dir}` : "WATCH";
+    const lean = consensus?.[conf.symbol] || null;
+    const callerFights = isFade && !!lean && lean.side !== "SPLIT" && lean.side !== dir;
     out.push({
       id: "read-confluence",
       priority: 78,
-      tone: "info",
-      title: `Confluence: ${conf.confluence} ${conf.symbol}`,
-      detail: `Funding and open interest agree — the strongest setup on the board, and exactly what the autonomous agent fades. ${conf.funding_signal === conf.confluence ? "Crowd positioning is extended." : ""}`.trim(),
-      action: { label: "Run the agent", tab: "agent" },
+      tone: callerFights ? "caution" : "info",
+      title: `${conf.symbol} · ${play} · ${annual >= 0 ? "+" : ""}${annual.toFixed(0)}%/yr`,
+      detail: isFade
+        ? `Funding and open interest agree the crowd is stretched${callerFights ? ` · CALLERS ${lean!.side} (they fight the fade)` : ""}. The mechanical fade — graded from the tape after, like every call.`
+        : `Funding and open interest agree, but it's elevated rather than stretched vs its own range — a watch, not a fade yet.`,
+      action: { label: "See the read", tab: "intel" },
     });
   }
 
@@ -195,12 +213,21 @@ export function buildMarketRead(input: MarketReadInput): Insight[] {
   const hot = byFund.find((s) => !conf || s.symbol !== conf.symbol);
   if (hot && Math.abs(hot.funding_rate_8h) >= 0.0004) {
     const heavy = hot.funding_rate_8h > 0 ? "long" : "short";
+    const hAnnual = Number(hot.funding_annual_pct ?? hot.funding_rate_8h * 1095 * 100);
+    const hDir = hot.fade_dir === "LONG" || hot.fade_dir === "SHORT" ? hot.fade_dir : (hot.funding_rate_8h > 0 ? "SHORT" : "LONG");
+    // "stretched" is the SERVER pierce, not a raw threshold (one verdict): FADE only when funding
+    // pierced its own range AND the band is economically large; else it's merely elevated (a WATCH).
+    const hFade = hot.verdict === "FADE" && Math.abs(hAnnual) >= FADE_FUNDING_FLOOR_PCT_YR;
     out.push({
       id: "read-funding",
       priority: 68,
       tone: "info",
-      title: `${hot.symbol} funding is stretched (${(hot.funding_rate_8h * 100).toFixed(3)}%/8h)`,
-      detail: `The crowd is heavily ${heavy}. Overcrowded funding is where fades set up — the higher it goes, the more it's paying you to lean the other way.`,
+      title: hFade
+        ? `${hot.symbol} · FADE ${hDir} · ${hAnnual >= 0 ? "+" : ""}${hAnnual.toFixed(0)}%/yr`
+        : `${hot.symbol} funding is elevated (${hAnnual >= 0 ? "+" : ""}${hAnnual.toFixed(0)}%/yr) — within its range`,
+      detail: hFade
+        ? `The crowd is heavily ${heavy} and stretched vs its own funding range — the mechanical fade. Graded from the tape after, like every call.`
+        : `The crowd is heavily ${heavy}, but funding is within its typical range — where fades set up, once it pierces out. A watch, not a fade yet.`,
       action: { label: "See the read", tab: "intel" },
     });
   }

@@ -2825,7 +2825,18 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
             const series = mergeFundingPrice(fh?.data?.rows || [], (ph && ph.s === "ok" && Array.isArray(ph.t)) ? { t: ph.t, c: ph.c } : null);
             const rev = fundingReversion(series);
             m.reversion = rev ? { revertedPct: rev.revertedPct, avgReversionPct: rev.avgReversionPct, samples: rev.samples, horizonDays: rev.horizonDays } : null;
-          } catch { m.reversion = null; }
+            // ── THE ONE PIERCE (Grok #1): the SAME funding-stretch test THE BOARD's /signals
+            // uses (computeSignalRows → fundingStretched → readVerdict), stamped onto the board
+            // row so a market can never read FADE on the Board and "within range · WATCHING" on
+            // the card right below it. Prefer the recorded oi:hist funding (IDENTICAL source to
+            // /signals) for the core symbols; fall back to Orderly's public funding history for
+            // the long-tail markets /signals never lists. One verdict object, do not split the flag.
+            let fvals = [];
+            try { const oh = await (env.NEXUS_AGENT || env.LAB_STORE).get(`oi:hist:${m.symbol}`); if (oh) fvals = (JSON.parse(oh) || []).map((h) => Number(h.funding)).filter(Number.isFinite); } catch { /* fall back to public history */ }
+            if (fvals.length < 8) fvals = (fh?.data?.rows || []).map((r) => Number(r.funding_rate)).filter(Number.isFinite);
+            m.stretched = fundingStretched(fvals);
+            m.verdict = readVerdict(m.direction, m.stretched);
+          } catch { m.reversion = null; m.stretched = null; m.verdict = readVerdict(m.direction, null); }
           m.edgeQuality = edgeQuality(m.reversion);
         }));
         flagged.sort((a, b) => (EDGE_QUALITY_RANK[a.edgeQuality.tier] - EDGE_QUALITY_RANK[b.edgeQuality.tier]) || (b.edge - a.edge));

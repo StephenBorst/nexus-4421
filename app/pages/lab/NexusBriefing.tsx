@@ -182,10 +182,10 @@ export function NexusBriefing({
   }, [wallet, trades, fusion]); // fusion dep → recompute after a fresh flag records
 
   const market = useMemo(
-    () => buildMarketRead({ rows, signals, liveAgents, tape })
+    () => buildMarketRead({ rows, signals, liveAgents, tape, consensus })
       .filter((m) => !fusion.some((f) => f.detail.startsWith(m.title.split(" ")[0]))) // avoid echoing the fusion's symbol read
       .slice(0, (personal.length ? 3 : 3) - Math.min(fusion.length, 1)),
-    [rows, signals, liveAgents, tape, personal.length, fusion]
+    [rows, signals, liveAgents, tape, consensus, personal.length, fusion]
   );
 
   // ⭐ THE ACTION QUEUE — the deepening: instead of three separate lenses, merge every

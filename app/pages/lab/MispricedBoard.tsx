@@ -40,6 +40,11 @@ type Market = {
   reversion?: { revertedPct: number; avgReversionPct: number; samples: number; horizonDays: number } | null;
   edgeQuality?: EdgeQuality; // flagged markets: has fading this HISTORICALLY paid?
   smartMoney?: SmartMoney | null; // sharp-capital consensus (merged server-side into the board)
+  // ── THE ONE PIERCE + VERDICT (Grok #1) — stamped by /intel/mispriced from the SAME oi:hist
+  // funding test THE BOARD's /signals uses, so the card can't read FADE on the Board and
+  // "within range · WATCHING" here. The card AND the detail ticket read this one flag.
+  stretched?: boolean | null;
+  verdict?: "FADE" | "WATCH" | "NONE";
 };
 type BoardResp = { asOf?: string; scanned?: number; mispricedCount?: number; markets?: Market[] };
 type Lean = { side: "LONG" | "SHORT" | "SPLIT"; lean: number; longCount: number; shortCount: number; participants: number };
@@ -87,6 +92,23 @@ function fundingStretched(points?: { f: number }[]): boolean | null {
   const q = (p: number) => srt[Math.min(srt.length - 1, Math.max(0, Math.round(p * (srt.length - 1))))];
   const lf = fs[fs.length - 1];
   return lf > q(0.75) || lf < q(0.25);
+}
+
+// ── ONE VERDICT (Grok #1) — the SINGLE gate shared by the board card badge AND the detail
+// ticket, so a card can never read a different verdict than the ticket it opens ("do not
+// split the flag"). `stretched` is the server pierce (m.stretched — from the SAME oi:hist
+// test THE BOARD's /signals uses). A clean FADE needs the crowd STRETCHED (pierced its own
+// funding range) AND an economically large band AND a base rate that isn't a known TRAP; a
+// stretch over a weak/absent clock is a WATCH you may still draft on your own read.
+function ticketVerdict(m: Market, stretched: boolean | null) {
+  const q = m.edgeQuality;
+  const weakEdge = !!q && (q.tier === "TRAP" || (q.revertedPct != null && q.revertedPct < 40));
+  const bigEnough = Math.abs(m.fundingAnnualPct) >= FADE_FUNDING_FLOOR_PCT_YR;
+  const tooSmall = stretched === true && !bigEnough;         // pierced its range, but trivially small
+  const isFade = m.direction !== "NONE" && stretched === true && bigEnough && !weakEdge;
+  const draftAnyway = m.direction !== "NONE" && stretched === true && bigEnough && weakEdge;
+  const verdict: "FADE" | "WATCH" | "NONE" = m.direction === "NONE" ? "NONE" : isFade ? "FADE" : "WATCH";
+  return { verdict, isFade, draftAnyway, weakEdge, bigEnough, tooSmall };
 }
 
 // Direction chips are POSITIONING, not P&L — kept monochrome per the design law
@@ -508,25 +530,17 @@ export function MispricedBoard() {
     const m = selected;
     const l = lean[m.coin];
     const change = m.change24hPct;
-    // ── ONE VERDICT drives the whole ticket (Grok): a FADE requires the crowd to be
-    // STRETCHED now (funding pierces its own range), not merely elevated. Not stretched
-    // (or too little history to confirm) → WATCH; balanced → NONE. Header, copy, the read,
-    // and the Draft button all read from this — so the page can never argue with itself.
-    const stretched = fundingStretched(pos?.points);
-    const q = m.edgeQuality;
-    // The historical base rate VETOES "FADE NOW" (Grok): funding can be stretched yet fading
-    // it has bled (TRAP / reverted <40% of instances). Then the ticket reads WATCH — but the
-    // Draft STAYS as "Draft anyway", because overriding a weak base rate on purpose is the
-    // honest path (same rule as the Thesis WATCH gate). A clean FADE needs BOTH a stretch AND
-    // a base rate that pays; a stretch alone, historically unproven, is a WATCH you may draft.
-    const weakEdge = !!q && (q.tier === "TRAP" || (q.revertedPct != null && q.revertedPct < 40));
-    // Magnitude floor (Grok): a stretch on a trivial band (−0.66%/yr) is not a crowded fade.
-    // A FADE needs a stretch AND an economically large annualized cost; else it's a WATCH.
-    const bigEnough = Math.abs(m.fundingAnnualPct) >= FADE_FUNDING_FLOOR_PCT_YR;
-    const tooSmall = stretched === true && !bigEnough;   // pierced its range, but trivially small
-    const verdict: "FADE" | "WATCH" | "NONE" = m.direction === "NONE" ? "NONE" : (stretched === true && !weakEdge && bigEnough) ? "FADE" : "WATCH";
-    const isFade = verdict === "FADE";
-    const draftAnyway = m.direction !== "NONE" && stretched === true && bigEnough && weakEdge;
+    // ── ONE pierce, ONE verdict (Grok #1) — header, copy, the read, and the Draft button all
+    // read from this, so the page can never argue with itself (nor with the card that opened it).
+
+    // Prefer the SERVER's stretch (m.stretched — the SAME oi:hist test THE BOARD's /signals
+    // and this coin's board card use) so the ticket can NEVER disagree with the card that
+    // opened it; fall back to the client pierce on the charted points only if the server
+    // didn't stamp it (older cache). The verdict gate itself lives in the shared ticketVerdict
+    // helper (card + ticket read the identical logic): a clean FADE needs a stretch AND a big
+    // band AND a base rate that isn't a TRAP; a stretch over a weak clock is a draftable WATCH.
+    const stretched = m.stretched != null ? m.stretched : fundingStretched(pos?.points);
+    const { verdict, isFade, draftAnyway, weakEdge, tooSmall } = ticketVerdict(m, stretched);
     const canDraft = isFade || draftAnyway;
     return (
       <div>
@@ -544,7 +558,7 @@ export function MispricedBoard() {
           <div style={{ position: "relative", border: `1px solid ${C.border}`, borderLeft: `2px solid ${C.accent}`, borderRadius: RADIUS.lg, padding: "24px 28px", background: "linear-gradient(180deg,#17171a 0%,#0d0d0f 100%)", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: MONO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: C.text.muted }}>
               <span style={{ color: C.text.fog }}>◆ Nexus · Funding edge</span>
-              <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: isFade ? C.accent : draftAnyway ? C.warn : C.text.muted }}>{verdict === "NONE" ? "BALANCED" : isFade ? "◆ FADE NOW" : draftAnyway ? `⚠ WATCH · FADE ${q?.revertedPct}% HIST` : "◆ WATCHING"}</span>
+              <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: isFade ? C.accent : draftAnyway ? C.warn : C.text.muted }}>{verdict === "NONE" ? "BALANCED" : isFade ? `◆ FADE ${m.direction}` : draftAnyway ? `⚠ WATCH · FADE ${m.edgeQuality?.revertedPct}% HIST` : "◆ WATCHING"}</span>
             </div>
             <div style={{ fontFamily: UI, fontSize: 14, color: C.text.fog, marginTop: 18 }}>{m.coin} perpetual</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 1 }}>
@@ -695,21 +709,26 @@ export function MispricedBoard() {
           {mispriced.length > 0 && (
             <>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10, margin: "6px 0 12px" }}>
-                <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", color: C.accent }}>◆ MISPRICED · WATCHING</span>
+                <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", color: C.accent }}>◆ MISPRICED</span>
                 <span style={{ fontFamily: MONO, fontSize: 9.5, color: C.text.faint }}>{mispriced.length}</span>
                 <span style={{ flex: 1, height: 1, background: C.border }} />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: 14 }}>
                 {mispriced.map((m) => {
                   const l = lean[m.coin];
+                  // ONE verdict (Grok #1): the card reads the SAME server pierce (m.stretched)
+                  // + shared gate as the detail ticket it opens — so a Board FADE can't sit over
+                  // a "within range · WATCHING" card. FADE badge names the side, matching THE BOARD.
+                  const { verdict, isFade, draftAnyway, weakEdge, tooSmall } = ticketVerdict(m, m.stretched ?? null);
+                  const badgeColor = isFade ? C.accent : draftAnyway ? C.warn : C.text.muted;
                   return (
                     <div key={m.symbol} onClick={() => setOpenCoin(m.coin)} title="Open this market"
                       className="nx-card-interactive"
-                      style={{ position: "relative", border: `1px solid ${C.borderStrong}`, borderLeft: `2px solid ${m.edgeQuality?.tier === "TRAP" ? C.warn : C.accent}`, borderRadius: RADIUS.lg, padding: "13px 15px 12px", background: "linear-gradient(180deg,#161619 0%,#101012 100%)", cursor: "pointer", overflow: "hidden" }}>
+                      style={{ position: "relative", border: `1px solid ${C.borderStrong}`, borderLeft: `2px solid ${isFade ? C.accent : draftAnyway ? C.warn : C.borderStrong}`, borderRadius: RADIUS.lg, padding: "13px 15px 12px", background: "linear-gradient(180deg,#161619 0%,#101012 100%)", cursor: "pointer", overflow: "hidden" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 11 }}>
                         <span style={{ fontFamily: MONO, fontSize: 15, fontWeight: 700, color: C.text.bright }}>{m.coin}</span>
                         <span style={{ fontFamily: MONO, fontSize: 8.5, color: C.text.faint }}>{fmtUsd(m.oiUsd)} open interest</span>
-                        <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: C.accent }}>WATCHING</span>
+                        <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: badgeColor }}>{verdict === "NONE" ? "BALANCED" : isFade ? `◆ FADE ${m.direction}` : draftAnyway ? `⚠ WATCH · ${m.edgeQuality?.revertedPct}% HIST` : "◆ WATCHING"}</span>
                       </div>
                       <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
                         <div>
@@ -723,7 +742,7 @@ export function MispricedBoard() {
                       <SmartMoneyChip m={m} />
                       <div style={{ margin: "11px 0 2px" }}><PositionBar m={m} maxEdge={maxEdge} /></div>
                       <p style={{ fontFamily: UI, fontSize: 12.5, lineHeight: 1.5, color: C.text.fog, marginTop: 10, marginBottom: 0, padding: "8px 10px", background: "rgba(237,237,240,0.03)", border: `1px solid ${C.border}`, borderRadius: RADIUS.md }}>
-                        {plainRead(m)}
+                        {plainRead(m, verdict, weakEdge, tooSmall, m.stretched ?? null)}
                       </p>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, fontFamily: MONO, fontSize: 11, color: C.text.fog }}>
                         <span>${fmtPrice(m.markPrice)}</span>
