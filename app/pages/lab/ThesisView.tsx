@@ -252,11 +252,14 @@ function ThesisCard({ t, onUpdate, onRemove, walletAddress, isMobile, markPrice 
           honesty survives publish. A weak hist you took anyway SAYS so on the card, amber. */}
       {t.baseRateAtEntry && (() => {
         const br = t.baseRateAtEntry!;
-        const weak = br.hitRate < 40 || br.expectancyR < 0;
+        // New cards freeze the reversion clock (revertedPct); old cards keep the backtest number
+        // (hitRate·R). Same "taken vs" label, never HIST/PROVEN/HIGH — the odds at the click.
+        const isRev = br.revertedPct != null;
+        const weak = isRev ? br.revertedPct! <= 42 : (br.hitRate ?? 0) < 40 || (br.expectancyR ?? 0) < 0;
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 10, fontFamily: "var(--nx-font-mono)", fontSize: 9.5, lineHeight: 1.5 }}>
             <span style={{ fontSize: 8, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase" }}>Base rate at entry</span>
-            <span style={{ color: weak ? "#e0a458" : "#71717a" }}>taken vs <b style={{ color: weak ? "#e0a458" : "#a1a1aa" }}>{br.hitRate}% hit · {br.expectancyR >= 0 ? "+" : ""}{br.expectancyR}R</b> · n={br.samples}{weak ? " — a weak hist, taken anyway" : ""}</span>
+            <span style={{ color: weak ? "#e0a458" : "#71717a" }}>taken vs <b style={{ color: weak ? "#e0a458" : "#a1a1aa" }}>{isRev ? `${br.revertedPct}% reverted` : `${br.hitRate}% hit · ${br.expectancyR! >= 0 ? "+" : ""}${br.expectancyR}R`}</b> · n={br.samples}{weak ? " — a weak hist, taken anyway" : ""}</span>
           </div>
         );
       })()}
@@ -1047,8 +1050,10 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
   // onto the call (Grok item 2): the card records the odds it was taken against, even a weak
   // one you chose to take anyway — ticket honesty that survives publish. A ref (not state):
   // it only needs to be read at save time, never to trigger a render.
-  const baseRateRef = useRef<{ hitRate: number; expectancyR: number; samples: number } | null>(null);
-  const handleBaseRate = useCallback((br: { hitRate: number; expectancyR: number; samples: number } | null) => { baseRateRef.current = br; }, []);
+  // New publishes freeze the canonical reversion clock ({revertedPct, samples, tier}) the ticket
+  // shows — labeled "taken vs" on the card (Grok's ruling). Old cards keep their backtest number.
+  const baseRateRef = useRef<{ revertedPct: number; samples: number; tier: string } | null>(null);
+  const handleBaseRate = useCallback((br: { revertedPct: number; samples: number; tier: string } | null) => { baseRateRef.current = br; }, []);
   // New market → forget the prior pick and re-arm until this coin's base rate is read.
   useEffect(() => { userChoseDir.current = false; setDirArmed(true); setWeakSetup(null); baseRateRef.current = null; }, [form.symbol]);
 

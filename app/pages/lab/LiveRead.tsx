@@ -27,7 +27,6 @@ type Regime = { trend?: string; vol?: string; atrPct?: number };
 type Warning = { text: string; severity?: string; kind?: string };
 type Advice = { regime: Regime | null; alignment: string | null; warnings: Warning[]; plan: { flags?: string[] } | null; yourRecord: { trend?: { avgR: number; calls: number } | null; vol?: { avgR: number; calls: number } | null } | null } | null;
 type Levels = { entryPrice: number; stopLoss: number; takeProfit1: number };
-type BaseRate = { available: boolean; hitRate: number; samples: number; expectancyR: number; windowDays: number; setup?: string };
 
 // ── MARKET BREADTH / BETA GATE — the tape a single-name read is posted INTO. A short on
 // one alt can be right about the coin and wrong about the market: when the whole book's
@@ -86,14 +85,13 @@ function magnetPull(m: Magnets | null, direction: "LONG" | "SHORT"): { side: "LO
 const TREND_WORD: Record<string, string> = { TREND_UP: "uptrend", TREND_DOWN: "downtrend", CHOP: "chop" };
 const VOL_WORD: Record<string, string> = { CALM: "calm", NORMAL: "normal vol", VOLATILE: "volatile" };
 
-export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge, onBaseRate }: { symbol: string; direction: "LONG" | "SHORT"; trades?: ProcessedTrade[]; levels?: Levels; wallet?: string | null; onWeakEdge?: (w: { weak: boolean; histPct: number | null }) => void; onBaseRate?: (br: { hitRate: number; expectancyR: number; samples: number } | null) => void }) {
+export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge, onBaseRate }: { symbol: string; direction: "LONG" | "SHORT"; trades?: ProcessedTrade[]; levels?: Levels; wallet?: string | null; onWeakEdge?: (w: { weak: boolean; histPct: number | null }) => void; onBaseRate?: (br: { revertedPct: number; samples: number; tier: string } | null) => void }) {
   const coin = bare(symbol);
   const [fused, setFused] = useState<Fused | null | undefined>(undefined); // undefined=loading, null=no read
   const [callers, setCallers] = useState<{ side: "LONG" | "SHORT"; participants: number } | null>(null);
   const [breadth, setBreadth] = useState<Breadth | null>(null);
   const [momentum, setMomentum] = useState<Momentum | null>(null);
   const [advice, setAdvice] = useState<Advice>(null);
-  const [baseRate, setBaseRate] = useState<BaseRate | null>(null);
   const [flush, setFlush] = useState<{ side: "UP" | "DOWN"; ratio: number } | null>(null);
   const [magnets, setMagnets] = useState<Magnets | null>(null);
   const [beta, setBeta] = useState<Beta | null>(null);
@@ -155,18 +153,6 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
     fetch(`${AGENT_API}/intel/liquidations/${coin}`).then((r) => r.json())
       .then((d) => { if (!off) setFlush(d && d.flush && (d.flush.side === "UP" || d.flush.side === "DOWN") ? d.flush : null); })
       .catch(() => { if (!off) setFlush(null); });
-    return () => { off = true; };
-  }, [coin]);
-
-  // Historical base rate for the funding-fade setup on this coin — the honest "how has
-  // this actually resolved" number, computed server-side by the REAL backtest engine over
-  // 60d of public funding+price (first-touch TP vs SL). Cached; fail-soft.
-  useEffect(() => {
-    if (!coin) { setBaseRate(null); return; }
-    let off = false;
-    fetch(`${AGENT_API}/intel/baserate/${coin}`).then((r) => r.json())
-      .then((d) => { if (!off) setBaseRate(d && d.available ? (d as BaseRate) : null); })
-      .catch(() => { if (!off) setBaseRate(null); });
     return () => { off = true; };
   }, [coin]);
 
@@ -314,9 +300,10 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
   const convColorFinal = weakBase ? WARN : cappedHigh ? MUTED : convColor;
   // The WATCH/arming gate is the reversion clock (one clock ticket↔read↔thesis, no fork).
   useEffect(() => { onWeakEdge?.({ weak: revWeak, histPct: revPct }); }, [revWeak, revPct, onWeakEdge]);
-  // /intel/baserate is kept ONLY to FREEZE the odds a published call was taken against — a
-  // past-tense record on the card, never a live conviction word (which cites the reversion clock).
-  useEffect(() => { onBaseRate?.(baseRate ? { hitRate: baseRate.hitRate, expectancyR: baseRate.expectancyR, samples: baseRate.samples } : null); }, [baseRate, onBaseRate]);
+  // FREEZE the odds at the click from the ONE reversion clock the ticket shows (Grok's ruling):
+  // a new publish stamps {revertedPct, samples, tier} onto the card, labeled "taken vs" — the same
+  // book as the live HIST line, just past tense. Old cards stay frozen on their backtest number.
+  useEffect(() => { onBaseRate?.(reversion ? { revertedPct: reversion.revertedPct, samples: reversion.samples, tier: reversion.tier } : null); }, [reversion, onBaseRate]);
 
   // ── PROVEN-EDGE PATTERN — not "more reads agree," but the SPECIFIC orthogonal stack the
   // backtests + live grading actually validated: the funding-fade CONDITIONED on smart-money

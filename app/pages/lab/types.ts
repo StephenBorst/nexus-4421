@@ -31,7 +31,11 @@ export interface ThesisTrade {
   // frozen so ticket honesty survives publish (Grok): "taken vs 25% hit · −0.88R · n=8". A
   // truthful, un-drifting record of the odds the trader faced — from /intel/baserate. If the
   // hist was weak, the card SAYS so, even for a call the trader chose to take anyway.
-  baseRateAtEntry?: { hitRate: number; expectancyR: number; samples: number };
+  // The frozen odds this call was taken against. New publishes stamp the canonical reversion
+  // clock ({revertedPct, samples, tier}) — the SAME object the ticket shows, labeled "taken vs"
+  // (never HIST/PROVEN/HIGH). Old cards stay frozen on the backtest shape ({hitRate, expectancyR,
+  // samples}) — the render branches on which is present; we never rewrite an old card (Grok).
+  baseRateAtEntry?: { hitRate?: number; expectancyR?: number; revertedPct?: number; samples: number; tier?: string };
   createdAt: number;
   positionSize: number;
   leverage: number;
