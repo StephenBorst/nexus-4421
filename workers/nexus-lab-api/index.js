@@ -2887,16 +2887,29 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       let points = hist.slice(-180)
         .map((p) => ({ t: p.t, f: Number(p.funding) }))
         .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.f));
-      let reversion = fundingReversion(hist);
-      let source = "recorded";
+      let source = points.length >= 12 ? "recorded" : "orderly-public";
 
-      // Universal fallback so the premium chart renders on EVERY market, not just the
-      // core symbols we record oi:hist for. Orderly exposes PUBLIC funding-rate history
-      // (all markets) even though it has no OI history — build the funding story-line
-      // from it, and rebuild the reversion proof by merging that funding with public 1h
-      // candles (same method as the mispriced board's enrichment). Best-effort: any
-      // failure just leaves the recorded (possibly empty) series untouched.
-      if (points.length < 12) {
+      // ── ONE reversion clock (Grok) ────────────────────────────────────────────────
+      // The reversion STAT (and its edgeQuality tier) is the number the card, scanner,
+      // ticket-verdict, Quick Call AND this ticket all cite — so it must be the SAME
+      // computation everywhere. It forked because this endpoint used the recorded oi:hist
+      // reversion for core coins while the mispriced board used Orderly's PUBLIC funding
+      // history (SOL read 63%/n8 here vs 80%/n5 on the card). Fix: the STAT always comes from
+      // the board's object — fast-path reuse the board's cached row so it's byte-identical,
+      // else recompute by the board's own method. The chart POINTS still prefer the richer
+      // recorded oi:hist story-line; only the STAT is unified.
+      let reversion = null, eq = null;
+      try {
+        const cached = await env.LAB_STORE.get("intel:mispriced:v1");
+        if (cached) {
+          const mk = (JSON.parse(cached)?.markets || []).find((x) => String(x.coin).toUpperCase() === coin);
+          if (mk && mk.reversion) { reversion = mk.reversion; eq = mk.edgeQuality || null; source += "+board"; }
+        }
+      } catch { /* fall through to recompute */ }
+
+      // Recompute from public funding history when the board cache had no row for this coin
+      // (not flagged / cache cold), OR when we still need public points for the story-line.
+      if (!reversion || points.length < 12) {
         try {
           const nowS = Math.floor(Date.now() / 1000), fromS = nowS - 45 * 86400;
           const [fh, ph] = await Promise.all([
@@ -2904,21 +2917,23 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
             fetch(`https://api-evm.orderly.org/tv/history?symbol=${symbol}&resolution=60&from=${fromS}&to=${nowS}`).then((r) => r.json()),
           ]);
           const rows = fh?.data?.rows || [];
-          const fpts = rows
-            .map((r) => ({ t: Number(r.funding_rate_timestamp), f: Number(r.funding_rate) }))
-            .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.f))
-            .sort((a, b) => a.t - b.t);
-          if (fpts.length >= 8) {
-            points = fpts.slice(-180);
-            source = "orderly-public";
+          if (!reversion) {
             const rev = fundingReversion(mergeFundingPrice(rows, (ph && ph.s === "ok" && Array.isArray(ph.t)) ? { t: ph.t, c: ph.c } : null));
-            if (rev) reversion = rev;
+            if (rev) { reversion = rev; eq = edgeQuality(rev); }   // same method as the board
           }
-        } catch { /* keep recorded (possibly empty) series */ }
+          if (points.length < 12) {
+            const fpts = rows
+              .map((r) => ({ t: Number(r.funding_rate_timestamp), f: Number(r.funding_rate) }))
+              .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.f))
+              .sort((a, b) => a.t - b.t);
+            if (fpts.length >= 8) { points = fpts.slice(-180); source = source.startsWith("recorded") ? "orderly-public" : source; }
+          }
+        } catch { /* keep what we have */ }
       }
+      if (!eq && reversion) eq = edgeQuality(reversion);
       return new Response(JSON.stringify({
-        coin, symbol, points, reversion, source,
-        note: "Funding story-line from recorded hourly history (core symbols) or Orderly public funding-rate history (all markets). Reversion = how price moved AGAINST the crowd over the next ~3 days the last times funding was this extreme.",
+        coin, symbol, points, reversion, edgeQuality: eq, source,
+        note: "Funding story-line from recorded hourly history (core symbols) or Orderly public funding-rate history (all markets). Reversion = how price moved AGAINST the crowd over the next ~3 days the last times funding was this extreme — the SAME series the mispriced board / card cite (one clock).",
       }), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300", ...cors(request) } });
     }
 

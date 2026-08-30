@@ -31,12 +31,15 @@ export function rankConviction(markets, smMap = {}, callerMap = {}, limit = 8) {
       if (c && (c.side === "LONG" || c.side === "SHORT")) reads.push({ label: "callers", ok: c.side === dir, side: c.side });
       const extra = reads.filter((r) => r.label !== "funding" && r.ok).length;
       const against = reads.filter((r) => !r.ok).length;
-      // Carry the reversion hist (edgeQuality) so the scanner can DOCK its conviction the same
-      // way the ticket does — a weak clock (TRAP / reverted ≤42%) can't read HIGH (Grok).
+      // Carry the reversion hist (edgeQuality — the ONE clock; same object the card/ticket/
+      // Quick Call cite) so the scanner DOCKS conviction the same way: a weak clock (TRAP /
+      // reverted ≤42%) can't read HIGH, and an UNPROVEN clock (n=0) can't either — HIGH/♦
+      // requires a PROVEN base rate (Grok: "n=0 → unproven, never HIGH").
       const eq = m.edgeQuality;
       const revertedPct = eq && Number.isFinite(eq.revertedPct) ? eq.revertedPct : null;
+      const histTier = eq && eq.tier ? eq.tier : "UNPROVEN";
       const histWeak = !!eq && (eq.tier === "TRAP" || (revertedPct != null && revertedPct <= 42));
-      return { coin, direction: dir, fundingAnnualPct: Number(m.fundingAnnualPct) || 0, extra, against, reads, revertedPct, histWeak };
+      return { coin, direction: dir, fundingAnnualPct: Number(m.fundingAnnualPct) || 0, extra, against, reads, revertedPct, histTier, histWeak };
     });
   rows.sort((a, b) => (b.extra - b.against) - (a.extra - a.against) || Math.abs(b.fundingAnnualPct) - Math.abs(a.fundingAnnualPct));
   return rows.slice(0, limit);
@@ -47,9 +50,12 @@ export function convictionLevel(row) {
   // A weak reversion clock DOCKS conviction — aligned lenses over a losing hist can't read
   // HIGH/MODERATE (Grok: "if hist hit <40% or E[R] <0, it cannot say HIGH").
   if (row && row.histWeak) return (row.against || 0) > (row.extra || 0) ? "CONFLICTED" : "FUNDING_ONLY";
-  const net = row.extra - row.against;
-  if (net >= 2) return "HIGH";
+  const net = (row.extra || 0) - (row.against || 0);
+  // HIGH requires a PROVEN clock too — a fade whose base rate is UNPROVEN (n=0) or merely MIXED
+  // is never HIGH, however many lenses align (Grok: "n=0 → unproven, never HIGH; HYPE at 20%
+  // over 5 is a fade with a dead clock, not a proven setup"). Unproven aligned reads cap at MODERATE.
+  if (net >= 2) return row && row.histTier === "PROVEN" ? "HIGH" : "MODERATE";
   if (net === 1) return "MODERATE";
-  if (row.against > row.extra) return "CONFLICTED";
+  if ((row.against || 0) > (row.extra || 0)) return "CONFLICTED";
   return "FUNDING_ONLY";
 }

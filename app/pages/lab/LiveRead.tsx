@@ -170,16 +170,18 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
     return () => { off = true; };
   }, [coin]);
 
-  // The reversion / last-N-fades base rate — the SAME series the GAPS ticket vetoes on
-  // (its edgeQuality is derived from this exact reversion stat). Making THE READ + the Thesis
-  // gate read THIS, not the separate /intel/baserate backtest, means one veto clock across
-  // ticket + read + thesis — a coin can never read WATCH on one and armed on another (Grok).
-  const [reversion, setReversion] = useState<{ revertedPct: number; samples: number } | null>(null);
+  // ── THE ONE HIST CLOCK (Grok) — the reversion / edgeQuality the GAPS card, ticket-verdict,
+  // scanner AND this Quick Call all cite. /intel/positioning now returns the SAME object the
+  // mispriced board computes (byte-identical fast-path, else its method), so every surface shows
+  // ONE number — no more "SOL 80% on the card, 63% on Quick Call, 25% on the backtest." The
+  // separate /intel/baserate backtest is NO LONGER cited on the live glass (kept only to FREEZE
+  // the odds a published call was taken against — a past-tense record, not live conviction).
+  const [reversion, setReversion] = useState<{ revertedPct: number; samples: number; tier: string } | null>(null);
   useEffect(() => {
     if (!coin) { setReversion(null); return; }
     let off = false;
     fetch(`${AGENT_API}/intel/positioning/${coin}`).then((r) => r.json())
-      .then((d) => { if (!off) setReversion(d && d.reversion && d.reversion.samples ? { revertedPct: d.reversion.revertedPct, samples: d.reversion.samples } : null); })
+      .then((d) => { if (!off) setReversion(d && d.reversion && d.reversion.samples ? { revertedPct: d.reversion.revertedPct, samples: d.reversion.samples, tier: (d.edgeQuality && d.edgeQuality.tier) || "" } : null); })
       .catch(() => { if (!off) setReversion(null); });
     return () => { off = true; };
   }, [coin]);
@@ -267,7 +269,8 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
   if (fused?.smartSide) reads.push({ label: "smart money", val: `${fused.smartSide} · ${fused.smartTraders}`, side: fused.smartSide, ok: fused.smartSide === direction, vote: true });
   if (fused && (fused.verdict === "CONFLUENCE" || fused.verdict === "SPLIT")) reads.push({ label: "positioning", val: fused.verdict === "CONFLUENCE" ? "◆ confluence" : "⚡ split", side: fused.verdict === "CONFLUENCE" ? boardLean : null, ok: fused.verdict === "CONFLUENCE" && boardLean === direction, vote: false });
   if (callers) reads.push({ label: "graded callers", val: `${callers.side} · ${callers.participants}`, side: callers.side, ok: callers.side === direction, vote: true });
-  if (baseRate) reads.push({ label: "base rate", val: `${baseRate.hitRate}% · ${baseRate.expectancyR >= 0 ? "+" : ""}${baseRate.expectancyR}R`, side: boardLean, ok: baseRate.expectancyR > 0 && boardLean === direction, vote: false });
+  // The hist read is the ONE reversion clock (below) — the /intel/baserate backtest is no longer
+  // shown as a read here (it was the second history book; one fade, one clock — Grok).
   if (flush) { const fs = flush.side === "DOWN" ? "SHORT" : "LONG"; reads.push({ label: "liq flush", val: `${flush.ratio}× ${flush.side === "DOWN" ? "↓longs" : "↑shorts"}`, side: fs, ok: fs === direction, vote: true }); }
   // Basis only VOTES when the premium/discount is actually a setup — a 7 bp discount shouldn't
   // mint a third "independent read" and bounce N every refresh (Grok). Below ~0.3% it's caption only.
@@ -288,25 +291,31 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
   const pushback = voteReads.filter((r) => r.side && r.side !== direction).length;
   const convLevel = voteReads.length >= 3 && agree >= 3 && agree > pushback ? "HIGH" : agree >= 2 && agree > pushback ? "MODERATE" : pushback > agree ? "AGAINST" : "LOW";
   const convColor = convLevel === "HIGH" ? POS : convLevel === "MODERATE" ? "#8fdcb8" : convLevel === "AGAINST" ? NEG : WARN;
-  const convWord = convLevel === "HIGH" ? "HIGH CONVICTION" : convLevel === "MODERATE" ? "MODERATE" : convLevel === "AGAINST" ? "READS DISAGREE" : "LOW CONVICTION";
-  // A weak historical result VETOES the confidence word (Grok): lenses agreeing is NOT the fade
-  // working, and "counting is doing marketing." Conviction docks if EITHER clock says it loses —
-  // the REVERSION/last-N-fades hist (edgeQuality TRAP, reverted ≤42%) OR the /intel/baserate
-  // BACKTEST E[R] (hit <40% or −EV). HYPE's reversion can be armed while its backtest is 25% /
-  // −0.88R; that still can't read "HIGH CONVICTION" — it reads "N/M ALIGNED · HIST 25% · −0.88R".
+  // "HIGH CONVICTION" is banned language app-wide (the loudest word must be the graded one) — the
+  // HIGH case is a STRONG READ, and it only survives the dock below over a PROVEN reversion clock.
+  const convWord = convLevel === "HIGH" ? "STRONG READ" : convLevel === "MODERATE" ? "MODERATE" : convLevel === "AGAINST" ? "READS DISAGREE" : "LOW CONVICTION";
+  // ── THE ONE HIST CLOCK — reversion / edgeQuality only (Grok). Lenses agreeing is NOT the fade
+  // working ("counting is doing marketing"), so a weak base rate VETOES the confidence word.
+  //   weak     = a losing clock (edgeQuality TRAP or reverted ≤42%) → amber HIST line + arms WATCH.
+  //   unproven = no reversion history (n=0) → can't read HIGH/PROVEN, says "unproven" (but doesn't
+  //              force WATCH — you may draft an unproven fade on your own read).
+  //   proven   = the fade has actually reverted here (edgeQuality PROVEN) → HIGH/PROVEN allowed.
+  // The /intel/baserate BACKTEST is NO LONGER a second clock on the glass — one fade, one clock.
   const revPct = reversion ? reversion.revertedPct : null;
-  const revWeak = revPct != null && revPct <= 42;                                        // drives the arming gate
-  const baseWeak = !!baseRate && (baseRate.hitRate < 40 || baseRate.expectancyR < 0);    // backtest E[R] weak
-  const weakBase = revWeak || baseWeak;                                                  // docks the conviction WORD
-  // Show the LOSING clock's numbers, backtest E[R] preferred (the loudest number after THE PLAY).
-  const histStr = baseWeak && baseRate ? `${baseRate.hitRate}% · ${baseRate.expectancyR >= 0 ? "+" : ""}${baseRate.expectancyR}R` : revPct != null ? `${revPct}%` : "—";
-  const convWordFinal = weakBase ? `${agree}/${voteReads.length} ALIGNED · HIST ${histStr}` : convWord;
-  const convColorFinal = weakBase ? WARN : convColor;
-  // The WATCH/arming gate stays on the REVERSION clock (one clock ticket↔thesis, no fork) — a coin
-  // can ARM as FADE LONG while its backtest E[R] docks the conviction WORD to a hist line above.
+  const revWeak = reversion ? (reversion.tier === "TRAP" || (revPct != null && revPct <= 42)) : false;
+  const revProven = reversion ? reversion.tier === "PROVEN" : false;
+  const revUnproven = !reversion || reversion.tier === "UNPROVEN";
+  const weakBase = revWeak;                                                               // the losing-clock dock (amber)
+  const histLabel = revPct != null ? `${revPct}% reverted` : "unproven";
+  // HIGH can only stand over a PROVEN clock; otherwise the word is capped to an aligned/HIST line
+  // (a weak clock is amber; an unproven clock is muted and says "unproven" — n≥1 never says unproven).
+  const cappedHigh = convLevel === "HIGH" && !revProven;
+  const convWordFinal = (weakBase || cappedHigh) ? `${agree}/${voteReads.length} ALIGNED · HIST ${histLabel}` : convWord;
+  const convColorFinal = weakBase ? WARN : cappedHigh ? MUTED : convColor;
+  // The WATCH/arming gate is the reversion clock (one clock ticket↔read↔thesis, no fork).
   useEffect(() => { onWeakEdge?.({ weak: revWeak, histPct: revPct }); }, [revWeak, revPct, onWeakEdge]);
-  // Also surface the /intel/baserate object (hit% · expectancyR · n) so a published call can
-  // FREEZE the odds it was taken against — a record, distinct from the reversion veto above.
+  // /intel/baserate is kept ONLY to FREEZE the odds a published call was taken against — a
+  // past-tense record on the card, never a live conviction word (which cites the reversion clock).
   useEffect(() => { onBaseRate?.(baseRate ? { hitRate: baseRate.hitRate, expectancyR: baseRate.expectancyR, samples: baseRate.samples } : null); }, [baseRate, onBaseRate]);
 
   // ── PROVEN-EDGE PATTERN — not "more reads agree," but the SPECIFIC orthogonal stack the
@@ -320,11 +329,11 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
   const provenEdge = !!(
     fused && fused.crowdFade === direction && fused.smartSide === direction &&
     fused.fundingAnnualPct != null && Math.abs(fused.fundingAnnualPct) >= 10 &&
-    baseRate && baseRate.expectancyR > 0 && !weakBase   // never "proven" while the reversion clock says it bled
+    revProven   // the fade has actually reverted here (the ONE clock, edgeQuality PROVEN) — never over a weak/unproven one
   );
 
   const loading = fused === undefined;
-  const nothing = fused === null && !callers && !record && !advice && !baseRate && !flush && !basis && !ob && !magnets && !term;
+  const nothing = fused === null && !callers && !record && !advice && !reversion && !flush && !basis && !ob && !magnets && !term;
 
   // THE SYNTHESIS — one honest "so what" line woven from the full engine: the conviction
   // headline (from the multi-axis tally), then the context the chips don't spell out — the
@@ -344,11 +353,12 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
     if (mag) bits.push(`a liquidation magnet sits at $${px(mag.price)} ${direction === "SHORT" ? "below" : "above"} — a natural target`);
     if (record?.side) bits.push(`your ${direction.toLowerCase()} record on ${coin} is ${record.side.net >= 0 ? "+" : "-"}$${Math.abs(record.side.net)} over ${record.side.n} (${record.side.wr}%)`);
     else if (record) bits.push(`your ${coin} record is ${record.net >= 0 ? "+" : "-"}$${Math.abs(record.net)} over ${record.n}`);
-    const head = provenEdge ? `◆ Proven-edge setup — the funding-fade ${direction} on ${coin}, confirmed by smart money and a +${baseRate!.expectancyR}R base rate. The one confluence that's held up in testing.`
-      : weakBase ? `${agree} of ${voteReads.length} reads align ${direction}, but the hist says it loses — ${baseWeak && baseRate ? `${baseRate.hitRate}% hit · ${baseRate.expectancyR >= 0 ? "+" : ""}${baseRate.expectancyR}R over ${baseRate.samples}` : `it reverted only ${revPct}% of recent stretched-funding instances`}. Aligned lenses aren't a paying edge; trust your own thesis, not the fade.`
-      : convLevel === "HIGH" ? `◆ High-conviction ${direction} — ${agree} of ${voteReads.length} independent reads align.`
+    const alignLine = `${agree} of ${voteReads.length} reads align ${direction}`;
+    const head = provenEdge ? `◆ Proven-edge setup — the funding-fade ${direction} on ${coin}, confirmed by smart money and a hist that's reverted ${revPct}% of the time. The one confluence that's held up in testing.`
+      : weakBase ? `${alignLine}, but the hist says it loses — it reverted only ${revPct}% of recent stretched-funding instances. Aligned lenses aren't a paying edge; trust your own thesis, not the fade.`
       : convLevel === "AGAINST" ? `Heads up — the reads lean against your ${direction} (${pushback} push back).`
-      : convLevel === "MODERATE" ? `Moderate ${direction} — ${agree} of ${voteReads.length} reads align.`
+      : (convLevel === "HIGH" && revProven) ? `◆ Strong read ${direction} — ${alignLine}, and the fade has paid here (${revPct}% reverted).`
+      : (convLevel === "HIGH" || convLevel === "MODERATE") ? `${alignLine}${revUnproven ? " — but the fade is unproven here, so trust your own thesis over the tally" : ""}.`
       : `Thin read on ${coin} — trust your own thesis.`;
     return bits.length ? `${head} ${bits.join("; ")}.` : head;
   })();
@@ -418,14 +428,17 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
             );
           })()}
 
-          {/* BASE RATE — the honest historical resolution of the funding-fade setup here,
-              from the same engine that grades live. Often below break-even by design; when
-              it is, the read is "don't lean on this setup — trust your own edge." */}
-          {baseRate && (
+          {/* HIST — the ONE reversion clock (the SAME series the card / ticket / scanner cite):
+              how often fading this stretch has actually reverted here. Green when proven, amber
+              when it has bled, muted when there isn't enough history to prove it. The separate
+              /intel/baserate backtest is NOT shown here — one fade, one clock (Grok). */}
+          {reversion && (
             <div style={{ marginTop: 8, fontFamily: UI, fontSize: 11.5, color: FOG, lineHeight: 1.5 }}>
-              <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED }}>BASE RATE · </span>
-              the funding-fade on {coin} resolved to target <b style={{ color: baseRate.expectancyR > 0 ? POS : WARN }}>{baseRate.hitRate}%</b> over {baseRate.samples} stretched-funding instances ({baseRate.windowDays}d), {baseRate.expectancyR >= 0 ? "+" : ""}{baseRate.expectancyR}R avg.{" "}
-              <span style={{ color: MUTED }}>{baseRate.expectancyR > 0 ? "A real edge here — still size for variance." : "This setup has bled here — lean on your own thesis, not the fade."}</span>
+              <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: MUTED }}>HIST · </span>
+              {revPct != null
+                ? <>fading {coin} here has reverted <b style={{ color: revProven ? POS : revWeak ? WARN : MUTED }}>{revPct}%</b> of the last {reversion.samples} stretched-funding instances.{" "}
+                    <span style={{ color: MUTED }}>{revProven ? "A real edge here — still size for variance." : revWeak ? "This setup has bled here — lean on your own thesis, not the fade." : "Not proven yet — trust your own read over the fade."}</span></>
+                : <span style={{ color: MUTED }}>no reversion history for {coin} yet — the fade is unproven; trust your own read.</span>}
             </div>
           )}
 
@@ -509,14 +522,14 @@ export function LiveRead({ symbol, direction, trades, levels, wallet, onWeakEdge
               <Simulate
                 label="◆ Pressure-test this trade →"
                 wallet={wallet}
-                body={{ kind: "thesis", coin, direction, notes: synth || `${direction} ${coin} — ${convWord}, ${agree}/${voteReads.length} reads align.` }}
+                body={{ kind: "thesis", coin, direction, notes: synth || `${direction} ${coin} — ${convWordFinal}, ${agree}/${voteReads.length} reads align.` }}
               />
             </div>
             {reads.length >= 2 && (() => {
               // Share the read — on-brand content ("multi-axis, graded, not advice"), pulls eyes
               // back to the Lab. Frames it as a READ, never a call/signal.
               const conf = reads.filter((r) => r.ok).map((r) => r.label).slice(0, 4).join(", ");
-              const text = `◆ Nexus read — ${convWord}, ${direction} ${coin}: ${agree}/${voteReads.length} independent reads align${conf ? ` (${conf})` : ""}. Multi-axis, graded on-chain, not advice. The full breakdown 👇`;
+              const text = `◆ Nexus read — ${convWordFinal}, ${direction} ${coin}: ${agree}/${voteReads.length} independent reads align${conf ? ` (${conf})` : ""}. Multi-axis, graded on-chain, not advice. The full breakdown 👇`;
               const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent("https://trade.nexustradinglabs.com/lab")}`;
               return (
                 <a href={xUrl} target="_blank" rel="noopener noreferrer" title="Share this read on X" className="nx-press"

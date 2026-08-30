@@ -33,11 +33,14 @@ test("rankConviction tallies agreement and ranks by net confirmation", () => {
 });
 
 test("convictionLevel maps net confirmations to a label", () => {
-  assert.equal(convictionLevel({ extra: 2, against: 0 }), "HIGH");
+  // HIGH requires BOTH ≥2 net confirmations AND a PROVEN hist clock (Grok: n=0 → never HIGH).
+  assert.equal(convictionLevel({ extra: 2, against: 0, histTier: "PROVEN" }), "HIGH");
+  assert.equal(convictionLevel({ extra: 2, against: 0, histTier: "UNPROVEN" }), "MODERATE"); // unproven clock caps at MODERATE
+  assert.equal(convictionLevel({ extra: 2, against: 0 }), "MODERATE");                        // no tier = unproven
   assert.equal(convictionLevel({ extra: 1, against: 0 }), "MODERATE");
   assert.equal(convictionLevel({ extra: 0, against: 1 }), "CONFLICTED");
   assert.equal(convictionLevel({ extra: 0, against: 0 }), "FUNDING_ONLY");
   // A weak reversion clock docks conviction — aligned lenses over a losing hist can't read HIGH.
-  assert.equal(convictionLevel({ extra: 2, against: 0, histWeak: true }), "FUNDING_ONLY");
-  assert.equal(convictionLevel({ extra: 0, against: 2, histWeak: true }), "CONFLICTED");
+  assert.equal(convictionLevel({ extra: 2, against: 0, histWeak: true, histTier: "TRAP" }), "FUNDING_ONLY");
+  assert.equal(convictionLevel({ extra: 0, against: 2, histWeak: true, histTier: "TRAP" }), "CONFLICTED");
 });

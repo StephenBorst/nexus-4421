@@ -218,9 +218,12 @@ function SynthChart({ points, price, direction, smartMoney, markPrice, fundingAn
 
   const smSide = smartMoney?.side;
   const MF = "ui-monospace,monospace";
-  // The caption + fade-accent highlight must follow the SAME floor as the verdict (Grok):
-  // a pierce on a trivial band is not "stretched". Pierced AND economically large → stretched.
-  const stretchedEnough = pierced && Math.abs(fundingAnnualPct) >= FADE_FUNDING_FLOOR_PCT_YR;
+  // The caption + fade-accent must follow the SAME pierce the badge uses (Grok): m.stretched
+  // (the server oi:hist pierce), not the chart's own read of the plotted window — else the panel
+  // prints "within its typical range · no crowd extreme" under a FADE LONG badge. Fall back to
+  // the chart's pierce only when the server didn't stamp one. Trivial band (< floor) is not stretched.
+  const badgePierced = m.stretched != null ? m.stretched === true : pierced;
+  const stretchedEnough = badgePierced && Math.abs(fundingAnnualPct) >= FADE_FUNDING_FLOOR_PCT_YR;
   return (
     <div>
       <svg viewBox={`0 0 ${VB_W} ${VB_H}`} style={{ display: "block", width: "100%", height: "auto" }} role="img" aria-label="Price over funding, time-aligned, with the smart-money marker on the live price.">
@@ -272,7 +275,7 @@ function SynthChart({ points, price, direction, smartMoney, markPrice, fundingAn
         {hasFunding
           ? (stretchedEnough
               ? "Funding has pierced its typical range — the crowd is stretched. Watch whether price gives it back."
-              : pierced
+              : badgePierced
               ? `Funding poked out of its range, but at ${fundingAnnualPct >= 0 ? "+" : ""}${fundingAnnualPct}%/yr the cost to hold is trivial — not stretched enough to fade.`
               : "Funding is within its typical range — no crowd extreme to fade right now.")
           : "Price over the window. Funding history is still accumulating for this market."}
