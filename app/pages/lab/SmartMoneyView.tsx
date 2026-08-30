@@ -66,6 +66,17 @@ function CopyConfirm({ leader, sym, side, onConfirm, onCancel }: {
       .finally(() => { if (!off) setLoading(false); });
     return () => { off = true; };
   }, [leader]);
+  // The coin's SHARP split — the SAME /smart/consensus field the Funding Edge ticket lens shows
+  // ({side, long, short}), so the confirm cites 4L/1S, not Quick Call's bare "5" (Grok). Context.
+  const [smart, setSmart] = useState<{ side: "LONG" | "SHORT"; count: number; long: number; short: number } | null>(null);
+  useEffect(() => {
+    let off = false;
+    const bare = sym.replace(/^PERP_/, "").replace(/_USDC$/, "").toUpperCase();
+    fetch(`${AGENT_API}/smart/consensus`).then((r) => r.json())
+      .then((d) => { const s = d?.consensus?.[bare]; if (!off) setSmart(s && (s.side === "LONG" || s.side === "SHORT") ? { side: s.side, count: s.count ?? 0, long: s.long ?? 0, short: s.short ?? 0 } : null); })
+      .catch(() => { /* no read — the line just hides */ });
+    return () => { off = true; };
+  }, [sym]);
   const graded = !!track && !track.building && (track.daysTracked ?? 0) > 0;
   const net = track?.netRealized ?? 0;
   const sideCol = side === "LONG" ? "#3ecf8e" : "#f7525f";
@@ -73,20 +84,33 @@ function CopyConfirm({ leader, sym, side, onConfirm, onCancel }: {
     <div onClick={onCancel} style={{ position: "fixed", inset: 0, zIndex: 9100, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(2px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div className="nx-fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "min(420px, 96vw)", background: "#0f0f11", border: "1px solid #33333a", borderRadius: 10, padding: 18 }}>
         <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase", marginBottom: 8 }}>Copy this move</div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: smart ? 6 : 14 }}>
           <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 18, fontWeight: 700, color: "#ededf0" }}>{sym}</span>
           <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 13, fontWeight: 700, color: sideCol }}>{side === "LONG" ? "↑ LONG" : "↓ SHORT"}</span>
           <span style={{ marginLeft: "auto", fontFamily: "var(--nx-font-mono)", fontSize: 10, color: "#71717a" }}>{short(leader)}</span>
         </div>
+        {/* The sharp split — the SAME field the Funding Edge ticket shows (4L/1S), not the Quick
+            Call's bare count. Plain context: the sharp positioning on this coin, no conviction word. */}
+        {smart && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14, fontFamily: "var(--nx-font-mono)", fontSize: 10.5 }}>
+            <span style={{ fontSize: 8, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase" }}>Smart money</span>
+            <b style={{ color: "#a1a1aa" }}>{smart.long}L/{smart.short}S</b>
+            <span style={{ color: smart.side === "LONG" ? "#3ecf8e" : "#f7525f" }}>{smart.side}</span>
+            {smart.side !== side && <span style={{ color: "#52525b" }}>· you're copying the other way</span>}
+          </div>
+        )}
         {/* The GRADED, WATCHED record — the number that can't be faked, not lifetime PnL. */}
         <div style={{ border: "1px solid #232327", borderRadius: 8, padding: "10px 12px", marginBottom: 14, background: "#0c0c0e" }}>
           <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 8, letterSpacing: "0.1em", color: "#52525b", textTransform: "uppercase", marginBottom: 6 }}>What you're tracking</div>
           {loading ? (
             <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#71717a" }}>reading graded record…</div>
           ) : graded ? (
-            <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#a1a1aa", lineHeight: 1.6 }}>
-              watched <b style={{ color: net >= 0 ? "#3ecf8e" : "#f7525f", fontSize: 14 }}>{net >= 0 ? "+" : ""}{usd(net)}</b> · {track!.daysTracked}d tracked{track!.winWindowRate != null ? <> · <b style={{ color: "#ededf0" }}>{track!.winWindowRate}%</b> green days</> : null}
-            </div>
+            <>
+              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#a1a1aa", lineHeight: 1.6 }}>
+                watched <b style={{ color: net >= 0 ? "#3ecf8e" : "#f7525f", fontSize: 14 }}>{net >= 0 ? "+" : ""}{usd(net)}</b> · {track!.daysTracked}d tracked{track!.winWindowRate != null ? <> · <b style={{ color: "#ededf0" }}>{track!.winWindowRate}%</b> green days</> : null}
+              </div>
+              <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 5, lineHeight: 1.5 }}>This is the window you've been watching, not lifetime.</div>
+            </>
           ) : (
             <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 11, color: "#71717a", lineHeight: 1.55 }}>No graded watched record yet — the agent grades this copy on-chain from here.</div>
           )}
