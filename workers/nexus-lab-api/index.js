@@ -2800,13 +2800,24 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
         }
       } catch { /* cache miss → recompute */ }
       try {
-        // Realistic UA — Orderly's edge intermittently serves an HTML 403 to header-light
-        // Worker fetches (same reason the brain sends browser headers).
-        const res = await fetch("https://api-evm.orderly.org/v1/public/futures", {
-          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36", "Accept": "application/json, text/plain, */*" },
-        });
-        const j = await res.json();
-        const board = mispricedBoard(j?.data?.rows || []);
+        // Realistic UA — Orderly's edge intermittently serves an HTML 403 to header-light Worker
+        // fetches (same reason the brain sends browser headers). That 403 throws on .json() and
+        // dumped the WHOLE board empty (scanned:0, no cards — it blinked out on a bad tick). One
+        // extra attempt (a short pause lands it on a different edge node) recovers it; if BOTH
+        // attempts fail we fail-soft WITHOUT caching, so the very next request retries fresh (never
+        // pin an empty board for the 600s cache TTL).
+        let rows = [];
+        for (let attempt = 0; attempt < 2 && !rows.length; attempt++) {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, 200));
+          try {
+            const res = await fetch("https://api-evm.orderly.org/v1/public/futures", {
+              headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36", "Accept": "application/json, text/plain, */*" },
+            });
+            rows = (await res.json())?.data?.rows || [];
+          } catch { /* retry once, then fail-soft below */ }
+        }
+        if (!rows.length) return json({ asOf: new Date().toISOString(), scanned: 0, mispricedCount: 0, markets: [], error: "futures unavailable" }, request);
+        const board = mispricedBoard(rows);
 
         // Self-awareness: enrich each FLAGGED market with whether fading it has
         // HISTORICALLY paid, then rank proven-edge first and traps last. Reversion is
