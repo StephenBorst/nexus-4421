@@ -8,7 +8,6 @@ import { SectionHeader } from "./components";
 import { C } from "@/config/theme";
 import { AGENT_API } from "./agentTypes";
 import { h4Atr14Frac } from "@/lib/atr.mjs";
-import { FADE_FUNDING_FLOOR_PCT_YR } from "./briefing";
 
 const MONO = "var(--nx-font-mono)";
 const UI = "var(--nx-font-ui, sans-serif)";
@@ -47,12 +46,10 @@ async function draftCatalyst(im: Impact, c: Catalyst, v: Verdict): Promise<boole
   const round = (x: number) => Number(x.toFixed(dp));
   const stopLoss = round(isShort ? entry + risk : entry - risk);
   const takeProfit1 = round(isShort ? entry - RR * risk : entry + RR * risk);
-  // Apply the 10% economic floor the Board applies (derivePlay) — /signals emits raw FADE without
-  // it (BTC leaves the API as FADE at 2.22%/yr), so a below-floor FADE reads WATCH here, never a
-  // "FADE at 0.8%" on this new surface. (The source fix in /signals readVerdict is a separate lane.)
-  const effVerdict = v.verdict === "FADE" && Math.abs(v.ann) < FADE_FUNDING_FLOOR_PCT_YR ? "WATCH" : v.verdict;
-  const fundLens = effVerdict === "FADE" ? `FADE ${v.fadeDir}` : effVerdict === "WATCH" ? "WATCH — funding not stretched" : "no funding edge";
-  const fundNote = effVerdict === "FADE"
+  // The funding verdict comes straight from /signals — the floor now lives in readVerdict there
+  // (one path owns it), so no client clamp: a below-floor pierce already arrives as WATCH.
+  const fundLens = v.verdict === "FADE" ? `FADE ${v.fadeDir}` : v.verdict === "WATCH" ? "WATCH — funding not stretched" : "no funding edge";
+  const fundNote = v.verdict === "FADE"
     ? (v.fadeDir === im.direction ? " (funding agrees)" : " (funding fades the other way — this is an event-driven directional call, not a funding fade)")
     : "";
   const draft = {

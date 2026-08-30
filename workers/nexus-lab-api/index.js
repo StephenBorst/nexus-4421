@@ -1153,7 +1153,7 @@ export default {
         stretched = fundingStretched((hist || []).map((h) => Number(h.funding)));
       } catch { /* stretched null → WATCH */ }
       const direction = row?.direction === "LONG" || row?.direction === "SHORT" ? row.direction : "NONE";
-      const verdict = readVerdict(direction, stretched);
+      const verdict = readVerdict(direction, stretched, Number(row?.fundingAnnualPct) || 0);
       const mp = Number(row?.markPrice) || 0;
       const payload = {
         coin,
@@ -2852,7 +2852,7 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
           } catch { m.reversion = null; }
           // Pierce + verdict ALWAYS stamped (oi:hist-first), regardless of the reversion fetch.
           m.stretched = fundingStretched(fvals);
-          m.verdict = readVerdict(m.direction, m.stretched);
+          m.verdict = readVerdict(m.direction, m.stretched, m.fundingAnnualPct);
           m.edgeQuality = edgeQuality(m.reversion);
         }));
         flagged.sort((a, b) => (EDGE_QUALITY_RANK[a.edgeQuality.tier] - EDGE_QUALITY_RANK[b.edgeQuality.tier]) || (b.edge - a.edge));

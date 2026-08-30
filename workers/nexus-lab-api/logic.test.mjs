@@ -2045,8 +2045,12 @@ test("fundingStretched + readVerdict: pierce=FADE, in-band=WATCH, thin=WATCH", (
   assert.equal(fundingStretched([...band, 2]), false); // last inside the band
   assert.equal(fundingStretched([...band, 5]), true);  // last pierces high
   assert.equal(fundingStretched([1, 2, 3]), null);     // too thin to judge
-  assert.equal(readVerdict("SHORT", true), "FADE");
-  assert.equal(readVerdict("SHORT", false), "WATCH");
-  assert.equal(readVerdict("SHORT", null), "WATCH");   // can't confirm → WATCH, never FADE
-  assert.equal(readVerdict("NONE", true), "NONE");
+  // FADE only when pierced AND the annualized funding clears the 10% economic floor (Grok).
+  assert.equal(readVerdict("SHORT", true, 27), "FADE");     // pierced + big → FADE
+  assert.equal(readVerdict("SHORT", true, 2.22), "WATCH");  // pierced but below floor (BTC case) → WATCH
+  assert.equal(readVerdict("SHORT", true, 9.64), "WATCH");  // just under the floor → WATCH
+  assert.equal(readVerdict("SHORT", true), "WATCH");        // unknown funding → can't confirm floor → WATCH
+  assert.equal(readVerdict("SHORT", false, 40), "WATCH");   // not pierced → WATCH even if huge
+  assert.equal(readVerdict("SHORT", null, 40), "WATCH");    // can't confirm pierce → WATCH, never FADE
+  assert.equal(readVerdict("NONE", true, 40), "NONE");
 });

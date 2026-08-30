@@ -92,11 +92,12 @@ export async function computeSignalRows(env) {
       const fs = histRaw ? (JSON.parse(histRaw) || []).map((h) => Number(h.funding)).filter(Number.isFinite) : [];
       const stretched = fundingStretched(fs);
       const fadeDir = funding > 0 ? "SHORT" : funding < 0 ? "LONG" : "NONE";
-      const verdict = readVerdict(fadeDir, stretched); // FADE | WATCH | NONE
+      const fundingAnnualPct = Number((funding * 1095 * 100).toFixed(2));
+      const verdict = readVerdict(fadeDir, stretched, fundingAnnualPct); // FADE only if pierce AND |annual| ≥ floor
       return {
         symbol: bare,
         mark_price: mark, funding_rate_8h: funding, open_interest: oi,
-        funding_annual_pct: Number((funding * 1095 * 100).toFixed(2)),
+        funding_annual_pct: fundingAnnualPct,
         fade_dir: fadeDir, verdict, stretched,
         price_change_pct: Number((priceChange * 100).toFixed(3)),
         oi_change_pct: Number((oiChange * 100).toFixed(3)),

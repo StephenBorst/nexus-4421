@@ -1,5 +1,9 @@
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+// The ONE economic floor for a FADE (shared, never a second literal) — a stretch on a trivial
+// funding band is not a crowded fade. readVerdict applies it so a below-floor pierce leaves the
+// API as WATCH, matching the client Board/ticket. Cross-dir import bundles like axisbt's atr.mjs.
+import { FADE_FUNDING_FLOOR_PCT_YR } from "../../app/lib/conviction.mjs";
 
 // ═══════════════════════════════════════════════════════════
 // Pure, testable logic for nexus-lab-api.
@@ -2078,9 +2082,14 @@ export function fundingStretched(fundingValues) {
   const lf = fs[fs.length - 1];
   return lf > q(0.75) || lf < q(0.25);
 }
-export function readVerdict(direction, stretched) {
+export function readVerdict(direction, stretched, fundingAnnualPct) {
   if (direction !== "LONG" && direction !== "SHORT") return "NONE";
-  return stretched === true ? "FADE" : "WATCH";
+  // FADE only when pierced (stretched vs its own band) AND the annualized cost clears the
+  // economic floor (Grok) — a below-floor pierce (e.g. BTC "stretched" at 2.22%/yr) is a WATCH,
+  // not a fade. ONE floor const, shared with the client Board/ticket so the API can't leave a
+  // row as FADE that the glass clamps to WATCH. Unknown funding → can't confirm the floor → WATCH.
+  const bigEnough = Math.abs(Number(fundingAnnualPct) || 0) >= FADE_FUNDING_FLOOR_PCT_YR;
+  return (stretched === true && bigEnough) ? "FADE" : "WATCH";
 }
 
 // ── THE BOARD share card — the top confluence reads, server-side ──────────────
