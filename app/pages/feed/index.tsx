@@ -483,6 +483,7 @@ function FeedCard({
   onFollowToggle: (wallet: string) => void;
   social?: { c: number; reactions: Record<string, number>; you: string[] };
 }) {
+  const isMobile = useIsMobile();
   const eff = effectiveStatus(thesis);
   const cfg = STATUS_CONFIG[eff] ?? STATUS_CONFIG.ACTIVE;
   // 2px state left-rule (Proof-card signature). Win/loss carry the only chroma;
@@ -648,8 +649,10 @@ function FeedCard({
         const toSL = distancePct(markPrice, thesis.stopLoss);
         const toTP = distancePct(markPrice, thesis.takeProfit1);
         const isWinning = pnl >= 0;
+        // Live P&L stats: on phones drop to a 2×2 grid so the UNREALIZED value (dollars +
+        // parenthetical %) gets a full-width cell and can't spill into TO SL; desktop keeps 4-up.
         return (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(70px, 1fr))", gap: "8px 12px", marginBottom: 10, paddingTop: 10, borderTop: "1px solid #232327" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(70px, 1fr))", gap: "8px 12px", marginBottom: 10, paddingTop: 10, borderTop: "1px solid #232327" }}>
             <div>
               <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#71717a", fontFamily: "var(--nx-font-mono)" }}>MARK</div>
               <div style={{ fontSize: 12, color: "#fff", fontFamily: "var(--nx-font-mono)", fontWeight: "bold", marginTop: 2 }}>

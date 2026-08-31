@@ -359,8 +359,27 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
     <button onClick={() => setSort(mode)} style={{
       background: sort === mode ? "#1a1a1e" : "none", border: `1px solid ${sort === mode ? C.accent : C.border}`,
       color: sort === mode ? C.accent : C.text.muted, fontFamily: MONO, fontSize: 9, letterSpacing: "0.08em",
-      padding: "4px 9px", borderRadius: RADIUS.sm, cursor: "pointer",
+      padding: isMobile ? "6px 4px" : "4px 9px", borderRadius: RADIUS.sm, cursor: "pointer",
+      // On phones each chip fills its equal grid cell (congruent) and never wraps its label.
+      ...(isMobile ? { width: "100%", textAlign: "center" as const, whiteSpace: "nowrap" as const, minHeight: 30 } : {}),
     }}>{label}</button>
+  );
+  // Extracted so the same SHARE control sits in the desktop inline row AND the mobile header
+  // row (no marginLeft:auto on mobile — it lives in a space-between flex there).
+  const shareBtn = (
+    <button
+      onClick={() => {
+        const text = "The Board on Nexus — every market, one read, graded from public price. The mechanical play + how many independent reads confirm it:";
+        const url = "https://og.nexustradinglabs.com/share/board";
+        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, "_blank", "noopener");
+      }}
+      title="Share this live read as a card on X"
+      className="nx-press"
+      style={{
+        marginLeft: isMobile ? 0 : "auto", background: "none", border: `1px solid ${C.border}`, color: C.text.muted,
+        fontFamily: MONO, fontSize: 9, letterSpacing: "0.08em", padding: "4px 10px", borderRadius: RADIUS.sm, cursor: "pointer", flexShrink: 0,
+      }}
+    >↗ SHARE</button>
   );
 
   const cols = "minmax(60px,0.85fr) minmax(76px,1fr) minmax(84px,1.05fr) 54px minmax(66px,0.8fr) minmax(140px,1.6fr) minmax(118px,1.25fr) 34px";
@@ -388,28 +407,35 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
         {hasLoop && <> Your loop state rides on the ticker: <b style={{ color: C.text.bright }}>● a live call</b> (planned) · <b style={{ color: C.text.bright }}>▸ an open position</b> (executing) — the graded record closes it.</>}
       </div>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center" }}>
-        <span style={{ fontFamily: MONO, fontSize: 9, color: C.text.faint, alignSelf: "center", letterSpacing: "0.06em" }}>SORT</span>
-        {hasLens && sortBtn("mine", "◆ MINE")}
-        {sortBtn("actionable", "ACTIONABLE")}
-        {sortBtn("confluence", "◆ CONFLUENCE")}
-        {sortBtn("funding", "FUNDING")}
-        {sortBtn("movers", "MOVERS")}
-        {/* Share the LIVE read as a branded, verifiable card that unfurls on X (the flywheel). */}
-        <button
-          onClick={() => {
-            const text = "The Board on Nexus — every market, one read, graded from public price. The mechanical play + how many independent reads confirm it:";
-            const url = "https://og.nexustradinglabs.com/share/board";
-            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, "_blank", "noopener");
-          }}
-          title="Share this live read as a card on X"
-          className="nx-press"
-          style={{
-            marginLeft: "auto", background: "none", border: `1px solid ${C.border}`, color: C.text.muted,
-            fontFamily: MONO, fontSize: 9, letterSpacing: "0.08em", padding: "4px 10px", borderRadius: RADIUS.sm, cursor: "pointer",
-          }}
-        >↗ SHARE</button>
-      </div>
+      {/* Sort controls. Desktop = one inline row. Mobile = SORT + SHARE on a header line, then
+          the chips in an equal-width repeat(3,1fr) grid so they're congruent and WRAP instead of
+          running off the right edge (the tab-row pattern). Share the LIVE read as a branded card
+          that unfurls on X (the flywheel). */}
+      {isMobile ? (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <span style={{ fontFamily: MONO, fontSize: 9, color: C.text.faint, letterSpacing: "0.06em" }}>SORT</span>
+            {shareBtn}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+            {hasLens && sortBtn("mine", "◆ MINE")}
+            {sortBtn("actionable", "ACTIONABLE")}
+            {sortBtn("confluence", "◆ CONFLUENCE")}
+            {sortBtn("funding", "FUNDING")}
+            {sortBtn("movers", "MOVERS")}
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center" }}>
+          <span style={{ fontFamily: MONO, fontSize: 9, color: C.text.faint, alignSelf: "center", letterSpacing: "0.06em" }}>SORT</span>
+          {hasLens && sortBtn("mine", "◆ MINE")}
+          {sortBtn("actionable", "ACTIONABLE")}
+          {sortBtn("confluence", "◆ CONFLUENCE")}
+          {sortBtn("funding", "FUNDING")}
+          {sortBtn("movers", "MOVERS")}
+          {shareBtn}
+        </div>
+      )}
 
       {!signals ? (
         <div style={{ fontFamily: MONO, fontSize: 11, color: C.text.faint, padding: "18px 4px" }}>loading the board…</div>
