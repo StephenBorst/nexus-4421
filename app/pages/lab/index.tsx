@@ -181,8 +181,10 @@ export default function TheLabPage() {
       {/* ── LIVE MARKET TICKER ── the Wall-Street tape up top (market presence
           restored to the fold as one thin ambient line, not the old 415px stack). */}
       <NexusTicker />
-      {/* ── STATS HEADER ── (the "THE LAB ●" mark was redundant with the nav tab — removed
-          to declutter; the account stats now lead this strip on their own) */}
+      {/* ── STATS HEADER ── account P&L stats. Hidden while DISCONNECTED (guest): the whole
+          strip would just be OPEN / CLOSED / WIN RATE / REALIZED / UNREALIZED / BALANCE dashes —
+          chrome over the board. Connect brings it (and the data) back. */}
+      {connected && (
       <div style={{ display: "flex", alignItems: "center", justifyContent: isMobile ? "space-between" : "flex-end", padding: isMobile ? "6px 10px" : "6px 18px", background: "#0f0f11", borderBottom: "1px solid #232327", flexWrap: "wrap", gap: 4 }}>
         <div style={isMobile
           ? { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px 6px", width: "100%", marginTop: 4 }
@@ -204,6 +206,7 @@ export default function TheLabPage() {
           ))}
         </div>
       </div>
+      )}
       {/* ── TAB BAR ── */}
       <div style={{ display: "flex", gap: 2, padding: isMobile ? "6px 8px" : "8px 16px", borderBottom: "1px solid #232327", background: "#0f0f11", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", gap: isMobile ? 4 : 2, flex: 1, minWidth: 0, flexWrap: isMobile ? "wrap" : "nowrap", overflowX: isMobile ? "visible" : "auto", alignItems: "center" }}>
@@ -259,7 +262,9 @@ export default function TheLabPage() {
           )}
         </div>
       </div>
-      <div style={{ padding: isMobile ? 12 : 16 }}>
+      {/* Extra bottom padding on phones so the last board rows (and their → ) can scroll clear
+          of the fixed bottom-right NEXUS AI FAB, instead of resting under it. */}
+      <div style={{ padding: isMobile ? "12px 12px 88px" : 16 }}>
         {/* Information hierarchy: the graded record (the moat claim) + onboarding
             lead, then the active tab — the task the user came for. The ambient promo/
             status chrome (market, network-verify, PRO badge) used to stack ~415px
