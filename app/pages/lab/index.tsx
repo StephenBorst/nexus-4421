@@ -59,6 +59,7 @@ export default function TheLabPage() {
   }, []);
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [showAllTabs, setShowAllTabs] = useState(false); // guest nav expands from 3 rooms → full set
   const today = new Date();
 
   // ── Persistence (KV + localStorage) ─────────────────────
@@ -150,8 +151,17 @@ export default function TheLabPage() {
     { id: "tradelog",       label: "Trading Log",        short: "LOG",   phase: "PROVE"   },
     { id: "analytics",      label: "Analytics",          short: "STATS", phase: "PROVE"   },
   ];
+  // ── Guest Lab IA — three rooms ────────────────────────────────────────────────
+  // A guest (no wallet) sees the three read-first rooms — Market Intel · Smart Money · Thesis
+  // Engine — plus a More toggle that reveals the rest (Agent / Quick Trade / Copy Trades / Holders
+  // Room / Trading Log / Analytics, which need a wallet to be useful). A connected wallet always
+  // sees the full set. If a guest deep-links to a gated tab, show everything so the active tab is
+  // never orphaned. Publish / COPY / ARM LIVE stay wallet-gated in their own surfaces.
+  const GUEST_ROOMS: TabId[] = ["intel", "smart", "thesis"];
+  const guestNav = !rootWalletAddress && !showAllTabs && GUEST_ROOMS.includes(activeTab);
+  const visibleTabs = guestNav ? tabs.filter((t) => GUEST_ROOMS.includes(t.id)) : tabs;
   // Group in declaration order — the array above IS the loop's order.
-  const tabGroups = tabs.reduce<{ phase: string; items: typeof tabs }[]>((acc, t) => {
+  const tabGroups = visibleTabs.reduce<{ phase: string; items: typeof tabs }[]>((acc, t) => {
     const last = acc[acc.length - 1];
     if (last && last.phase === t.phase) last.items.push(t);
     else acc.push({ phase: t.phase, items: [t] });
@@ -247,6 +257,19 @@ export default function TheLabPage() {
               })}
             </div>
           ))}
+          {/* Guest nav: a More toggle reveals the wallet-gated rooms without a full-screen funnel. */}
+          {guestNav && (
+            <button onClick={() => setShowAllTabs(true)} title="Show all Lab tools"
+              style={isMobile ? {
+                background: "none", border: "1px solid #232327", color: "#71717a",
+                fontFamily: "var(--nx-font-mono)", fontSize: 10, letterSpacing: "0.06em", fontWeight: 600,
+                padding: "6px 8px", cursor: "pointer", borderRadius: 4, minHeight: 36, flex: "1 0 21%", flexShrink: 1, whiteSpace: "nowrap",
+              } : {
+                background: "none", border: "none", borderBottom: "2px solid transparent", color: "#71717a",
+                fontFamily: "var(--nx-font-ui)", fontSize: 12.5, letterSpacing: "0.01em", fontWeight: 500,
+                padding: "5px 13px 8px", cursor: "pointer", whiteSpace: "nowrap",
+              }}>{isMobile ? "MORE +" : "More +"}</button>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, marginLeft: 8 }}>
           {!isMobile && <SimCreditsBadge />}
