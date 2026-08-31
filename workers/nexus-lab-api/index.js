@@ -73,6 +73,7 @@ import { computeSignalRows, deliverSignals, snapshotTrendRegimes } from "./signa
 // shareable card can never disagree with the profile it depicts. Bundled cross-dir by
 // wrangler like the other ../ imports.
 import { buildOperatorProfile } from "../../app/lib/operatorProfile.mjs";
+import { h4Atr14Frac } from "../../app/lib/atr.mjs";
 // Directive level validation lives with the exec's money-path logic (single source);
 // wrangler bundles the cross-dir import (same as backtest.mjs).
 import { directiveLevels } from "../nexus-agent-exec/logic.mjs";
@@ -774,9 +775,36 @@ async function buildCatalystBoard(env) {
     if (markByCoin.NAS != null) markByCoin.NAS100 = markByCoin.NAS;
     if (markByCoin.OIL != null) markByCoin.CL = markByCoin.OIL;
   } catch { markByCoin = {}; }
+
+  // ── THE GATE (Grok) — the API must match the card: a catalyst mints a PUBLIC thesis ONLY
+  // for a coin that has a /signals funding VERDICT (computeSignalRows — the ONE verdict source,
+  // crypto signals set only, so SPX500/NAS100/CL never qualify) AND an H4 ATR-14 (candle:hist)
+  // to fill the frozen 1.2×ATR / 1.5R / 7d object. Everything else stays a chip (thesis:null) —
+  // never a fabricated RR-2 draft. Fail-soft: any error ⇒ empty gate ⇒ all chips (honest).
+  const gateByCoin = {};
+  try {
+    const AGENT_KV = env.NEXUS_AGENT || env.LAB_STORE;
+    const sigRows = await computeSignalRows(env);
+    const verdictByCoin = {};
+    for (const r of sigRows || []) if (r && r.symbol && r.verdict) verdictByCoin[String(r.symbol).toUpperCase()] = r.verdict;
+    const coins = new Set();
+    for (const c of board.catalysts || []) for (const im of (c.impacts || [])) if (im && im.coin) coins.add(String(im.coin).toUpperCase());
+    await Promise.all([...coins].map(async (coin) => {
+      const verdict = verdictByCoin[coin];
+      if (!verdict) return;                            // no /signals row → chip
+      try {
+        const raw = await AGENT_KV.get(`candle:hist:PERP_${coin}_USDC`);
+        const candles = raw ? JSON.parse(raw) : [];
+        // candle:hist stores t in ms; h4Atr14Frac wants seconds. null until ~60h of history.
+        const atrFrac = h4Atr14Frac((candles || []).map((k) => ({ t: Number(k.t) / 1000, h: Number(k.h), l: Number(k.l), c: Number(k.c) })));
+        if (Number.isFinite(atrFrac) && atrFrac > 0) gateByCoin[coin] = { verdict, atrFrac };
+      } catch { /* no candle history → no ATR → chip */ }
+    }));
+  } catch { /* no signals / ATR → gateByCoin empty → every impact a chip */ }
+
   return {
-    asOf: new Date().toISOString(), ...attachCatalystTheses(board, markByCoin),
-    note: "World events mapped to markets you can trade on Nexus — crowd probability shows how priced it already is. Each impact carries a GRADEABLE thesis (entry/stop/target, graded in R by the same grader as human calls). A setup to stake a graded thesis + execute here, not advice, not a signal.",
+    asOf: new Date().toISOString(), ...attachCatalystTheses(board, markByCoin, gateByCoin),
+    note: "World events mapped to markets you can trade on Nexus — crowd probability shows how priced it already is. A coin drafts a GRADEABLE thesis ONLY when it has a funding verdict on the board and can fill the frozen object (mark, 1.2× H4 ATR stop, 1.5R, 7d, why = event + funding); the rest stay event chips. A setup to stake a graded thesis + execute here, not advice, not a signal.",
   };
 }
 
@@ -811,7 +839,7 @@ async function generateCatalystHouseCalls(env, { dryRun = false, max = 2 } = {})
       const recent = existing.find((t) => t.symbol === im.thesis.symbol && t.direction === im.direction &&
         ((now - (t.createdAt || 0) < DAY) || (t.status === "ACTIVE" && t.gradedOutcome !== "WIN" && t.gradedOutcome !== "LOSS")));
       if (recent) continue;
-      const call = catalystHouseCall(im, { markPrice: im.thesis.entryPrice, question: c.question, category: c.category, now });
+      const call = catalystHouseCall(im, { thesis: im.thesis, question: c.question, category: c.category, now });
       if (call) { toPost.push(call); seenKey.add(key); }
     }
   }

@@ -1951,64 +1951,90 @@ test("resolveLens: negated rate question flips the lens", () => {
 });
 
 // ── Roadmap #3: Catalyst → the ONE gradeable thesis schema, graded in R ────────
-test("catalystToThesis: LONG impact → gradeable levels a WIN prints at +riskReward R", () => {
+test("catalystToThesis: gated LONG → FROZEN 1.2×ATR / 1.5R levels, a WIN prints at +1.5R", () => {
   const impact = { coin: "BTC", market: "PERP_BTC_USDC", direction: "LONG", rationale: "risk-on backdrop" };
-  const th = catalystToThesis(impact, { markPrice: 100, createdAt: t0 * 1000, stopPct: 2, riskReward: 2, question: "Fed cuts?", category: "RATES" });
+  // atrFrac 0.025 @ mark 100 → risk = 100 × 0.025 × 1.2 = 3 → stop 97, TP 100 + 1.5×3 = 104.5
+  const th = catalystToThesis(impact, { markPrice: 100, atrFrac: 0.025, verdict: "WATCH", createdAt: t0 * 1000, question: "Fed cuts?", category: "RATES" });
   assert.equal(th.symbol, "PERP_BTC_USDC");
   assert.equal(th.entryPrice, 100);
-  assert.equal(th.stopLoss, 98);       // 2% risk leg
-  assert.equal(th.takeProfit1, 104);   // riskReward × risk leg
+  assert.equal(th.riskReward, 1.5);        // FROZEN — never 2
+  assert.equal(th.stopLoss, 97);           // 1.2× H4 ATR risk leg
+  assert.equal(th.takeProfit1, 104.5);     // 1.5R
+  assert.equal(th.horizonDays, 7);         // 7d frozen hold
+  assert.equal(th.fundingVerdict, "WATCH");// why = event + funding verdict
   assert.equal(th.source, "catalyst");
-  assert.equal(th.catalyst, "Fed cuts?"); // "why now" preserved for macro attribution
+  assert.equal(th.catalyst, "Fed cuts?");  // "why now" preserved for macro attribution
   // The whole point: it grades through the SAME grader, in R.
-  const cd = series(t0, [{ h: 101, l: 99 }, { h: 105, l: 100 }]); // TP 104 touched, SL 98 never
+  const cd = series(t0, [{ h: 101, l: 99 }, { h: 105, l: 100 }]); // TP 104.5 touched, SL 97 never
   const g = gradeCall(th, cd);
   assert.equal(g.outcome, "WIN");
-  assert.equal(g.r, 2);
+  assert.equal(g.r, 1.5);
 });
 
-test("catalystToThesis: SHORT impact inverts the levels + grades", () => {
+test("catalystToThesis: gated SHORT inverts the frozen levels + grades", () => {
   const impact = { coin: "BTC", market: "PERP_BTC_USDC", direction: "SHORT", rationale: "risk-off" };
-  const th = catalystToThesis(impact, { markPrice: 100, createdAt: t0 * 1000, stopPct: 2, riskReward: 2 });
-  assert.equal(th.stopLoss, 102);
-  assert.equal(th.takeProfit1, 96);
-  const cd = series(t0, [{ h: 101, l: 97 }, { h: 101, l: 95 }]); // low 95 ≤ TP 96, high 101 < SL 102
+  const th = catalystToThesis(impact, { markPrice: 100, atrFrac: 0.025, verdict: "FADE", createdAt: t0 * 1000 });
+  assert.equal(th.riskReward, 1.5);
+  assert.equal(th.stopLoss, 103);          // 100 + 3
+  assert.equal(th.takeProfit1, 95.5);      // 100 − 1.5×3
+  const cd = series(t0, [{ h: 101, l: 97 }, { h: 101, l: 95 }]); // low 95 ≤ TP 95.5, high 101 < SL 103
   assert.equal(gradeCall(th, cd).outcome, "WIN");
 });
 
-test("catalystToThesis: unpriced or bad direction → null (ungradeable, surfaced honestly)", () => {
-  assert.equal(catalystToThesis({ coin: "BTC", market: "PERP_BTC_USDC", direction: "LONG" }, { markPrice: 0 }), null);
-  assert.equal(catalystToThesis({ coin: "BTC", market: "PERP_BTC_USDC", direction: "FLAT" }, { markPrice: 100 }), null);
-  assert.equal(catalystToThesis({ coin: "BTC", direction: "LONG" }, { markPrice: 100 }), null); // no market
+test("catalystToThesis: THE GATE — no verdict / no ATR / no mark / bad dir / no market → null (chip)", () => {
+  const im = { coin: "BTC", market: "PERP_BTC_USDC", direction: "LONG" };
+  assert.equal(catalystToThesis(im, { markPrice: 100, atrFrac: 0.025, verdict: null }), null);   // no /signals verdict
+  assert.equal(catalystToThesis(im, { markPrice: 100, atrFrac: 0, verdict: "WATCH" }), null);     // no H4 ATR
+  assert.equal(catalystToThesis(im, { markPrice: 100, atrFrac: null, verdict: "WATCH" }), null);  // no H4 ATR
+  assert.equal(catalystToThesis(im, { markPrice: 0, atrFrac: 0.025, verdict: "WATCH" }), null);   // no live mark
+  assert.equal(catalystToThesis({ coin: "BTC", market: "PERP_BTC_USDC", direction: "FLAT" }, { markPrice: 100, atrFrac: 0.025, verdict: "WATCH" }), null); // bad dir
+  assert.equal(catalystToThesis({ coin: "BTC", direction: "LONG" }, { markPrice: 100, atrFrac: 0.025, verdict: "WATCH" }), null); // no market
 });
 
-test("attachCatalystTheses: prices every impact, counts only the gradeable ones", () => {
-  const board = { scanned: 1, count: 1, catalysts: [{
-    question: "Rate cut?", category: "RATES", riskLens: "RISK_ON", yesProbPct: 60,
-    impacts: [
+test("attachCatalystTheses: only coins with a /signals verdict + ATR draft (RR always 1.5); the rest are chips", () => {
+  const board = { scanned: 1, count: 2, catalysts: [
+    { question: "Rate cut?", category: "RATES", riskLens: "RISK_ON", yesProbPct: 60, impacts: [
       { coin: "BTC", market: "PERP_BTC_USDC", direction: "LONG", rationale: "risk-on" },
       { coin: "NAS100", market: "PERP_NAS100_USDC", direction: "LONG", rationale: "lower rates lift tech" },
-    ],
-  }] };
-  const out = attachCatalystTheses(board, { BTC: 100 }); // NAS100 has no mark
-  assert.equal(out.catalysts[0].impacts[0].thesis.symbol, "PERP_BTC_USDC");
-  assert.equal(out.catalysts[0].impacts[1].thesis, null); // unpriced → honest null
+    ] },
+    { question: "Hormuz?", category: "GEOPOLITICS", riskLens: "RISK_OFF", yesProbPct: 40, impacts: [
+      { coin: "CL", market: "PERP_CL_USDC", direction: "LONG", rationale: "supply-risk premium" },
+    ] },
+  ] };
+  const markByCoin = { BTC: 100, NAS100: 20000, CL: 80 };            // marks exist for all three
+  const gateByCoin = { BTC: { verdict: "WATCH", atrFrac: 0.025 } };  // only BTC has a /signals row + ATR
+  const out = attachCatalystTheses(board, markByCoin, gateByCoin);
+  const btc = out.catalysts[0].impacts[0], nas = out.catalysts[0].impacts[1], cl = out.catalysts[1].impacts[0];
+  assert.ok(btc.thesis, "BTC fills the frozen thesis");
+  assert.equal(btc.thesis.riskReward, 1.5);          // never 2
+  assert.equal(btc.thesis.fundingVerdict, "WATCH");
+  assert.equal(nas.thesis, null, "NAS100 has a mark but no /signals verdict → chip");
+  assert.equal(cl.thesis, null, "CL has a mark but no /signals verdict → chip");
   assert.equal(out.gradeableCount, 1);
+  // The acceptance in miniature: every EMITTED public thesis is RR 1.5, none on a coin w/o a verdict.
+  for (const c of out.catalysts) for (const im of c.impacts) if (im.thesis) {
+    assert.equal(im.thesis.riskReward, 1.5);
+    assert.equal(im.thesis.isPublic, true);
+  }
 });
 
-test("catalystHouseCall: full graded thesis record on its own track, grades through gradeCall", () => {
+test("catalystHouseCall: built from the gated thesis → RR 1.5 record on its own track; ungradeable → null", () => {
   const impact = { coin: "BTC", market: "PERP_BTC_USDC", direction: "LONG", rationale: "risk-on backdrop" };
-  const call = catalystHouseCall(impact, { markPrice: 100, question: "Fed cuts?", category: "RATES", now: t0 * 1000 });
+  const thesis = catalystToThesis(impact, { markPrice: 100, atrFrac: 0.025, verdict: "WATCH", question: "Fed cuts?", category: "RATES" });
+  const call = catalystHouseCall(impact, { thesis, question: "Fed cuts?", category: "RATES", now: t0 * 1000 });
   assert.equal(call.source, "catalyst");     // own track, not the funding-fade "nexus-signal"
   assert.equal(call.status, "ACTIVE");
+  assert.equal(call.riskReward, 1.5);         // inherits the frozen contract — never 2
   assert.ok(call.id.startsWith("catalyst-BTC-LONG-"));
   assert.equal(call.takeProfit2, 0);          // full ThesisCard shape (no partial-object crash)
   assert.equal(call.leverage, 0);
-  const cd = series(t0, [{ h: 101, l: 99 }, { h: 105, l: 100 }]);
+  const cd = series(t0, [{ h: 101, l: 99 }, { h: 105, l: 100 }]); // TP 104.5 touched, SL 97 never
   const g = gradeCall(call, cd);
   assert.equal(g.outcome, "WIN");
-  assert.equal(g.r, 2);
-  assert.equal(catalystHouseCall({ coin: "X", market: "PERP_X_USDC", direction: "NONE" }, { markPrice: 10 }), null);
+  assert.equal(g.r, 1.5);
+  // no prebuilt thesis and no gate inputs → null (never mint an ungradeable house call)
+  assert.equal(catalystHouseCall(impact, { question: "x" }), null);
+  assert.equal(catalystHouseCall({ coin: "X", market: "PERP_X_USDC", direction: "NONE" }, { markPrice: 10, atrFrac: 0.02, verdict: "WATCH" }), null);
 });
 
 // ── THE BOARD share card (boardCardRows) — same play + agreement as the live Board ──

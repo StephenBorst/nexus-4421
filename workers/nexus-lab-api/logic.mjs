@@ -2016,20 +2016,29 @@ export function catalystBoard(polyMarkets, { minVolumeUsd = 20000, limit = 24 } 
   return { scanned: (polyMarkets || []).length, count: uniq.length, catalysts: uniq.slice(0, limit) };
 }
 
+// ── The FROZEN catalyst contract (Grok gate) — the SAME object the client CatalystBoard
+// drafts and axisbt's R_CONTRACT freezes: a 1.2× H4 ATR-14 risk leg, a 1.5R target, a 7d
+// hold. Mirrored here (not imported) so the live thesis path stays decoupled from the
+// backtest harness — change these ONLY in lockstep with axisbt R_CONTRACT + the card.
+const CATALYST_ATR_MULT = 1.2, CATALYST_RR = 1.5, CATALYST_HORIZON_DAYS = 7;
+
 // ── Roadmap #3: Catalyst → the ONE gradeable thesis schema ────────────────────
 // Convert a catalyst IMPACT ({coin, market, direction, rationale}) into the exact shape
 // gradeCall() consumes, so the Catalyst producer and hand-authored theses are graded by
-// ONE grader, in R. Levels come from a symmetric risk leg (stopPct of entry) and the
-// target asymmetry (riskReward): first-touch of TP prints +riskReward R, first-touch of
-// SL prints −1R — identical to a manual call. `catalyst` carries the "why now" so the
-// macro classifier / regime attribution pick it up for free. entry defaults to the live
-// mark (the moment it's staked); pass createdAt to pin the grade window. null if unpriced.
-export function catalystToThesis(impact, { markPrice, createdAt = Date.now(), stopPct = 2, riskReward = 2, question = "", category = null } = {}) {
+// ONE grader, in R. THE GATE (match the card): an impact drafts a PUBLIC thesis ONLY when
+// its coin has a /signals funding VERDICT (proves it's in the signals set — SPX500/NAS100/CL
+// are NOT) AND the frozen object can be filled (a live MARK + an H4 ATR-14 from candle:hist).
+// Levels are the frozen contract — a 1.2× H4 ATR risk leg + a 1.5R target — NEVER a fixed-%
+// stop and NEVER RR 2. Missing verdict / ATR / mark ⇒ null (the event stays a chip). `catalyst`
+// carries the "why now"; `fundingVerdict` records the /signals read. Pure — the route supplies
+// markPrice + atrFrac + verdict.
+export function catalystToThesis(impact, { markPrice, atrFrac, verdict, createdAt = Date.now(), question = "", category = null } = {}) {
   const dir = impact && impact.direction;
   const px = Number(markPrice);
-  if ((dir !== "LONG" && dir !== "SHORT") || !(px > 0) || !impact.market) return null;
-  const rr = Number(riskReward) > 0 ? Number(riskReward) : 2;
-  const risk = px * (Math.max(0.1, Number(stopPct) || 2) / 100);
+  const frac = Number(atrFrac);
+  if ((dir !== "LONG" && dir !== "SHORT") || !impact.market || !(px > 0) || !(frac > 0) || !verdict) return null;
+  const risk = px * frac * CATALYST_ATR_MULT;                 // 1.2× H4 ATR-14 (frozen ruler)
+  const rr = CATALYST_RR;                                     // 1.5R (frozen) — never 2
   const stopLoss = dir === "LONG" ? px - risk : px + risk;
   const takeProfit1 = dir === "LONG" ? px + risk * rr : px - risk * rr;
   return {
@@ -2041,6 +2050,8 @@ export function catalystToThesis(impact, { markPrice, createdAt = Date.now(), st
     stopLoss: round(stopLoss, 4),
     takeProfit1: round(takeProfit1, 4),
     riskReward: rr,
+    horizonDays: CATALYST_HORIZON_DAYS,   // 7d frozen hold (the card's reversion clock)
+    fundingVerdict: verdict,              // the /signals read — "why = event + funding verdict"
     createdAt,
     catalyst: question,             // the "why now" → isMacroCall + macro-caller attribution
     category,
@@ -2054,18 +2065,23 @@ export function catalystToThesis(impact, { markPrice, createdAt = Date.now(), st
 // fields the grader and ThesisCard read (id, status, UI zeros, notes). source:"catalyst"
 // keeps it on its own track, distinct from the funding-fade "nexus-signal" house calls.
 export function catalystHouseCall(impact, opts = {}) {
-  const { markPrice, question = "", category = null, now = Date.now(), stopPct = 2, riskReward = 2 } = opts;
-  const base = catalystToThesis(impact, { markPrice, createdAt: now, stopPct, riskReward, question, category });
+  const { thesis, markPrice, atrFrac, verdict, question = "", category = null, now = Date.now() } = opts;
+  // Prefer the ALREADY-GATED board thesis when one is passed (so the record inherits the frozen
+  // 1.2×ATR / 1.5R levels + verdict — the two producers can never drift); else re-derive it from
+  // mark+atrFrac+verdict. null when the gate fails ⇒ a house call is never minted on an
+  // ungradeable coin (no verdict / no ATR / no mark).
+  const base = thesis || catalystToThesis(impact, { markPrice, atrFrac, verdict, createdAt: now, question, category });
   if (!base) return null;
   return {
     ...base,
+    createdAt: now,                 // staked now — pins the grade window even off a cached board thesis
     id: `catalyst-${impact.coin}-${impact.direction}-${now}`,
     takeProfit2: 0,
     riskPercent: 0, accountSize: 0, fundingRate: 0, positionSize: 0, leverage: 0,
     fundingCost8h: 0, fundingCost24h: 0, fundingCost72h: 0,
     status: "ACTIVE",
     actualPnl: null,
-    notes: `Catalyst Read - ${question || "world event"} → ${impact.rationale || `${impact.direction} ${impact.coin}`}. Deterministic levels (${stopPct}% risk leg, ${riskReward}R). Graded trustlessly from public price, first-touch TP vs SL. A setup, not advice, not a signal.`,
+    notes: `Catalyst Read - ${question || base.catalyst || "world event"} → ${impact.rationale || `${impact.direction} ${impact.coin}`}. Frozen contract (1.2× H4 ATR stop, ${base.riskReward}R, 7d), funding ${base.fundingVerdict || "—"}. Graded trustlessly from public price, first-touch TP vs SL. A setup, not advice, not a signal.`,
   };
 }
 
@@ -2128,16 +2144,29 @@ export function boardCardRows({ signals = [], consensus = {}, smart = {}, cataly
   return rows.slice(0, limit);
 }
 
-// Attach a gradeable thesis draft to every impact on every catalyst, using a coin→mark
-// price map (bare coin, e.g. BTC/SPX500/CL). Impacts without a live price get thesis:null
-// (ungradeable, surfaced honestly). Pure — the price fetch happens in the route.
-export function attachCatalystTheses(board, markByCoin, opts = {}) {
+// Attach a gradeable thesis draft to every impact, GATED (Grok): a draft is minted ONLY for a
+// coin that has a /signals funding verdict AND an H4 ATR to fill the frozen 1.2×ATR / 1.5R / 7d
+// object — the SAME gate the client card enforces. gateByCoin maps bare coin → { verdict,
+// atrFrac } (from computeSignalRows + candle:hist, built in the route); a coin absent from it
+// (SPX500/NAS100/CL — no signals row) OR without a live mark gets thesis:null — an honest chip,
+// never an RR-2 draft. Pure — the signals/ATR/mark fetches happen in the route.
+export function attachCatalystTheses(board, markByCoin, gateByCoin = {}, opts = {}) {
   const catalysts = (board.catalysts || []).map((c) => ({
     ...c,
-    impacts: (c.impacts || []).map((im) => ({
-      ...im,
-      thesis: catalystToThesis(im, { ...opts, markPrice: markByCoin[im.coin], question: c.question, category: c.category }),
-    })),
+    impacts: (c.impacts || []).map((im) => {
+      const g = gateByCoin[im.coin] || null;
+      return {
+        ...im,
+        thesis: catalystToThesis(im, {
+          ...opts,
+          markPrice: markByCoin[im.coin],
+          atrFrac: g ? g.atrFrac : undefined,
+          verdict: g ? g.verdict : undefined,
+          question: c.question,
+          category: c.category,
+        }),
+      };
+    }),
   }));
   return { ...board, catalysts, gradeableCount: catalysts.reduce((n, c) => n + c.impacts.filter((i) => i.thesis).length, 0) };
 }
