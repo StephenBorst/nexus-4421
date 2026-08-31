@@ -161,6 +161,19 @@ export default function TheLabPage() {
   const calendarProps = { dayGroups, onDayClick: handleDayClick, viewMonth, viewYear, onPrevMonth: prevMonth, onNextMonth: nextMonth, totalPnl };
 
   const connected = !!rootWalletAddress;
+  // ── Guest Lab ───────────────────────────────────────────────────────────────
+  // Once a visitor is past the funnel — ?guest=1 (documented read-only preview), a
+  // prior visit's ntl_onboarded, or a Skip that set it — the Market Intel first paint
+  // is THE BOARD, not the six-tile marketing splash. Read at render (uncached) so a
+  // Skip that flips ntl_onboarded reveals the board on the very next paint; the URL
+  // param still counts when storage is blocked. Guest is READ-ONLY — COPY / PUBLISH /
+  // ARM LIVE stay wallet-gated in their own surfaces (untouched here).
+  const guestPreview = (() => {
+    try {
+      if (searchParams.get("guest") === "1") return true;
+      return localStorage.getItem("ntl_onboarded") === "true";
+    } catch { return false; }
+  })();
 
   return (
     <div style={{ background: "#0a0a0b", minHeight: "100dvh", padding: 0 }}>
@@ -359,9 +372,13 @@ export default function TheLabPage() {
           // gradeable call on a Nexus market. Fail-soft (renders a quiet line if sparse).
           const forecast = <ForecastDivergence />;
           const lenses = <>{lensesHeader}{funding}{positioning}{catalysts}{forecast}</>;
-          return connected
-            ? <>{briefing}{board}{lenses}{deep}</>
-            : <><LabWelcome />{briefing}{board}{lenses}{deep}</>;
+          // The splash only greets a brand-new DISCONNECTED visitor who hasn't cleared
+          // onboarding yet (in practice the full-screen modal covers this — it's a
+          // defensive fallback). Everyone else — connected, or a guest/onboarded preview
+          // — lands straight on the Briefing → Board → lenses read. No wallet needed to
+          // scan the whole book; only COPY / PUBLISH / ARM LIVE ask for a connect.
+          const showSplash = !connected && !guestPreview;
+          return <>{showSplash && <LabWelcome />}{briefing}{board}{lenses}{deep}</>;
         })()}
         {activeTab === "smart" && (
           // Smart Money is now the DEEP WALLET DRILL-DOWN the Intel funnel's Positioning lens
