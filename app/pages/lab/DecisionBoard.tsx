@@ -22,6 +22,23 @@ import type { TabId } from "./types";
 const AGENT_API = "https://og.nexustradinglabs.com";
 const FUTURES = "https://api-evm.orderly.org/v1/public/futures";
 const CROWDED = 0.0004;   // |funding|/8h at/above which the crowd is extended (fade band)
+// The board's /signals call gates the whole table's spinner, so a hung connection (no
+// response, no reset — seen on a cold guest-context load while curl to the same URL
+// returns rows) would strand it on "loading the board…" forever. Cap it: abort after
+// SIGNALS_TIMEOUT_MS so the promise REJECTS instead of pending, and the caller fails
+// soft to last-good/empty. No explicit return-type annotation → it infers Promise<any>
+// from r.json(), so callers keep reading j?.signals exactly as before.
+const SIGNALS_TIMEOUT_MS = 2000;
+async function fetchJsonTimeout(url: string, ms: number) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms);
+  try {
+    const res = await fetch(url, { signal: ctl.signal });
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 type Consensus = Record<string, { side: "LONG" | "SHORT" | "SPLIT"; lean: number; participants: number }>;
 type Dir = "LONG" | "SHORT";
@@ -220,7 +237,11 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
   useEffect(() => {
     let alive = true;
     const load = () => {
-      fetch(`${AGENT_API}/signals`).then((r) => r.json()).then((j) => { if (alive) setSignals(Array.isArray(j?.signals) ? j.signals : []); }).catch(() => alive && setSignals([]));
+      // /signals gates the table spinner — timeout-cap it and fail soft to last-good
+      // (or empty on the very first load) so the board can never hang on "loading…".
+      fetchJsonTimeout(`${AGENT_API}/signals`, SIGNALS_TIMEOUT_MS)
+        .then((j) => { if (alive) setSignals(Array.isArray(j?.signals) ? j.signals : []); })
+        .catch(() => { if (alive) setSignals((prev) => prev ?? []); });
       fetch(`${AGENT_API}/theses/consensus`).then((r) => r.json()).then((j) => { if (alive) setConsensus(j?.consensus ?? null); }).catch(() => { /* no crowd lean */ });
       // Three more INDEPENDENT lenses to fuse into the read — smart money, catalysts,
       // forecasters. Each fail-soft (an absent lens just shows "·", never blocks the board).
