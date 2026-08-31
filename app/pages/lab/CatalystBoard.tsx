@@ -7,8 +7,8 @@ import { useEffect, useState } from "react";
 import { SectionHeader } from "./components";
 import { C } from "@/config/theme";
 import { AGENT_API } from "./agentTypes";
-import { h4Atr14Frac } from "@/lib/atr.mjs";
 import { R_CONTRACT } from "@/lib/rContract.mjs";
+import { frozenLevelsFor } from "@/lib/frozenDraft";
 
 const MONO = "var(--nx-font-mono)";
 const UI = "var(--nx-font-ui, sans-serif)";
@@ -30,25 +30,11 @@ type Verdict = { verdict: "FADE" | "WATCH" | "NONE"; fadeDir: "LONG" | "SHORT" |
 // grader, no LEAN/HIGH/fake E[R], RSI never enters. Returns false if the live data can't fill it.
 const THESIS_DRAFT_KEY = "nexus_thesis_draft";
 async function draftCatalyst(im: Impact, c: Catalyst, v: Verdict): Promise<boolean> {
-  const now = Math.floor(Date.now() / 1000);
-  let entry = 0, atrFrac: number | null = null;
-  try {
-    const j = await fetch(`https://api-evm.orderly.org/tv/history?symbol=${im.market}&resolution=60&from=${now - 100 * 3600}&to=${now}`).then((r) => r.json());
-    if (j?.s === "ok" && Array.isArray(j.t) && Array.isArray(j.c) && Array.isArray(j.h) && Array.isArray(j.l)) {
-      const hourly = j.t.map((t: number, i: number) => ({ t: Number(t), h: Number(j.h[i]), l: Number(j.l[i]), c: Number(j.c[i]) })).filter((p: { c: number }) => Number.isFinite(p.c) && p.c > 0);
-      if (hourly.length) entry = hourly[hourly.length - 1].c;
-      atrFrac = h4Atr14Frac(hourly);
-    }
-  } catch { /* fall through — the gate should prevent this; abort below if unfilled */ }
-  if (!(entry > 0) || atrFrac == null) return false; // can't fill the frozen object → no draft
-  const isShort = im.direction === "SHORT";
-  // The frozen contract comes from the ONE shared object (app/lib/rContract.mjs) — the SAME
-  // R_CONTRACT axisbt grades in and lab-api's catalyst thesis builds with, so no drift.
-  const risk = entry * R_CONTRACT.atrMult * atrFrac, RR = R_CONTRACT.rMultiple, holdDays = R_CONTRACT.maxHoldH / 24;
-  const dp = entry >= 1000 ? 0 : entry >= 1 ? 2 : 6;
-  const round = (x: number) => Number(x.toFixed(dp));
-  const stopLoss = round(isShort ? entry + risk : entry - risk);
-  const takeProfit1 = round(isShort ? entry - RR * risk : entry + RR * risk);
+  // The frozen levels (1.2× H4 ATR-14 stop, 1.5R, 7d) come from the ONE shared helper — the SAME
+  // object The Board's PLAY → draft uses, so a fade drafted from either surface is one schema.
+  const lv = await frozenLevelsFor(im.market, im.direction);
+  if (!lv) return false; // can't fill the frozen object → no draft
+  const { entryPrice: entry, stopLoss, takeProfit1, riskReward: RR, holdDays } = lv;
   // The funding verdict comes straight from /signals — the floor now lives in readVerdict there
   // (one path owns it), so no client clamp: a below-floor pierce already arrives as WATCH.
   const fundLens = v.verdict === "FADE" ? `FADE ${v.fadeDir}` : v.verdict === "WATCH" ? "WATCH — funding not stretched" : "no funding edge";
@@ -58,7 +44,7 @@ async function draftCatalyst(im: Impact, c: Catalyst, v: Verdict): Promise<boole
   const draft = {
     symbol: im.coin,
     direction: im.direction,
-    entryPrice: String(round(entry)),
+    entryPrice: String(entry),
     stopLoss: String(stopLoss),
     takeProfit1: String(takeProfit1),
     catalyst: `Event · ${c.question}`,

@@ -18,6 +18,8 @@ import { SectionHeader } from "./components";
 import { useIsMobile } from "./useIsMobile";
 import { computeTape, FADE_FUNDING_FLOOR_PCT_YR, type MarketSignal } from "./briefing";
 import type { TabId } from "./types";
+import { R_CONTRACT } from "@/lib/rContract.mjs";
+import { frozenLevelsFor } from "@/lib/frozenDraft";
 
 const AGENT_API = "https://og.nexustradinglabs.com";
 const FUTURES = "https://api-evm.orderly.org/v1/public/futures";
@@ -196,6 +198,7 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
   const [forecast, setForecast] = useState<Record<string, Dir>>({}); // forecaster lean per coin
   const [proc, setProc] = useState<ProcessEdge>(null);
   const [sort, setSort] = useState<SortMode>("actionable");
+  const [draftingSym, setDraftingSym] = useState<string | null>(null); // the row whose PLAY→draft is fetching levels
 
   // Personal edge = which side the user measurably wins on + their align (counter/with-
   // trend) class. From their own trades + graded process record. Fail-soft; empty when
@@ -327,28 +330,46 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
 
   // OBSERVE → PLAN handoff: a clean read is a thesis waiting to be written. Draft the
   // play into the Thesis Engine (same contract the Mispriced board + copilot use).
-  const draftPlay = (r: Row) => {
-    if (!r.play.dir) return;
-    const crowd = r.play.dir === "SHORT" ? "long" : "short";
+  const draftPlay = async (r: Row) => {
+    if (!r.play.dir || draftingSym) return;
+    const dir = r.play.dir;
+    const crowd = dir === "SHORT" ? "long" : "short";
     // Carry the FUSION into the plan: name the independent lenses that confirm this play so
     // the drafted thesis records WHY it was a confluent read (the loop stays explainable).
     const lensName: Record<string, string> = { callers: "graded callers", smart: "smart money", catalyst: "catalysts", forecast: "forecasters" };
-    const agreeing = (["callers", "smart", "catalyst", "forecast"] as const).filter((k) => r.lens[k] === r.play.dir);
+    const agreeing = (["callers", "smart", "catalyst", "forecast"] as const).filter((k) => r.lens[k] === dir);
     const confNote = r.agree >= 2 ? ` ${r.agree} independent reads confirm this: ${agreeing.map((k) => lensName[k]).join(", ")}.` : "";
-    const draft = {
-      symbol: r.sym,
-      direction: r.play.dir,
-      // Prefill the entry from the live mark so the read arrives one field closer to armed —
-      // the trader still sets stop + target (where the chart tells them), then deploys to the agent.
-      entryPrice: r.price != null ? String(r.price) : "",
-      catalyst: `${r.play.label} · funding ${r.fundingAnnual >= 0 ? "+" : ""}${r.fundingAnnual.toFixed(1)}%/yr, crowd offside ${crowd}`,
-      notes: `${r.play.label} — the crowd is stretched ${crowd}. BUILD sets a 1.2× H4 ATR stop from live volatility; set your target, then it grades first-touch vs the tape.${confNote}`,
-    };
+    // why = the board verdict + funding (the same object the ticket shows).
+    const why = `${r.play.label} · funding ${r.fundingAnnual >= 0 ? "+" : ""}${r.fundingAnnual.toFixed(1)}%/yr, crowd offside ${crowd}`;
+    // Fill the FROZEN object from the SAME shared helper the Catalyst card uses (mark + 1.2× H4
+    // ATR-14 stop + 1.5R + 7d, levels from rContract.mjs) so the fade lands one tap from the row
+    // as a complete graded thesis — no second schema, no hunting the engine. If the candles can't
+    // fill it (thin history), fall back to an entry-only prefill and let the engine BUILD the stop.
+    setDraftingSym(r.sym);
+    let lv = null as Awaited<ReturnType<typeof frozenLevelsFor>>;
+    try { lv = await frozenLevelsFor(`PERP_${r.sym}_USDC`, dir); } catch { /* fall back below */ }
+    const draft = lv
+      ? {
+          symbol: r.sym, direction: dir,
+          entryPrice: String(lv.entryPrice), stopLoss: String(lv.stopLoss), takeProfit1: String(lv.takeProfit1),
+          targetWindow: `${lv.holdDays}d`,
+          catalyst: why,
+          notes: `${r.play.label} — the crowd is stretched ${crowd}. Frozen: entry at mark, stop ${R_CONTRACT.atrMult}× H4 ATR(14), TP +${lv.riskReward}R, ${lv.holdDays}-day time-stop. Graded first-touch vs the tape.${confNote}`,
+        }
+      : {
+          symbol: r.sym, direction: dir,
+          // Prefill the entry from the live mark so the read arrives one field closer to armed —
+          // the engine's BUILD sets the frozen stop from live volatility, the trader sets target.
+          entryPrice: r.price != null ? String(r.price) : "",
+          catalyst: why,
+          notes: `${r.play.label} — the crowd is stretched ${crowd}. BUILD sets a 1.2× H4 ATR stop from live volatility; set your target, then it grades first-touch vs the tape.${confNote}`,
+        };
     try { window.localStorage.setItem("nexus_thesis_draft", JSON.stringify(draft)); } catch { /* private mode */ }
     try {
       window.dispatchEvent(new CustomEvent("nexus:lab-tab", { detail: { tab: "thesis" } }));
       window.dispatchEvent(new CustomEvent("nexus:thesis-draft"));
     } catch { /* non-browser */ }
+    setDraftingSym(null);
     onSelectTab?.("thesis");
   };
 
@@ -549,12 +570,17 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
                   </div>
                   {/* Action — draft the play as a thesis (real setups only) */}
                   <div style={{ ...cell, justifyContent: "flex-end" }}>
-                    {r.play.strong && r.play.dir && (
-                      <button onClick={() => draftPlay(r)} title="Structure this as a graded thesis" style={{
-                        background: "#1a1a1e", border: `1px solid ${C.border}`, color: C.accent, fontFamily: MONO, fontSize: 11,
-                        width: 26, height: 24, borderRadius: RADIUS.sm, cursor: "pointer", lineHeight: 1,
-                      }}>→</button>
-                    )}
+                    {r.play.strong && r.play.dir && (() => {
+                      const busy = draftingSym === r.sym;
+                      return (
+                        <button onClick={() => draftPlay(r)} disabled={!!draftingSym}
+                          title="Draft this fade as a graded thesis — mark · 1.2× H4 ATR stop · 1.5R · 7d" style={{
+                          background: "#1a1a1e", border: `1px solid ${C.border}`, color: C.accent, fontFamily: MONO, fontSize: 11,
+                          width: 26, height: 24, borderRadius: RADIUS.sm, cursor: draftingSym ? "default" : "pointer", lineHeight: 1,
+                          opacity: draftingSym && !busy ? 0.4 : 1,
+                        }}>{busy ? "…" : "→"}</button>
+                      );
+                    })()}
                   </div>
                 </div>
               );
