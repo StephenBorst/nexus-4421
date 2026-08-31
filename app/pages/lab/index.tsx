@@ -398,7 +398,13 @@ export default function TheLabPage() {
           // FORECAST DIVERGENCE — the prediction-market lens, restored but scoped to markets
           // you can trade here (our-markets-only until the Quotient feed lands). A tradeable,
           // gradeable call on a Nexus market. Fail-soft (renders a quiet line if sparse).
-          const forecast = <ForecastDivergence />;
+          // Collapsed by default so its charts are OFF the Intel first paint (expand to read) —
+          // the first screen after the briefing is the ACTIONABLE board, not a wall of charts.
+          const forecast = (
+            <Collapsible title="◇ FORECAST DIVERGENCE" subtitle="where prediction markets disagree with price — our markets only" storageKey="nx_forecast_open">
+              <ForecastDivergence />
+            </Collapsible>
+          );
           const lenses = <>{lensesHeader}{funding}{positioning}{catalysts}{forecast}</>;
           // The splash only greets a brand-new DISCONNECTED visitor who hasn't cleared
           // onboarding yet (in practice the full-screen modal covers this — it's a
