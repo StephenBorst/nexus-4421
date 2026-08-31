@@ -4,6 +4,7 @@ import { hexToBytes, bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 // funding band is not a crowded fade. readVerdict applies it so a below-floor pierce leaves the
 // API as WATCH, matching the client Board/ticket. Cross-dir import bundles like axisbt's atr.mjs.
 import { FADE_FUNDING_FLOOR_PCT_YR } from "../../app/lib/conviction.mjs";
+import { R_CONTRACT } from "../../app/lib/rContract.mjs";
 
 // ═══════════════════════════════════════════════════════════
 // Pure, testable logic for nexus-lab-api.
@@ -2016,13 +2017,9 @@ export function catalystBoard(polyMarkets, { minVolumeUsd = 20000, limit = 24 } 
   return { scanned: (polyMarkets || []).length, count: uniq.length, catalysts: uniq.slice(0, limit) };
 }
 
-// ── The FROZEN catalyst contract (Grok gate) — the SAME object the client CatalystBoard
-// drafts and axisbt's R_CONTRACT freezes: a 1.2× H4 ATR-14 risk leg, a 1.5R target, a 7d
-// hold. Mirrored here (not imported) so the live thesis path stays decoupled from the
-// backtest harness — change these ONLY in lockstep with axisbt R_CONTRACT + the card.
-const CATALYST_ATR_MULT = 1.2, CATALYST_RR = 1.5, CATALYST_HORIZON_DAYS = 7;
-
 // ── Roadmap #3: Catalyst → the ONE gradeable thesis schema ────────────────────
+// The frozen levels come from the ONE shared R_CONTRACT (app/lib/rContract.mjs) — the SAME
+// object axisbt grades in and the client CatalystBoard drafts with, so the three never drift.
 // Convert a catalyst IMPACT ({coin, market, direction, rationale}) into the exact shape
 // gradeCall() consumes, so the Catalyst producer and hand-authored theses are graded by
 // ONE grader, in R. THE GATE (match the card): an impact drafts a PUBLIC thesis ONLY when
@@ -2037,8 +2034,8 @@ export function catalystToThesis(impact, { markPrice, atrFrac, verdict, createdA
   const px = Number(markPrice);
   const frac = Number(atrFrac);
   if ((dir !== "LONG" && dir !== "SHORT") || !impact.market || !(px > 0) || !(frac > 0) || !verdict) return null;
-  const risk = px * frac * CATALYST_ATR_MULT;                 // 1.2× H4 ATR-14 (frozen ruler)
-  const rr = CATALYST_RR;                                     // 1.5R (frozen) — never 2
+  const risk = px * frac * R_CONTRACT.atrMult;                // 1.2× H4 ATR-14 (frozen ruler)
+  const rr = R_CONTRACT.rMultiple;                            // 1.5R (frozen) — never 2
   const stopLoss = dir === "LONG" ? px - risk : px + risk;
   const takeProfit1 = dir === "LONG" ? px + risk * rr : px - risk * rr;
   return {
@@ -2050,7 +2047,7 @@ export function catalystToThesis(impact, { markPrice, atrFrac, verdict, createdA
     stopLoss: round(stopLoss, 4),
     takeProfit1: round(takeProfit1, 4),
     riskReward: rr,
-    horizonDays: CATALYST_HORIZON_DAYS,   // 7d frozen hold (the card's reversion clock)
+    horizonDays: R_CONTRACT.maxHoldH / 24,   // 7d frozen hold (the card's reversion clock)
     fundingVerdict: verdict,              // the /signals read — "why = event + funding verdict"
     createdAt,
     catalyst: question,             // the "why now" → isMacroCall + macro-caller attribution

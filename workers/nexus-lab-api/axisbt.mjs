@@ -13,6 +13,7 @@
 // why it only becomes meaningful as that history matures (~Sept 14).
 import { classifyCvdDivergence } from "./flow.mjs";
 import { h4Atr14Frac } from "../../app/lib/atr.mjs";
+import { R_CONTRACT } from "../../app/lib/rContract.mjs";
 
 export function hourBucket(t) { return Math.round(Number(t) / 3600000); }
 
@@ -374,7 +375,9 @@ function agg(arr) {
 // The ruler is H4 ATR-14 (the ONE shared ATR); the multiples are frozen. Changing the ruler,
 // not the multiples: 1.2× ATR stop, 1.5R target, 7d hold — the SAME contract BUILD IT applies.
 // No atrPeriod knob — H4 ATR-14 has a fixed period (that's the point: one number, no wrappers).
-export const R_CONTRACT = Object.freeze({ atrMult: 1.2, rMultiple: 1.5, maxHoldH: 168 });
+// The frozen object now lives in ONE module (app/lib/rContract.mjs); imported above and
+// re-exported here so axisbt's public surface is unchanged. Do NOT vary the values.
+export { R_CONTRACT };
 export function gradeEventR(cbh, eventHour, side, entry, opts = R_CONTRACT) {
   const { atrMult, rMultiple, maxHoldH } = { ...R_CONTRACT, ...opts };
   if (!cbh || !cbh.size || !(entry > 0)) return null;

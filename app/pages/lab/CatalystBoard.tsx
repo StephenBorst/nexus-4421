@@ -8,6 +8,7 @@ import { SectionHeader } from "./components";
 import { C } from "@/config/theme";
 import { AGENT_API } from "./agentTypes";
 import { h4Atr14Frac } from "@/lib/atr.mjs";
+import { R_CONTRACT } from "@/lib/rContract.mjs";
 
 const MONO = "var(--nx-font-mono)";
 const UI = "var(--nx-font-ui, sans-serif)";
@@ -41,7 +42,9 @@ async function draftCatalyst(im: Impact, c: Catalyst, v: Verdict): Promise<boole
   } catch { /* fall through — the gate should prevent this; abort below if unfilled */ }
   if (!(entry > 0) || atrFrac == null) return false; // can't fill the frozen object → no draft
   const isShort = im.direction === "SHORT";
-  const risk = entry * 1.2 * atrFrac, RR = 1.5;
+  // The frozen contract comes from the ONE shared object (app/lib/rContract.mjs) — the SAME
+  // R_CONTRACT axisbt grades in and lab-api's catalyst thesis builds with, so no drift.
+  const risk = entry * R_CONTRACT.atrMult * atrFrac, RR = R_CONTRACT.rMultiple, holdDays = R_CONTRACT.maxHoldH / 24;
   const dp = entry >= 1000 ? 0 : entry >= 1 ? 2 : 6;
   const round = (x: number) => Number(x.toFixed(dp));
   const stopLoss = round(isShort ? entry + risk : entry - risk);
@@ -59,8 +62,8 @@ async function draftCatalyst(im: Impact, c: Catalyst, v: Verdict): Promise<boole
     stopLoss: String(stopLoss),
     takeProfit1: String(takeProfit1),
     catalyst: `Event · ${c.question}`,
-    targetWindow: "7d",
-    notes: `${c.question} — ${im.rationale} (${im.coin} ${im.direction}). Funding lens: ${fundLens}${fundNote}. Frozen: entry at mark, stop 1.2× H4 ATR(14), TP +${RR}R, 7-day time-stop. Event-driven directional call, graded first-touch on published dollars.`,
+    targetWindow: `${holdDays}d`,
+    notes: `${c.question} — ${im.rationale} (${im.coin} ${im.direction}). Funding lens: ${fundLens}${fundNote}. Frozen: entry at mark, stop ${R_CONTRACT.atrMult}× H4 ATR(14), TP +${RR}R, ${holdDays}-day time-stop. Event-driven directional call, graded first-touch on published dollars.`,
   };
   try { window.localStorage.setItem(THESIS_DRAFT_KEY, JSON.stringify(draft)); } catch { /* private mode */ }
   try {
