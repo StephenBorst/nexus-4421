@@ -460,6 +460,62 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
 
       {!signals ? (
         <div style={{ fontFamily: MONO, fontSize: 11, color: C.text.faint, padding: "18px 4px" }}>loading the board…</div>
+      ) : isMobile ? (
+        // Mobile — the 720px table hid THE PLAY behind a side-swipe. Instead, one 2-line card per
+        // row so the DECISION is the first paint: line 1 = market · funding/yr · the play · → ;
+        // line 2 = confluence · trend · tape. No side-scroll; the → is pinned right so it's never
+        // clipped. Desktop keeps the full verifiable table (the `else` branch below, unchanged).
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {rows.map((r) => {
+            const fundHot = Math.abs(r.funding) >= CROWDED;
+            const confluent = r.play.strong && !!r.play.dir && r.agree >= 3;
+            const busy = draftingSym === r.sym;
+            const tapeTag = r.play.klass === "FADE" && r.play.dir && tapeRead
+              ? (tapeRead.label === "RISK-OFF" && r.play.dir === "LONG" ? "risk-off"
+                : tapeRead.label === "RISK-ON" && r.play.dir === "SHORT" ? "risk-on" : null)
+              : null;
+            const trendEl = r.trend === "TREND_UP" ? <span style={{ color: C.pos }}>↑ up{r.trendMove != null ? ` ${r.trendMove.toFixed(1)}%` : ""}</span>
+              : r.trend === "TREND_DOWN" ? <span style={{ color: C.neg }}>↓ dn{r.trendMove != null ? ` ${Math.abs(r.trendMove).toFixed(1)}%` : ""}</span>
+              : <span style={{ color: C.text.faint }}>chop</span>;
+            const dot = <span style={{ color: C.text.faint }}>·</span>;
+            return (
+              <div key={r.sym} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 8px 10px 11px", borderBottom: `1px solid ${C.surfaceAlt}`, borderLeft: confluent ? `3px solid ${C.accent}` : "3px solid transparent", background: confluent ? `${C.accent}0c` : undefined }}>
+                {/* Line 1 — the decision. The market/funding/play group flexes + wraps; → pinned right. */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontFamily: MONO }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: C.text.bright, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      {r.sym}
+                      {liveCallBy[r.sym] && <span title={`Your live call: ${liveCallBy[r.sym].toLowerCase()}`} style={{ fontSize: 8, color: dirColor(liveCallBy[r.sym]) }}>●</span>}
+                      {inPosBy[r.sym] && <span title={`You're ${inPosBy[r.sym].toLowerCase()} here`} style={{ fontSize: 9, color: dirColor(inPosBy[r.sym]) }}>▸</span>}
+                    </span>
+                    {dot}
+                    <span style={{ fontSize: 11, color: fundHot ? C.warn : C.text.muted, whiteSpace: "nowrap" }}>{r.fundingAnnual >= 0 ? "+" : ""}{r.fundingAnnual.toFixed(1)}%/yr</span>
+                    {dot}
+                    {r.play.klass === "FADE"
+                      ? <span style={{ fontSize: 12.5, fontWeight: 700, color: C.text.bright, letterSpacing: "0.03em", whiteSpace: "nowrap" }}>{r.play.label}</span>
+                      : r.play.klass === "WATCH"
+                      ? <span style={{ fontSize: 12, fontWeight: 600, color: C.text.muted, letterSpacing: "0.05em" }}>WATCH</span>
+                      : <span style={{ fontSize: 12, color: C.text.faint }}>—</span>}
+                  </div>
+                  {r.play.strong && r.play.dir && (
+                    <button onClick={() => draftPlay(r)} disabled={!!draftingSym}
+                      title="Draft this fade as a graded thesis — mark · 1.2× H4 ATR stop · 1.5R · 7d"
+                      style={{ flexShrink: 0, background: "#1a1a1e", border: `1px solid ${C.border}`, color: C.accent, fontFamily: MONO, fontSize: 13, width: 34, height: 30, borderRadius: RADIUS.sm, cursor: draftingSym ? "default" : "pointer", lineHeight: 1, opacity: draftingSym && !busy ? 0.4 : 1 }}>
+                      {busy ? "…" : "→"}
+                    </button>
+                  )}
+                </div>
+                {/* Line 2 — the why: confluence · trend · tape (· your edge, when connected). */}
+                <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", fontFamily: MONO, fontSize: 11 }}>
+                  <span title="Independent reads confirming THE PLAY" style={{ fontWeight: 700, color: r.play.dir ? (r.agree >= 3 ? C.accent : r.agree >= 2 ? C.text.bright : C.text.muted) : C.text.faint }}>{r.play.dir ? `${r.agree}/4` : "—"}</span>
+                  {dot}{trendEl}
+                  {tapeTag && <>{dot}<span style={{ color: C.accent }}>{tapeTag}</span></>}
+                  {r.mine && <>{dot}<span style={{ color: r.mine.tone === "pos" ? C.pos : C.warn, fontSize: 10 }}>{r.mine.tone === "pos" ? "◆" : "△"} {r.mine.text}</span></>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
           <div style={{ minWidth: 720 }}>
