@@ -23,6 +23,7 @@ import { C, MONO, UI, RADIUS } from "@/config/theme";
 import { AGENT_API } from "./agentTypes";
 import { FADE_FUNDING_FLOOR_PCT_YR } from "./briefing";
 import { useIsMobile } from "./useIsMobile";
+import { Collapsible } from "./Collapsible";
 import { SectionHeader } from "./components";
 import { Simulate } from "./Simulate";
 import { ProjectionBand } from "@/components/ProjectionBand";
@@ -305,6 +306,22 @@ function reversionSentence(coin: string, r: Reversion): string {
   return `Careful: the last ${r.samples} times ${coin} funding ran this hot, price kept going the crowd's way by ${mag}% on average over ${d} — the fade only worked ${r.revertedPct}% of the time.`;
 }
 
+// Share the READ as a branded, verifiable card (verdict only — no fake R/stops). ONE helper so
+// the phone head and the desktop footer can never put different words on the same read; the card
+// it links to is server-rendered from the canonical verdict, so the artifact can't drift either.
+function shareRead(m: Market, isFade: boolean, draftAnyway: boolean) {
+  const pct = `${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr`;
+  const text = isFade
+    ? `${m.coin} funding is stretched — the fade is ${m.direction} (${pct}). A positioning read on Nexus, graded from public price:`
+    : draftAnyway
+    ? `${m.coin} funding is stretched (${pct}) but fading it has historically underperformed — a watch, not a clean fade. The read on Nexus:`
+    : `${m.coin} funding is elevated (${pct}) but within its typical range — no fade yet. The read on Nexus:`;
+  window.open(
+    `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(`https://og.nexustradinglabs.com/share/read/${m.coin}`)}`,
+    "_blank", "noopener",
+  );
+}
+
 // Edge quality — pairs the raw funding signal with its TRACK RECORD (has fading this
 // historically paid?). The honest intelligence: most tools stop at the number; this
 // says when the fade has edge (PROVEN) and — crucially — when it's a TRAP (funding
@@ -545,35 +562,23 @@ export function MispricedBoard() {
     const stretched = m.stretched != null ? m.stretched : fundingStretched(pos?.points);
     const { verdict, isFade, draftAnyway, weakEdge, tooSmall } = ticketVerdict(m, stretched);
     const canDraft = isFade || draftAnyway;
-    return (
-      <div>
-        <button onClick={() => setOpenCoin(null)} className="nx-card-interactive" style={{
-          display: "inline-flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 10, letterSpacing: "0.08em",
-          color: C.text.muted, background: "none", border: `1px solid ${C.border}`, borderRadius: RADIUS.sm,
-          padding: "6px 11px", cursor: "pointer", marginBottom: 16,
-        }}>← BACK TO BOARD</button>
-
-        {/* Primo layout: the card (with the hero chart) takes the bulk of the width so the
-            SynthChart breathes; the learnable legend fills the right cleanly instead of a
-            smushed card + a big empty gap. Capped so it doesn't sprawl on ultra-wide. */}
-        <div style={{ display: isMobile ? "block" : "grid", gridTemplateColumns: "minmax(0,1.75fr) minmax(260px,1fr)", gap: 32, alignItems: "start", maxWidth: 1240 }}>
-          {/* The card */}
-          <div style={{ position: "relative", border: `1px solid ${C.border}`, borderLeft: `2px solid ${C.accent}`, borderRadius: RADIUS.lg, padding: "24px 28px", background: "linear-gradient(180deg,#17171a 0%,#0d0d0f 100%)", overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: MONO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: C.text.muted }}>
-              <span style={{ color: C.text.fog }}>◆ Nexus · Funding edge</span>
-              <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: isFade ? C.accent : draftAnyway ? C.warn : C.text.muted }}>{verdict === "NONE" ? "BALANCED" : isFade ? `◆ FADE ${m.direction}` : draftAnyway ? `⚠ WATCH · FADE ${m.edgeQuality?.revertedPct}% HIST` : "◆ WATCHING"}</span>
-            </div>
-            <div style={{ fontFamily: UI, fontSize: 14, color: C.text.fog, marginTop: 18 }}>{m.coin} perpetual</div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 1 }}>
-              <span style={{ fontFamily: MONO, fontSize: 40, fontWeight: 600, color: C.text.bright, letterSpacing: "-0.02em", lineHeight: 1 }}>${fmtPrice(m.markPrice)}</span>
-              {change != null && <span style={{ fontFamily: MONO, fontSize: 14, color: change > 0 ? C.pos : change < 0 ? C.neg : C.text.muted }}>{change > 0 ? "+" : ""}{change}% today</span>}
-            </div>
-
-            <div style={{ height: 1, background: C.border, margin: "16px 0" }} />
-            <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: MONO, fontSize: 12, letterSpacing: "0.12em", textTransform: "uppercase", color: C.text.bright }}>
-              <span style={{ width: 16, height: 3, borderRadius: 2, background: C.accent }} />{stanceLabel(m.direction)}
-            </div>
-
+    // ── PHONE TICKET (Grok): the same two-line discipline the Board already runs — line 1 is the
+    // verdict (badge · %/yr · HIST), line 2 is the action. The reasoning isn't cut, it moves one
+    // tap down under WHY: on a phone the essay pushed the one button that answers this page's
+    // question below three screens of prose. Desktop is untouched. Every value here reads the
+    // SAME verdict object the badge and the Draft gate read, so the head cannot disagree.
+    const verdictLabel = verdict === "NONE" ? "BALANCED" : isFade ? `◆ FADE ${m.direction}` : draftAnyway ? "⚠ WATCH" : "◆ WATCHING";
+    const verdictColor = isFade ? C.accent : draftAnyway ? C.warn : C.text.muted;
+    const fundingLabel = `${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr`;
+    // HIST is the canonical edgeQuality record (the source the share card already cites); absent
+    // when the coin has no graded reversion history yet — then it simply isn't drawn.
+    const histTag = m.edgeQuality && m.edgeQuality.revertedPct != null && m.edgeQuality.samples > 0
+      ? `HIST ${m.edgeQuality.revertedPct}% · n=${m.edgeQuality.samples}`
+      : null;
+    // The reasoning stack — chart, projection, plain read, reversion proof, three-lens synthesis.
+    // Inline on desktop; under WHY on a phone so the verdict and Draft are the FIRST screen.
+    const deepRead = (
+      <>
             {/* two-pole positioning read */}
             <div style={{ margin: "18px 0 4px" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontFamily: MONO, fontSize: 10, marginBottom: 8 }}>
@@ -612,45 +617,10 @@ export function MispricedBoard() {
                   <Callers m={m} lean={l} />
                 </div>
               )}
-
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.border}`, flexWrap: "wrap" }}>
-              <span style={{ fontFamily: MONO, fontSize: 9.5, color: C.text.faint }}>{isFade ? "Live read · funding + smart money" : draftAnyway ? "Stretched, but the fade is historically unproven here" : "Watching · no fade edge right now"}</span>
-              {/* Share the READ as a branded, verifiable card (verdict only — no fake R/stops).
-                  A WATCH card shares as WATCH, a FADE as FADE; unfurls on X, links back. */}
-              <button onClick={() => {
-                const text = isFade
-                  ? `${m.coin} funding is stretched — the fade is ${m.direction} (${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr). A positioning read on Nexus, graded from public price:`
-                  : draftAnyway
-                  ? `${m.coin} funding is stretched (${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr) but fading it has historically underperformed — a watch, not a clean fade. The read on Nexus:`
-                  : `${m.coin} funding is elevated (${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr) but within its typical range — no fade yet. The read on Nexus:`;
-                window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(`https://og.nexustradinglabs.com/share/read/${m.coin}`)}`, "_blank", "noopener");
-              }} title="Share this read as a card on X" className="nx-press" style={{
-                marginLeft: "auto", fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.06em", color: C.text.muted,
-                background: "none", border: `1px solid ${C.border}`, borderRadius: RADIUS.sm, padding: "8px 12px", cursor: "pointer",
-              }}>↗ SHARE</button>
-              {/* One primary action, and it answers the page's one question: is there a fade NOW?
-                  FADE → greenlight Draft. WATCH/NONE → Draft disabled (Simulate stays below). */}
-              <button onClick={() => canDraft && draftFade(m)} disabled={!canDraft} title={isFade ? "Draft this fade into the Thesis Engine" : draftAnyway ? "Funding is stretched but fading it has historically underperformed — draft it anyway on your own read, not the base rate" : "No fade edge right now — funding isn't stretched vs its range"} className="nx-card-interactive" style={{
-                fontFamily: MONO, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em",
-                color: isFade ? C.accent : draftAnyway ? C.warn : C.text.faint, background: "none",
-                border: `1px solid ${isFade ? C.borderStrong : draftAnyway ? `${C.warn}88` : C.border}`, borderRadius: RADIUS.md, padding: "9px 15px",
-                cursor: canDraft ? "pointer" : "not-allowed", opacity: canDraft ? 1 : 0.55,
-              }}>{isFade ? "Draft this fade →" : draftAnyway ? "Draft anyway →" : "No fade to draft yet"}</button>
-            </div>
-
-            {/* Pressure-test the fade before you take it — run it through a simulation. */}
-            {m.direction !== "NONE" && (
-              <div style={{ marginTop: 12 }}>
-                <Simulate label="◆ Simulate this fade" wallet={wallet} body={{
-                  kind: "thesis", coin: m.coin, direction: m.direction, entry: m.markPrice,
-                  notes: `Funding fade — ${m.coin} funding is ${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr, the crowd is offside ${m.direction === "SHORT" ? "long" : "short"}; fading for the mean-revert.`,
-                }} />
-              </div>
-            )}
-          </div>
-
-          {/* Learnable legend */}
-          <div style={{ paddingTop: isMobile ? 20 : 6 }}>
+      </>
+    );
+    const legendBody = (
+      <>
             <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: C.text.muted, marginBottom: 14 }}>Reading the card</div>
             {[
               ["The price, big", "Where the market is now, and today's move. No decoding."],
@@ -670,6 +640,111 @@ export function MispricedBoard() {
                 Not enough funding history recorded for {m.coin} yet — the story-line and reversion stat light up as it accumulates.
               </div>
             )}
+      </>
+    );
+    return (
+      <div>
+        <button onClick={() => setOpenCoin(null)} className="nx-card-interactive" style={{
+          display: "inline-flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 10, letterSpacing: "0.08em",
+          color: C.text.muted, background: "none", border: `1px solid ${C.border}`, borderRadius: RADIUS.sm,
+          padding: "6px 11px", cursor: "pointer", marginBottom: 16,
+        }}>← BACK TO BOARD</button>
+
+        {/* Primo layout: the card (with the hero chart) takes the bulk of the width so the
+            SynthChart breathes; the learnable legend fills the right cleanly instead of a
+            smushed card + a big empty gap. Capped so it doesn't sprawl on ultra-wide. */}
+        <div style={{ display: isMobile ? "block" : "grid", gridTemplateColumns: "minmax(0,1.75fr) minmax(260px,1fr)", gap: 32, alignItems: "start", maxWidth: 1240 }}>
+          {/* The card */}
+          <div style={{ position: "relative", border: `1px solid ${C.border}`, borderLeft: `2px solid ${C.accent}`, borderRadius: RADIUS.lg, padding: "24px 28px", background: "linear-gradient(180deg,#17171a 0%,#0d0d0f 100%)", overflow: "hidden" }}>
+            {isMobile ? (
+              /* Line 1 the verdict, line 2 the action — nothing between them, so a phone answers
+                 "is there a fade, and what do I do about it" without a scroll. */
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.04em" }}>
+                  <span style={{ color: verdictColor, flexShrink: 0 }}>{verdictLabel}</span>
+                  <span style={{ color: C.text.faint, flexShrink: 0 }}>·</span>
+                  <span style={{ color: C.text.bright, flexShrink: 0 }}>{fundingLabel}</span>
+                  {histTag && <><span style={{ color: C.text.faint, flexShrink: 0 }}>·</span><span style={{ color: C.text.muted, fontWeight: 400, flexShrink: 0 }}>{histTag}</span></>}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+                  <button onClick={() => canDraft && draftFade(m)} disabled={!canDraft} className="nx-card-interactive" style={{
+                    flex: 1, minWidth: 0, fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.06em",
+                    color: isFade ? C.accent : draftAnyway ? C.warn : C.text.faint, background: "none",
+                    border: `1px solid ${isFade ? C.borderStrong : draftAnyway ? `${C.warn}88` : C.border}`, borderRadius: RADIUS.md,
+                    padding: "11px 12px", cursor: canDraft ? "pointer" : "not-allowed", opacity: canDraft ? 1 : 0.55,
+                  }}>{isFade ? "Draft this fade →" : draftAnyway ? "Draft anyway →" : "No fade to draft yet"}</button>
+                  <button onClick={() => shareRead(m, isFade, draftAnyway)} title="Share this read as a card on X" className="nx-press" style={{
+                    flexShrink: 0, fontFamily: MONO, fontSize: 11, letterSpacing: "0.06em", color: C.text.muted,
+                    background: "none", border: `1px solid ${C.border}`, borderRadius: RADIUS.sm, padding: "11px 13px", cursor: "pointer",
+                  }}>↗</button>
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 14 }}>
+                  <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 600, color: C.text.bright, letterSpacing: "-0.02em", lineHeight: 1 }}>${fmtPrice(m.markPrice)}</span>
+                  <span style={{ fontFamily: UI, fontSize: 12, color: C.text.faint }}>{m.coin}</span>
+                  {change != null && <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 12, color: change > 0 ? C.pos : change < 0 ? C.neg : C.text.muted }}>{change > 0 ? "+" : ""}{change}% today</span>}
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: MONO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: C.text.muted }}>
+                  <span style={{ color: C.text.fog }}>◆ Nexus · Funding edge</span>
+                  <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: verdictColor }}>{verdict === "NONE" ? "BALANCED" : isFade ? `◆ FADE ${m.direction}` : draftAnyway ? `⚠ WATCH · FADE ${m.edgeQuality?.revertedPct}% HIST` : "◆ WATCHING"}</span>
+                </div>
+                <div style={{ fontFamily: UI, fontSize: 14, color: C.text.fog, marginTop: 18 }}>{m.coin} perpetual</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 1 }}>
+                  <span style={{ fontFamily: MONO, fontSize: 40, fontWeight: 600, color: C.text.bright, letterSpacing: "-0.02em", lineHeight: 1 }}>${fmtPrice(m.markPrice)}</span>
+                  {change != null && <span style={{ fontFamily: MONO, fontSize: 14, color: change > 0 ? C.pos : change < 0 ? C.neg : C.text.muted }}>{change > 0 ? "+" : ""}{change}% today</span>}
+                </div>
+              </>
+            )}
+
+            <div style={{ height: 1, background: C.border, margin: "16px 0" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: MONO, fontSize: 12, letterSpacing: "0.12em", textTransform: "uppercase", color: C.text.bright }}>
+              <span style={{ width: 16, height: 3, borderRadius: 2, background: C.accent }} />{stanceLabel(m.direction)}
+            </div>
+
+            {isMobile
+              ? <Collapsible title="WHY" subtitle="the chart, the read, the history" storageKey="nx_ticket_why_open">{deepRead}</Collapsible>
+              : deepRead}
+
+            {/* Desktop keeps the footer action row. On a phone the SAME verdict-gated buttons are
+                already in the head, and a second copy at the bottom is the essay this pass cuts. */}
+            {!isMobile && <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.border}`, flexWrap: "wrap" }}>
+              <span style={{ fontFamily: MONO, fontSize: 9.5, color: C.text.faint }}>{isFade ? "Live read · funding + smart money" : draftAnyway ? "Stretched, but the fade is historically unproven here" : "Watching · no fade edge right now"}</span>
+              {/* Share the READ as a branded, verifiable card (verdict only — no fake R/stops).
+                  A WATCH card shares as WATCH, a FADE as FADE; unfurls on X, links back. */}
+              <button onClick={() => shareRead(m, isFade, draftAnyway)} title="Share this read as a card on X" className="nx-press" style={{
+                marginLeft: "auto", fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.06em", color: C.text.muted,
+                background: "none", border: `1px solid ${C.border}`, borderRadius: RADIUS.sm, padding: "8px 12px", cursor: "pointer",
+              }}>↗ SHARE</button>
+              {/* One primary action, and it answers the page's one question: is there a fade NOW?
+                  FADE → greenlight Draft. WATCH/NONE → Draft disabled (Simulate stays below). */}
+              <button onClick={() => canDraft && draftFade(m)} disabled={!canDraft} title={isFade ? "Draft this fade into the Thesis Engine" : draftAnyway ? "Funding is stretched but fading it has historically underperformed — draft it anyway on your own read, not the base rate" : "No fade edge right now — funding isn't stretched vs its range"} className="nx-card-interactive" style={{
+                fontFamily: MONO, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em",
+                color: isFade ? C.accent : draftAnyway ? C.warn : C.text.faint, background: "none",
+                border: `1px solid ${isFade ? C.borderStrong : draftAnyway ? `${C.warn}88` : C.border}`, borderRadius: RADIUS.md, padding: "9px 15px",
+                cursor: canDraft ? "pointer" : "not-allowed", opacity: canDraft ? 1 : 0.55,
+              }}>{isFade ? "Draft this fade →" : draftAnyway ? "Draft anyway →" : "No fade to draft yet"}</button>
+            </div>}
+
+            {/* Pressure-test the fade before you take it — run it through a simulation. */}
+            {m.direction !== "NONE" && (
+              <div style={{ marginTop: 12 }}>
+                <Simulate label="◆ Simulate this fade" wallet={wallet} body={{
+                  kind: "thesis", coin: m.coin, direction: m.direction, entry: m.markPrice,
+                  notes: `Funding fade — ${m.coin} funding is ${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr, the crowd is offside ${m.direction === "SHORT" ? "long" : "short"}; fading for the mean-revert.`,
+                }} />
+              </div>
+            )}
+          </div>
+
+          {/* Learnable legend — a side rail beside the card on desktop. On a phone it would be a
+              five-step tutorial stacked under the verdict, so it collapses behind its own header:
+              one tap away, never in front of the read. */}
+          <div style={{ paddingTop: isMobile ? 4 : 6 }}>
+            {isMobile
+              ? <Collapsible title="READING THE CARD" storageKey="nx_ticket_legend_open">{legendBody}</Collapsible>
+              : legendBody}
           </div>
         </div>
       </div>
