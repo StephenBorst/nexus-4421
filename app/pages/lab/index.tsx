@@ -59,7 +59,7 @@ export default function TheLabPage() {
   }, []);
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [showAllTabs, setShowAllTabs] = useState(false); // guest nav expands from 3 rooms → full set
+  const [showAllTabs, setShowAllTabs] = useState(false); // More expands the condensed nav → full set
   const today = new Date();
 
   // ── Persistence (KV + localStorage) ─────────────────────
@@ -158,8 +158,19 @@ export default function TheLabPage() {
   // sees the full set. If a guest deep-links to a gated tab, show everything so the active tab is
   // never orphaned. Publish / COPY / ARM LIVE stay wallet-gated in their own surfaces.
   const GUEST_ROOMS: TabId[] = ["intel", "smart", "thesis"];
-  const guestNav = !rootWalletAddress && !showAllTabs && GUEST_ROOMS.includes(activeTab);
-  const visibleTabs = guestNav ? tabs.filter((t) => GUEST_ROOMS.includes(t.id)) : tabs;
+  // ── Connected nav — the same mechanism, a wider set ───────────────────────────
+  // Nine equal-weight tabs is a tool dump: everything shouts, so nothing is the next step.
+  // The loop's spine stays on the bar and the rest (Copy Trades · Holders Room · Trading Log ·
+  // Analytics) moves behind the SAME More toggle the guest nav already uses — no second
+  // mechanism, and one tap away rather than hidden. AGENT DELIBERATELY STAYS SURFACED: it is
+  // what produces the graded record, and demoting the differentiator to tidy a nav would be
+  // optimizing the wrong thing.
+  const PRIMARY_ROOMS: TabId[] = ["intel", "smart", "thesis", "agent", "quicktrade"];
+  const navRooms = rootWalletAddress ? PRIMARY_ROOMS : GUEST_ROOMS;
+  // Condensed only while the ACTIVE tab is inside the set — deep-linking to a tab behind More
+  // (or opening it once) shows the full bar, so the active tab is never orphaned.
+  const condensedNav = !showAllTabs && navRooms.includes(activeTab);
+  const visibleTabs = condensedNav ? tabs.filter((t) => navRooms.includes(t.id)) : tabs;
   // Group in declaration order — the array above IS the loop's order.
   const tabGroups = visibleTabs.reduce<{ phase: string; items: typeof tabs }[]>((acc, t) => {
     const last = acc[acc.length - 1];
@@ -257,8 +268,9 @@ export default function TheLabPage() {
               })}
             </div>
           ))}
-          {/* Guest nav: a More toggle reveals the wallet-gated rooms without a full-screen funnel. */}
-          {guestNav && (
+          {/* One More toggle for both navs: for a guest it reveals the wallet-gated rooms without a
+              full-screen funnel; connected, it reveals the rooms behind the loop's spine. */}
+          {condensedNav && (
             <button onClick={() => setShowAllTabs(true)} title="Show all Lab tools"
               style={isMobile ? {
                 background: "none", border: "1px solid #232327", color: "#71717a",
