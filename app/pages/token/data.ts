@@ -14,6 +14,7 @@
 const DS_BASE = "https://api.dexscreener.com/latest/dex";
 const GT_BASE = "https://api.geckoterminal.com/api/v2";
 const ORDERLY_INFO = "https://api-evm.orderly.org/v1/public/info";
+const AGENT_API = "https://og.nexustradinglabs.com";
 
 // ── shared: a fetch that can't hang the UI (the watchdog lesson — an unsettled promise
 // never runs your .catch, so cap it with an abort) ───────────────────────────────────
@@ -191,6 +192,33 @@ export async function orderlyPerpSet(): Promise<Set<string>> {
   }
   if (set.size) { _perpSet = set; _perpAt = Date.now(); }
   return set;
+}
+
+// ── the Nexus edge, on any token we list ──────────────────────────────────────
+// The differentiator vs a plain swap terminal: next to the chart, the SAME graded funding
+// verdict the Board and the ticket show. Reads the canonical /signals row (the ONE verdict
+// source) — the terminal never re-derives it, so it can't disagree with the Lab. Null when the
+// token isn't a listed market (we don't compute funding/OI on arbitrary memecoins — honest).
+export interface NexusSignal {
+  symbol: string;
+  verdict: "FADE" | "WATCH" | "NONE" | null;
+  fadeDir: "LONG" | "SHORT" | "NONE" | null;
+  fundingAnnualPct: number | null;
+  stretched: boolean | null;
+}
+export async function nexusSignal(symbol: string): Promise<NexusSignal | null> {
+  const j = (await getJson(`${AGENT_API}/signals`)) as { signals?: unknown[] } | null;
+  const rows = Array.isArray(j?.signals) ? j!.signals! : [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const r = (rows as any[]).find((x) => String(x?.symbol || "").toUpperCase() === symbol.toUpperCase());
+  if (!r) return null;
+  return {
+    symbol: symbol.toUpperCase(),
+    verdict: r.verdict === "FADE" || r.verdict === "WATCH" || r.verdict === "NONE" ? r.verdict : null,
+    fadeDir: r.fade_dir === "LONG" || r.fade_dir === "SHORT" || r.fade_dir === "NONE" ? r.fade_dir : null,
+    fundingAnnualPct: num(r.funding_annual_pct),
+    stretched: typeof r.stretched === "boolean" ? r.stretched : null,
+  };
 }
 
 // ── formatters (compact, terminal register) ──────────────────────────────────

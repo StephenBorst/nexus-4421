@@ -11,11 +11,31 @@ import { generatePageTitle } from "@/utils/utils";
 import { getPageMeta } from "@/utils/seo";
 import { renderSEOTags } from "@/utils/seo-tags";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
+import { FADE_FUNDING_FLOOR_PCT_YR } from "@/pages/lab/briefing";
 import {
-  searchToken, poolCandles, poolTrades, orderlyPerpSet,
+  searchToken, poolCandles, poolTrades, orderlyPerpSet, nexusSignal,
   fmtUsd, fmtPrice, fmtAge, shortAddr,
-  type TokenPair, type Candle, type Trade,
+  type TokenPair, type Candle, type Trade, type NexusSignal,
 } from "./data";
+
+// Fire the global copilot (mounted in App) with a token-context question. The same
+// nexus:assistant-ask contract the Lab's "Ask Nexus" chips use.
+function askNexus(prompt: string) {
+  window.dispatchEvent(new CustomEvent("nexus:assistant-ask", { detail: { prompt } }));
+}
+
+// The graded funding verdict for a listed market, read EXACTLY as the Board reads it (the server
+// verdict + the ONE shared economic floor) so the terminal can't disagree with the Lab.
+function nexusReadLabel(sig: NexusSignal): { label: string; color: string; sub: string } {
+  const dir = sig.fadeDir === "LONG" || sig.fadeDir === "SHORT" ? sig.fadeDir : null;
+  const annual = sig.fundingAnnualPct ?? 0;
+  const bigEnough = Math.abs(annual) >= FADE_FUNDING_FLOOR_PCT_YR;
+  const isFade = sig.verdict === "FADE" && !!dir && bigEnough;
+  const fundTxt = `funding ${annual >= 0 ? "+" : ""}${annual.toFixed(1)}%/yr`;
+  if (isFade) return { label: `◆ FADE ${dir}`, color: "#3ecf8e", sub: `${fundTxt} — the crowd is stretched ${dir === "SHORT" ? "long" : "short"}, graded from the tape after.` };
+  if (sig.verdict === "FADE" || sig.verdict === "WATCH") return { label: "◆ WATCHING", color: "#71717a", sub: `${fundTxt} — elevated but not stretched vs its own range. No fade edge yet.` };
+  return { label: "BALANCED", color: "#71717a", sub: `${fundTxt} — no crowd extreme to fade right now.` };
+}
 
 const MONO = "var(--nx-font-mono)";
 const UI = "var(--nx-font-ui, sans-serif)";
@@ -111,6 +131,7 @@ export default function TokenTerminal() {
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
   const [copied, setCopied] = useState(false);
+  const [sig, setSig] = useState<NexusSignal | null>(null);
 
   useEffect(() => { orderlyPerpSet().then(setPerpSet).catch(() => { /* no perp routing */ }); }, []);
   useEffect(() => { setInput(query || ""); }, [query]);
@@ -164,6 +185,17 @@ export default function TokenTerminal() {
     }, 25000);
     return () => { alive = false; clearInterval(id); };
   }, [query, pair]);
+
+  // ── the Nexus edge on a listed market ──
+  // Only for a symbol we actually list — we don't compute funding/OI on arbitrary memecoins,
+  // and inventing a read for one would be the exact dishonesty the rest of this page avoids.
+  useEffect(() => {
+    const sym = pair?.baseSymbol;
+    if (!sym || !perpSet.has(sym)) { setSig(null); return; }
+    let alive = true;
+    nexusSignal(sym).then((s) => { if (alive) setSig(s); }).catch(() => { if (alive) setSig(null); });
+    return () => { alive = false; };
+  }, [pair, perpSet]);
 
   const submit = useCallback((q: string) => {
     const v = q.trim();
@@ -317,8 +349,43 @@ export default function TokenTerminal() {
                 </div>
               </div>
 
+              {/* ── NEXUS — the read, and the agent you can ask ──────────────────
+                  The differentiator vs every other token terminal: a swap page anyone can
+                  clone, but not the graded funding verdict beside it, and not an analyst you
+                  can interrogate about the thing you're looking at. */}
+              <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, padding: 14, marginTop: isMobile ? 12 : 0, marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                  <span style={{ fontFamily: MONO, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.14em", color: BRIGHT }}>◆ NEXUS</span>
+                  {isPerp && <span style={{ fontFamily: MONO, fontSize: 8, letterSpacing: "0.08em", color: FAINT }}>· LISTED MARKET</span>}
+                </div>
+
+                {sig ? (() => {
+                  const r = nexusReadLabel(sig);
+                  return (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.04em", color: r.color, marginBottom: 4 }}>{r.label}</div>
+                      <div style={{ fontFamily: UI, fontSize: 11.5, lineHeight: 1.5, color: MUT }}>{r.sub}</div>
+                    </div>
+                  );
+                })() : (
+                  <div style={{ fontFamily: UI, fontSize: 11.5, lineHeight: 1.5, color: MUT, marginBottom: 12 }}>
+                    {isPerp
+                      ? "Reading the funding tape for this market…"
+                      : <>Nexus grades funding and positioning on the markets it lists — {pair.baseSymbol} isn’t one, so there’s no graded read to show. Ask below for what can be seen from public data.</>}
+                  </div>
+                )}
+
+                <button
+                  onClick={() => askNexus(isPerp
+                    ? `Give me your read on ${pair.baseSymbol} right now — funding, positioning, and whether there's a real edge here. Then the one thing to watch. Be honest if there isn't a setup.`
+                    : `What can you tell me about the token ${pair.baseSymbol}${pair.baseAddress ? ` (${pair.baseAddress} on ${pair.chainId})` : ""}? It trades around ${fmtPrice(pair.priceUsd)} with ${fmtUsd(pair.liquidityUsd)} liquidity and ${fmtUsd(pair.volume24h)} 24h volume. Be explicit about what you can and can't verify.`)}
+                  className="nx-card-interactive"
+                  style={{ width: "100%", fontFamily: MONO, fontSize: 11.5, fontWeight: 700, letterSpacing: "0.04em", color: BRIGHT, background: "none", border: `1px solid #ededf055`, borderRadius: 8, padding: "10px 0", cursor: "pointer" }}
+                >Ask Nexus about {pair.baseSymbol} →</button>
+              </div>
+
               {/* trade panel — honest routing, no fake fills */}
-              <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, padding: 14, marginTop: isMobile ? 12 : 0 }}>
+              <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, padding: 14 }}>
                 <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
                   {(["buy", "sell"] as const).map((s) => (
                     <button key={s} onClick={() => setSide(s)} style={{ flex: 1, fontFamily: MONO, fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: side === s ? "#0a0a0b" : s === "buy" ? POS : NEG, background: side === s ? (s === "buy" ? POS : NEG) : "none", border: `1px solid ${s === "buy" ? POS : NEG}55`, borderRadius: 7, padding: "9px 0", cursor: "pointer" }}>{isPerp ? (s === "buy" ? "Long" : "Short") : s}</button>
