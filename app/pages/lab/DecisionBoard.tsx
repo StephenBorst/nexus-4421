@@ -12,7 +12,8 @@
 //
 // Sits between the Briefing (the narrative read) and Market Intel (the deep detail):
 // Briefing = "what matters now", Board = "scan the whole book", Intel = "go deep".
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { C, MONO, UI, RADIUS } from "@/config/theme";
 import { SectionHeader } from "./components";
 import { useIsMobile } from "./useIsMobile";
@@ -199,6 +200,13 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
   const [proc, setProc] = useState<ProcessEdge>(null);
   const [sort, setSort] = useState<SortMode>("actionable");
   const [draftingSym, setDraftingSym] = useState<string | null>(null); // the row whose PLAY→draft is fetching levels
+  // ── Deep link: /lab?guest=1&coin=SOL ──────────────────────────────────────────
+  // A shared verdict card lands here. Scroll that row into view and mark it, so the reader sees
+  // the row the card was about — and its → still drafts. Fail-soft: an unknown coin is ignored.
+  const [searchParams] = useSearchParams();
+  const deepCoin = (searchParams.get("coin") || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const scrolledFor = useRef<string | null>(null);
 
   // Personal edge = which side the user measurably wins on + their align (counter/with-
   // trend) class. From their own trades + graded process record. Fail-soft; empty when
@@ -328,6 +336,15 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
     return out.sort(cmp[sort]);
   }, [signals, tape, consensus, smart, catalyst, forecast, sort, edge, records]);
 
+  // Bring the deep-linked row into view once the board has rows (once per coin).
+  useEffect(() => {
+    if (!deepCoin || !rows.length || scrolledFor.current === deepCoin) return;
+    const el = rowRefs.current[deepCoin];
+    if (!el) return;
+    scrolledFor.current = deepCoin;
+    try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { el.scrollIntoView(); }
+  }, [deepCoin, rows]);
+
   // OBSERVE → PLAN handoff: a clean read is a thesis waiting to be written. Draft the
   // play into the Thesis Engine (same contract the Mispriced board + copilot use).
   const draftPlay = async (r: Row) => {
@@ -387,20 +404,32 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
   );
   // Extracted so the same SHARE control sits in the desktop inline row AND the mobile header
   // row (no marginLeft:auto on mobile — it lives in a space-between flex there).
+  // SHARE emits the ROW'S VERDICT, not a generic board card. It points at the per-coin card that
+  // already exists (/share/read/:coin → /og/read/:coin.png) — which renders the canonical
+  // readVerdict, so the card can never disagree with the board, and no second card is invented.
+  // That card's link lands on the guest Lab with this row in view (?guest=1&coin=). The shared
+  // target is the top real FADE, else the top row of the current sort.
+  const shareRow = rows.find((r) => r.play.klass === "FADE") || rows[0] || null;
   const shareBtn = (
     <button
       onClick={() => {
-        const text = "The Board on Nexus — every market, one read, graded from public price. The mechanical play + how many independent reads confirm it:";
-        const url = "https://og.nexustradinglabs.com/share/board";
+        if (!shareRow) return;
+        const v = shareRow.play.klass === "FADE" && shareRow.play.dir ? `FADE ${shareRow.play.dir}`
+          : shareRow.play.klass === "WATCH" ? "WATCH" : "NO READ";
+        const fund = `${shareRow.fundingAnnual >= 0 ? "+" : ""}${shareRow.fundingAnnual.toFixed(1)}%/yr`;
+        const text = `${shareRow.sym} · ${v} · funding ${fund} — the crowd's positioning, graded from public price on Nexus.`;
+        const url = `https://og.nexustradinglabs.com/share/read/${encodeURIComponent(shareRow.sym)}`;
         window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, "_blank", "noopener");
       }}
-      title="Share this live read as a card on X"
+      title={shareRow ? `Share the ${shareRow.sym} verdict as a card on X` : "Share the live read on X"}
       className="nx-press"
+      disabled={!shareRow}
       style={{
         marginLeft: isMobile ? 0 : "auto", background: "none", border: `1px solid ${C.border}`, color: C.text.muted,
-        fontFamily: MONO, fontSize: 9, letterSpacing: "0.08em", padding: "4px 10px", borderRadius: RADIUS.sm, cursor: "pointer", flexShrink: 0,
+        fontFamily: MONO, fontSize: 9, letterSpacing: "0.08em", padding: "4px 10px", borderRadius: RADIUS.sm,
+        cursor: shareRow ? "pointer" : "default", opacity: shareRow ? 1 : 0.5, flexShrink: 0,
       }}
-    >↗ SHARE</button>
+    >{shareRow ? `↗ SHARE ${shareRow.sym}` : "↗ SHARE"}</button>
   );
 
   const cols = "minmax(60px,0.85fr) minmax(76px,1fr) minmax(84px,1.05fr) 54px minmax(66px,0.8fr) minmax(140px,1.6fr) minmax(118px,1.25fr) 34px";
@@ -470,6 +499,7 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
             const fundHot = Math.abs(r.funding) >= CROWDED;
             const confluent = r.play.strong && !!r.play.dir && r.agree >= 3;
             const busy = draftingSym === r.sym;
+            const deepHit = !!deepCoin && r.sym === deepCoin;   // arrived from a shared verdict card
             const tapeTag = r.play.klass === "FADE" && r.play.dir && tapeRead
               ? (tapeRead.label === "RISK-OFF" && r.play.dir === "LONG" ? "risk-off"
                 : tapeRead.label === "RISK-ON" && r.play.dir === "SHORT" ? "risk-on" : null)
@@ -479,7 +509,8 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
               : <span style={{ color: C.text.faint }}>chop</span>;
             const dot = <span style={{ color: C.text.faint }}>·</span>;
             return (
-              <div key={r.sym} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 8px 10px 11px", borderBottom: `1px solid ${C.surfaceAlt}`, borderLeft: confluent ? `3px solid ${C.accent}` : "3px solid transparent", background: confluent ? `${C.accent}0c` : undefined }}>
+              <div key={r.sym} ref={(el: HTMLDivElement | null) => { rowRefs.current[r.sym] = el; }}
+                style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 8px 10px 11px", borderBottom: `1px solid ${C.surfaceAlt}`, borderLeft: deepHit || confluent ? `3px solid ${C.accent}` : "3px solid transparent", background: deepHit ? `${C.accent}1c` : confluent ? `${C.accent}0c` : undefined }}>
                 {/* Line 1 — the decision. The market/funding/play group flexes + wraps; → pinned right. */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontFamily: MONO }}>
@@ -536,6 +567,7 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
               // moat in one glance: not one indicator, but where separate verifiable reads converge.
               const confluent = r.play.strong && !!r.play.dir && r.agree >= 3;
               const pc = C.accent; // FADE highlight = bone accent (matches the ticket; green stays profit-only)
+              const deepHit = !!deepCoin && r.sym === deepCoin;   // arrived from a shared verdict card
               // Is THIS fade the mean-reversion book the tape favors? (long into RISK-OFF /
               // short into RISK-ON) — a context tag, never a vote, so the risk-off gate reads
               // as "keep the stretched fade," not "kill longs." Only on real FADE plays.
@@ -544,7 +576,8 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
                   : tapeRead.label === "RISK-ON" && r.play.dir === "SHORT" ? "RISK-ON" : null)
                 : null;
               return (
-                <div key={r.sym} style={{ display: "grid", gridTemplateColumns: cols, gap: gridGap, padding: rowPad, borderBottom: `1px solid ${C.surfaceAlt}`, alignItems: "center", borderLeft: confluent ? `3px solid ${pc}` : "3px solid transparent", background: confluent ? `${pc}0c` : undefined }}>
+                <div key={r.sym} ref={(el: HTMLDivElement | null) => { rowRefs.current[r.sym] = el; }}
+                  style={{ display: "grid", gridTemplateColumns: cols, gap: gridGap, padding: rowPad, borderBottom: `1px solid ${C.surfaceAlt}`, alignItems: "center", borderLeft: deepHit || confluent ? `3px solid ${pc}` : "3px solid transparent", background: deepHit ? `${pc}1c` : confluent ? `${pc}0c` : undefined }}>
                   {/* Market + YOUR loop state: ● live call (plan) · ◆ in position (execute) */}
                   <div style={{ ...cell, fontSize: 13, fontWeight: 700, color: C.text.bright, gap: 5 }}>
                     <span>{r.sym}</span>

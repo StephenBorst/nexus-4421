@@ -405,6 +405,7 @@ function buildReadOgSvg(p, { fontFamily = "'Courier New', Courier, monospace" } 
   <text x="${96 + verdictLabel.length * 20}" y="219" fill="${MUT}" font-size="20">${esc(stanceLabel)}</text>
   <text x="60" y="290" fill="${MUT}" font-size="16" letter-spacing="4">FUNDING EDGE</text>
   <text x="60" y="340" fill="${BONE}" font-size="44" font-weight="bold">${esc(fundingTxt)}</text>
+  ${p.hist ? `<text x="1140" y="340" fill="${FOG}" font-size="24" text-anchor="end">HIST ${esc(String(p.hist.pct))}% · n=${esc(String(p.hist.n))}</text>` : ""}
   <text x="60" y="376" fill="${FOG}" font-size="17">${esc(stretchSub)}</text>
   ${lensCell(60, "CROWD (FUNDING)", `paying to be ${crowdSide || "balanced"}`, isFade && fadeDir ? `FADE ${fadeDir}` : "", accent)}
   ${lensCell(630, "SMART $", smSide ? `${p.smartMoney.count} sharp${p.smartMoney.count === 1 ? "" : "s"} ${smSide}` : "no read", smWith == null ? "" : (smWith ? "WITH THE FADE" : "AGAINST"), smWith ? POS : NEG)}
@@ -1190,6 +1191,12 @@ export default {
         fundingAnnualPct: Number(row?.fundingAnnualPct) || 0,
         stretched,
         smartMoney: row?.smartMoney || null,
+        // HIST — the canonical reversion record the mispriced board already stamps (edgeQuality's
+        // own source): how often fading this market actually reverted, on how many samples. Only
+        // FLAGGED rows carry it, so it's absent — and simply not drawn — on the rest.
+        hist: Number.isFinite(row?.reversion?.revertedPct) && Number(row?.reversion?.samples) > 0
+          ? { pct: Math.round(Number(row.reversion.revertedPct)), n: Number(row.reversion.samples) }
+          : null,
       };
       if (isPng) {
         try {
@@ -1205,7 +1212,10 @@ export default {
     // ── GET /share/read/:coin — crawler-friendly OG proxy for a funding-ticket card ─
     if (parts[0] === "share" && parts[1] === "read" && parts[2]) {
       const coin = String(parts[2]).toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
-      const appUrl = "https://trade.nexustradinglabs.com/lab?tab=intel";
+      // Land on the GUEST Lab with this row in view — a share that drops you on a generic tab is
+      // just a screenshot. ?guest=1 clears the funnel, &coin= scrolls/highlights the row, and the
+      // row's → still drafts the frozen thesis.
+      const appUrl = `https://trade.nexustradinglabs.com/lab?guest=1&coin=${encodeURIComponent(coin)}`;
       const img = `https://og.nexustradinglabs.com/og/read/${encodeURIComponent(coin)}.png`;
       const shareUrl = `https://og.nexustradinglabs.com/share/read/${encodeURIComponent(coin)}`;
       const title = `${coin} funding read — the crowd's positioning, graded from public price`;
