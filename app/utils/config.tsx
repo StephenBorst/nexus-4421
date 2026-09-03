@@ -411,13 +411,17 @@ const allMenuItems = [
           // matching the editorial design system so it feels owned, not bolted on.
           main: {
             component: (
-              <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
+              // Congruent lockup (Definitive's △ DEFINITIVE): the mark and the wordmark read as
+              // ONE unit — mark height ≈ the wordmark's optical size, not towering over it. Was
+              // 30px mark / 19px word (1.58×, the mark dwarfed the name); now 22 / 20 so they sit
+              // as a matched pair. Tune the ratio here if the mark's own padding reads heavy.
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <img
                   src={withBasePath("/logo-mark.png")}
                   alt="Nexus Trading Labs"
-                  style={{ height: "30px", width: "auto", flexShrink: 0 }}
+                  style={{ height: "22px", width: "auto", flexShrink: 0 }}
                 />
-                <span style={{ fontFamily: "var(--nx-font-serif, 'Libre Baskerville', Georgia, serif)", fontSize: 19, fontWeight: 700, color: "#f4f4f5", letterSpacing: "0.01em", lineHeight: 1, whiteSpace: "nowrap" }}>Nexus</span>
+                <span style={{ fontFamily: "var(--nx-font-serif, 'Libre Baskerville', Georgia, serif)", fontSize: 20, fontWeight: 700, color: "#f4f4f5", letterSpacing: "0.01em", lineHeight: 1, whiteSpace: "nowrap" }}>Nexus</span>
               </span>
             ),
           },
