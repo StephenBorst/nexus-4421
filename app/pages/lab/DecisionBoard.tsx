@@ -449,13 +449,23 @@ export function DecisionBoard({ onSelectTab, trades, wallet, theses, positions }
         note={<span>{signals ? `${rows.length} markets` : "loading…"}{signals && rows.some((r) => r.play.strong && r.agree >= 3) ? ` · ${rows.filter((r) => r.play.strong && r.agree >= 3).length} in confluence` : ""} · every column verifiable</span>}
       />
 
-      {/* Honesty framing — the whole point of the moat. */}
+      {/* Honesty framing — the whole point of the moat. On a phone it is ONE sentence (Grok):
+          the full doctrine is five sentences plus two conditionals, and on a 390px screen it
+          pushed the actual board below the fold. It is compressed, not dropped — cut it entirely
+          and the board reads like a signal service, which is exactly what it is not. Desktop,
+          where there is room for the argument, keeps it in full. */}
+      {isMobile ? (
+        <div style={{ fontFamily: UI, fontSize: 11, lineHeight: 1.5, color: C.text.muted, marginTop: -8, marginBottom: 12 }}>
+          <b style={{ color: C.text.bright }}>FADE</b> only when the crowd is <b style={{ color: C.text.bright }}>stretched</b> vs its own funding range — public facts, graded from the tape after, never advice.
+        </div>
+      ) : (
       <div style={{ fontFamily: UI, fontSize: 11, lineHeight: 1.5, color: C.text.muted, marginTop: -8, marginBottom: 14 }}>
         Funding and positioning are <b style={{ color: C.text.bright }}>public facts</b>. <b style={{ color: C.text.bright }}>The play</b> is one verdict word — <b style={{ color: C.text.bright }}>FADE</b> only when the crowd is <b style={{ color: C.text.bright }}>stretched</b> vs its own funding range, <b style={{ color: C.text.muted }}>WATCH</b> when it's merely elevated — the SAME read as the ticket. It grades <b style={{ color: C.text.bright }}>from the tape</b> after, like every call. No score to trust; a record to verify.
         {" "}<b style={{ color: C.text.bright }}>Confluence</b> shows four INDEPENDENT reads — <span style={{ color: C.text.muted }}>callers · smart money · catalysts · forecasters</span> — and how many <b style={{ color: C.text.bright }}>agree with the play</b> (<span style={{ color: C.accent }}>◆</span> marks where separate signals converge). Agreement is a reason to look, still graded after.
         {hasLens && <> Each play is also matched against <b style={{ color: C.pos }}>your own graded edge</b> — <span style={{ color: C.pos }}>◆ your side/class</span> vs <span style={{ color: C.warn }}>△ off your edge</span>.</>}
         {hasLoop && <> Your loop state rides on the ticker: <b style={{ color: C.text.bright }}>● a live call</b> (planned) · <b style={{ color: C.text.bright }}>▸ an open position</b> (executing) — the graded record closes it.</>}
       </div>
+      )}
 
       {/* Sort controls. Desktop = one inline row. Mobile = SORT + SHARE on a header line, then
           the chips in an equal-width repeat(3,1fr) grid so they're congruent and WRAP instead of

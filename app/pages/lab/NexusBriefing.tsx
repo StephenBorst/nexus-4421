@@ -16,6 +16,9 @@ import { buildOperatorProfile, profileNarrative } from "@/lib/operatorProfile.mj
 import { tiltRead, sessionEdge, overtradingRead, sizingRead } from "@/lib/behavioral.mjs";
 import { computeEdge } from "@/config/edge";
 
+// Bare ticker for the briefing's symbol dedup (BTC, not PERP_BTC_USDC).
+const bareTicker = (sym: string) => String(sym || "").toUpperCase().replace("PERP_", "").replace("_USDC", "");
+
 const FLAGS_KEY = "nexus_flagged_setups";
 const money = (n: number) => `${n < 0 ? "-" : "+"}$${Math.abs(n) >= 1000 ? `${(Math.abs(n) / 1000).toFixed(1)}K` : Math.abs(n).toFixed(2)}`;
 
@@ -195,9 +198,33 @@ export function NexusBriefing({
   const queue = useMemo(() => {
     const all: Insight[] = [...fusion, ...(coaching ? [coaching] : []), ...personal, ...market];
     const seen = new Set<string>();
-    const dedup = all.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
-    return dedup.sort((a, b) => b.priority - a.priority).slice(0, 5);
-  }, [fusion, coaching, personal, market]);
+    const byId = all.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
+    // Dedup by SYMBOL as well as by id (Grok). The four builders are independent, so the same
+    // coin could arrive from the fusion, a personal read and a market read under three different
+    // ids and take three of the briefing's slots — "SOL" three times reads like the Lab has one
+    // idea. Sort FIRST so the survivor per symbol is the highest-priority read of it, not
+    // whichever builder happened to run first. Symbol-less reads (the tape, your record, the
+    // session edge) always pass — they aren't about a coin.
+    const known = new Set((signals || []).map((s) => bareTicker(s.symbol)));
+    const symbolOf = (i: Insight): string | null => {
+      if (i.meta?.symbol) return bareTicker(i.meta.symbol);
+      for (const tok of i.title.toUpperCase().match(/[A-Z0-9]{2,6}/g) || []) if (known.has(tok)) return tok;
+      return null;
+    };
+    const usedSym = new Set<string>();
+    return byId
+      .sort((a, b) => b.priority - a.priority)
+      .filter((i) => {
+        const s = symbolOf(i);
+        if (!s) return true;
+        if (usedSym.has(s)) return false;
+        usedSym.add(s);
+        return true;
+      })
+      // Three items, not five: a briefing you scroll is a feed. The rest of the read is one tap
+      // away on the Board, which ranks every market anyway.
+      .slice(0, 3);
+  }, [fusion, coaching, personal, market, signals]);
 
   if (!queue.length) return null;
 
