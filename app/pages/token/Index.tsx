@@ -1,0 +1,367 @@
+// ── Nexus token terminal (/token) ────────────────────────────────────────────
+// A Definitive-style spot terminal: search any token → identity + live stats header,
+// a candlestick chart, the live trade tape, and a trade panel. Built on public data
+// (DexScreener + GeckoTerminal, client-side) so it works for any token, and HONEST about
+// execution — Nexus has no spot venue, so the CTA routes to where an order can actually
+// fill: our own perp page when the token is a listed Orderly market, else a deep-link to
+// the token's pool. No fake order tabs, no dead "Buy" button.
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { generatePageTitle } from "@/utils/utils";
+import { getPageMeta } from "@/utils/seo";
+import { renderSEOTags } from "@/utils/seo-tags";
+import { useIsMobile } from "@/pages/lab/useIsMobile";
+import {
+  searchToken, poolCandles, poolTrades, orderlyPerpSet,
+  fmtUsd, fmtPrice, fmtAge, shortAddr,
+  type TokenPair, type Candle, type Trade,
+} from "./data";
+
+const MONO = "var(--nx-font-mono)";
+const UI = "var(--nx-font-ui, sans-serif)";
+const BG = "#0a0a0b", CARD = "#0f0f11", BORD = "#232327", BORD2 = "#1a1a1e";
+const BRIGHT = "#f4f4f5", MUT = "#71717a", FAINT = "#52525b";
+const POS = "#3ecf8e", NEG = "#f7525f";
+
+// Uniswap `chain` param by DexScreener chainId — the honest spot deep-link for EVM tokens
+// we don't list as a perp. Solana routes to Jupiter; anything else falls back to the pool page.
+const UNISWAP_CHAIN: Record<string, string> = {
+  ethereum: "mainnet", base: "base", arbitrum: "arbitrum", optimism: "optimism",
+  polygon: "polygon", bsc: "bnb", avalanche: "avalanche", blast: "blast", zora: "zora", celo: "celo",
+};
+function tradeLink(pair: TokenPair, isPerp: boolean): { href: string; venue: string; internal: boolean } {
+  if (isPerp) return { href: `/perp/PERP_${pair.baseSymbol}_USDC`, venue: "Nexus perp", internal: true };
+  if (pair.chainId === "solana" && pair.baseAddress) return { href: `https://jup.ag/swap/SOL-${pair.baseAddress}`, venue: "Jupiter", internal: false };
+  const uni = UNISWAP_CHAIN[pair.chainId];
+  if (uni && pair.baseAddress) return { href: `https://app.uniswap.org/swap?chain=${uni}&outputCurrency=${pair.baseAddress}`, venue: "Uniswap", internal: false };
+  return { href: pair.url || "#", venue: pair.dexId || "the pool", internal: false };
+}
+
+// ── candlestick chart (dependency-free SVG; the mini-app pattern, scaled up) ───
+const TIMEFRAMES: { label: string; tf: string; agg: number }[] = [
+  { label: "5m", tf: "minute", agg: 5 },
+  { label: "1H", tf: "hour", agg: 1 },
+  { label: "4H", tf: "hour", agg: 4 },
+  { label: "1D", tf: "day", agg: 1 },
+];
+function Chart({ candles, loading, height }: { candles: Candle[]; loading: boolean; height: number }) {
+  const box: React.CSSProperties = { width: "100%", height, background: BG, border: `1px solid ${BORD}`, borderRadius: 6 };
+  if (!candles.length) {
+    return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 11, color: FAINT }}>{loading ? "loading chart…" : "no chart data for this pair"}</div>;
+  }
+  const W = 800, H = height, PL = 4, PR = 56, PT = 8, PB = 18;
+  const plotW = W - PL - PR, plotH = H - PT - PB;
+  const lo = Math.min(...candles.map((d) => d.l)), hi = Math.max(...candles.map((d) => d.h)), range = hi - lo || 1;
+  const n = candles.length, slot = plotW / n;
+  const x = (i: number) => PL + i * slot + slot / 2;
+  const y = (v: number) => PT + (1 - (v - lo) / range) * plotH;
+  const bodyW = Math.max(1, slot * 0.66);
+  const last = candles[candles.length - 1].c;
+  const gridVals = [hi, lo + range * 0.5, lo];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={box}>
+      {gridVals.map((v, i) => (
+        <g key={i}>
+          <line x1={PL} x2={PL + plotW} y1={y(v)} y2={y(v)} stroke={BORD2} strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
+          <text x={PL + plotW + 4} y={y(v) + 3} fill={FAINT} fontSize={9} fontFamily={MONO}>{fmtPrice(v).replace("$", "")}</text>
+        </g>
+      ))}
+      <line x1={PL} x2={PL + plotW} y1={y(last)} y2={y(last)} stroke={MUT} strokeWidth={0.5} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+      {candles.map((d, i) => {
+        const up = d.c >= d.o;
+        const col = up ? POS : NEG;
+        const cx = x(i);
+        const yTop = Math.min(y(d.o), y(d.c));
+        const bh = Math.max(0.8, Math.abs(y(d.c) - y(d.o)));
+        return (
+          <g key={i}>
+            <line x1={cx} x2={cx} y1={y(d.h)} y2={y(d.l)} stroke={col} strokeWidth={0.7} vectorEffect="non-scaling-stroke" />
+            <rect x={cx - bodyW / 2} y={yTop} width={bodyW} height={bh} fill={col} />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ── one header stat cell ──────────────────────────────────────────────────────
+function Stat({ label, value, color }: { label: string; value: React.ReactNode; color?: string }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+      <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: FAINT, textTransform: "uppercase" }}>{label}</span>
+      <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 600, color: color || BRIGHT, whiteSpace: "nowrap" }}>{value}</span>
+    </div>
+  );
+}
+
+export default function TokenTerminal() {
+  const isMobile = useIsMobile();
+  const { query } = useParams();
+  const navigate = useNavigate();
+  const [input, setInput] = useState(query || "");
+  const [pair, setPair] = useState<TokenPair | null>(null);
+  const [alts, setAlts] = useState<TokenPair[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+  const [candles, setCandles] = useState<Candle[]>([]);
+  const [chartLoading, setChartLoading] = useState(false);
+  const [tf, setTf] = useState(1); // index into TIMEFRAMES (1H default)
+  const [trades, setTrades] = useState<Trade[]>([]);
+  const [perpSet, setPerpSet] = useState<Set<string>>(new Set());
+  const [side, setSide] = useState<"buy" | "sell">("buy");
+  const [amount, setAmount] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => { orderlyPerpSet().then(setPerpSet).catch(() => { /* no perp routing */ }); }, []);
+  useEffect(() => { setInput(query || ""); }, [query]);
+
+  // ── resolve the searched token → the deepest pair ──
+  useEffect(() => {
+    if (!query) { setPair(null); setAlts([]); setNotFound(false); return; }
+    let alive = true;
+    setLoading(true); setNotFound(false);
+    // independent watchdog: never leave the terminal on a spinner if the fetch hangs
+    const paint = setTimeout(() => { if (alive) setLoading(false); }, 6500);
+    searchToken(query)
+      .then(({ best, alts }) => {
+        if (!alive) return;
+        setPair(best); setAlts(alts); setNotFound(!best);
+      })
+      .catch(() => { if (alive) { setPair(null); setNotFound(true); } })
+      .finally(() => { if (alive) { setLoading(false); clearTimeout(paint); } });
+    return () => { alive = false; clearTimeout(paint); };
+  }, [query]);
+
+  // ── chart for the resolved pair (+ on timeframe change) ──
+  useEffect(() => {
+    if (!pair) { setCandles([]); return; }
+    let alive = true;
+    setChartLoading(true);
+    const { tf: gtf, agg } = TIMEFRAMES[tf];
+    poolCandles(pair.chainId, pair.pairAddress, gtf, agg, 100)
+      .then((c) => { if (alive) setCandles(c); })
+      .catch(() => { if (alive) setCandles([]); })
+      .finally(() => { if (alive) setChartLoading(false); });
+    return () => { alive = false; };
+  }, [pair, tf]);
+
+  // ── live tape (polled) ──
+  useEffect(() => {
+    if (!pair) { setTrades([]); return; }
+    let alive = true;
+    const load = () => poolTrades(pair.chainId, pair.pairAddress).then((t) => { if (alive) setTrades(t); }).catch(() => { /* keep last */ });
+    load();
+    const id = setInterval(load, 20000);
+    return () => { alive = false; clearInterval(id); };
+  }, [pair]);
+
+  // ── header stats refresh (price moves) ──
+  useEffect(() => {
+    if (!query || !pair) return;
+    let alive = true;
+    const id = setInterval(() => {
+      searchToken(query).then(({ best }) => { if (alive && best) setPair(best); }).catch(() => { /* keep last */ });
+    }, 25000);
+    return () => { alive = false; clearInterval(id); };
+  }, [query, pair]);
+
+  const submit = useCallback((q: string) => {
+    const v = q.trim();
+    if (v) navigate(`/token/${encodeURIComponent(v)}`);
+  }, [navigate]);
+
+  const isPerp = !!pair && perpSet.has(pair.baseSymbol);
+  const route = useMemo(() => (pair ? tradeLink(pair, isPerp) : null), [pair, isPerp]);
+  const estOut = useMemo(() => {
+    const a = parseFloat(amount);
+    if (!pair?.priceUsd || !Number.isFinite(a) || a <= 0) return null;
+    return a / pair.priceUsd;
+  }, [amount, pair]);
+
+  const copyCa = useCallback(() => {
+    if (!pair?.baseAddress) return;
+    try { navigator.clipboard.writeText(pair.baseAddress); setCopied(true); setTimeout(() => setCopied(false), 1400); } catch { /* ignore */ }
+  }, [pair]);
+
+  const pageMeta = getPageMeta();
+  const pageTitle = generatePageTitle(pair ? `${pair.baseSymbol} · Token` : "Token Terminal");
+
+  return (
+    <>
+      {renderSEOTags(pageMeta, pageTitle)}
+      <div style={{ background: BG, minHeight: "100dvh", padding: isMobile ? "12px 12px 96px" : "16px 20px 40px" }}>
+        {/* ── SEARCH ── Definitive's "Search CA or Token" */}
+        <form onSubmit={(e) => { e.preventDefault(); submit(input); }} style={{ display: "flex", gap: 8, marginBottom: 16, maxWidth: 640 }}>
+          <input
+            value={input} onChange={(e) => setInput(e.target.value)}
+            placeholder="Search any token — symbol, name, or contract address"
+            spellCheck={false} autoCapitalize="off" autoCorrect="off"
+            style={{ flex: 1, minWidth: 0, background: CARD, border: `1px solid ${BORD}`, borderRadius: 8, color: BRIGHT, fontFamily: MONO, fontSize: 13, padding: "11px 14px", outline: "none" }}
+          />
+          <button type="submit" style={{ flexShrink: 0, background: BRIGHT, color: "#0a0a0b", border: "none", borderRadius: 8, fontFamily: MONO, fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", padding: "0 18px", cursor: "pointer" }}>SEARCH</button>
+        </form>
+
+        {/* ── LANDING (no query) ── */}
+        {!query && (
+          <div style={{ maxWidth: 640 }}>
+            <div style={{ fontFamily: UI, fontSize: 15, color: BRIGHT, fontWeight: 600, marginBottom: 6 }}>Look up any token.</div>
+            <div style={{ fontFamily: UI, fontSize: 13, lineHeight: 1.6, color: MUT, marginBottom: 16 }}>
+              Live price, chart, and the trade tape for any token across the majors and every memecoin — read the market, then trade it. When it’s a market Nexus lists, you trade it here; otherwise we route you to its pool.
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {["BTC", "ETH", "SOL", "HYPE", "NEXUS"].map((s) => (
+                <button key={s} onClick={() => submit(s)} style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 6, color: MUT, fontFamily: MONO, fontSize: 12, padding: "7px 12px", cursor: "pointer" }}>{s}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── NOT FOUND ── */}
+        {query && notFound && !loading && (
+          <div style={{ fontFamily: MONO, fontSize: 13, color: MUT, padding: "40px 0" }}>No token found for “{query}”. Try a symbol (SOL), a name, or paste the contract address.</div>
+        )}
+
+        {/* ── LOADING ── */}
+        {query && loading && !pair && (
+          <div style={{ fontFamily: MONO, fontSize: 12, color: FAINT, padding: "40px 0" }}>resolving {query}…</div>
+        )}
+
+        {/* ── THE TERMINAL ── */}
+        {pair && (
+          <>
+            {/* header: identity + stats */}
+            <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", padding: isMobile ? "12px" : "12px 16px", background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                {pair.imageUrl
+                  ? <img src={pair.imageUrl} alt="" width={36} height={36} style={{ borderRadius: "50%", flexShrink: 0, background: BG }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                  : <div style={{ width: 36, height: 36, borderRadius: "50%", background: BG, border: `1px solid ${BORD}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 14, color: MUT }}>{pair.baseSymbol.slice(0, 1)}</div>}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                    <span style={{ fontFamily: MONO, fontSize: 17, fontWeight: 700, color: BRIGHT }}>{pair.baseSymbol}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 11, color: FAINT }}>/{pair.quoteSymbol}</span>
+                    {isPerp && <span style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: POS, border: `1px solid ${POS}55`, borderRadius: 4, padding: "1px 5px" }}>NEXUS PERP</span>}
+                  </div>
+                  <div style={{ fontFamily: UI, fontSize: 11, color: MUT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 180 }}>{pair.baseName}</div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span style={{ fontFamily: MONO, fontSize: 24, fontWeight: 600, color: BRIGHT, letterSpacing: "-0.01em" }}>{fmtPrice(pair.priceUsd)}</span>
+                {pair.priceChange24h != null && <span style={{ fontFamily: MONO, fontSize: 13, color: pair.priceChange24h > 0 ? POS : pair.priceChange24h < 0 ? NEG : MUT }}>{pair.priceChange24h > 0 ? "+" : ""}{pair.priceChange24h.toFixed(2)}%</span>}
+              </div>
+
+              <div style={{ display: "flex", gap: isMobile ? 14 : 22, flexWrap: "wrap", marginLeft: isMobile ? 0 : "auto" }}>
+                <Stat label="Mkt Cap" value={fmtUsd(pair.marketCap)} />
+                <Stat label="FDV" value={fmtUsd(pair.fdv)} />
+                <Stat label="24h Vol" value={fmtUsd(pair.volume24h)} />
+                <Stat label="Liquidity" value={fmtUsd(pair.liquidityUsd)} />
+                <Stat label="24h Buys" value={pair.buys24h != null ? pair.buys24h.toLocaleString() : "—"} color={POS} />
+                <Stat label="24h Sells" value={pair.sells24h != null ? pair.sells24h.toLocaleString() : "—"} color={NEG} />
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                {pair.baseAddress && (
+                  <button onClick={copyCa} title="Copy contract address" style={{ display: "flex", alignItems: "center", gap: 5, background: BG, border: `1px solid ${BORD}`, borderRadius: 6, color: MUT, fontFamily: MONO, fontSize: 10, padding: "6px 9px", cursor: "pointer" }}>
+                    <span>{copied ? "copied ✓" : shortAddr(pair.baseAddress)}</span>
+                  </button>
+                )}
+                {pair.websites[0] && <a href={pair.websites[0]} target="_blank" rel="noopener noreferrer" style={{ fontFamily: MONO, fontSize: 11, color: MUT, textDecoration: "none", border: `1px solid ${BORD}`, borderRadius: 6, padding: "6px 9px" }}>web ↗</a>}
+                {pair.socials.filter((s) => /twitter|x/i.test(s.type)).slice(0, 1).map((s) => <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: MONO, fontSize: 11, color: MUT, textDecoration: "none", border: `1px solid ${BORD}`, borderRadius: 6, padding: "6px 9px" }}>𝕏 ↗</a>)}
+              </div>
+            </div>
+
+            {/* did-you-mean (ambiguous ticker) */}
+            {alts.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                <span style={{ fontFamily: MONO, fontSize: 9.5, color: FAINT, textTransform: "uppercase", letterSpacing: "0.08em" }}>Other pairs</span>
+                {alts.map((a) => (
+                  <button key={a.pairAddress} onClick={() => { setPair(a); setAlts((prev) => [pair, ...prev.filter((p) => p.pairAddress !== a.pairAddress)].slice(0, 4)); }}
+                    style={{ fontFamily: MONO, fontSize: 10, color: MUT, background: CARD, border: `1px solid ${BORD}`, borderRadius: 6, padding: "5px 9px", cursor: "pointer" }}>
+                    {a.baseSymbol}/{a.quoteSymbol} · {a.chainId} · {fmtUsd(a.liquidityUsd)}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* body: chart + tape (left) · trade panel (right) */}
+            <div style={{ display: isMobile ? "block" : "grid", gridTemplateColumns: "1fr 320px", gap: 12, alignItems: "start" }}>
+              <div style={{ minWidth: 0 }}>
+                {/* chart + timeframe */}
+                <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, padding: 10, marginBottom: 12 }}>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                    {TIMEFRAMES.map((t, i) => (
+                      <button key={t.label} onClick={() => setTf(i)} style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", color: i === tf ? BRIGHT : FAINT, background: i === tf ? BG : "none", border: `1px solid ${i === tf ? BORD : "transparent"}`, borderRadius: 5, padding: "4px 9px", cursor: "pointer" }}>{t.label}</button>
+                    ))}
+                    <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 9, color: FAINT, alignSelf: "center" }}>chart · GeckoTerminal</span>
+                  </div>
+                  <Chart candles={candles} loading={chartLoading} height={isMobile ? 220 : 340} />
+                </div>
+
+                {/* live tape */}
+                <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, overflow: "hidden" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 64px", gap: 8, padding: "9px 12px", borderBottom: `1px solid ${BORD}`, fontFamily: MONO, fontSize: 9, letterSpacing: "0.08em", color: FAINT, textTransform: "uppercase" }}>
+                    <span>Amount</span><span>Price</span><span>Wallet</span><span style={{ textAlign: "right" }}>Age</span>
+                  </div>
+                  <div style={{ maxHeight: 260, overflowY: "auto" }}>
+                    {trades.length === 0
+                      ? <div style={{ fontFamily: MONO, fontSize: 11, color: FAINT, padding: "18px 12px" }}>waiting for trades…</div>
+                      : trades.map((t, i) => (
+                        <div key={t.tx + i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 64px", gap: 8, padding: "6px 12px", borderTop: i === 0 ? "none" : `1px solid ${BORD2}`, fontFamily: MONO, fontSize: 11 }}>
+                          <span style={{ color: t.kind === "buy" ? POS : NEG }}>{fmtUsd(t.amountUsd)}</span>
+                          <span style={{ color: MUT }}>{fmtPrice(t.priceUsd)}</span>
+                          <span style={{ color: FAINT }}>{shortAddr(t.wallet)}</span>
+                          <span style={{ color: FAINT, textAlign: "right" }}>{fmtAge(t.ts)}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* trade panel — honest routing, no fake fills */}
+              <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, padding: 14, marginTop: isMobile ? 12 : 0 }}>
+                <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                  {(["buy", "sell"] as const).map((s) => (
+                    <button key={s} onClick={() => setSide(s)} style={{ flex: 1, fontFamily: MONO, fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: side === s ? "#0a0a0b" : s === "buy" ? POS : NEG, background: side === s ? (s === "buy" ? POS : NEG) : "none", border: `1px solid ${s === "buy" ? POS : NEG}55`, borderRadius: 7, padding: "9px 0", cursor: "pointer" }}>{isPerp ? (s === "buy" ? "Long" : "Short") : s}</button>
+                  ))}
+                </div>
+
+                <div style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: FAINT, textTransform: "uppercase", marginBottom: 5 }}>Amount (USD)</div>
+                <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="0.00"
+                  style={{ width: "100%", background: BG, border: `1px solid ${BORD}`, borderRadius: 8, color: BRIGHT, fontFamily: MONO, fontSize: 18, fontWeight: 600, padding: "10px 12px", outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
+                <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                  {[50, 100, 250, 1000].map((v) => (
+                    <button key={v} onClick={() => setAmount(String(v))} style={{ flex: 1, fontFamily: MONO, fontSize: 10, color: MUT, background: BG, border: `1px solid ${BORD}`, borderRadius: 5, padding: "5px 0", cursor: "pointer" }}>${v}</button>
+                  ))}
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 11, color: MUT, marginBottom: 4 }}>
+                  <span>Est. {side === "buy" ? "output" : "value"}</span>
+                  <span style={{ color: BRIGHT }}>{estOut != null ? `${estOut.toLocaleString("en-US", { maximumFractionDigits: estOut >= 1 ? 2 : 6 })} ${pair.baseSymbol}` : "—"}</span>
+                </div>
+
+                {route && (
+                  <a href={route.href} {...(route.internal ? {} : { target: "_blank", rel: "noopener noreferrer" })}
+                    style={{ display: "block", textAlign: "center", marginTop: 12, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: side === "buy" ? POS : NEG, borderRadius: 9, padding: "13px 0", textDecoration: "none" }}>
+                    {isPerp ? `${side === "buy" ? "Long" : "Short"} ${pair.baseSymbol} on Nexus →` : `${side === "buy" ? "Buy" : "Sell"} ${pair.baseSymbol} on ${route.venue} →`}
+                  </a>
+                )}
+
+                {/* honesty: where the order actually fills */}
+                <div style={{ fontFamily: UI, fontSize: 10.5, lineHeight: 1.5, color: FAINT, marginTop: 10 }}>
+                  {isPerp
+                    ? <>Nexus lists {pair.baseSymbol} as a perp — you trade it here, on our book, graded like every Nexus position.</>
+                    : <>Nexus doesn’t run a spot book for {pair.baseSymbol}, so we route your order to <b style={{ color: MUT }}>{route?.venue}</b> where it can fill. The read is ours; the swap is theirs.</>}
+                </div>
+              </div>
+            </div>
+
+            {/* provenance */}
+            <div style={{ fontFamily: MONO, fontSize: 9, color: FAINT, marginTop: 14, letterSpacing: "0.04em" }}>
+              Stats + tape from DexScreener &amp; GeckoTerminal · public data · not advice. {pair.url && <a href={pair.url} target="_blank" rel="noopener noreferrer" style={{ color: MUT }}>view pair ↗</a>}
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  );
+}

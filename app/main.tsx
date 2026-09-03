@@ -38,6 +38,8 @@ const VaultsLayout = lazy(() => import('./pages/vaults/Layout'));
 const VaultsIndex = lazy(() => import('./pages/vaults/Index'));
 const SwapLayout = lazy(() => import('./pages/swap/Layout'));
 const SwapIndex = lazy(() => import('./pages/swap/Index'));
+const TokenLayout = lazy(() => import('./pages/token/Layout'));
+const TokenIndex = lazy(() => import('./pages/token/Index'));
 const PointsLayout = lazy(() => import('./pages/points/Layout'));
 const PointsIndex = lazy(() => import('./pages/points/Index'));
 
@@ -231,6 +233,14 @@ const router = createBrowserRouter([
         element: <SwapLayout />,
         children: [
           { index: true, element: <SwapIndex /> },
+        ],
+      },
+      {
+        path: 'token',
+        element: <TokenLayout />,
+        children: [
+          { index: true, element: <TokenIndex /> },
+          { path: ':query', element: <TokenIndex /> },
         ],
       },
       {
