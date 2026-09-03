@@ -279,7 +279,7 @@ function WhyChip({ ticker }: { ticker: string }) {
   return (
     <button
       type="button"
-      title={`Ask Nexus AI why ${ticker} is moving`}
+      title={`Ask Nexus why ${ticker} is moving`}
       onClick={(e) => {
         e.preventDefault(); e.stopPropagation();
         window.dispatchEvent(new CustomEvent("nexus:assistant-ask", {

@@ -5,7 +5,7 @@
 //     intelligent to ANYONE, connected or not.
 //   • YOUR TERMINAL — a personalized read of your graded record + open risk (only
 //     when connected with trades).
-// Deterministic (no LLM, no key, instant), with a one-tap hand-off to NEXUS AI to
+// Deterministic (no LLM, no key, instant), with a one-tap hand-off to Nexus to
 // go deeper. Renders nothing when there's genuinely nothing to say (cold-start safe).
 import { useEffect, useMemo, useState } from "react";
 import { SectionHeader } from "./components";
@@ -291,7 +291,7 @@ export function NexusBriefing({
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "9px 14px" }}>
             <span style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", letterSpacing: "0.05em" }}>deterministic — no AI, no key, just the data</span>
             <button onClick={askAi} style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9.5, letterSpacing: "0.05em", color: "#6cb6ff", background: "none", border: "1px solid #23303f", borderRadius: 4, padding: "5px 10px", cursor: "pointer", whiteSpace: "nowrap" }}>
-              ◆ Ask NEXUS AI to go deeper →
+              ◆ Ask Nexus to go deeper →
             </button>
           </div>
         </div>

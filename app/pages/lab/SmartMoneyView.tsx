@@ -486,7 +486,7 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
                 <span style={{ marginLeft: "auto", display: "flex", gap: 6, flexShrink: 0 }}>
                   <button
                     type="button"
-                    title="Ask Nexus AI to analyze this consensus"
+                    title="Ask Nexus to analyze this consensus"
                     onClick={() => window.dispatchEvent(new CustomEvent("nexus:assistant-ask", { detail: { prompt: `${c.count} tracked smart-money traders are ${c.side} ${c.sym}. Use get_smart_money and explain_move — is this consensus worth following, what's driving it, and how does it fit my edge?` } }))}
                     style={{ background: "transparent", border: "1px solid #232327", borderRadius: 4, color: "#a1a1aa", fontFamily: "var(--nx-font-mono)", fontSize: 10, padding: "2px 6px", cursor: "pointer" }}
                     onMouseEnter={(e) => { e.currentTarget.style.color = "#ededf0"; e.currentTarget.style.borderColor = "#33333a"; }}

@@ -499,9 +499,9 @@ export default function NexusAssistant() {
                 padding: "8px 12px", maxWidth: 200, boxShadow: "0 0 16px rgba(0,0,0,0.5)",
               }}
             >
-              <div style={{ fontFamily: mono, fontSize: 10, color: GREEN, fontWeight: "bold", letterSpacing: "0.06em" }}>✦ Meet NEXUS AI</div>
+              <div style={{ fontFamily: mono, fontSize: 10, color: GREEN, fontWeight: "bold", letterSpacing: "0.06em" }}>✦ Meet Nexus</div>
               <div style={{ fontFamily: mono, fontSize: 8.5, color: "#a1a1aa", lineHeight: 1.5, marginTop: 2 }}>
-                Your trading copilot — ask about the market, your positions, or your track record.
+                Ask Nexus anything — the market, a token, your positions, your track record.
               </div>
             </div>
           </>
@@ -511,8 +511,8 @@ export default function NexusAssistant() {
           onPointerMove={onLauncherMove}
           onPointerUp={onLauncherUp}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPanel(); } }}
-          aria-label="Nexus AI Assistant (drag to move, tap to open)"
-          title="Nexus AI — tap to open, hold & drag to move"
+          aria-label="Nexus — ask anything (drag to move, tap to open)"
+          title="Nexus — tap to open, hold & drag to move"
           style={{
             width: 52, height: 52, borderRadius: "50%",
             background: "#141416", border: `1px solid ${GREEN}`,
@@ -554,7 +554,7 @@ export default function NexusAssistant() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid #232327", background: "#141416" }}>
         <span style={{ fontFamily: mono, fontSize: 12, fontWeight: "bold", letterSpacing: "0.18em" }}>
-          <span style={{ color: "#fff" }}>NEXUS AI</span>
+          <span style={{ color: "#fff" }}>NEXUS</span>
         </span>
         <span style={{ fontFamily: mono, fontSize: 8, color: "#71717a" }}>{hostedActive ? `Hosted · ${HOSTED_TIERS.find((t) => t.id === hostedModel)?.label ?? hostedModel}` : `${PROVIDERS[provider].label.split(" ")[0]} · ${model}`}</span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
@@ -638,7 +638,7 @@ export default function NexusAssistant() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder={ready ? "Ask Nexus AI…" : "Enable hosted (PRO) or set a key in ⚙"}
+              placeholder={ready ? "Ask Nexus…" : "Enable hosted (PRO) or set a key in ⚙"}
               rows={1}
               style={{
                 flex: 1, background: "#141416", border: "1px solid #232327", borderRadius: 4,
@@ -710,7 +710,7 @@ function SettingsView({
           <div>
             <div style={{ fontFamily: mono, fontSize: 11, color: GREEN, fontWeight: "bold" }}>◆ NEXUS HOSTED <span style={{ color: "#a1a1aa", fontWeight: "normal" }}>· PRO</span></div>
             <div style={{ fontFamily: mono, fontSize: 9, color: "#a1a1aa", lineHeight: 1.5, marginTop: 3 }}>
-              {isPro ? "Run NEXUS AI with no API key — we host it. One wallet signature per session." : "Hosted AI is a PRO benefit. Subscribe or hold ARCHITECT $NEXUS to enable."}
+              {isPro ? "Run Nexus with no API key — we host it. One wallet signature per session." : "Hosted AI is a PRO benefit. Subscribe or hold ARCHITECT $NEXUS to enable."}
             </div>
           </div>
           <button
