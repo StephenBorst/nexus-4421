@@ -7,9 +7,9 @@ import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAccount } from "@orderly.network/hooks";
 import { useIsMobile } from "./useIsMobile";
-import { agentCardStyle, agentLabelStyle } from "./styles";
+import { agentCardStyle, agentLabelStyle, navBtnStyle } from "./styles";
 import { deployDirectiveFromThesis } from "@/utils/agentPrefill";
-import { EmptyState, Coachmark } from "./components";
+import { Coachmark } from "./components";
 import { SharePoster, type PosterData } from "./SharePoster";
 import { TraderDetail } from "./TraderDetail";
 import type { XrayTrack } from "@/components/TrackedRecordCard";
@@ -295,19 +295,32 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
     navigate("/lab?tab=thesis");
   };
 
+  // ── First paint has a DEADLINE ────────────────────────────────────────────────
+  // A hung scout fetch used to leave this tab on "indexing Hyperliquid…" forever — the same bug
+  // class as the board's /signals stall, and the lesson there was that a promise which never
+  // settles never runs your .finally. So there are TWO guards: an independent watchdog clears
+  // `loading` at the deadline no matter what the promises do, and the fetches are abort-capped
+  // so they can't hang unbounded. Result: the tab always resolves to a ranked list or an honest
+  // empty state within ~2s. The abort cap is looser than the paint deadline so a slow-but-valid
+  // refresh (45s poll, board already on screen) can still land.
   const load = useCallback(async () => {
+    const ctl = new AbortController();
+    const paintDeadline = setTimeout(() => setLoading(false), 2000);
+    const abortCap = setTimeout(() => ctl.abort(), 8000);
     try {
       const [b, e] = await Promise.all([
-        fetch(`${AGENT_API}/smart/board`).then((r) => r.json()).catch(() => null),
-        fetch(`${AGENT_API}/smart/events`).then((r) => r.json()).catch(() => null),
+        fetch(`${AGENT_API}/smart/board`, { signal: ctl.signal }).then((r) => r.json()).catch(() => null),
+        fetch(`${AGENT_API}/smart/events`, { signal: ctl.signal }).then((r) => r.json()).catch(() => null),
       ]);
       if (b?.traders) setBoard(b.traders);
       if (e?.events) setEvents(e.events);
       if (!b?.traders && !e?.events) setError("Couldn't reach the Smart Money feed. Try again shortly.");
+      else setError(null);
     } catch {
       setError("Couldn't reach the Smart Money feed. Try again shortly.");
-    } finally { setLoading(false); }
+    } finally { clearTimeout(paintDeadline); clearTimeout(abortCap); setLoading(false); }
   }, []);
+  const retryLoad = useCallback(() => { setError(null); setLoading(true); load(); }, [load]);
 
   useEffect(() => {
     load();
@@ -421,10 +434,21 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
         That's how you go from watching smart money to <strong style={{ color: "#d4d4d8" }}>being</strong> graded next to them — a record nobody can fake.
       </Coachmark>
 
+      {/* Bounded by the paint deadline above — this line can no longer stand forever. */}
       {loading && !board && !events && (
         <div style={{ color: "#71717a", fontFamily: "var(--nx-font-mono)", fontSize: 12, padding: 24, textAlign: "center" }}>indexing Hyperliquid…</div>
       )}
-      {error && !board && !events && <EmptyState message={error} />}
+      {/* Resolved with nothing to show → an honest empty state with a way to try again, never a
+          standing index line. Surfaces the reach error when there was one. */}
+      {!loading && !board?.length && !events?.length && (
+        <div style={{ ...agentCardStyle, textAlign: "center", padding: "22px 18px" }}>
+          <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 12, color: "#a1a1aa", letterSpacing: "0.04em" }}>No wallets yet.</div>
+          <div style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: 11.5, color: "#71717a", marginTop: 6, lineHeight: 1.55 }}>
+            {error || "The scout hasn't returned a ranked wallet set for this window."}
+          </div>
+          <button onClick={retryLoad} style={{ ...navBtnStyle, marginTop: 12, color: "#ededf0", borderColor: "#33333a", background: "#1a1a1e", padding: "8px 16px", fontSize: 10 }}>RETRY</button>
+        </div>
+      )}
 
       {/* ── #1 YOU vs SMART MONEY — your positions vs the crowd ── */}
       {alignment.length > 0 && (
