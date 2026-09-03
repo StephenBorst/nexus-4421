@@ -2037,19 +2037,29 @@ test("catalystHouseCall: built from the gated thesis → RR 1.5 record on its ow
   assert.equal(catalystHouseCall({ coin: "X", market: "PERP_X_USDC", direction: "NONE" }, { markPrice: 10, atrFrac: 0.02, verdict: "WATCH" }), null);
 });
 
-// ── THE BOARD share card (boardCardRows) — same play + agreement as the live Board ──
-test("boardCardPlay: confluence > crowded fade > trend > lean, matching DecisionBoard", () => {
-  assert.equal(boardCardPlay({ funding_rate_8h: -0.0001, confluence: "LONG" }).klass, "CONFLUENCE");
-  assert.equal(boardCardPlay({ funding_rate_8h: 0.0005 }).dir, "SHORT");   // crowded long → fade short
-  assert.equal(boardCardPlay({ funding_rate_8h: 0.00001 }).dir, null);     // too quiet → no play
+// ── THE BOARD share card (boardCardRows) — the SAME verdict as the live Board ──
+// ONE RULER: the card reads the server verdict off the signals row (the exact object
+// DecisionBoard's derivePlay reads). No local threshold may mint a play of its own.
+test("boardCardPlay: reads the server verdict, never a threshold of its own", () => {
+  // FADE needs the verdict AND the shared economic floor — both, or it's a WATCH.
+  assert.equal(boardCardPlay({ verdict: "FADE", fade_dir: "SHORT", funding_annual_pct: 27 }).klass, "FADE");
+  assert.equal(boardCardPlay({ verdict: "WATCH", fade_dir: "SHORT", funding_annual_pct: 27 }).klass, "WATCH");
+  assert.equal(boardCardPlay({ verdict: "NONE", fade_dir: "NONE", funding_annual_pct: 0 }).klass, null);
+  // The drift this exists to prevent: big raw funding that the verdict did NOT call a fade
+  // (in-band) must NOT render as a fade on a card that outlives the session that shared it.
+  assert.equal(boardCardPlay({ verdict: "WATCH", fade_dir: "SHORT", funding_rate_8h: 0.0005 }).klass, "WATCH");
+  // …and a stretched-but-economically-trivial fade is a WATCH, matching the glass.
+  assert.equal(boardCardPlay({ verdict: "FADE", fade_dir: "SHORT", funding_annual_pct: 2.22 }).klass, "WATCH");
+  // A row with no server verdict at all gets no read — no fallback ruler.
+  assert.equal(boardCardPlay({ funding_rate_8h: 0.0005 }).dir, null);
 });
 
-test("boardCardRows: agreement counts confirming lenses, ranks confluence first", () => {
+test("boardCardRows: agreement counts confirming lenses, ranks a real FADE first", () => {
   const rows = boardCardRows({
     signals: [
-      { symbol: "SOL", funding_rate_8h: -0.0001, confluence: "LONG" },
-      { symbol: "ETH", funding_rate_8h: 0.0005, confluence: null },
-      { symbol: "BTC", funding_rate_8h: 0.00001, confluence: null },
+      { symbol: "SOL", funding_rate_8h: -0.0001, verdict: "WATCH", fade_dir: "LONG", funding_annual_pct: -10.95 },
+      { symbol: "ETH", funding_rate_8h: 0.0005, verdict: "FADE", fade_dir: "SHORT", funding_annual_pct: 54.75 },
+      { symbol: "BTC", funding_rate_8h: 0.00001, verdict: "NONE", fade_dir: "NONE", funding_annual_pct: 1.1 },
     ],
     consensus: { SOL: { side: "LONG" } },
     smart: { SOL: "LONG", ETH: "LONG" },
@@ -2057,12 +2067,13 @@ test("boardCardRows: agreement counts confirming lenses, ranks confluence first"
     forecast: {},
   });
   const sol = rows.find((r) => r.coin === "SOL");
-  assert.equal(sol.play.dir, "LONG");
+  assert.equal(sol.play.klass, "WATCH");
   assert.equal(sol.agree, 2);          // callers + smart both confirm LONG
   const eth = rows.find((r) => r.coin === "ETH");
-  assert.equal(eth.play.dir, "SHORT"); // crowded funding → fade short
+  assert.equal(eth.play.dir, "SHORT"); // stretched crowd → fade short
   assert.equal(eth.agree, 1);          // catalyst SHORT confirms; smart LONG does not
-  assert.equal(rows[0].coin, "SOL");   // confluence + agreement ranks first
+  assert.equal(rows[0].coin, "ETH");   // a real FADE outranks a WATCH, however many lenses agree
+  assert.equal(rows[2].coin, "BTC");   // no read sinks to the bottom
 });
 
 // ── Funding-ticket verdict (Grok's honest edge test) ──────────────────────────

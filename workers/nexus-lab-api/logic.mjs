@@ -2105,18 +2105,26 @@ export function readVerdict(direction, stretched, fundingAnnualPct) {
   return (stretched === true && bigEnough) ? "FADE" : "WATCH";
 }
 
-// ── THE BOARD share card — the top confluence reads, server-side ──────────────
-// Mirrors DecisionBoard's mechanical PLAY + 4-lens agreement so the shareable OG card
-// shows the SAME read as the live Board (no drift on the thresholds). Pure; the OG route
-// supplies the fetched inputs (signals + the four lens maps). Honesty by construction:
-// every input is a public fact, the play is the mechanical read, agreement is independent.
-const CB_CROWDED = 0.0004, CB_LEAN_MIN = 0.00003;
+// ── THE BOARD share card — the top reads, server-side ─────────────────────────
+// ONE RULER (Grok): the play here IS the live Board's play — the server `verdict` that
+// computeSignalRows already stamps on every signals row (fundingStretched pierce test →
+// readVerdict) plus the ONE shared economic floor, read exactly as DecisionBoard's derivePlay
+// reads it. There is deliberately no second threshold in this file: a card that says FADE while
+// the Board says WATCH is precisely the drift this product exists to prevent, and a shared link
+// outlives the session that minted it. Pure — the OG route supplies the fetched inputs (signals +
+// the lens maps) and the verdict rides in on the row, so the truth costs no extra I/O. Honesty by
+// construction: every input is a public fact, the play is mechanical, agreement is independent.
 export function boardCardPlay(s) {
-  const f = Number(s.funding_rate_8h) || 0;
-  if (s.confluence === "LONG" || s.confluence === "SHORT") return { dir: s.confluence, label: `Confluence ${s.confluence === "LONG" ? "long" : "short"}`, klass: "CONFLUENCE", strong: true };
-  if (Math.abs(f) >= CB_CROWDED) { const dir = f > 0 ? "SHORT" : "LONG"; return { dir, label: `Fade ${dir === "LONG" ? "long" : "short"}`, klass: "FADE", strong: true }; }
-  if ((s.trend === "TREND_UP" || s.trend === "TREND_DOWN") && (Number(s.trend_oi_pct) || 0) >= 1) { const dir = s.trend === "TREND_UP" ? "LONG" : "SHORT"; return { dir, label: `Ride ${dir === "LONG" ? "up" : "down"}`, klass: "TREND", strong: true }; }
-  if (Math.abs(f) >= CB_LEAN_MIN) { const dir = f > 0 ? "SHORT" : "LONG"; return { dir, label: `leans ${dir === "LONG" ? "long" : "short"}`, klass: "LEAN", strong: false }; }
+  const dir = s.fade_dir === "SHORT" || s.fade_dir === "LONG" ? s.fade_dir : null;
+  // Magnitude floor: a pierce of a trivial band is not a crowded fade — it needs an economically
+  // large annualized cost too, so a stretched-but-small FADE reads WATCH here, same as the glass.
+  const annual = Math.abs(Number(s.funding_annual_pct ?? (Number(s.funding_rate_8h) || 0) * 1095 * 100));
+  const bigEnough = annual >= FADE_FUNDING_FLOOR_PCT_YR;
+  if (s.verdict === "FADE" && dir && bigEnough) return { dir, label: `FADE ${dir}`, klass: "FADE", strong: true };
+  if (s.verdict === "FADE" && dir) return { dir, label: "WATCH", klass: "WATCH", strong: false };
+  if (s.verdict === "WATCH") return { dir, label: "WATCH", klass: "WATCH", strong: false };
+  // "NONE", or a row carrying no server verdict at all → no read. Never a local fallback
+  // threshold: that fallback WAS the second ruler.
   return { dir: null, label: "—", klass: null, strong: false };
 }
 const cbBare = (x) => String(x || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
@@ -2133,8 +2141,10 @@ export function boardCardRows({ signals = [], consensus = {}, smart = {}, cataly
       forecast: forecast[coin] || null,
     };
     const agree = play.dir ? Object.values(lens).filter((v) => v === play.dir).length : 0;
-    const base = play.klass === "CONFLUENCE" ? 300 : play.klass === "FADE" ? 200 : play.klass === "TREND" ? 100 : play.klass === "LEAN" ? 10 : 0;
-    const score = base + (play.strong ? agree * 25 : 0);
+    // Actionability, mirroring the Board's own scoreOf: a real FADE first, then rows where ≥2
+    // independent lenses agree, then the rest — so the card ranks what the Board ranks.
+    const base = play.klass === "FADE" ? 300 : play.klass === "WATCH" ? (agree >= 2 ? 100 : 0) : 0;
+    const score = base + (play.strong ? agree * 25 : 0) + Math.min(49, Math.abs(Number(s.funding_rate_8h) || 0) * 100000);
     rows.push({ coin, play, lens, agree, score, funding: Number(s.funding_rate_8h) || 0 });
   }
   rows.sort((a, b) => b.score - a.score);

@@ -326,11 +326,14 @@ function buildOgSvg({ displayName, wallet, wins, losses, active, total, avgRR, w
 function buildBoardOgSvg(rows, asOf, { fontFamily = "'Courier New', Courier, monospace" } = {}) {
   const BONE = "#ededf0", MUT = "#71717a", FAINT = "#52525b", POS = "#3ecf8e", NEG = "#f7525f", BG = "#0a0a0b", BORD = "#232327";
   const dcOf = (d) => (d === "LONG" ? POS : d === "SHORT" ? NEG : "#3a3a40");
+  // A WATCH row must LOOK like WATCH, never like a soft fade: only a real FADE earns the
+  // direction colour, everything else reads muted (the rule buildReadOgSvg already follows).
+  const playCol = (play) => (play.klass === "FADE" ? dcOf(play.dir) : MUT);
   const lensCol = (v) => (v === "LONG" ? POS : v === "SHORT" ? NEG : "#232327");
   const lensCols = [{ k: "smart", x: 636 }, { k: "catalyst", x: 706 }, { k: "forecast", x: 776 }];
   const body = (rows || []).slice(0, 6).map((r, i) => {
     const y = 306 + i * 46;
-    const dc = dcOf(r.play.dir);
+    const dc = playCol(r.play);
     const strong = r.play.strong && r.agree >= 2;
     const rects = lensCols.map(({ k, x }) => `<rect x="${x}" y="${y - 17}" width="22" height="22" rx="4" fill="${lensCol(r.lens[k])}"/>`).join("");
     const accent = strong ? `<rect x="40" y="${y - 24}" width="4" height="36" fill="${dc}"/>` : "";
@@ -349,7 +352,7 @@ function buildBoardOgSvg(rows, asOf, { fontFamily = "'Courier New', Courier, mon
   <text x="1140" y="54" fill="${FAINT}" font-size="15" text-anchor="end">trade.nexustradinglabs.com/lab</text>
   <text x="60" y="126" fill="${MUT}" font-size="16" letter-spacing="6">THE BOARD · LIVE READ</text>
   <text x="60" y="174" fill="${BONE}" font-size="44" font-weight="bold">Every market, one read</text>
-  <text x="60" y="210" fill="${MUT}" font-size="16">The mechanical play on funding · OI · trend — and how many independent reads confirm it.</text>
+  <text x="60" y="210" fill="${MUT}" font-size="16">FADE only when funding is stretched vs its own range — and how many independent reads confirm it.</text>
   <text x="60" y="266" fill="${FAINT}" font-size="13" letter-spacing="2">MARKET</text>
   <text x="250" y="266" fill="${FAINT}" font-size="13" letter-spacing="2">THE PLAY</text>
   <text x="647" y="266" fill="${FAINT}" font-size="12" text-anchor="middle">Sm</text>
@@ -1422,13 +1425,15 @@ Loading the record… <a style="color:#ededf0" href="${appUrl}">view on Nexus �
 
     // ── GET /share/board — crawler-friendly OG proxy for THE BOARD share card ────
     // Share links point HERE (not the SPA, whose OG tags are JS-injected): a JS-less crawler
-    // reads real og:image (the live confluence card) + unfurls it; humans bounce to the Lab.
+    // reads real og:image (the live board card) + unfurls it; humans bounce to the Lab.
     if (parts[0] === "share" && parts[1] === "board") {
-      const appUrl = "https://trade.nexustradinglabs.com/lab?tab=intel";
+      // Land on the GUEST Lab: the funnel is already cleared there, so a link shared out of the
+      // building opens on the board itself rather than a connect wall.
+      const appUrl = "https://trade.nexustradinglabs.com/lab?guest=1";
       const img = "https://og.nexustradinglabs.com/og/board.png";
       const shareUrl = "https://og.nexustradinglabs.com/share/board";
       const title = "The Board — every market, one read (graded from public price)";
-      const desc = "The mechanical play on funding · OI · trend, and how many independent reads confirm it. Live on Nexus, graded from the tape — not advice.";
+      const desc = "FADE only when funding is stretched vs its own range, and how many independent reads confirm it. Live on Nexus, graded from the tape — not advice.";
       const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title}</title>
