@@ -33,6 +33,46 @@ const WATCH_KEY = "nexus_sm_watchlist";
 const loadWatch = (): string[] => { try { return JSON.parse(localStorage.getItem(WATCH_KEY) || "[]"); } catch { return []; } };
 interface SmEvent { source?: "orderly" | "hl"; addr: string; coin: string; sym: string; side: "LONG" | "SHORT"; type: "OPEN" | "CLOSE"; price: number; szUsd: number; closedPnl: number | null; ts: number; }
 
+// ── THE SHOVEL LINE ───────────────────────────────────────────────────────────
+// "Whale moved $5m" is noise — it names no one and implies nothing. The sentence that is
+// actually worth reading names WHO, HOW MANY, and WHAT THEY INDEPENDENTLY DID: "6 wallets
+// with $1M+ realized opened LONG SOL in the last 41m". Derived entirely from data we already
+// own — the OPEN feed crossed with each wallet's graded realized PnL — so it costs no new
+// indexing. The credential is the floor ALL the clustered wallets clear, never the best one
+// (an average would flatter). Returns null unless ≥2 independent wallets agree: silence beats
+// a manufactured signal.
+export function sharpCluster(
+  events: { addr: string; sym: string; side: "LONG" | "SHORT"; type: "OPEN" | "CLOSE"; szUsd: number; ts: number }[],
+  pnlByWallet: Record<string, number>,
+  now = Date.now(),
+  windowMs = 2 * 3600 * 1000,
+): { sym: string; side: "LONG" | "SHORT"; wallets: number; szUsd: number; credential: string | null; minutes: number } | null {
+  const recent = (events || []).filter((e) => e.type === "OPEN" && now - e.ts <= windowMs && now - e.ts >= 0);
+  const groups = new Map<string, { sym: string; side: "LONG" | "SHORT"; addrs: Set<string>; szUsd: number; oldest: number }>();
+  for (const e of recent) {
+    if (!e.sym || (e.side !== "LONG" && e.side !== "SHORT")) continue;
+    const k = `${e.sym}|${e.side}`;
+    const g = groups.get(k) || { sym: e.sym, side: e.side, addrs: new Set<string>(), szUsd: 0, oldest: e.ts };
+    g.addrs.add(String(e.addr || "").toLowerCase());
+    g.szUsd += Number(e.szUsd) || 0;
+    g.oldest = Math.min(g.oldest, e.ts);
+    groups.set(k, g);
+  }
+  let best: { sym: string; side: "LONG" | "SHORT"; addrs: Set<string>; szUsd: number; oldest: number } | null = null;
+  for (const g of groups.values()) {
+    if (g.addrs.size < 2) continue;
+    if (!best || g.addrs.size > best.addrs.size || (g.addrs.size === best.addrs.size && g.szUsd > best.szUsd)) best = g;
+  }
+  if (!best) return null;
+  const pnls = [...best.addrs].map((a) => pnlByWallet[a] ?? 0);
+  const minPnl = pnls.length ? Math.min(...pnls) : 0;
+  const credential = minPnl >= 1e6 ? "$1M+ realized" : minPnl >= 1e5 ? "$100K+ realized" : minPnl >= 1e4 ? "$10K+ realized" : null;
+  return {
+    sym: best.sym, side: best.side, wallets: best.addrs.size, szUsd: best.szUsd, credential,
+    minutes: Math.max(1, Math.round((now - best.oldest) / 60000)),
+  };
+}
+
 const TRACKED = "#ededf0"; // watchlist/tracked accent — bone, NOT blue (blue is teaching copy only)
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const usd = (n: number | null | undefined) => {
@@ -195,6 +235,13 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
       .catch(() => {});
     return () => { cancel = true; };
   }, []);
+
+  // THE SHOVEL LINE — the excerpt's sentence, from data we already hold (see sharpCluster).
+  const shovel = useMemo(() => {
+    const pnlBy: Record<string, number> = {};
+    for (const t of board || []) pnlBy[String(t.address || "").toLowerCase()] = Number(t.pnl) || 0;
+    return sharpCluster(events || [], pnlBy);
+  }, [events, board]);
 
   // Smart-money CONSENSUS — coins where ≥2 tracked traders hold the same side.
   // The highest-conviction signal: not one whale, but agreement. Derived free
@@ -469,6 +516,25 @@ export function SmartMoneyView({ myPositions = [] }: { myPositions?: { symbol?: 
           <div style={{ fontFamily: "var(--nx-font-mono)", fontSize: 9, color: "#52525b", marginTop: 8 }}>
             Context, not a signal — smart money is often early AND often wrong. Know which side you're on.
           </div>
+        </div>
+      )}
+
+      {/* ── THE SHOVEL LINE — who did what, in one sentence you can act on ── */}
+      {shovel && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "11px 13px", marginBottom: 14, background: "#0f0f11", border: "1px solid #232327", borderLeft: `3px solid ${shovel.side === "LONG" ? "#3ecf8e" : "#f7525f"}`, borderRadius: 8 }}>
+          <span style={{ fontFamily: "var(--nx-font-ui)", fontSize: 13, lineHeight: 1.5, color: "#a1a1aa", flex: 1, minWidth: 220 }}>
+            <b style={{ color: "#f4f4f5" }}>{shovel.wallets} wallets</b>
+            {shovel.credential && <> with <b style={{ color: "#f4f4f5" }}>{shovel.credential}</b></>}
+            {" "}independently opened{" "}
+            <b style={{ color: shovel.side === "LONG" ? "#3ecf8e" : "#f7525f" }}>{shovel.side} {shovel.sym}</b>
+            {" "}in the last {shovel.minutes}m
+            {shovel.szUsd > 0 && <span style={{ color: "#71717a" }}> — ${Math.round(shovel.szUsd).toLocaleString()} of size</span>}.
+          </span>
+          <button
+            title={`Ask Nexus about the ${shovel.sym} cluster`}
+            onClick={() => window.dispatchEvent(new CustomEvent("nexus:assistant-ask", { detail: { prompt: `${shovel.wallets} tracked smart-money wallets${shovel.credential ? ` (each ${shovel.credential})` : ""} independently opened ${shovel.side} ${shovel.sym} in the last ${shovel.minutes} minutes. Is this a real cluster or coincidence, what's likely driving it, and does it fit my edge? Be honest if it's thin.` } }))}
+            style={{ flexShrink: 0, fontFamily: "var(--nx-font-mono)", fontSize: 10.5, fontWeight: 700, letterSpacing: "0.04em", color: "#ededf0", background: "none", border: "1px solid #ededf055", borderRadius: 6, padding: "8px 12px", cursor: "pointer" }}
+          >Ask Nexus →</button>
         </div>
       )}
 
