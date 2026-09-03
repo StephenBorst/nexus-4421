@@ -18,6 +18,8 @@ import { LOSS_REASONS, lossReason } from "@/lib/postmortem.mjs";
 import { parseThesis } from "@/lib/thesisParse.mjs";
 import { h4Atr14Frac } from "@/lib/atr.mjs";
 import { AGENT_API } from "./agentTypes";
+import { FADE_FUNDING_FLOOR_PCT_YR } from "./briefing";
+import { frozenLevelsFor } from "@/lib/frozenDraft";
 import { ThesisTimeline } from "./ThesisTimeline";
 import { ThesisAdvisor } from "./ThesisAdvisor";
 import { PnlChart, EmptyState, Coachmark } from "./components";
@@ -1415,6 +1417,61 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
     persist(updated);
   };
 
+  // ── The empty-state DOOR ──────────────────────────────────────────────────────
+  // With no coin picked the engine is a wall of blank inputs — a dead end for a guest who
+  // landed here from the 3-room nav. Offer the same one-tap frozen call the board does: pull
+  // the top FADE off /signals (the SAME read — server verdict + the shared funding floor) and
+  // draft it in place. Capped + fail-soft: if /signals is slow or has no clean fade, the door
+  // just points at Market Intel. No SIM (already gated on symbol), no splash, no connect wall.
+  const [topFade, setTopFade] = useState<{ sym: string; dir: "LONG" | "SHORT" } | null>(null);
+  const [doorBusy, setDoorBusy] = useState(false);
+  useEffect(() => {
+    if (form.symbol) return;             // only needed while the engine is empty
+    let alive = true;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 2000);
+    fetch(`${AGENT_API}/signals`, { signal: ctl.signal })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!alive) return;
+        const rows: { symbol?: string; verdict?: string; fade_dir?: string; funding_annual_pct?: number }[] =
+          Array.isArray(j?.signals) ? j.signals : [];
+        const best = rows
+          .filter((s) => s?.verdict === "FADE" && (s.fade_dir === "LONG" || s.fade_dir === "SHORT")
+            && Math.abs(Number(s.funding_annual_pct ?? 0)) >= FADE_FUNDING_FLOOR_PCT_YR)
+          .sort((a, b) => Math.abs(Number(b.funding_annual_pct ?? 0)) - Math.abs(Number(a.funding_annual_pct ?? 0)))[0];
+        setTopFade(best ? { sym: String(best.symbol), dir: best.fade_dir as "LONG" | "SHORT" } : null);
+      })
+      .catch(() => { /* no top fade → the door falls back to Open Market Intel */ })
+      .finally(() => clearTimeout(timer));
+    return () => { alive = false; clearTimeout(timer); };
+  }, [form.symbol]);
+  const openBoard = () => {
+    try { window.dispatchEvent(new CustomEvent("nexus:lab-tab", { detail: { tab: "intel" } })); } catch { /* non-browser */ }
+  };
+  // Write the SAME frozen draft object the board writes and let the existing consumer fill the
+  // form + R knobs — one path, no second schema.
+  const draftTopFade = async () => {
+    if (!topFade || doorBusy) return;
+    setDoorBusy(true);
+    let lv = null as Awaited<ReturnType<typeof frozenLevelsFor>>;
+    try { lv = await frozenLevelsFor(`PERP_${topFade.sym}_USDC`, topFade.dir); } catch { /* fall through */ }
+    if (lv) {
+      const draft = {
+        symbol: topFade.sym, direction: topFade.dir,
+        entryPrice: String(lv.entryPrice), stopLoss: String(lv.stopLoss), takeProfit1: String(lv.takeProfit1),
+        targetWindow: `${lv.holdDays}d`,
+        catalyst: `FADE ${topFade.dir} · the board's funding read`,
+        notes: `FADE ${topFade.dir} from The Board. Frozen: entry at mark, stop 1.2× H4 ATR(14), TP +${lv.riskReward}R, ${lv.holdDays}-day time-stop. Graded first-touch vs the tape.`,
+      };
+      try { window.localStorage.setItem(THESIS_DRAFT_KEY, JSON.stringify(draft)); } catch { /* private mode */ }
+      try { window.dispatchEvent(new CustomEvent("nexus:thesis-draft")); } catch { /* non-browser */ }
+    } else {
+      openBoard();                        // couldn't fill the frozen object → send them to the board
+    }
+    setDoorBusy(false);
+  };
+
   return (
     <div>
       {/* Header */}
@@ -1451,6 +1508,25 @@ export function ThesisView({ realizedTrades, wallet }: { realizedTrades?: Proces
           </div>
         )}
       </div>
+
+      {/* Empty-state DOOR — with no coin picked, offer the way in instead of blank inputs. */}
+      {!form.symbol && (
+        <div style={{ ...cardStyle, marginBottom: 14, display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: 14, color: "#f4f4f5", fontWeight: 600 }}>Pick a play on the board.</div>
+            <div style={{ fontFamily: "var(--nx-font-ui, sans-serif)", fontSize: 11.5, color: "#71717a", marginTop: 4, lineHeight: 1.5 }}>
+              A call starts from a read. The board&apos;s fade lands here already filled — entry at mark, a 1.2× H4 ATR stop, 1.5R and a 7-day clock — then it grades itself from public price.
+            </div>
+          </div>
+          <button
+            onClick={topFade ? draftTopFade : openBoard}
+            disabled={doorBusy}
+            style={{ ...navBtnStyle, flexShrink: 0, color: "#ededf0", borderColor: "#33333a", background: "#1a1a1e", padding: "10px 16px", fontSize: 11, cursor: doorBusy ? "default" : "pointer", opacity: doorBusy ? 0.6 : 1, whiteSpace: "nowrap" }}
+          >
+            {doorBusy ? "drafting…" : topFade ? `DRAFT ${topFade.sym} FADE ${topFade.dir} →` : "OPEN MARKET INTEL →"}
+          </button>
+        </div>
+      )}
 
       {/* What makes a Signal — the plain recipe (congruent with the Mispriced Board). */}
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 14, padding: "11px 13px", border: "1px solid #232327", borderLeft: "2px solid #71717a", borderRadius: 6, background: "#0f0f11" }}>
