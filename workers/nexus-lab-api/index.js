@@ -5649,16 +5649,20 @@ document.getElementById("btn").addEventListener("click",go);
       const amount = url.searchParams.get("amount") || "";      // base units of tokenIn
       if (!chain || !tokenOut || !tokenIn || !amount) return json({ available: true, ok: false, reason: "bad_params" }, request);
       try {
-        const q = new URLSearchParams({ chainId: chain, tokenIn, tokenOut, amount }).toString();
+        // Fabric uses 0x-style param names (verified from a live 400: "missing field `sellToken`"):
+        // sellToken / buyToken / sellAmount + chainId. Our own /swap/quote API keeps the neutral
+        // tokenIn/tokenOut/amount names; the mapping to Fabric's names lives here so the client
+        // never has to know a provider's dialect.
+        const q = new URLSearchParams({ chainId: chain, sellToken: tokenIn, buyToken: tokenOut, sellAmount: amount }).toString();
         const fr = await fetch(`https://route.withfabric.xyz/v1/quote?${q}`, {
           headers: { "X-App-Id": appId, "Accept": "application/json" },
         });
         const body = await fr.json().catch(() => null);
         if (!fr.ok || !body) return json({ available: true, ok: false, status: fr.status, raw: body }, request, 200);
-        // Best-effort normalization — several likely field names; the RAW body is returned so the
-        // real names can be pinned from a live response and this tightened without guessing.
-        const outAmount = body.outAmount ?? body.toAmount ?? body.buyAmount ?? body.amountOut ?? body?.quote?.outAmount ?? null;
-        const priceImpact = body.priceImpact ?? body.priceImpactPct ?? body.impact ?? body?.quote?.priceImpact ?? null;
+        // Best-effort normalization (0x-style: buyAmount / amountOut, estimatedPriceImpact). The RAW
+        // body is returned so the real names can be pinned from a live 200 and this tightened.
+        const outAmount = body.buyAmount ?? body.amountOut ?? body.outAmount ?? body.toAmount ?? body?.quote?.buyAmount ?? body?.quote?.amountOut ?? null;
+        const priceImpact = body.estimatedPriceImpact ?? body.priceImpact ?? body.priceImpactPct ?? body.impact ?? body?.quote?.estimatedPriceImpact ?? null;
         return json({ available: true, ok: outAmount != null, router: "Fabric", outAmount, priceImpact, raw: body }, request);
       } catch (e) {
         return json({ available: true, ok: false, error: String(e) }, request);
