@@ -11,6 +11,7 @@ import { generatePageTitle } from "@/utils/utils";
 import { getPageMeta } from "@/utils/seo";
 import { renderSEOTags } from "@/utils/seo-tags";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
+import { SectionHeader } from "@/pages/lab/components";
 import { FADE_FUNDING_FLOOR_PCT_YR } from "@/pages/lab/briefing";
 import {
   searchToken, poolCandles, poolTrades, orderlyPerpSet, nexusSignal, swapQuote,
@@ -246,12 +247,16 @@ export default function TokenTerminal() {
   }, [pair]);
 
   const pageMeta = getPageMeta();
-  const pageTitle = generatePageTitle(pair ? `${pair.baseSymbol} · Token` : "Token Terminal");
+  const pageTitle = generatePageTitle(pair ? `${pair.baseSymbol} · Spot` : "Spot");
 
   return (
     <>
       {renderSEOTags(pageMeta, pageTitle)}
-      <div style={{ background: BG, minHeight: "100dvh", padding: isMobile ? "12px 12px 96px" : "16px 20px 40px" }}>
+      <div style={{ background: BG, minHeight: "100dvh" }}>
+        {/* Capped + centered container with the shared SectionHeader, so Spot reads as one of the
+            Nexus custom surfaces (X-Ray / Feed / Proof), not a bespoke page. */}
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: isMobile ? "20px 14px 96px" : "32px 24px 80px" }}>
+        <SectionHeader eyebrow="SPOT" title="Trade any token." note="LIVE DATA · ANY CHAIN" />
         {/* ── SEARCH ── Definitive's "Search CA or Token" */}
         <form onSubmit={(e) => { e.preventDefault(); submit(input); }} style={{ display: "flex", gap: 8, marginBottom: 16, maxWidth: 640 }}>
           <input
@@ -301,6 +306,10 @@ export default function TokenTerminal() {
                   <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
                     <span style={{ fontFamily: MONO, fontSize: 17, fontWeight: 700, color: BRIGHT }}>{pair.baseSymbol}</span>
                     <span style={{ fontFamily: MONO, fontSize: 11, color: FAINT }}>/{pair.quoteSymbol}</span>
+                    {/* chain badge — a bare-ticker search picks the deepest pair across ALL chains, so
+                        WETH can resolve to Solana when you meant Base; naming the chain here (+ the CA
+                        below, + the switchable "Other pairs" chips) makes which token you're on unambiguous. */}
+                    <span style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: MUT, border: `1px solid ${BORD}`, borderRadius: 4, padding: "1px 5px", textTransform: "uppercase" }}>{pair.chainId}</span>
                     {isPerp && <span style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: POS, border: `1px solid ${POS}55`, borderRadius: 4, padding: "1px 5px" }}>NEXUS PERP</span>}
                   </div>
                   <div style={{ fontFamily: UI, fontSize: 11, color: MUT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 180 }}>{pair.baseName}</div>
@@ -487,6 +496,7 @@ export default function TokenTerminal() {
             </div>
           </>
         )}
+        </div>
       </div>
     </>
   );
