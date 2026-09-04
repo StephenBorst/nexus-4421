@@ -5647,13 +5647,18 @@ document.getElementById("btn").addEventListener("click",go);
       const tokenIn = url.searchParams.get("tokenIn") || "";    // USDC address on that chain
       const tokenOut = url.searchParams.get("tokenOut") || "";  // the token's contract address
       const amount = url.searchParams.get("amount") || "";      // base units of tokenIn
+      const taker = url.searchParams.get("taker") || "";        // connected wallet (optional — binds recipient + unlocks the executable tx)
       if (!chain || !tokenOut || !tokenIn || !amount) return json({ available: true, ok: false, reason: "bad_params" }, request);
       try {
         // Fabric uses 0x-style param names (verified from a live 400: "missing field `sellToken`"):
         // sellToken / buyToken / sellAmount + chainId. Our own /swap/quote API keeps the neutral
         // tokenIn/tokenOut/amount names; the mapping to Fabric's names lives here so the client
-        // never has to know a provider's dialect.
-        const q = new URLSearchParams({ chainId: chain, sellToken: tokenIn, buyToken: tokenOut, sellAmount: amount }).toString();
+        // never has to know a provider's dialect. `taker` is forwarded only when the client sends
+        // it (the signing pass does) so Fabric binds the swap recipient to the caller; a bare
+        // preview omits it and stays a pure quote.
+        const fp = { chainId: chain, sellToken: tokenIn, buyToken: tokenOut, sellAmount: amount };
+        if (/^0x[a-fA-F0-9]{40}$/.test(taker)) fp.taker = taker;
+        const q = new URLSearchParams(fp).toString();
         const fr = await fetch(`https://route.withfabric.xyz/v1/quote?${q}`, {
           headers: { "X-App-Id": appId, "Accept": "application/json" },
         });
@@ -5661,14 +5666,26 @@ document.getElementById("btn").addEventListener("click",go);
         if (!fr.ok || !body) return json({ available: true, ok: false, status: fr.status, raw: body }, request, 200);
         // Normalization PINNED to Fabric's real 200 shape (verified from a live response):
         //   amountOut = the quote out amount; priceImpactBps = impact in BASIS POINTS (50 = 0.5%).
-        // Normalize bps → percent so the client's priceImpactPct matches Jupiter's semantics. The
-        // execution fields (approval.{token,amount,spender}, transaction.{to,data,value},
-        // minimumAmountOut) ride along in the RAW body — that's what the signing pass reads.
+        // Normalize bps → percent so the client's priceImpactPct matches Jupiter's semantics.
         const outAmount = body.amountOut ?? body.buyAmount ?? body.outAmount ?? null;
         const bps = Number(body.priceImpactBps);
         const priceImpact = Number.isFinite(bps) ? bps / 100
           : (body.estimatedPriceImpact ?? body.priceImpact ?? body.priceImpactPct ?? null);
-        return json({ available: true, ok: outAmount != null, router: "Fabric", outAmount, priceImpact, raw: body }, request);
+        // Execution route (present when Fabric returns one; only used by the gated in-app signing
+        // pass, never by the preview). Surface CLEAN normalized fields so the client reads fixed
+        // names instead of guessing inside `raw` — but keep `raw` too for verification. Nothing
+        // here decides to sign: the worker only relays what Fabric returned; the client validates
+        // token/amount/spender/minOut against what the user chose before it ever prompts a wallet.
+        const ra = body.approval || null;
+        const approval = ra && (ra.spender || ra.to) ? {
+          token: ra.token ?? ra.sellToken ?? tokenIn,
+          amount: ra.amount ?? ra.value ?? amount,   // EXACT approve amount — client must never widen this
+          spender: ra.spender ?? ra.to ?? null,
+        } : null;
+        const rt = body.transaction || body.tx || null;
+        const tx = rt && rt.to ? { to: rt.to, data: rt.data ?? "0x", value: rt.value ?? "0" } : null;
+        const minOut = body.minimumAmountOut ?? body.minAmountOut ?? body.minBuyAmount ?? null;
+        return json({ available: true, ok: outAmount != null, router: "Fabric", outAmount, priceImpact, approval, tx, minOut, raw: body }, request);
       } catch (e) {
         return json({ available: true, ok: false, error: String(e) }, request);
       }

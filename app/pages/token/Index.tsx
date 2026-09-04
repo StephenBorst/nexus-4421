@@ -10,7 +10,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { generatePageTitle } from "@/utils/utils";
 import { getPageMeta } from "@/utils/seo";
 import { renderSEOTags } from "@/utils/seo-tags";
-import { useAccount } from "@orderly.network/hooks";
+import { useAccount, useWalletConnector } from "@orderly.network/hooks";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { SectionHeader } from "@/pages/lab/components";
 import { FADE_FUNDING_FLOOR_PCT_YR } from "@/pages/lab/briefing";
@@ -20,6 +20,7 @@ import {
   type TokenPair, type Candle, type Trade, type NexusSignal, type SwapQuote,
 } from "./data";
 import { fetchHoldings, type Holding } from "./holdings";
+import { planBuy, executeBuy, explorerTx, fmtTokenAmount, slippagePct, type BuyPlan, type Eip1193 } from "./swapExec";
 
 // Fire the global copilot (mounted in App) with a token-context question. The same
 // nexus:assistant-ask contract the Lab's "Ask Nexus" chips use.
@@ -144,6 +145,20 @@ function Stat({ label, value, color }: { label: string; value: React.ReactNode; 
   );
 }
 
+// One line item in the swap confirm modal — a label, a right-aligned value, and an optional
+// sub-line. accent (green) for the enforced floor, danger (red) for a high price impact.
+function ModalRow({ label, value, sub, accent, danger }: { label: string; value: string; sub?: string; accent?: boolean; danger?: boolean }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, padding: "7px 0", borderBottom: `1px solid ${BORD2}` }}>
+      <span style={{ fontFamily: MONO, fontSize: 10.5, color: MUT, flexShrink: 0 }}>{label}</span>
+      <span style={{ textAlign: "right", minWidth: 0 }}>
+        <span style={{ display: "block", fontFamily: MONO, fontSize: 12, fontWeight: 600, color: danger ? NEG : accent ? POS : BRIGHT, wordBreak: "break-word" }}>{value}</span>
+        {sub && <span style={{ display: "block", fontFamily: MONO, fontSize: 8.5, color: FAINT, marginTop: 2 }}>{sub}</span>}
+      </span>
+    </div>
+  );
+}
+
 export default function TokenTerminal() {
   const isMobile = useIsMobile();
   const { query } = useParams();
@@ -253,14 +268,21 @@ export default function TokenTerminal() {
 
   // ── swap QUOTE (non-perp only; preview, no signing) ──
   // Perp-listed names keep Long/Short on Nexus and are never probed — the venue is our own book.
+  // The probe tracks the AMOUNT box (impact is size-dependent), debounced so a keystroke doesn't
+  // spam the router; empty/zero falls back to a $100 reference probe. Capped for a sane request.
   const [quote, setQuote] = useState<SwapQuote | null>(null);
+  const probeUsd = useMemo(() => {
+    const a = parseFloat(amount);
+    return Number.isFinite(a) && a > 0 ? Math.min(a, 100000) : 100;
+  }, [amount]);
   useEffect(() => {
     if (!pair || isPerp) { setQuote(null); return; }
     let alive = true;
-    setQuote(null);
-    swapQuote(pair).then((q) => { if (alive) setQuote(q); }).catch(() => { if (alive) setQuote(null); });
-    return () => { alive = false; };
-  }, [pair, isPerp]);
+    const t = setTimeout(() => {
+      swapQuote(pair, probeUsd).then((q) => { if (alive) setQuote(q); }).catch(() => { if (alive) setQuote(null); });
+    }, 450);
+    return () => { alive = false; clearTimeout(t); };
+  }, [pair, isPerp, probeUsd]);
 
   // The fill affordance, resolved once so the button and the honesty line agree:
   //  perp     → Long/Short on our book (unchanged).
@@ -276,7 +298,7 @@ export default function TokenTerminal() {
   // on Uniswap) — so the badge and the button name the truth for each, never a merged fiction.
   const swapState = useMemo(() => {
     if (isPerp) return { kind: "perp" as const };
-    if (quote && route) return { kind: "quote" as const, href: route.href, quoteRouter: quote.router, completeVenue: route.venue, impact: quote.priceImpactPct };
+    if (quote && route) return { kind: "quote" as const, href: route.href, quoteRouter: quote.router, completeVenue: route.venue, impact: quote.priceImpactPct, probeUsd: quote.probeUsd };
     if (route && route.href && route.href !== "#") return { kind: "deeplink" as const, href: route.href, venue: route.venue };
     return { kind: "noroute" as const };
   }, [isPerp, quote, route]);
@@ -285,6 +307,61 @@ export default function TokenTerminal() {
     if (!pair?.priceUsd || !Number.isFinite(a) || a <= 0) return null;
     return a / pair.priceUsd;
   }, [amount, pair]);
+
+  // ── in-app SWAP (EVM · Fabric · BUY only) — gated, ADDITIVE to the deep-link ──
+  // Offered only when a Fabric route confirmed (quote), the user is BUYING, and a wallet is
+  // connected. Everything else (Solana/Jupiter, perp, no wallet) keeps the exact prior behavior.
+  // The deep-link never goes away — this is the extra "don't leave to Uniswap" path, and any
+  // failure falls back to it. planBuy validates hard before the modal; executeBuy signs only on
+  // an explicit confirm.
+  const { wallet: wc } = useWalletConnector();
+  const provider = (wc?.provider as Eip1193 | undefined) || undefined;
+  const canInApp = swapState.kind === "quote" && quote?.router === "Fabric" && side === "buy" && !!wallet && !!provider;
+  const [plan, setPlan] = useState<BuyPlan | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [planning, setPlanning] = useState(false);
+  const [swapBusy, setSwapBusy] = useState(false);
+  const [swapStep, setSwapStep] = useState("");
+  const [swapErr, setSwapErr] = useState<string | null>(null);
+  const [swapDone, setSwapDone] = useState<{ hash: string } | null>(null);
+
+  // A changed token/side/amount invalidates a captured plan — close + clear so the modal can
+  // never sign against a plan the numbers on screen no longer match.
+  useEffect(() => { setModalOpen(false); setPlan(null); setSwapErr(null); setSwapDone(null); }, [pair, side, amount]);
+
+  const openSwap = useCallback(async () => {
+    const usd = parseFloat(amount);
+    setSwapErr(null); setSwapDone(null);
+    if (!pair?.baseAddress || !wallet || !provider) return;
+    if (!Number.isFinite(usd) || usd < 1) { setSwapErr("Enter at least $1 to swap in-app."); return; }
+    setPlanning(true);
+    try {
+      const p = await planBuy(pair.chainId, pair.baseAddress, usd, wallet, provider);
+      setPlan(p); setModalOpen(true);
+    } catch (e) {
+      setSwapErr((e as Error)?.message || "Couldn't build the swap — use the deep-link.");
+    } finally { setPlanning(false); }
+  }, [pair, wallet, provider, amount]);
+
+  const confirmSwap = useCallback(async () => {
+    if (!plan || !wallet || !provider) return;
+    setSwapBusy(true); setSwapErr(null); setSwapStep("preparing…");
+    try {
+      const { swapHash } = await executeBuy(provider, wallet, plan, setSwapStep);
+      setSwapDone({ hash: swapHash });
+    } catch (e) {
+      const m = (e as Error)?.message || "swap failed";
+      setSwapErr(
+        /insufficient|exceeds balance|transfer amount exceeds/i.test(m) ? "Not enough USDC (+ a little ETH for gas) on this network."
+        : /user rejected|user denied|rejected the request|4001/i.test(m) ? "Cancelled in your wallet."
+        : m);
+    } finally { setSwapBusy(false); setSwapStep(""); }
+  }, [plan, wallet, provider]);
+
+  const closeSwap = useCallback(() => {
+    if (swapBusy) return; // never yank the modal out from under a pending signature
+    setModalOpen(false); setPlan(null); setSwapErr(null); setSwapDone(null);
+  }, [swapBusy]);
 
   const copyCa = useCallback(() => {
     if (!pair?.baseAddress) return;
@@ -495,7 +572,7 @@ export default function TokenTerminal() {
                 {swapState.kind === "quote" && (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, fontFamily: MONO, fontSize: 10.5, color: POS }}>
                     <span>✓ Route via {swapState.quoteRouter}</span>
-                    {swapState.impact != null && <span style={{ color: swapState.impact >= 3 ? NEG : MUT }}>~{swapState.impact.toFixed(swapState.impact >= 1 ? 1 : 2)}% impact · $100</span>}
+                    {swapState.impact != null && <span style={{ color: swapState.impact >= 3 ? NEG : MUT }}>~{swapState.impact.toFixed(swapState.impact >= 1 ? 1 : 2)}% impact · ${Math.round(swapState.probeUsd).toLocaleString("en-US")}</span>}
                   </div>
                 )}
 
@@ -505,7 +582,22 @@ export default function TokenTerminal() {
                     {side === "buy" ? "Long" : "Short"} {pair.baseSymbol} on Nexus →
                   </a>
                 )}
-                {swapState.kind === "quote" && (
+                {/* in-app swap when we can sign it (Fabric · buy · wallet); the deep-link stays,
+                    demoted to a secondary line, so there's always the honest fallback. */}
+                {swapState.kind === "quote" && canInApp && (
+                  <>
+                    <button onClick={openSwap} disabled={planning}
+                      style={{ display: "block", width: "100%", textAlign: "center", marginTop: 8, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: POS, border: "none", borderRadius: 9, padding: "13px 0", cursor: planning ? "wait" : "pointer", opacity: planning ? 0.7 : 1 }}>
+                      {planning ? "Building route…" : `Swap ${pair.baseSymbol} in-app →`}
+                    </button>
+                    <a href={swapState.href} target="_blank" rel="noopener noreferrer"
+                      style={{ display: "block", textAlign: "center", marginTop: 8, fontFamily: MONO, fontSize: 10.5, color: MUT, textDecoration: "none" }}>
+                      or complete on {swapState.completeVenue} ↗
+                    </a>
+                    {swapErr && !modalOpen && <div style={{ fontFamily: MONO, fontSize: 10.5, color: NEG, marginTop: 8, textAlign: "center" }}>{swapErr}</div>}
+                  </>
+                )}
+                {swapState.kind === "quote" && !canInApp && (
                   <a href={swapState.href} target="_blank" rel="noopener noreferrer"
                     style={{ display: "block", textAlign: "center", marginTop: 8, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: BRIGHT, borderRadius: 9, padding: "13px 0", textDecoration: "none" }}>
                     Swap {pair.baseSymbol} on {swapState.completeVenue} →
@@ -528,7 +620,9 @@ export default function TokenTerminal() {
                   {swapState.kind === "perp"
                     ? <>Nexus lists {pair.baseSymbol} as a perp — you trade it here, on our book, graded like every Nexus position.</>
                     : swapState.kind === "quote"
-                    ? <>Route + price from <b style={{ color: MUT }}>{swapState.quoteRouter}</b>{swapState.completeVenue !== swapState.quoteRouter ? <>; you complete on <b style={{ color: MUT }}>{swapState.completeVenue}</b> until in-app swap lands</> : <> — preview only, in-app signing is coming</>}. The read is ours.</>
+                    ? (canInApp
+                      ? <>Route + price from <b style={{ color: MUT }}>{swapState.quoteRouter}</b> — you sign the swap in your own wallet (exact-amount approval, minimum-received enforced on-chain). Non-custodial. The read is ours.</>
+                      : <>Route + price from <b style={{ color: MUT }}>{swapState.quoteRouter}</b>{swapState.completeVenue !== swapState.quoteRouter ? <>; you complete on <b style={{ color: MUT }}>{swapState.completeVenue}</b> until in-app swap lands</> : <> — preview only, in-app signing is coming</>}. The read is ours.</>)
                     : swapState.kind === "deeplink"
                     ? <>Nexus doesn’t run a spot book for {pair.baseSymbol}, so we route you to <b style={{ color: MUT }}>{swapState.venue}</b> where it can fill. The read is ours; the swap is theirs.</>
                     : <>No router quotes {pair.baseSymbol} right now — no honest fill to offer, so we don’t fake a Buy. The read above still stands.</>}
@@ -544,6 +638,50 @@ export default function TokenTerminal() {
         )}
         </div>
       </div>
+
+      {/* ── swap confirm modal (in-app EVM/Fabric buy) — nothing signs until "Confirm swap" ── */}
+      {modalOpen && plan && pair && (
+        <div onClick={closeSwap} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.72)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 384, background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, padding: 18 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: BRIGHT }}>CONFIRM SWAP</span>
+              <button onClick={closeSwap} disabled={swapBusy} style={{ background: "none", border: "none", color: swapBusy ? FAINT : MUT, fontSize: 16, cursor: swapBusy ? "default" : "pointer", lineHeight: 1 }}>✕</button>
+            </div>
+
+            {!swapDone ? (
+              <>
+                <ModalRow label="You pay" value={`$${plan.usd.toLocaleString("en-US", { maximumFractionDigits: 2 })}`} sub={`${plan.usd.toLocaleString("en-US", { maximumFractionDigits: 2 })} USDC · ${pair.chainId}`} />
+                <ModalRow label="Receive (est.)" value={fmtTokenAmount(plan.outAmount, plan.decimals) ? `${fmtTokenAmount(plan.outAmount, plan.decimals)} ${pair.baseSymbol}` : "—"} />
+                <ModalRow label="Minimum received" value={fmtTokenAmount(plan.minOut, plan.decimals) ? `${fmtTokenAmount(plan.minOut, plan.decimals)} ${pair.baseSymbol}` : "—"} sub={slippagePct(plan.outAmount, plan.minOut) != null ? `reverts below this · ≤${slippagePct(plan.outAmount, plan.minOut)!.toFixed(2)}% slippage` : "on-chain slippage floor applies"} accent />
+                <ModalRow label="Route" value={plan.router} />
+                {plan.priceImpactPct != null && <ModalRow label="Price impact" value={`~${plan.priceImpactPct.toFixed(plan.priceImpactPct >= 1 ? 1 : 2)}%`} danger={plan.priceImpactPct >= 3} />}
+
+                <div style={{ fontFamily: UI, fontSize: 10, lineHeight: 1.5, color: FAINT, margin: "12px 0 14px" }}>
+                  You approve <b style={{ color: MUT }}>exactly ${plan.usd.toLocaleString("en-US", { maximumFractionDigits: 2 })}</b> of USDC (never more), then sign the swap — both in your own wallet. Non-custodial: Nexus never holds your funds or keys.
+                </div>
+
+                {swapBusy && <div style={{ fontFamily: MONO, fontSize: 11, color: POS, marginBottom: 10, textAlign: "center" }}>{swapStep || "working…"}</div>}
+                {swapErr && <div style={{ fontFamily: MONO, fontSize: 11, color: NEG, marginBottom: 10, textAlign: "center" }}>{swapErr}</div>}
+
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={closeSwap} disabled={swapBusy} style={{ flex: 1, fontFamily: MONO, fontSize: 12, fontWeight: 700, color: MUT, background: "none", border: `1px solid ${BORD}`, borderRadius: 8, padding: "11px 0", cursor: swapBusy ? "default" : "pointer" }}>Cancel</button>
+                  <button onClick={confirmSwap} disabled={swapBusy} style={{ flex: 2, fontFamily: MONO, fontSize: 12, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: POS, border: "none", borderRadius: 8, padding: "11px 0", cursor: swapBusy ? "wait" : "pointer", opacity: swapBusy ? 0.7 : 1 }}>{swapBusy ? "Confirming…" : "Confirm swap"}</button>
+                </div>
+              </>
+            ) : (
+              <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
+                <div style={{ fontSize: 28, marginBottom: 8, color: POS }}>✓</div>
+                <div style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: POS, marginBottom: 6 }}>Swap sent</div>
+                <div style={{ fontFamily: UI, fontSize: 11, color: MUT, marginBottom: 14 }}>Your {pair.baseSymbol} lands once it confirms on-chain.</div>
+                {explorerTx(plan.chainId, swapDone.hash) && (
+                  <a href={explorerTx(plan.chainId, swapDone.hash)!} target="_blank" rel="noopener noreferrer" style={{ fontFamily: MONO, fontSize: 11, color: BRIGHT, textDecoration: "none", display: "inline-block", marginBottom: 14 }}>view transaction ↗</a>
+                )}
+                <button onClick={closeSwap} style={{ display: "block", width: "100%", fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "#0a0a0b", background: BRIGHT, border: "none", borderRadius: 8, padding: "11px 0", cursor: "pointer" }}>Done</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }

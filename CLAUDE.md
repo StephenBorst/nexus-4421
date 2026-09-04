@@ -419,6 +419,20 @@ baked into the code comments. Keep it that way (Howey). The real lawyer-gate is 
   deep-link. So "Swap via Fabric" shows for Fabric-listed EVM tokens; unlisted → Uniswap. SIGNING pass builds on
   the execution fields above (exact-amount approve → tx via the mini-app `eth_sendTransaction` pattern → confirm
   modal showing amount/minReceived/venue → /security-review before merge). Solana signing still deferred (no wallet wiring).
+- **⚙️ In-app EVM/Fabric BUY signing — BUILT (branch `claude/guest-lab-half-shipped-1dkw0n`), pending a small live test
+  before merge.** `app/pages/token/swapExec.ts` = the ONE signing site: `planBuy()` fetches an EXECUTABLE Fabric quote
+  (worker `/swap/quote` now forwards an optional `taker` + surfaces normalized `approval{token,amount,spender}`/`tx{to,data}`/
+  `minOut` alongside `raw`), VALIDATES hard, then `executeBuy()` signs via `useWalletConnector().wallet.provider`
+  (`eth_sendTransaction`). Guards (all pre-signature): approve token MUST === our hardcoded USDC (never Fabric's claimed
+  token — we encode approve against OUR usdc addr), approve amount MUST === exact sellAmount (never infinite), tx.value
+  MUST === 0 (else ETH-drain — and we force `0x0` on send anyway), wallet MUST be on the token's chain (ensureChain
+  re-reads + aborts), swap receipt status 0x0 → surfaced as a revert (no fake "sent ✓"). ERC-20 calldata is hand-encoded
+  (`0x095ea7b3` approve / `0xdd62ed3e` allowance) — **verified byte-for-byte against viem** (caught a double-`0x` bug in
+  review). GATED + ADDITIVE: the button only appears for Fabric-quoted EVM tokens, side=BUY, wallet connected; the honest
+  Uniswap deep-link never leaves (demoted to a secondary line). BUY-only (USDC→token); Solana + SELL stay deep-link.
+  Confirm modal shows pay/receive-est/min-received/slippage/impact; nothing signs until "Confirm swap". ⚠️ First live
+  test: confirm Fabric's `taker` param name (we send `taker`; if unhonored the takerless tx still binds recipient to
+  msg.sender) and run a small real buy on a Fabric-listed token (e.g. WETH/BNKR on Base) before trusting.
 
 ## Nexus PRO — subscriptions / revenue (freemium model)
 The business-model layer. **PRO is a SOFTWARE subscription** (ordinary commerce, real USDC revenue) — NOT a
