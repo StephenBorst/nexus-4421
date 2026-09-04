@@ -10,6 +10,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { generatePageTitle } from "@/utils/utils";
 import { getPageMeta } from "@/utils/seo";
 import { renderSEOTags } from "@/utils/seo-tags";
+import { useAccount } from "@orderly.network/hooks";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { SectionHeader } from "@/pages/lab/components";
 import { FADE_FUNDING_FLOOR_PCT_YR } from "@/pages/lab/briefing";
@@ -18,6 +19,7 @@ import {
   fmtUsd, fmtPrice, fmtAge, shortAddr,
   type TokenPair, type Candle, type Trade, type NexusSignal, type SwapQuote,
 } from "./data";
+import { fetchHoldings, type Holding } from "./holdings";
 
 // Fire the global copilot (mounted in App) with a token-context question. The same
 // nexus:assistant-ask contract the Lab's "Ask Nexus" chips use.
@@ -41,7 +43,7 @@ function nexusReadLabel(sig: NexusSignal): { label: string; color: string; sub: 
 const MONO = "var(--nx-font-mono)";
 const UI = "var(--nx-font-ui, sans-serif)";
 const BG = "#0a0a0b", CARD = "#0f0f11", BORD = "#232327", BORD2 = "#1a1a1e";
-const BRIGHT = "#f4f4f5", MUT = "#71717a", FAINT = "#52525b";
+const BRIGHT = "#f4f4f5", FOG = "#a1a1aa", MUT = "#71717a", FAINT = "#52525b";
 const POS = "#3ecf8e", NEG = "#f7525f";
 
 // Uniswap `chain` param by DexScreener chainId — the honest spot deep-link for EVM tokens
@@ -105,6 +107,33 @@ function Chart({ candles, loading, height }: { candles: Candle[]; loading: boole
   );
 }
 
+// ── YOUR WALLET strip — read-only spot holdings, a launcher + (later) MAX source ──
+// Connected only; disconnected renders nothing. Each row opens that token on Spot.
+function HoldingsStrip({ holdings, loading, onOpen }: { holdings: Holding[]; loading: boolean; onOpen: (h: Holding) => void }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.14em", color: FAINT, textTransform: "uppercase", marginBottom: 7 }}>Your wallet</div>
+      {loading && holdings.length === 0 ? (
+        <div style={{ fontFamily: MONO, fontSize: 11, color: FAINT }}>reading balances…</div>
+      ) : holdings.length === 0 ? (
+        <div style={{ fontFamily: UI, fontSize: 12, color: MUT }}>No spot tokens in this wallet.</div>
+      ) : (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {holdings.map((h, i) => (
+            <button key={`${h.chain}-${h.sym}-${i}`} onClick={() => onOpen(h)} className="nx-press"
+              style={{ display: "flex", alignItems: "center", gap: 7, background: CARD, border: `1px solid ${BORD}`, borderRadius: 8, padding: "7px 11px", cursor: "pointer", fontFamily: MONO }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: BRIGHT }}>{h.sym}</span>
+              <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: "0.06em", color: MUT, border: `1px solid ${BORD}`, borderRadius: 3, padding: "0 4px", textTransform: "uppercase" }}>{h.chain}</span>
+              <span style={{ fontSize: 11, color: FOG }}>{h.amountLabel}</span>
+              <span style={{ fontSize: 11, color: MUT }}>· {h.usdLabel}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── one header stat cell ──────────────────────────────────────────────────────
 function Stat({ label, value, color }: { label: string; value: React.ReactNode; color?: string }) {
   return (
@@ -133,6 +162,22 @@ export default function TokenTerminal() {
   const [amount, setAmount] = useState("");
   const [copied, setCopied] = useState(false);
   const [sig, setSig] = useState<NexusSignal | null>(null);
+
+  // Connected wallet → read-only spot holdings (no txs). Disconnected → no strip.
+  const { state: acct } = useAccount();
+  const wallet = (acct as { address?: string })?.address ?? null;
+  const [holdings, setHoldings] = useState<Holding[]>([]);
+  const [holdingsLoading, setHoldingsLoading] = useState(false);
+  useEffect(() => {
+    if (!wallet) { setHoldings([]); setHoldingsLoading(false); return; }
+    let alive = true;
+    setHoldingsLoading(true);
+    fetchHoldings(wallet)
+      .then((h) => { if (alive) setHoldings(h); })
+      .catch(() => { if (alive) setHoldings([]); })
+      .finally(() => { if (alive) setHoldingsLoading(false); });
+    return () => { alive = false; };
+  }, [wallet]);
 
   useEffect(() => { orderlyPerpSet().then(setPerpSet).catch(() => { /* no perp routing */ }); }, []);
   useEffect(() => { setInput(query || ""); }, [query]);
@@ -257,6 +302,7 @@ export default function TokenTerminal() {
             Nexus custom surfaces (X-Ray / Feed / Proof), not a bespoke page. */}
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: isMobile ? "20px 14px 96px" : "32px 24px 80px" }}>
         <SectionHeader eyebrow="SPOT" title="Trade any token." note="LIVE DATA · ANY CHAIN" />
+        {wallet && <HoldingsStrip holdings={holdings} loading={holdingsLoading} onOpen={(h) => navigate(`/token/${encodeURIComponent(h.address || h.sym)}`)} />}
         {/* ── SEARCH ── Definitive's "Search CA or Token" */}
         <form onSubmit={(e) => { e.preventDefault(); submit(input); }} style={{ display: "flex", gap: 8, marginBottom: 16, maxWidth: 640 }}>
           <input
