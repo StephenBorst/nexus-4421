@@ -224,9 +224,13 @@ export default function TokenTerminal() {
   //             the $NEXUS / v4-gap case: aggregators miss it, Uniswap routes it, so Uniswap is
   //             the honest answer — not a dead button.
   //  noroute  → nothing to route to → disabled, says "no route". Never a fake Buy.
+  // quoteRouter = who confirmed the route + impact (Jupiter / Fabric). completeVenue = where the
+  // swap actually finishes until in-app signing lands (the deep-link). They're the same for
+  // Jupiter (its own app completes it) and differ for Fabric-on-EVM (route via Fabric, complete
+  // on Uniswap) — so the badge and the button name the truth for each, never a merged fiction.
   const swapState = useMemo(() => {
     if (isPerp) return { kind: "perp" as const };
-    if (quote && route) return { kind: "quote" as const, href: route.href, venue: quote.router, impact: quote.priceImpactPct };
+    if (quote && route) return { kind: "quote" as const, href: route.href, quoteRouter: quote.router, completeVenue: route.venue, impact: quote.priceImpactPct };
     if (route && route.href && route.href !== "#") return { kind: "deeplink" as const, href: route.href, venue: route.venue };
     return { kind: "noroute" as const };
   }, [isPerp, quote, route]);
@@ -432,10 +436,10 @@ export default function TokenTerminal() {
                   <span style={{ color: BRIGHT }}>{estOut != null ? `${estOut.toLocaleString("en-US", { maximumFractionDigits: estOut >= 1 ? 2 : 6 })} ${pair.baseSymbol}` : "—"}</span>
                 </div>
 
-                {/* route-confirmed preview badge (Jupiter) — a real quote, not price math */}
+                {/* route-confirmed preview badge — a real quote (Jupiter / Fabric), not price math */}
                 {swapState.kind === "quote" && (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, fontFamily: MONO, fontSize: 10.5, color: POS }}>
-                    <span>✓ Route via {swapState.venue}</span>
+                    <span>✓ Route via {swapState.quoteRouter}</span>
                     {swapState.impact != null && <span style={{ color: swapState.impact >= 3 ? NEG : MUT }}>~{swapState.impact.toFixed(swapState.impact >= 1 ? 1 : 2)}% impact · $100</span>}
                   </div>
                 )}
@@ -446,10 +450,16 @@ export default function TokenTerminal() {
                     {side === "buy" ? "Long" : "Short"} {pair.baseSymbol} on Nexus →
                   </a>
                 )}
-                {(swapState.kind === "quote" || swapState.kind === "deeplink") && (
+                {swapState.kind === "quote" && (
                   <a href={swapState.href} target="_blank" rel="noopener noreferrer"
-                    style={{ display: "block", textAlign: "center", marginTop: swapState.kind === "quote" ? 8 : 12, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: BRIGHT, borderRadius: 9, padding: "13px 0", textDecoration: "none" }}>
-                    Swap {pair.baseSymbol} via {swapState.venue} →
+                    style={{ display: "block", textAlign: "center", marginTop: 8, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: BRIGHT, borderRadius: 9, padding: "13px 0", textDecoration: "none" }}>
+                    Swap {pair.baseSymbol} on {swapState.completeVenue} →
+                  </a>
+                )}
+                {swapState.kind === "deeplink" && (
+                  <a href={swapState.href} target="_blank" rel="noopener noreferrer"
+                    style={{ display: "block", textAlign: "center", marginTop: 12, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: BRIGHT, borderRadius: 9, padding: "13px 0", textDecoration: "none" }}>
+                    Swap {pair.baseSymbol} on {swapState.venue} →
                   </a>
                 )}
                 {swapState.kind === "noroute" && (
@@ -463,7 +473,7 @@ export default function TokenTerminal() {
                   {swapState.kind === "perp"
                     ? <>Nexus lists {pair.baseSymbol} as a perp — you trade it here, on our book, graded like every Nexus position.</>
                     : swapState.kind === "quote"
-                    ? <>Route found on <b style={{ color: MUT }}>{swapState.venue}</b>. Preview only — you complete the swap on {swapState.venue}; in-app signing is coming. The read is ours.</>
+                    ? <>Route + price from <b style={{ color: MUT }}>{swapState.quoteRouter}</b>{swapState.completeVenue !== swapState.quoteRouter ? <>; you complete on <b style={{ color: MUT }}>{swapState.completeVenue}</b> until in-app swap lands</> : <> — preview only, in-app signing is coming</>}. The read is ours.</>
                     : swapState.kind === "deeplink"
                     ? <>Nexus doesn’t run a spot book for {pair.baseSymbol}, so we route you to <b style={{ color: MUT }}>{swapState.venue}</b> where it can fill. The read is ours; the swap is theirs.</>
                     : <>No router quotes {pair.baseSymbol} right now — no honest fill to offer, so we don’t fake a Buy. The read above still stands.</>}

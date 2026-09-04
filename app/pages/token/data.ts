@@ -230,15 +230,37 @@ export async function nexusSignal(symbol: string): Promise<NexusSignal | null> {
 // page, it just hides the badge. This does NOT execute anything; signing is a separate pass.
 const JUP_QUOTE = "https://quote-api.jup.ag/v6/quote";
 const USDC_SOL = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; // USDC mint, Solana
+// USDC by DexScreener chainId → numeric chainId, for the EVM (Fabric) quote probe. Only chains
+// where we know the canonical USDC; anything else simply doesn't get an EVM quote (deep-link).
+const EVM_USDC: Record<string, { chainId: number; usdc: string }> = {
+  base:      { chainId: 8453,  usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" },
+  ethereum:  { chainId: 1,     usdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" },
+  arbitrum:  { chainId: 42161, usdc: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831" },
+  optimism:  { chainId: 10,    usdc: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85" },
+  polygon:   { chainId: 137,   usdc: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359" },
+};
 export interface SwapQuote { router: string; priceImpactPct: number | null; probeUsd: number }
+
+// Preview-only quote (NO signing). Solana → keyless Jupiter, client-side. EVM → Fabric, but ONLY
+// through our worker (the App ID is a server secret) — /swap/quote injects the X-App-Id header.
+// Fail-soft everywhere: any miss returns null and the panel keeps the honest deep-link.
 export async function swapQuote(pair: TokenPair, probeUsd = 100): Promise<SwapQuote | null> {
-  if (pair.chainId !== "solana" || !pair.baseAddress) return null;
-  const amount = Math.round(probeUsd * 1e6); // USDC has 6 decimals
-  const url = `${JUP_QUOTE}?inputMint=${USDC_SOL}&outputMint=${encodeURIComponent(pair.baseAddress)}&amount=${amount}&slippageBps=100`;
-  const j = (await getJson(url)) as { outAmount?: string; priceImpactPct?: string } | null;
-  if (!j || !j.outAmount) return null; // no route found → caller falls back to the deep-link
-  const impact = Number(j.priceImpactPct); // Jupiter returns a fraction (0.012 = 1.2%)
-  return { router: "Jupiter", priceImpactPct: Number.isFinite(impact) ? impact * 100 : null, probeUsd };
+  if (!pair.baseAddress) return null;
+  const amount = Math.round(probeUsd * 1e6); // USDC has 6 decimals on both Solana and EVM
+  if (pair.chainId === "solana") {
+    const url = `${JUP_QUOTE}?inputMint=${USDC_SOL}&outputMint=${encodeURIComponent(pair.baseAddress)}&amount=${amount}&slippageBps=100`;
+    const j = (await getJson(url)) as { outAmount?: string; priceImpactPct?: string } | null;
+    if (!j || !j.outAmount) return null;
+    const impact = Number(j.priceImpactPct); // Jupiter returns a fraction (0.012 = 1.2%)
+    return { router: "Jupiter", priceImpactPct: Number.isFinite(impact) ? impact * 100 : null, probeUsd };
+  }
+  const evm = EVM_USDC[pair.chainId];
+  if (!evm) return null;
+  const url = `${AGENT_API}/swap/quote?chain=${evm.chainId}&tokenIn=${evm.usdc}&tokenOut=${encodeURIComponent(pair.baseAddress)}&amount=${amount}`;
+  const j = (await getJson(url)) as { ok?: boolean; router?: string; priceImpact?: unknown } | null;
+  if (!j || !j.ok) return null; // no route / secret unset / unknown shape → deep-link fallback
+  const impact = Number(j.priceImpact);
+  return { router: j.router || "Fabric", priceImpactPct: Number.isFinite(impact) ? impact : null, probeUsd };
 }
 
 // ── formatters (compact, terminal register) ──────────────────────────────────

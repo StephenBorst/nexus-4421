@@ -5631,6 +5631,40 @@ document.getElementById("btn").addEventListener("click",go);
       }, request);
     }
 
+    // ── GET /swap/quote — EVM swap quote via Fabric (secret X-App-Id stays server-side) ──
+    // The token terminal's EVM router. Jupiter (Solana) is keyless and quoted client-side; Fabric
+    // needs our App ID, which must NEVER reach the browser — so it is injected HERE and nowhere
+    // else. PREVIEW ONLY: this returns a quote, never a signed transaction. Fail-soft by design —
+    // no secret set, a Fabric error, or an unrecognized shape all return {available|ok:false} and
+    // the client falls back to the honest Uniswap named link, so a wrong guess never breaks the
+    // page. Returns Fabric's RAW body too, so the exact quote + execution-route shape can be
+    // verified from a real response BEFORE any in-app signing pass is built to sign against it.
+    if (parts[0] === "swap" && parts[1] === "quote") {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+      const appId = env.FABRIC_APP_ID;
+      if (!appId) return json({ available: false, reason: "no_app_id" }, request);
+      const chain = url.searchParams.get("chain") || "";       // numeric chainId (8453, 1, 42161…)
+      const tokenIn = url.searchParams.get("tokenIn") || "";    // USDC address on that chain
+      const tokenOut = url.searchParams.get("tokenOut") || "";  // the token's contract address
+      const amount = url.searchParams.get("amount") || "";      // base units of tokenIn
+      if (!chain || !tokenOut || !tokenIn || !amount) return json({ available: true, ok: false, reason: "bad_params" }, request);
+      try {
+        const q = new URLSearchParams({ chainId: chain, tokenIn, tokenOut, amount }).toString();
+        const fr = await fetch(`https://route.withfabric.xyz/v1/quote?${q}`, {
+          headers: { "X-App-Id": appId, "Accept": "application/json" },
+        });
+        const body = await fr.json().catch(() => null);
+        if (!fr.ok || !body) return json({ available: true, ok: false, status: fr.status, raw: body }, request, 200);
+        // Best-effort normalization — several likely field names; the RAW body is returned so the
+        // real names can be pinned from a live response and this tightened without guessing.
+        const outAmount = body.outAmount ?? body.toAmount ?? body.buyAmount ?? body.amountOut ?? body?.quote?.outAmount ?? null;
+        const priceImpact = body.priceImpact ?? body.priceImpactPct ?? body.impact ?? body?.quote?.priceImpact ?? null;
+        return json({ available: true, ok: outAmount != null, router: "Fabric", outAmount, priceImpact, raw: body }, request);
+      } catch (e) {
+        return json({ available: true, ok: false, error: String(e) }, request);
+      }
+    }
+
     // ── /desks — team layer ("clans") ranked by aggregate TRUSTLESS call score ──
     // A Desk groups wallets; its rank = the COMBINED graded-call record of its
     // members (same public-price grading as the caller leaderboard, via the shared
