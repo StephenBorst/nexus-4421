@@ -13,9 +13,9 @@ import { renderSEOTags } from "@/utils/seo-tags";
 import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { FADE_FUNDING_FLOOR_PCT_YR } from "@/pages/lab/briefing";
 import {
-  searchToken, poolCandles, poolTrades, orderlyPerpSet, nexusSignal,
+  searchToken, poolCandles, poolTrades, orderlyPerpSet, nexusSignal, swapQuote,
   fmtUsd, fmtPrice, fmtAge, shortAddr,
-  type TokenPair, type Candle, type Trade, type NexusSignal,
+  type TokenPair, type Candle, type Trade, type NexusSignal, type SwapQuote,
 } from "./data";
 
 // Fire the global copilot (mounted in App) with a token-context question. The same
@@ -204,6 +204,32 @@ export default function TokenTerminal() {
 
   const isPerp = !!pair && perpSet.has(pair.baseSymbol);
   const route = useMemo(() => (pair ? tradeLink(pair, isPerp) : null), [pair, isPerp]);
+
+  // ── swap QUOTE (non-perp only; preview, no signing) ──
+  // Perp-listed names keep Long/Short on Nexus and are never probed — the venue is our own book.
+  const [quote, setQuote] = useState<SwapQuote | null>(null);
+  useEffect(() => {
+    if (!pair || isPerp) { setQuote(null); return; }
+    let alive = true;
+    setQuote(null);
+    swapQuote(pair).then((q) => { if (alive) setQuote(q); }).catch(() => { if (alive) setQuote(null); });
+    return () => { alive = false; };
+  }, [pair, isPerp]);
+
+  // The fill affordance, resolved once so the button and the honesty line agree:
+  //  perp     → Long/Short on our book (unchanged).
+  //  quote    → a real router quote (Jupiter) → "Swap via {router}" preview; still deep-links to
+  //             the router to COMPLETE, since in-app signing is a later pass.
+  //  deeplink → no quote but a named venue (Uniswap/Jupiter/pool) → honest named link. This is
+  //             the $NEXUS / v4-gap case: aggregators miss it, Uniswap routes it, so Uniswap is
+  //             the honest answer — not a dead button.
+  //  noroute  → nothing to route to → disabled, says "no route". Never a fake Buy.
+  const swapState = useMemo(() => {
+    if (isPerp) return { kind: "perp" as const };
+    if (quote && route) return { kind: "quote" as const, href: route.href, venue: quote.router, impact: quote.priceImpactPct };
+    if (route && route.href && route.href !== "#") return { kind: "deeplink" as const, href: route.href, venue: route.venue };
+    return { kind: "noroute" as const };
+  }, [isPerp, quote, route]);
   const estOut = useMemo(() => {
     const a = parseFloat(amount);
     if (!pair?.priceUsd || !Number.isFinite(a) || a <= 0) return null;
@@ -406,18 +432,41 @@ export default function TokenTerminal() {
                   <span style={{ color: BRIGHT }}>{estOut != null ? `${estOut.toLocaleString("en-US", { maximumFractionDigits: estOut >= 1 ? 2 : 6 })} ${pair.baseSymbol}` : "—"}</span>
                 </div>
 
-                {route && (
-                  <a href={route.href} {...(route.internal ? {} : { target: "_blank", rel: "noopener noreferrer" })}
+                {/* route-confirmed preview badge (Jupiter) — a real quote, not price math */}
+                {swapState.kind === "quote" && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, fontFamily: MONO, fontSize: 10.5, color: POS }}>
+                    <span>✓ Route via {swapState.venue}</span>
+                    {swapState.impact != null && <span style={{ color: swapState.impact >= 3 ? NEG : MUT }}>~{swapState.impact.toFixed(swapState.impact >= 1 ? 1 : 2)}% impact · $100</span>}
+                  </div>
+                )}
+
+                {swapState.kind === "perp" && route && (
+                  <a href={route.href}
                     style={{ display: "block", textAlign: "center", marginTop: 12, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: side === "buy" ? POS : NEG, borderRadius: 9, padding: "13px 0", textDecoration: "none" }}>
-                    {isPerp ? `${side === "buy" ? "Long" : "Short"} ${pair.baseSymbol} on Nexus →` : `${side === "buy" ? "Buy" : "Sell"} ${pair.baseSymbol} on ${route.venue} →`}
+                    {side === "buy" ? "Long" : "Short"} {pair.baseSymbol} on Nexus →
                   </a>
+                )}
+                {(swapState.kind === "quote" || swapState.kind === "deeplink") && (
+                  <a href={swapState.href} target="_blank" rel="noopener noreferrer"
+                    style={{ display: "block", textAlign: "center", marginTop: swapState.kind === "quote" ? 8 : 12, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: BRIGHT, borderRadius: 9, padding: "13px 0", textDecoration: "none" }}>
+                    Swap {pair.baseSymbol} via {swapState.venue} →
+                  </a>
+                )}
+                {swapState.kind === "noroute" && (
+                  <div style={{ textAlign: "center", marginTop: 12, fontFamily: MONO, fontSize: 12, fontWeight: 700, letterSpacing: "0.03em", color: FAINT, background: "none", border: `1px solid ${BORD}`, borderRadius: 9, padding: "12px 0", cursor: "not-allowed" }}>
+                    No route
+                  </div>
                 )}
 
                 {/* honesty: where the order actually fills */}
                 <div style={{ fontFamily: UI, fontSize: 10.5, lineHeight: 1.5, color: FAINT, marginTop: 10 }}>
-                  {isPerp
+                  {swapState.kind === "perp"
                     ? <>Nexus lists {pair.baseSymbol} as a perp — you trade it here, on our book, graded like every Nexus position.</>
-                    : <>Nexus doesn’t run a spot book for {pair.baseSymbol}, so we route your order to <b style={{ color: MUT }}>{route?.venue}</b> where it can fill. The read is ours; the swap is theirs.</>}
+                    : swapState.kind === "quote"
+                    ? <>Route found on <b style={{ color: MUT }}>{swapState.venue}</b>. Preview only — you complete the swap on {swapState.venue}; in-app signing is coming. The read is ours.</>
+                    : swapState.kind === "deeplink"
+                    ? <>Nexus doesn’t run a spot book for {pair.baseSymbol}, so we route you to <b style={{ color: MUT }}>{swapState.venue}</b> where it can fill. The read is ours; the swap is theirs.</>
+                    : <>No router quotes {pair.baseSymbol} right now — no honest fill to offer, so we don’t fake a Buy. The read above still stands.</>}
                 </div>
               </div>
             </div>

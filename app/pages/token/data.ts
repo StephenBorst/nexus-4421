@@ -221,6 +221,26 @@ export async function nexusSignal(symbol: string): Promise<NexusSignal | null> {
   };
 }
 
+// ── in-app swap QUOTE (preview only — no signing this pass) ───────────────────
+// Grok/borst rails: a router + a preview, never a Nexus book. Jupiter is the one router I can
+// quote KEYLESS and CORS-open from the browser with no wallet — so Solana tokens get a real
+// route check + price impact here. EVM routers (WooFi/0x) need a key or the full widget, so
+// EVM stays on the honest named deep-link rather than a faked quote. Fail-soft: any error →
+// null → the panel falls back to the deep-link, so a changed Jupiter endpoint never breaks the
+// page, it just hides the badge. This does NOT execute anything; signing is a separate pass.
+const JUP_QUOTE = "https://quote-api.jup.ag/v6/quote";
+const USDC_SOL = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; // USDC mint, Solana
+export interface SwapQuote { router: string; priceImpactPct: number | null; probeUsd: number }
+export async function swapQuote(pair: TokenPair, probeUsd = 100): Promise<SwapQuote | null> {
+  if (pair.chainId !== "solana" || !pair.baseAddress) return null;
+  const amount = Math.round(probeUsd * 1e6); // USDC has 6 decimals
+  const url = `${JUP_QUOTE}?inputMint=${USDC_SOL}&outputMint=${encodeURIComponent(pair.baseAddress)}&amount=${amount}&slippageBps=100`;
+  const j = (await getJson(url)) as { outAmount?: string; priceImpactPct?: string } | null;
+  if (!j || !j.outAmount) return null; // no route found → caller falls back to the deep-link
+  const impact = Number(j.priceImpactPct); // Jupiter returns a fraction (0.012 = 1.2%)
+  return { router: "Jupiter", priceImpactPct: Number.isFinite(impact) ? impact * 100 : null, probeUsd };
+}
+
 // ── formatters (compact, terminal register) ──────────────────────────────────
 export function fmtUsd(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";

@@ -391,10 +391,21 @@ baked into the code comments. Keep it that way (Howey). The real lawyer-gate is 
   return **"No route found"** for WETH→NEXUS while routing majors (WETH→USDC) fine. It's the **v4-hook indexing gap**,
   NOT pool-specific — they'll auto-route NEXUS once they index v4 hooks OR the pool deepens. So embedded $NEXUS swap =
   hand-build (vetted) OR wait. Real lever = **liquidity depth** (treasury buyback / LP seeding).
-- **Spandex/Fabric:** `spanDEX/spandex` = cloned `github.com/withfabricxyz/spandex` (Fabric's OSS aggregator).
-  `app/components/SpanDEX/*` + `useSpanDEX.ts` = a SCAFFOLD (placeholder `api.fabric.com/quote` URL, never wired).
-  Reviving it would upgrade GENERAL swaps over the WooFi widget (majors/cross-chain) but does **NOT** solve buying
-  $NEXUS (can't route the v4 pool). That mismatch is likely why it never shipped.
+- **Spandex/Fabric:** ⚠️ **NO LONGER IN THE REPO (verified 2026-09-04, repo-wide grep).** The old
+  `app/components/SpanDEX/*` + `useSpanDEX.ts` scaffold (cloned `github.com/withfabricxyz/spandex`, placeholder
+  `api.fabric.com/quote`, never wired) is GONE — the only "fabric" hits left are the word "fabricated" in comments.
+  Reviving Fabric is a FRESH build, not a restore. Fabric endpoint = `route.withfabric.xyz/v1/quote` (header
+  `X-App-Id`); Fabric AND LiFi both return "No route found" for WETH→$NEXUS (Uniswap v4-hook indexing gap, not the
+  pool) while routing majors fine — so an aggregator still can't buy $NEXUS; Uniswap deep-link (or the vetted
+  hand-built v4 Universal Router call) remains the honest $NEXUS path.
+- **⚠️ In-app spot = router + sign, NOT a Nexus book.** Orderly SDK ships ZERO spot (perp packages only; grep the
+  hooks/types dist — no `spot` API). WooFi (`woofi-swap-widget-kit`, a standalone WooFi pkg, not `@orderly.network/*`)
+  is the ONLY in-app fill, and only for majors it quotes. `/token` swap layer (SHIPPED, quote-only, no signing):
+  Solana non-perp → real keyless **Jupiter** quote (`quote-api.jup.ag/v6/quote`, `swapQuote` in `app/pages/token/
+  data.ts`) → "Swap via Jupiter" preview (deep-links to complete). EVM → named Uniswap deep-link (no keyless
+  WooFi/0x quote to trust). Perp-listed names keep Long/Short on Nexus, never probed. No quote + no venue →
+  disabled "No route", never a fake Buy. NEXT: in-app signing (approvals exact-amount, slippage cap, confirm step)
+  as a SEPARATE reviewed pass — the highest-risk code in the app.
 
 ## Nexus PRO — subscriptions / revenue (freemium model)
 The business-model layer. **PRO is a SOFTWARE subscription** (ordinary commerce, real USDC revenue) — NOT a
