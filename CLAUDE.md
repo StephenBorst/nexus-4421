@@ -406,6 +406,19 @@ baked into the code comments. Keep it that way (Howey). The real lawyer-gate is 
   WooFi/0x quote to trust). Perp-listed names keep Long/Short on Nexus, never probed. No quote + no venue →
   disabled "No route", never a fake Buy. NEXT: in-app signing (approvals exact-amount, slippage cap, confirm step)
   as a SEPARATE reviewed pass — the highest-risk code in the app.
+- **✅ Fabric EVM quote LIVE-VERIFIED (2026-09-04), contract PINNED.** Worker `GET /swap/quote` (nexus-lab-api)
+  injects secret `FABRIC_APP_ID` (set) as header `X-App-Id` and calls `route.withfabric.xyz/v1/quote`. **Request =
+  0x-style query:** `chainId`, `sellToken`, `buyToken`, `sellAmount` (our client sends neutral `chain`/`tokenIn`/
+  `tokenOut`/`amount`; the worker maps to Fabric's names — client never learns the dialect). **Response (verified
+  200):** quote out amount = `amountOut`; price impact = **`priceImpactBps` (BASIS POINTS**, 50 = 0.5% — worker
+  normalizes `/100` to a percent so client `priceImpactPct` matches Jupiter). **Execution route (for signing):**
+  `approval.{token,amount,spender}` (the ERC-20 approve — spend EXACT `approval.amount`, never infinite),
+  `transaction.{to,data,value}` (the swap tx to sign), `minimumAmountOut` (the slippage floor). Worker returns the
+  RAW body so these stay available. ⚠️ **Fabric has a curated TOKEN LIST — an unlisted token 404s** (e.g. PEPE
+  404'd; WETH/USDC on Base work). That's fine: worker → ok:false → client falls back to the honest Uniswap
+  deep-link. So "Swap via Fabric" shows for Fabric-listed EVM tokens; unlisted → Uniswap. SIGNING pass builds on
+  the execution fields above (exact-amount approve → tx via the mini-app `eth_sendTransaction` pattern → confirm
+  modal showing amount/minReceived/venue → /security-review before merge). Solana signing still deferred (no wallet wiring).
 
 ## Nexus PRO — subscriptions / revenue (freemium model)
 The business-model layer. **PRO is a SOFTWARE subscription** (ordinary commerce, real USDC revenue) — NOT a

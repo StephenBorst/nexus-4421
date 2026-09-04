@@ -5659,10 +5659,15 @@ document.getElementById("btn").addEventListener("click",go);
         });
         const body = await fr.json().catch(() => null);
         if (!fr.ok || !body) return json({ available: true, ok: false, status: fr.status, raw: body }, request, 200);
-        // Best-effort normalization (0x-style: buyAmount / amountOut, estimatedPriceImpact). The RAW
-        // body is returned so the real names can be pinned from a live 200 and this tightened.
-        const outAmount = body.buyAmount ?? body.amountOut ?? body.outAmount ?? body.toAmount ?? body?.quote?.buyAmount ?? body?.quote?.amountOut ?? null;
-        const priceImpact = body.estimatedPriceImpact ?? body.priceImpact ?? body.priceImpactPct ?? body.impact ?? body?.quote?.estimatedPriceImpact ?? null;
+        // Normalization PINNED to Fabric's real 200 shape (verified from a live response):
+        //   amountOut = the quote out amount; priceImpactBps = impact in BASIS POINTS (50 = 0.5%).
+        // Normalize bps → percent so the client's priceImpactPct matches Jupiter's semantics. The
+        // execution fields (approval.{token,amount,spender}, transaction.{to,data,value},
+        // minimumAmountOut) ride along in the RAW body — that's what the signing pass reads.
+        const outAmount = body.amountOut ?? body.buyAmount ?? body.outAmount ?? null;
+        const bps = Number(body.priceImpactBps);
+        const priceImpact = Number.isFinite(bps) ? bps / 100
+          : (body.estimatedPriceImpact ?? body.priceImpact ?? body.priceImpactPct ?? null);
         return json({ available: true, ok: outAmount != null, router: "Fabric", outAmount, priceImpact, raw: body }, request);
       } catch (e) {
         return json({ available: true, ok: false, error: String(e) }, request);
