@@ -25,7 +25,18 @@ const guestParam = (() => {
   try { return new URLSearchParams(window.location.search).get("guest") === "1"; }
   catch { return false; }
 })();
-if (guestParam) {
+// ── Public read surfaces ─────────────────────────────────────────────────────
+// The storefront. A shared /token or /feed link IS the traffic, so the onboarding
+// funnel must never stand in front of it — and requiring ?guest=1 on a link someone
+// posts to X would put it right back. These routes are public BY ROUTE, the same
+// suppression ?guest=1 performs, applied without needing the param. Still READ-ONLY:
+// Buy / Copy / Publish / ARM LIVE gate on a wallet in their own components, untouched.
+const PUBLIC_ROUTES = ["/token", "/feed"];
+const isPublicRoute = (() => {
+  try { return PUBLIC_ROUTES.some((r) => window.location.pathname.startsWith(r)); }
+  catch { return false; }
+})();
+if (guestParam || isPublicRoute) {
   try {
     // Persist so internal SPA navs (e.g. /lab?tab=intel) that drop the param stay clean.
     localStorage.setItem("ntl_onboarded", "true");
@@ -43,7 +54,7 @@ export default function App() {
   const seoConfig = getSEOConfig();
   const defaultLanguage = getUserLanguage();
   // Honor the guest/onboarded flags BEFORE the onboarding modal mounts.
-  const [showOnboarding, setShowOnboarding] = useState(() => !(guestParam || isOnboarded()));
+  const [showOnboarding, setShowOnboarding] = useState(() => !(guestParam || isPublicRoute || isOnboarded()));
   useEffect(() => {
     if (isOnboarded()) setShowOnboarding(false);
   }, []);
