@@ -19,7 +19,7 @@ import {
   fmtUsd, fmtPrice, fmtAge, shortAddr,
   type TokenPair, type Candle, type Trade, type NexusSignal, type SwapQuote,
 } from "./data";
-import { fetchHoldings, type Holding } from "./holdings";
+import { fetchHoldings, addRecent, optimisticHolding, type Holding } from "./holdings";
 import { planBuy, executeBuy, explorerTx, fmtTokenAmount, slippagePct, type BuyPlan, type Eip1193 } from "./swapExec";
 
 // Fire the global copilot (mounted in App) with a token-context question. The same
@@ -347,8 +347,19 @@ export default function TokenTerminal() {
     if (!plan || !wallet || !provider) return;
     setSwapBusy(true); setSwapErr(null); setSwapStep("preparing…");
     try {
-      const { swapHash } = await executeBuy(provider, wallet, plan, setSwapStep);
+      const { swapHash, confirmed } = await executeBuy(provider, wallet, plan, setSwapStep);
       setSwapDone({ hash: swapHash });
+      // Follow the fill: on a CONFIRMED (status=1) buy, remember the bought token per-wallet and
+      // optimistically show its chip, then reconcile the whole strip from chain (USDC drops, the
+      // bought token appears via recents). No indexer — recents just widens the balance sweep.
+      if (confirmed && pair?.baseAddress && plan.decimals != null) {
+        addRecent(wallet, { ca: pair.baseAddress, sym: pair.baseSymbol, chain: pair.chainId, decimals: plan.decimals });
+        if (plan.outAmount != null) {
+          const chip = optimisticHolding(pair.baseSymbol, pair.chainId, pair.baseAddress, plan.outAmount, plan.decimals, pair.priceUsd ?? null);
+          setHoldings((h) => [chip, ...h.filter((x) => !((x.address || "").toLowerCase() === pair.baseAddress.toLowerCase() && x.chain === pair.chainId))]);
+        }
+        fetchHoldings(wallet).then(setHoldings).catch(() => { /* keep the optimistic chip */ });
+      }
     } catch (e) {
       const m = (e as Error)?.message || "swap failed";
       setSwapErr(
@@ -356,7 +367,7 @@ export default function TokenTerminal() {
         : /user rejected|user denied|rejected the request|4001/i.test(m) ? "Cancelled in your wallet."
         : m);
     } finally { setSwapBusy(false); setSwapStep(""); }
-  }, [plan, wallet, provider]);
+  }, [plan, wallet, provider, pair]);
 
   const closeSwap = useCallback(() => {
     if (swapBusy) return; // never yank the modal out from under a pending signature

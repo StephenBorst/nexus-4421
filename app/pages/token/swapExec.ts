@@ -179,6 +179,12 @@ const reverted = (r: { status?: string } | null): boolean => {
   if (!r || r.status == null) return false;
   try { return BigInt(r.status) === 0n; } catch { return false; }
 };
+// A receipt status of 0x1 = the tx succeeded on-chain. Only then does the caller remember the
+// bought token (spec: append to recents on status=1 only); a timeout (null) stays "pending".
+const succeeded = (r: { status?: string } | null): boolean => {
+  if (!r || r.status == null) return false;
+  try { return BigInt(r.status) === 1n; } catch { return false; }
+};
 
 // Execute the validated plan: ensure chain → (approve EXACT sellAmount only if the current
 // allowance is short) → send the swap. `onStep` narrates for the modal. Returns the swap tx
@@ -186,7 +192,7 @@ const reverted = (r: { status?: string } | null): boolean => {
 // exact amount, so nothing is left standing after.
 export async function executeBuy(
   provider: Eip1193, owner: string, plan: BuyPlan, onStep: (s: string) => void,
-): Promise<{ swapHash: string; approveHash: string | null }> {
+): Promise<{ swapHash: string; approveHash: string | null; confirmed: boolean }> {
   if (!isAddr(owner) || owner.toLowerCase() !== plan.taker.toLowerCase())
     throw new Error("Wallet changed — re-open the swap.");
   await ensureChain(provider, plan.chainId);
@@ -212,9 +218,11 @@ export async function executeBuy(
   onStep("swap sent — confirming on-chain…");
   // A revert here means the price moved past the min-received floor; the swap didn't fill (only
   // gas was spent). Surface it honestly instead of claiming a successful buy. A timeout (null)
-  // is left as "pending" — the caller shows the hash so the user can watch it confirm.
-  if (reverted(await waitForReceipt(provider, swapHash))) throw new Error("Swap reverted on-chain (price moved past the min received). Nothing was spent beyond gas — try again.");
-  return { swapHash, approveHash };
+  // is left as "pending" (confirmed:false) — the caller shows the hash so the user can watch it
+  // confirm, and holds off remembering the token until it's actually mined (status=1).
+  const rc = await waitForReceipt(provider, swapHash);
+  if (reverted(rc)) throw new Error("Swap reverted on-chain (price moved past the min received). Nothing was spent beyond gas — try again.");
+  return { swapHash, approveHash, confirmed: succeeded(rc) };
 }
 
 // Human "min received" / "quote out" for the modal, using the decimals we read. Returns null when

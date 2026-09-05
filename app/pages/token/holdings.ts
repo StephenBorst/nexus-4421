@@ -59,6 +59,40 @@ export interface Holding {
   usdLabel: string;
 }
 
+// ── recents ("watched") — tokens the wallet actually bought in-app ────────────
+// The curated set can't enumerate arbitrary tokens (no indexer), so a token you just
+// bought (BNKR) would never show. Recents patches exactly that gap WITHOUT an indexer:
+// after a confirmed swap the bought token's CA is remembered (per-wallet, localStorage),
+// and folded into the balance sweep below so its LIVE balance shows like any curated row.
+// Identity only (CA/sym/chain/decimals) — the amount is always read fresh on-chain, never
+// stored. Keyed by wallet so switching accounts never shows another wallet's tokens.
+export interface RecentToken { ca: string; sym: string; chain: string; decimals: number }
+const RECENTS_KEY = (addr: string): string => `nexus_spot_recents_${addr.toLowerCase()}`;
+const RECENTS_CAP = 12;
+const isCa = (s: unknown): s is string => typeof s === "string" && /^0x[a-fA-F0-9]{40}$/.test(s);
+
+export function getRecents(address: string): RecentToken[] {
+  try {
+    const raw = localStorage.getItem(RECENTS_KEY(address));
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((r): r is RecentToken =>
+      r && isCa(r.ca) && typeof r.sym === "string" && typeof r.chain === "string" && Number.isInteger(r.decimals));
+  } catch { return []; }
+}
+
+// Remember a bought token (call ONLY after a confirmed status=1 swap). Newest first,
+// deduped by CA, capped. Fail-soft — a private-mode localStorage throw never bubbles.
+export function addRecent(address: string, token: RecentToken): void {
+  if (!isCa(address) || !isCa(token.ca) || !Number.isInteger(token.decimals)) return;
+  try {
+    const ca = token.ca.toLowerCase();
+    const next = [{ ...token, ca }, ...getRecents(address).filter((r) => r.ca.toLowerCase() !== ca)].slice(0, RECENTS_CAP);
+    localStorage.setItem(RECENTS_KEY(address), JSON.stringify(next));
+  } catch { /* ignore */ }
+}
+
 // Price a held token off DexScreener (the terminal's own feed) — stables are $1, native/others by
 // contract address. Cached per address for the session; fail-soft → null (row shows amount, no USD).
 const priceCache = new Map<string, number | null>();
@@ -85,10 +119,22 @@ const fmtAmount = (n: number): string =>
   : n >= 1 ? n.toLocaleString("en-US", { maximumFractionDigits: 3 })
   : n.toLocaleString("en-US", { maximumFractionDigits: 6 });
 
-// Read the connected EVM wallet's curated spot balances across supported chains. Read-only.
+// Build a Holding row from a just-filled swap (the OPTIMISTIC chip shown the instant a swap
+// confirms, before the on-chain refetch reconciles it). Amount = the raw token units Fabric
+// quoted; USD priced off the page's own priceUsd. Label formatting stays here so the strip
+// never renders a hand-built row that formats differently from the swept ones.
+export function optimisticHolding(sym: string, chain: string, address: string, rawAmount: bigint, decimals: number, priceUsd: number | null): Holding {
+  const amount = Number(formatUnits(rawAmount, decimals));
+  const usd = priceUsd != null && Number.isFinite(priceUsd) ? amount * priceUsd : null;
+  return { sym, chain, amount, usd, address, amountLabel: fmtAmount(amount), usdLabel: usd != null ? fmtUsd(usd) : "—" };
+}
+
+// Read the connected EVM wallet's spot balances (curated ∪ this wallet's recents) across
+// supported chains. Read-only — no txs, no signing.
 export async function fetchHoldings(address: string): Promise<Holding[]> {
   if (!/^0x[a-fA-F0-9]{40}$/.test(address)) return [];
   const addr = address as `0x${string}`;
+  const recents = getRecents(address);
   const perChain = await Promise.all(CHAINS.map(async (c) => {
     const rows: Holding[] = [];
     // native
@@ -101,8 +147,14 @@ export async function fetchHoldings(address: string): Promise<Holding[]> {
         rows.push({ sym: c.native, chain: c.dsChain, amount, usd, address: null, amountLabel: fmtAmount(amount), usdLabel: usd != null ? fmtUsd(usd) : "—" });
       }
     } catch { /* skip native on this chain */ }
-    // curated ERC-20s
-    await Promise.all(c.tokens.map(async (t) => {
+    // curated ERC-20s + this wallet's recents on this chain (deduped by CA vs curated).
+    // Recents carry no `stable` flag, so they price by contract address off DexScreener —
+    // exactly how an arbitrary bought token (BNKR) gets a USD value without an indexer.
+    const curatedCas = new Set(c.tokens.map((t) => t.addr?.toLowerCase()).filter(Boolean));
+    const recentToks: Tok[] = recents
+      .filter((r) => r.chain === c.dsChain && !curatedCas.has(r.ca.toLowerCase()))
+      .map((r) => ({ sym: r.sym, addr: r.ca as `0x${string}`, decimals: r.decimals }));
+    await Promise.all([...c.tokens, ...recentToks].map(async (t) => {
       if (!t.addr) return;
       try {
         const raw = await c.client.readContract({ address: t.addr, abi: ERC20_ABI, functionName: "balanceOf", args: [addr] });
