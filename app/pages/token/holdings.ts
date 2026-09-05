@@ -117,6 +117,7 @@ export async function probeHeldToken(address: string, dsChain: string, ca: strin
 
 // Price a held token off DexScreener (the terminal's own feed) — stables are $1, native/others by
 // contract address. Cached per address for the session; fail-soft → null (row shows amount, no USD).
+const NEXUS_CA = "0x3d958634ab725b627919ef8f2ed59227309fdba3"; // $NEXUS on Base (lowercased)
 const priceCache = new Map<string, number | null>();
 async function priceUsd(addr: string | null, stable?: boolean): Promise<number | null> {
   if (stable) return 1;
@@ -132,6 +133,20 @@ async function priceUsd(addr: string | null, stable?: boolean): Promise<number |
       if (best) px = Number(best.priceUsd);
     }
   } catch { /* price stays null */ }
+  // $NEXUS chip fallback: its Uniswap-v4 pool isn't in the DexScreener index (the v4-hook gap), so
+  // DS returns no price and the chip reads "—". GeckoTerminal prices it — the SAME source
+  // NexusMarket uses. Scoped to NEXUS only (not a general GT sweep) — no new surface, one extra
+  // fetch for one token, fail-soft.
+  if (px == null && key === NEXUS_CA) {
+    try {
+      const r = await fetch(`https://api.geckoterminal.com/api/v2/networks/base/tokens/${addr}`, { headers: { Accept: "application/json" } });
+      if (r.ok) {
+        const j = (await r.json()) as { data?: { attributes?: { price_usd?: string } } };
+        const p = Number(j?.data?.attributes?.price_usd);
+        if (Number.isFinite(p) && p > 0) px = p;
+      }
+    } catch { /* stays null */ }
+  }
   priceCache.set(key, Number.isFinite(px as number) ? px : null);
   return priceCache.get(key)!;
 }
