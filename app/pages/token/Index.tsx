@@ -19,8 +19,18 @@ import {
   fmtUsd, fmtTapeUsd, fmtPrice, fmtAge, shortAddr,
   type TokenPair, type Candle, type Trade, type NexusSignal, type SwapQuote, type CallMark, type LiqMap,
 } from "./data";
-import { fetchHoldings, addRecent, optimisticHolding, probeHeldToken, type Holding } from "./holdings";
-import { planBuy, planSell, executeSwap, explorerTx, fmtTokenAmount, slippagePct, type SwapPlan, type Eip1193 } from "./swapExec";
+import { fetchHoldings, addRecent, getRecents, optimisticHolding, probeHeldToken, type Holding } from "./holdings";
+import { planBuy, planSell, executeSwap, explorerTx, fmtTokenAmount, slippagePct, EVM_USDC, type SwapPlan, type Eip1193 } from "./swapExec";
+
+// Canonical WETH per DexScreener chain slug — the always-available token→token target on a SELL
+// (alongside the user's own recents). Address-list data only; the received token is NEVER approved
+// (only the sold token is), so this is a display/convenience list, not a trust surface.
+const WETH_BY_CHAIN: Record<string, string> = {
+  base:     "0x4200000000000000000000000000000000000006",
+  ethereum: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+  arbitrum: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+  optimism: "0x4200000000000000000000000000000000000006",
+};
 
 // Fire the global copilot (mounted in App) with a token-context question. The same
 // nexus:assistant-ask contract the Lab's "Ask Nexus" chips use.
@@ -290,6 +300,9 @@ export default function TokenTerminal() {
   const [sellAmt, setSellAmt] = useState("");
   const [sellMax, setSellMax] = useState(false);
   const [sellUnit, setSellUnit] = useState<"token" | "usd">("token"); // type the sell in tokens or $
+  // Token→token: what a SELL receives. null = USDC (the default, plain sell); a target = rotate the
+  // sold token straight into another token in ONE swap. The sold token is still the only approve.
+  const [sellOut, setSellOut] = useState<{ token: string; sym: string; decimals: number } | null>(null);
   const [tradeOpen, setTradeOpen] = useState(true); // collapse the buy/sell panel to give the chart room
   const [copied, setCopied] = useState(false);
   const [sig, setSig] = useState<NexusSignal | null>(null);
@@ -503,6 +516,28 @@ export default function TokenTerminal() {
     : sellUnit === "usd" ? (sellPrice > 0 ? (parseFloat(sellAmt) || 0) / sellPrice : 0)
     : (parseFloat(sellAmt) || 0);
   const sellUsdEst = held && sellPrice > 0 ? sellTokens * sellPrice : null;
+  // Token→token receive targets for a SELL: WETH (if the chain has one) + the wallet's own recents on
+  // this chain, minus USDC (the default) and the token being sold. Each carries known decimals/sym, so
+  // no arbitrary on-chain resolution — the received token is never spent, this is a convenience list.
+  const receiveTargets = useMemo(() => {
+    if (!pair) return [] as { token: string; sym: string; decimals: number }[];
+    const evm = EVM_USDC[pair.chainId];
+    if (!evm) return []; // token→token in-app is EVM/Fabric only
+    const cur = (pair.baseAddress || "").toLowerCase();
+    const seen = new Set<string>([evm.usdc.toLowerCase(), cur]);
+    const out: { token: string; sym: string; decimals: number }[] = [];
+    const push = (token: string, sym: string, decimals: number) => {
+      const t = token.toLowerCase();
+      if (!/^0x[a-f0-9]{40}$/.test(t) || seen.has(t) || !Number.isInteger(decimals)) return;
+      seen.add(t); out.push({ token, sym, decimals });
+    };
+    const w = WETH_BY_CHAIN[pair.chainId];
+    if (w) push(w, "WETH", 18);
+    for (const r of getRecents(wallet || "")) if (r.chain === pair.chainId) push(r.ca, r.sym, r.decimals);
+    return out.slice(0, 4);
+  }, [pair, wallet]);
+  // A new token/chain resets the receive pick (never carry a Base token to an Arbitrum pair).
+  useEffect(() => { setSellOut(null); }, [pair?.baseAddress, pair?.chainId]);
   const [plan, setPlan] = useState<SwapPlan | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [planning, setPlanning] = useState(false);
@@ -513,7 +548,7 @@ export default function TokenTerminal() {
 
   // A changed token/side/amount invalidates a captured plan — close + clear so the modal can
   // never sign against a plan the numbers on screen no longer match.
-  useEffect(() => { setModalOpen(false); setPlan(null); setSwapErr(null); setSwapDone(null); }, [pair?.baseAddress, side, amount, sellAmt, sellMax, sellUnit, venue]);
+  useEffect(() => { setModalOpen(false); setPlan(null); setSwapErr(null); setSwapDone(null); }, [pair?.baseAddress, side, amount, sellAmt, sellMax, sellUnit, sellOut, venue]);
 
   const openSwap = useCallback(async () => {
     const usd = parseFloat(amount);
@@ -522,7 +557,7 @@ export default function TokenTerminal() {
     if (!Number.isFinite(usd) || usd < 1) { setSwapErr("Enter at least $1 to swap in-app."); return; }
     setPlanning(true);
     try {
-      const p = await planBuy(pair.chainId, pair.baseAddress, usd, wallet, provider);
+      const p = await planBuy(pair.chainId, pair.baseAddress, pair.baseSymbol, usd, wallet, provider);
       setPlan(p); setModalOpen(true);
     } catch (e) {
       setSwapErr((e as Error)?.message || "Couldn't build the swap — use the deep-link.");
@@ -544,12 +579,12 @@ export default function TokenTerminal() {
     const req = sellMax ? { pct: 100 } : { amountStr: sellUnit === "usd" ? tokens.toLocaleString("en-US", { useGrouping: false, maximumFractionDigits: 18 }) : sellAmt };
     setPlanning(true);
     try {
-      const p = await planSell(pair.chainId, pair.baseAddress, req, wallet, provider, pair.priceUsd ?? null);
+      const p = await planSell(pair.chainId, pair.baseAddress, pair.baseSymbol, req, wallet, provider, pair.priceUsd ?? null, sellOut ?? undefined);
       setPlan(p); setModalOpen(true);
     } catch (e) {
       setSwapErr((e as Error)?.message || "Couldn't build the sell — use the deep-link.");
     } finally { setPlanning(false); }
-  }, [pair, wallet, provider, sellAmt, sellMax, sellUnit, holdsToken]);
+  }, [pair, wallet, provider, sellAmt, sellMax, sellUnit, sellOut, holdsToken]);
 
   const confirmSwap = useCallback(async () => {
     if (!plan || !wallet || !provider) return;
@@ -567,6 +602,10 @@ export default function TokenTerminal() {
             const chip = optimisticHolding(pair.baseSymbol, pair.chainId, pair.baseAddress, plan.outAmount, plan.decimalsOut, pair.priceUsd ?? null);
             setHoldings((h) => [chip, ...h.filter((x) => !((x.address || "").toLowerCase() === pair.baseAddress.toLowerCase() && x.chain === pair.chainId))]);
           }
+        } else if (plan.dir === "sell" && plan.outSym !== "USDC" && plan.decimalsOut != null) {
+          // token→token: remember the RECEIVED token so the strip shows it once the on-chain read lands.
+          // addRecent validates the CA + decimals itself and fail-softs, so a bad value is a no-op.
+          addRecent(wallet, { ca: plan.tokenOut, sym: plan.outSym, chain: pair.chainId, decimals: plan.decimalsOut });
         }
         fetchHoldings(wallet).then(setHoldings).catch(() => { /* keep what's shown */ });
       }
@@ -829,6 +868,26 @@ export default function TokenTerminal() {
                         );
                       })}
                     </div>
+                    {/* Receive — token→token: rotate the sold token straight into another (WETH / a recent),
+                        or keep the default USDC. Only when we can actually sign it in-app (Fabric · EVM ·
+                        wallet · balance). The sold token stays the only approve; this just picks the output. */}
+                    {canInAppSell && receiveTargets.length > 0 && (
+                      <>
+                        <div style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: FAINT, textTransform: "uppercase", marginBottom: 5 }}>Receive</div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                          {[null, ...receiveTargets].map((t) => {
+                            const key = t ? t.token.toLowerCase() : "usdc";
+                            const sel = (sellOut ? sellOut.token.toLowerCase() : "usdc") === key;
+                            return (
+                              <button key={key} onClick={() => setSellOut(t)}
+                                style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", color: sel ? BRIGHT : MUT, background: sel ? "#ededf012" : BG, border: `1px solid ${sel ? "#ededf044" : BORD}`, borderRadius: 6, padding: "6px 10px", cursor: "pointer" }}>
+                                {t ? t.sym : "USDC"}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
                   </>
                 ) : (
                   <>
@@ -886,7 +945,7 @@ export default function TokenTerminal() {
                       <>
                         <button onClick={openSell} disabled={planning}
                           style={{ display: "block", width: "100%", textAlign: "center", marginTop: 8, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#fff", background: NEG, border: "none", borderRadius: 9, padding: "13px 0", cursor: planning ? "wait" : "pointer", opacity: planning ? 0.7 : 1 }}>
-                          {planning ? "Building route…" : `Sell ${pair.baseSymbol} in-app →`}
+                          {planning ? "Building route…" : sellOut ? `Sell ${pair.baseSymbol} → ${sellOut.sym} in-app →` : `Sell ${pair.baseSymbol} in-app →`}
                         </button>
                         <a href={swapState.href} target="_blank" rel="noopener noreferrer"
                           style={{ display: "block", textAlign: "center", marginTop: 8, fontFamily: MONO, fontSize: 10.5, color: MUT, textDecoration: "none" }}>
@@ -952,19 +1011,22 @@ export default function TokenTerminal() {
             </div>
 
             {(() => {
-              // Dir-aware display: BUY = USDC → token; SELL = token → USDC. The plan's guards are
-              // identical either way; only the labels flip.
+              // Dir-aware display. BUY = USDC → token; SELL = token → USDC, OR token → token. The plan's
+              // guards are identical in every case; only the labels flip. The received side is USD-priced
+              // only when the OUT is USDC (a plain sell) — a token→token receive shows the token amount +
+              // its symbol instead. `plan.inSym`/`plan.outSym` carry the two symbols so nothing is hardcoded.
               const isSell = plan.dir === "sell";
               const usdStr = (plan.usd ?? 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
               const payAmt = isSell ? (fmtTokenAmount(plan.amountIn, plan.decimalsIn) ?? "—") : `$${usdStr}`;
+              const recvUsd = isSell && plan.outSym === "USDC"; // render the received side as ~$amount only for a plain sell
               const recvFmt = fmtTokenAmount(plan.outAmount, plan.decimalsOut);
-              const recvVal = recvFmt ? (isSell ? `~$${recvFmt}` : `${recvFmt} ${pair.baseSymbol}`) : "—";
+              const recvVal = recvFmt ? (recvUsd ? `~$${recvFmt}` : `${recvFmt} ${plan.outSym}`) : "—";
               const minFmt = fmtTokenAmount(plan.minOut, plan.decimalsOut);
-              const minVal = minFmt ? (isSell ? `~$${minFmt}` : `${minFmt} ${pair.baseSymbol}`) : "—";
-              const approveStr = isSell ? `${payAmt} ${pair.baseSymbol}` : `$${usdStr} of USDC`;
+              const minVal = minFmt ? (recvUsd ? `~$${minFmt}` : `${minFmt} ${plan.outSym}`) : "—";
+              const approveStr = isSell ? `${payAmt} ${plan.inSym}` : `$${usdStr} of USDC`;
               return !swapDone ? (
               <>
-                <ModalRow label={isSell ? "You sell" : "You pay"} value={isSell ? `${payAmt} ${pair.baseSymbol}` : payAmt} sub={isSell ? `on ${pair.chainId}` : `${usdStr} USDC · ${pair.chainId}`} />
+                <ModalRow label={isSell ? "You sell" : "You pay"} value={isSell ? `${payAmt} ${plan.inSym}` : payAmt} sub={isSell ? `on ${pair.chainId}` : `${usdStr} USDC · ${pair.chainId}`} />
                 {plan.feeBps > 0 && <ModalRow label="Nexus fee" value={`${plan.feeBps} bps`} sub="included in the swap — not added on top" />}
                 <ModalRow label="Receive (est.)" value={recvVal} />
                 <ModalRow label="Minimum received" value={minVal} sub={slippagePct(plan.outAmount, plan.minOut) != null ? `reverts below this · ≤${slippagePct(plan.outAmount, plan.minOut)!.toFixed(2)}% slippage` : "on-chain slippage floor applies"} accent />
@@ -987,12 +1049,12 @@ export default function TokenTerminal() {
               <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
                 <div style={{ fontSize: 28, marginBottom: 8, color: POS }}>✓</div>
                 <div style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: POS, marginBottom: 6 }}>Swap sent</div>
-                <div style={{ fontFamily: UI, fontSize: 11, color: MUT, marginBottom: 14 }}>{isSell ? "Your USDC" : `Your ${pair.baseSymbol}`} lands once it confirms on-chain.</div>
+                <div style={{ fontFamily: UI, fontSize: 11, color: MUT, marginBottom: 14 }}>Your {isSell ? plan.outSym : pair.baseSymbol} lands once it confirms on-chain.</div>
 
                 {/* share-on-swap card — the fact + a link to the token's Spot page. Verdict-only. */}
                 <div style={{ background: BG, border: `1px solid ${BORD}`, borderRadius: 8, padding: "10px 12px", marginBottom: 14, textAlign: "left" }}>
                   <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.08em", color: FAINT, marginBottom: 3 }}>{pair.baseSymbol} · {isSell ? "SOLD" : "BOUGHT"} ON NEXUS</div>
-                  <div style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: BRIGHT, marginBottom: 9 }}>{isSell ? `${payAmt} ${pair.baseSymbol} → ${recvVal}` : `${recvFmt ?? "—"} ${pair.baseSymbol}`}</div>
+                  <div style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: BRIGHT, marginBottom: 9 }}>{isSell ? `${payAmt} ${plan.inSym} → ${recvVal}` : `${recvFmt ?? "—"} ${pair.baseSymbol}`}</div>
                   <button onClick={copyShare} style={{ width: "100%", fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.03em", color: shareCopied ? POS : BRIGHT, background: "none", border: `1px solid ${shareCopied ? "#3ecf8e88" : BORD}`, borderRadius: 7, padding: "9px 0", cursor: "pointer" }}>
                     {shareCopied ? "✓ Link copied" : `Copy ${pair.baseSymbol} link ↗`}
                   </button>

@@ -4,8 +4,9 @@
 // swap WITHOUT leaving for Uniswap. It is deliberately narrow and ONE audited path for
 // both directions:
 //
-//   • BUY  = USDC → token (approve USDC).   SELL = token → USDC (approve the token).
-//     Token↔token is intentionally out of scope here (a separate reviewed pass).
+//   • BUY  = USDC → token (approve USDC).   SELL = token → USDC, OR token → token (approve the
+//     input token). Token→token shares the SAME invariants — only the OUTPUT token differs; the
+//     approve is still the exact input token, minOut still protects the received side.
 //   • EVM only, and only via Fabric (the one EVM aggregator we proxy). Solana stays
 //     the Jupiter deep-link (no wallet wiring), perp names keep their own book.
 //   • The approve is the EXACT amount we spend, NEVER infinite — so the blast radius of
@@ -65,6 +66,8 @@ export interface SwapPlan {
   outAmount: bigint | null; // Fabric quote out (raw tokenOut units)
   minOut: bigint | null;    // slippage floor (raw tokenOut units) — enforced on-chain
   decimalsOut: number | null; // tokenOut decimals for display (best-effort)
+  inSym: string;            // display symbol for the token we spend
+  outSym: string;           // display symbol for the token we receive ("USDC" for a buy/plain sell)
   usd: number | null;       // buy: the USD input; sell: est. USD received (display only)
   priceImpactPct: number | null;
   feeBps: number;           // Nexus fee in bps disclosed in the modal (0 = none). Taken INSIDE
@@ -123,9 +126,9 @@ function safeBig(v: string | number): bigint | null {
 // equal `tokenIn` — the input token WE chose (never a token Fabric names).
 async function quoteAndGuard(args: {
   dir: SwapDir; chainId: number; tokenIn: string; tokenOut: string; amountIn: bigint; taker: string;
-  provider: Eip1193; decimalsIn: number | null; decimalsOut: number | null;
+  provider: Eip1193; decimalsIn: number | null; decimalsOut: number | null; inSym: string; outSym: string;
 }): Promise<SwapPlan> {
-  const { dir, chainId, tokenIn, tokenOut, amountIn, taker, provider, decimalsIn, decimalsOut } = args;
+  const { dir, chainId, tokenIn, tokenOut, amountIn, taker, provider, decimalsIn, decimalsOut, inSym, outSym } = args;
   const u = `${AGENT_API}/swap/quote?chain=${chainId}&tokenIn=${encodeURIComponent(tokenIn)}&tokenOut=${encodeURIComponent(tokenOut)}&amount=${amountIn.toString()}&taker=${taker}`;
   const res = await fetch(u, { headers: { Accept: "application/json" } });
   const j = (await res.json().catch(() => null)) as {
@@ -160,14 +163,14 @@ async function quoteAndGuard(args: {
 
   return {
     dir, router: j.router || "Fabric", chainId, tokenIn, tokenOut, taker,
-    amountIn, decimalsIn, outAmount, minOut, decimalsOut,
+    amountIn, decimalsIn, outAmount, minOut, decimalsOut, inSym, outSym,
     usd: null, priceImpactPct: Number.isFinite(impact) ? impact : null, feeBps,
     spender: j.approval.spender!, tx: { to: j.tx.to!, data: j.tx.data! },
   };
 }
 
 // BUY: USDC → token. `dsChain` is the DexScreener slug (base/arbitrum/…); `taker` the wallet.
-export async function planBuy(dsChain: string, tokenOut: string, usd: number, taker: string, provider: Eip1193): Promise<SwapPlan> {
+export async function planBuy(dsChain: string, tokenOut: string, outSym: string, usd: number, taker: string, provider: Eip1193): Promise<SwapPlan> {
   const evm = EVM_USDC[dsChain];
   if (!evm) throw new Error("In-app swap isn't available on this chain — use the deep-link.");
   if (!isAddr(tokenOut)) throw new Error("Missing token address.");
@@ -180,7 +183,7 @@ export async function planBuy(dsChain: string, tokenOut: string, usd: number, ta
   const decimalsOut = await readDecimals(provider, tokenOut);
   const plan = await quoteAndGuard({
     dir: "buy", chainId: evm.chainId, tokenIn: evm.usdc, tokenOut, amountIn, taker, provider,
-    decimalsIn: 6, decimalsOut,
+    decimalsIn: 6, decimalsOut, inSym: "USDC", outSym,
   });
   plan.usd = usd;
   return plan;
@@ -196,11 +199,12 @@ function parseTokenUnits(s: string, dec: number): bigint | null {
   try { return BigInt(((w || "0") + frac).replace(/^0+(?=\d)/, "")); } catch { return null; }
 }
 
-// SELL: token → USDC. `req` is either an exact `pct` (1–100) of the fresh on-chain balance (100 =
-// the whole balance) OR a typed `amountStr` in tokens (parsed to base units, CLAMPED to the balance
-// so "sell whatever" can never oversell). `priceUsd` only powers a soft notional cap — the real
-// safety is the exact-amount approve + on-chain minOut. Refuses if decimals/balance can't be read.
-export async function planSell(dsChain: string, tokenIn: string, req: { pct?: number; amountStr?: string }, taker: string, provider: Eip1193, priceUsd: number | null): Promise<SwapPlan> {
+// SELL: token → USDC (default), OR token → `out` token (token→token rotation). `req` is either an
+// exact `pct` (1–100) of the fresh on-chain balance (100 = the whole balance) OR a typed `amountStr`
+// in tokens (parsed to base units, CLAMPED to the balance so "sell whatever" can never oversell).
+// `priceUsd` only powers a soft notional cap — the real safety is the exact-amount approve + on-chain
+// minOut, unchanged by the output token. Refuses if decimals/balance can't be read.
+export async function planSell(dsChain: string, tokenIn: string, inSym: string, req: { pct?: number; amountStr?: string }, taker: string, provider: Eip1193, priceUsd: number | null, out?: { token: string; sym: string; decimals: number }): Promise<SwapPlan> {
   const evm = EVM_USDC[dsChain];
   if (!evm) throw new Error("In-app swap isn't available on this chain — use the deep-link.");
   if (!isAddr(tokenIn)) throw new Error("Missing token address.");
@@ -236,11 +240,19 @@ export async function planSell(dsChain: string, tokenIn: string, req: { pct?: nu
     if (Number.isFinite(tokens) && tokens * priceUsd > 100000) throw new Error("Amount too large for the in-app swap.");
   }
 
+  // Receive token: default USDC (a plain sell), or an explicit `out` token for a token→token swap.
+  // Same audited invariants either way — only the OUTPUT token differs (the input approve is still
+  // the exact `tokenIn`, minOut still protects the received side). Refuse a self-swap.
+  const outToken = out?.token ?? evm.usdc;
+  if (!isAddr(outToken)) throw new Error("Bad receive token.");
+  if (outToken.toLowerCase() === tokenIn.toLowerCase()) throw new Error("Pick a different token to receive.");
   const plan = await quoteAndGuard({
-    dir: "sell", chainId: evm.chainId, tokenIn, tokenOut: evm.usdc, amountIn, taker, provider,
-    decimalsIn, decimalsOut: 6,
+    dir: "sell", chainId: evm.chainId, tokenIn, tokenOut: outToken, amountIn, taker, provider,
+    decimalsIn, decimalsOut: out ? out.decimals : 6, inSym, outSym: out?.sym ?? "USDC",
   });
-  plan.usd = plan.outAmount != null ? Number(plan.outAmount) / 1e6 : null; // est. USDC received
+  // USD line only when the OUT is USDC (a dollar stable). For a token→token swap the received side
+  // isn't dollars, so leave usd null and let the modal show the token amount + slippage instead.
+  plan.usd = out ? null : (plan.outAmount != null ? Number(plan.outAmount) / 1e6 : null);
   return plan;
 }
 
