@@ -35,8 +35,9 @@ AI_GATEWAY = "bankr"
 # fee to apply; recipient + bps are public (the recipient lands in tx calldata on-chain).
 # Fee is carved from USDC input, disclosed in the confirm modal. Set to "" / remove to disable.
 # ⚠️ Fabric caps the integrator fee at ~0.1% = 10 bps — a larger value is silently ignored, so
-# keep SPOT_FEE_BPS <= 10 (the worker also validates this). Params: integratorSwapFeeBps +
-# integratorFeeAddress (confirmed via spandex.sh/configuration/fees).
+# keep SPOT_FEE_BPS <= 10 (the worker also validates this). Fabric reads the fee as GET params
+# `feeRecipient` + `feeBps`, sent with `slippageBps` + `receiver` (verified byte-for-byte from
+# @spandex/core's Fabric aggregator source) — NOT integrator*/swapFeeBps.
 SPOT_FEE_BPS = "10"
 SPOT_FEE_RECIPIENT = "0x34dFC08eB3B7eD60D00e5B2CB611ac27C152B45c"
 # Request-bound (v2) signing enforcement (issue #14). Unset/"false" = no-op (legacy

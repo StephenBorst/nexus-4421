@@ -5665,18 +5665,25 @@ document.getElementById("btn").addEventListener("click",go);
         // before (ships DARK). The fee is carved from the SELL token (USDC), so the caller still
         // approves EXACTLY sellAmount and just receives slightly less of the bought token. Only
         // applied to EXECUTABLE (taker) quotes so previews stay a single call.
-        // ⚠️ CONFIRMED from Fabric/spanDEX docs (spandex.sh/configuration/fees): the params are
-        // `integratorSwapFeeBps` + `integratorFeeAddress` (the recipient IS per-request), NOT
-        // feeBps/swapFeeBps. Fabric's MAX is ~0.1% = 10 bps — a larger value is silently ignored
-        // (that's why 25 never applied). So cap ≤10 and send the documented pair. Regression-proof:
-        // if Fabric errors on them, fall back to a clean quote so the swap never breaks. (Optional
-        // future: integratorSurplusBps for a positive-slippage cut.)
+        // ⚠️ GROUND TRUTH from @spandex/core's FabricAggregator (dist/esm/lib/aggregators/fabric.js
+        // `extractQueryParams`, verified byte-for-byte): Fabric reads the integrator fee as GET query
+        // params `feeRecipient` + `feeBps`, and the reference SDK ALWAYS sends them alongside
+        // `slippageBps` + `receiver` on a complete (executable) request. Earlier tries used the wrong
+        // `integrator*` names, or the right names WITHOUT slippageBps/receiver → Fabric dropped the
+        // fee (fees:[]). This sends that exact complete shape directly — no 715KB SDK, whose wire
+        // call is just this GET. Cap ≤10 bps (Fabric silently ignores more). Regression-proof: if
+        // Fabric 400s on it, the clean-quote fallback (null) keeps the swap working. This is the
+        // FINAL param shape — if fees still come back [], the fee is gated on Fabric's account (app
+        // not provisioned for integrator fees) and B stays dark; no more renaming.
         const cfgBps = parseInt(env.SPOT_FEE_BPS || "", 10);
         const cfgRecipient = env.SPOT_FEE_RECIPIENT || "";
         const takerValid = /^0x[a-fA-F0-9]{40}$/.test(taker);
         const feeConfigured = Number.isInteger(cfgBps) && cfgBps > 0 && cfgBps <= 10 && /^0x[a-fA-F0-9]{40}$/.test(cfgRecipient);
+        // Caller slippage (bps); default 1%. Fabric only computes the fee on a complete request, so
+        // send slippageBps + receiver (= taker) WITH it, mirroring the SDK's Fabric request exactly.
+        const slipBps = (() => { const s = parseInt(url.searchParams.get("slippageBps") || "", 10); return Number.isInteger(s) && s > 0 && s <= 5000 ? s : 100; })();
         const feeParams = (feeConfigured && takerValid)
-          ? { integratorFeeAddress: cfgRecipient, integratorSwapFeeBps: String(cfgBps) }
+          ? { feeRecipient: cfgRecipient, feeBps: String(cfgBps), slippageBps: String(slipBps), receiver: taker }
           : null;
         const attempts = feeParams ? [feeParams, null] : [null]; // fee first; clean quote is the fallback
 
