@@ -15,9 +15,9 @@ import { useIsMobile } from "@/pages/lab/useIsMobile";
 import { SectionHeader } from "@/pages/lab/components";
 import { FADE_FUNDING_FLOOR_PCT_YR } from "@/pages/lab/briefing";
 import {
-  searchToken, poolCandles, poolTrades, orderlyPerpSet, nexusSignal, swapQuote,
+  searchToken, poolCandles, poolTrades, orderlyPerpSet, nexusSignal, swapQuote, chartOverlays,
   fmtUsd, fmtTapeUsd, fmtPrice, fmtAge, shortAddr,
-  type TokenPair, type Candle, type Trade, type NexusSignal, type SwapQuote,
+  type TokenPair, type Candle, type Trade, type NexusSignal, type SwapQuote, type CallMark, type LiqMap,
 } from "./data";
 import { fetchHoldings, addRecent, optimisticHolding, probeHeldToken, type Holding } from "./holdings";
 import { planBuy, planSell, executeSwap, explorerTx, fmtTokenAmount, slippagePct, type SwapPlan, type Eip1193 } from "./swapExec";
@@ -73,7 +73,18 @@ const TIMEFRAMES: { label: string; tf: string; agg: number }[] = [
 // the pool's OHLCV so it works for any spot token, listed or not.
 const CH_MA = [{ p: 20, c: "#ededf0" }, { p: 50, c: "#9aa2b4" }] as const;
 const chFmtPx = (v: number) => (v >= 1000 ? v.toLocaleString("en-US", { maximumFractionDigits: 0 }) : v >= 1 ? v.toFixed(2) : v >= 0.01 ? v.toFixed(4) : v.toPrecision(4));
-function Chart({ candles, loading, height }: { candles: Candle[]; loading: boolean; height: number }) {
+// Small caller avatar for the graded-call markers (mirrors the Lab chart) — pfp with a monogram
+// fallback so a broken image never leaves a blank marker.
+function SpotCallAvatar({ pfp, name, ring }: { pfp: string | null; name: string | null; ring: string }) {
+  const [err, setErr] = useState(false);
+  const initial = (name || "◆").slice(0, 1).toUpperCase();
+  return (
+    <div style={{ width: 18, height: 18, borderRadius: "50%", overflow: "hidden", border: `1.5px solid ${ring}`, background: "#141416", boxShadow: "0 0 0 2px #0a0a0b", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {pfp && !err ? <img src={pfp} alt="" referrerPolicy="no-referrer" onError={() => setErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontFamily: MONO, fontSize: 9, color: ring, fontWeight: 700 }}>{initial}</span>}
+    </div>
+  );
+}
+function Chart({ candles, loading, height, calls, liq }: { candles: Candle[]; loading: boolean; height: number; calls?: CallMark[]; liq?: LiqMap | null }) {
   const [width, setWidth] = useState(720);
   const [hover, setHover] = useState<number | null>(null);
   const roRef = useRef<ResizeObserver | null>(null);
@@ -116,6 +127,24 @@ function Chart({ candles, loading, height }: { candles: Candle[]; loading: boole
   }
   const hc = hover != null && hover < n ? candles[hover] : null;
 
+  // ── overlays (listed-perp only): graded call markers + estimated liq bands, mapped onto this
+  //    chart's price/time axes (candle t is SECONDS; a call's t is ms). Fail-soft — anything out
+  //    of the visible range is skipped. The same Nexus social + liq layer the Lab chart carries. ──
+  const t0 = candles[0].t, t1 = candles[n - 1].t, tspan = t1 - t0 || 1;
+  const xOfTime = (ms: number) => LPAD + ((ms / 1000 - t0) / tspan) * plotW;
+  const callMarks = (calls || [])
+    .filter((c) => c.t / 1000 >= t0 && c.t / 1000 <= t1)
+    .slice(0, 16)
+    .map((c) => ({ ...c, cx: xOfTime(c.t), cy: c.entry >= min && c.entry <= max ? y(c.entry) : (c.entry < min ? priceBottom - 8 : TOP + 8) }));
+  const liqBands = liq ? [
+    ...(liq.below || []).map((c) => ({ price: c.price, mag: c.mag, dir: "long" as const })),
+    ...(liq.above || []).map((c) => ({ price: c.price, mag: c.mag, dir: "short" as const })),
+  ].filter((c) => Number.isFinite(c.price) && c.price >= min && c.price <= max && (Number(c.mag) || 0) > 0) : [];
+  const maxLiqMag = Math.max(...liqBands.map((c) => Number(c.mag) || 0), 1);
+  const liqRects = liqBands.map((c) => ({ dir: c.dir, price: c.price, yy: y(c.price), w: Math.max(10, (Number(c.mag) / maxLiqMag) * plotW * 0.42) }));
+  const topLong = liqRects.filter((b) => b.dir === "long").sort((a, b) => b.w - a.w)[0];
+  const topShort = liqRects.filter((b) => b.dir === "short").sort((a, b) => b.w - a.w)[0];
+
   return (
     <div ref={measureRef} style={box}>
       {maLines.length > 0 && (
@@ -151,6 +180,17 @@ function Chart({ candles, loading, height }: { candles: Candle[]; loading: boole
           );
         })}
         {maLines.length > 0 && <g clipPath="url(#spot-price-clip)">{maLines.map((m) => <path key={m.p} d={m.d} fill="none" stroke={m.c} strokeWidth={m.p === 20 ? 1.4 : 1.1} strokeLinejoin="round" strokeLinecap="round" opacity={0.95} />)}</g>}
+        {liqRects.map((b, i) => {
+          const col = b.dir === "long" ? NEG : POS, xRight = LPAD + plotW;
+          return (
+            <g key={`liq-${i}`}>
+              <rect x={xRight - b.w} y={b.yy - 4} width={b.w} height={8} fill={col} opacity={0.13} />
+              <line x1={LPAD} x2={xRight} y1={b.yy} y2={b.yy} stroke={col} strokeWidth={0.8} strokeDasharray="2 5" opacity={0.4} />
+            </g>
+          );
+        })}
+        {topLong && <text x={LPAD + plotW - topLong.w - 5} y={topLong.yy - 4} fontFamily={MONO} fontSize={8} fill={NEG} textAnchor="end" opacity={0.95} stroke={BG} strokeWidth={2.2} paintOrder="stroke" strokeLinejoin="round">long-liq ▼ {chFmtPx(topLong.price)}</text>}
+        {topShort && (!topLong || Math.abs(topShort.yy - topLong.yy) > 15) && <text x={LPAD + plotW - topShort.w - 5} y={topShort.yy + 9} fontFamily={MONO} fontSize={8} fill={POS} textAnchor="end" opacity={0.95} stroke={BG} strokeWidth={2.2} paintOrder="stroke" strokeLinejoin="round">short-liq ▲ {chFmtPx(topShort.price)}</text>}
         <line x1={LPAD} x2={LPAD + plotW} y1={y(last.c)} y2={y(last.c)} stroke={lastUp ? POS : NEG} strokeWidth={0.6} strokeDasharray="1 3" opacity={0.6} />
         <rect x={width - RPAD} y={y(last.c) - 8} width={RPAD} height={16} fill={lastUp ? POS : NEG} />
         <text x={width - RPAD + RPAD / 2} y={y(last.c) + 3.5} fontFamily={MONO} fontSize={9} fill="#0a0a0b" fontWeight={700} textAnchor="middle">{chFmtPx(last.c)}</text>
@@ -160,6 +200,18 @@ function Chart({ candles, loading, height }: { candles: Candle[]; loading: boole
         <div style={{ position: "absolute", top: TOP + 4, left: 8, zIndex: 2, background: "#0f0f11ee", border: `1px solid ${BORD}`, borderRadius: 4, padding: "5px 8px", fontFamily: MONO, fontSize: 9.5, color: MUT, pointerEvents: "none", lineHeight: 1.5 }}>
           <span style={{ color: FAINT }}>{new Date(hc.t * 1000).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span><br />
           O <span style={{ color: BRIGHT }}>{chFmtPx(hc.o)}</span> H <span style={{ color: BRIGHT }}>{chFmtPx(hc.h)}</span> L <span style={{ color: BRIGHT }}>{chFmtPx(hc.l)}</span> C <span style={{ color: hc.c >= hc.o ? POS : NEG }}>{chFmtPx(hc.c)}</span>
+        </div>
+      )}
+      {callMarks.map((c, i) => (
+        <div key={`${c.wallet}-${i}`} title={`${c.name || `${c.wallet.slice(0, 6)}…`} · ${c.dir} @ $${chFmtPx(c.entry)}`}
+          style={{ position: "absolute", left: c.cx, top: c.cy, transform: "translate(-50%,-50%)", zIndex: 2, pointerEvents: "none" }}>
+          <SpotCallAvatar pfp={c.pfp} name={c.name} ring={c.dir === "LONG" ? POS : NEG} />
+        </div>
+      ))}
+      {(callMarks.length > 0 || liqRects.length > 0) && (
+        <div style={{ position: "absolute", bottom: TIMEH + 3, right: 8, zIndex: 2, fontFamily: MONO, fontSize: 8, color: FAINT, letterSpacing: "0.04em", display: "flex", gap: 10, background: "#0a0a0bd9", padding: "2px 6px", borderRadius: 3, pointerEvents: "none" }}>
+          {liqRects.length > 0 && <span>⚡ est. liq · <span style={{ color: NEG }}>long▼</span> <span style={{ color: POS }}>short▲</span></span>}
+          {callMarks.length > 0 && <span>{callMarks.length} graded call{callMarks.length === 1 ? "" : "s"}</span>}
         </div>
       )}
     </div>
@@ -240,6 +292,9 @@ export default function TokenTerminal() {
   const [tradeOpen, setTradeOpen] = useState(true); // collapse the buy/sell panel to give the chart room
   const [copied, setCopied] = useState(false);
   const [sig, setSig] = useState<NexusSignal | null>(null);
+  // Graded call markers + estimated liq for the chart — only for a LISTED perp (the Lab data).
+  const [chartCalls, setChartCalls] = useState<CallMark[]>([]);
+  const [chartLiq, setChartLiq] = useState<LiqMap | null>(null);
 
   // Connected wallet → read-only spot holdings (no txs). Disconnected → no strip.
   const { state: acct } = useAccount();
@@ -283,7 +338,15 @@ export default function TokenTerminal() {
     let alive = true;
     setChartLoading(true);
     const { tf: gtf, agg } = TIMEFRAMES[tf];
-    poolCandles(pair.chainId, pair.pairAddress, gtf, agg, 100)
+    // GeckoTerminal rate-limits (429) → a momentary empty that read as "no chart data" for a
+    // perfectly good pool. Retry once after a short beat before giving up.
+    const fetchOnce = () => poolCandles(pair.chainId, pair.pairAddress, gtf, agg, 100);
+    fetchOnce()
+      .then(async (c) => {
+        if (c.length || !alive) return c;
+        await new Promise((r) => setTimeout(r, 900));
+        return alive ? fetchOnce() : c;
+      })
       .then((c) => { if (alive) setCandles(c); })
       .catch(() => { if (alive) setCandles([]); })
       .finally(() => { if (alive) setChartLoading(false); });
@@ -318,6 +381,15 @@ export default function TokenTerminal() {
     if (!sym || !perpSet.has(sym)) { setSig(null); return; }
     let alive = true;
     nexusSignal(sym).then((s) => { if (alive) setSig(s); }).catch(() => { if (alive) setSig(null); });
+    return () => { alive = false; };
+  }, [pair, perpSet]);
+
+  // ── chart overlays — graded calls + liq for a listed perp (fail-soft; empty for memecoins) ──
+  useEffect(() => {
+    const sym = pair?.baseSymbol;
+    if (!sym || !perpSet.has(sym)) { setChartCalls([]); setChartLiq(null); return; }
+    let alive = true;
+    chartOverlays(sym).then((o) => { if (alive) { setChartCalls(o.calls); setChartLiq(o.liq); } }).catch(() => { if (alive) { setChartCalls([]); setChartLiq(null); } });
     return () => { alive = false; };
   }, [pair, perpSet]);
 
@@ -633,7 +705,7 @@ export default function TokenTerminal() {
                     ))}
                     <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.04em", color: FAINT, alignSelf: "center", textTransform: "uppercase" }}>chart · GeckoTerminal</span>
                   </div>
-                  <Chart candles={candles} loading={chartLoading} height={isMobile ? 300 : 460} />
+                  <Chart candles={candles} loading={chartLoading} height={isMobile ? 300 : 460} calls={chartCalls} liq={chartLiq} />
                 </div>
 
                 {/* live tape */}

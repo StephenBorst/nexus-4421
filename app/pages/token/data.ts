@@ -206,6 +206,36 @@ export interface NexusSignal {
   fundingAnnualPct: number | null;
   stretched: boolean | null;
 }
+// ── chart overlays (graded calls + estimated liq) for a LISTED perp — the same sources the Lab
+// QuickTrade chart plots, so the Spot chart can carry the Nexus social + liq layer too. ────────
+export interface CallMark { t: number; entry: number; dir: "LONG" | "SHORT"; pfp: string | null; name: string | null; wallet: string }
+export interface LiqMap { below: { price: number; mag: number }[]; above: { price: number; mag: number }[]; currentPrice: number }
+const bareSym = (s: string) => String(s || "").toUpperCase().replace(/^PERP_/, "").replace(/_USDC$/, "");
+export async function chartOverlays(coin: string): Promise<{ calls: CallMark[]; liq: LiqMap | null }> {
+  const sym = bareSym(coin);
+  const [feed, lm] = await Promise.all([
+    getJson(`${AGENT_API}/feed`).catch(() => null),
+    getJson(`${AGENT_API}/intel/liqmap/${sym}`).catch(() => null),
+  ]);
+  const rows = (Array.isArray(feed) ? feed : (feed as { feed?: unknown[]; items?: unknown[] })?.feed ?? (feed as { items?: unknown[] })?.items ?? []) as Record<string, unknown>[];
+  const calls: CallMark[] = rows
+    .map((t) => ({
+      wallet: String(t.wallet || ""), pfp: (t.pfp as string) ?? null, name: (t.displayName as string) ?? null,
+      dir: (t.direction === "SHORT" ? "SHORT" : "LONG") as "LONG" | "SHORT",
+      entry: Number(t.entryPrice ?? t.entry_price ?? 0),
+      t: Number(t.createdAt ?? t.created_at ?? 0),
+      coin: bareSym(String(t.symbol || "")),
+    }))
+    .filter((c) => c.coin === sym && c.entry > 0 && c.t > 0)
+    .slice(0, 16)
+    .map((c) => ({ wallet: c.wallet, pfp: c.pfp, name: c.name, dir: c.dir, entry: c.entry, t: c.t }));
+  const d = lm as { available?: boolean; below?: { price: number; mag: number }[]; above?: { price: number; mag: number }[]; currentPrice?: number } | null;
+  const liq: LiqMap | null = d?.available && Number(d.currentPrice) > 0
+    ? { below: d.below || [], above: d.above || [], currentPrice: Number(d.currentPrice) }
+    : null;
+  return { calls, liq };
+}
+
 export async function nexusSignal(symbol: string): Promise<NexusSignal | null> {
   const j = (await getJson(`${AGENT_API}/signals`)) as { signals?: unknown[] } | null;
   const rows = Array.isArray(j?.signals) ? j!.signals! : [];
