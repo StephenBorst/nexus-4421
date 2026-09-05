@@ -68,43 +68,101 @@ const TIMEFRAMES: { label: string; tf: string; agg: number }[] = [
   { label: "4H", tf: "hour", agg: 4 },
   { label: "1D", tf: "day", agg: 1 },
 ];
+// Congruent with the Lab QuickTrade chart (TradeChart): grid + right price axis + time axis +
+// volume strip + MA(20/50) + crosshair, dependency-free SVG, measured width (no stretch). Fed by
+// the pool's OHLCV so it works for any spot token, listed or not.
+const CH_MA = [{ p: 20, c: "#ededf0" }, { p: 50, c: "#9aa2b4" }] as const;
+const chFmtPx = (v: number) => (v >= 1000 ? v.toLocaleString("en-US", { maximumFractionDigits: 0 }) : v >= 1 ? v.toFixed(2) : v >= 0.01 ? v.toFixed(4) : v.toPrecision(4));
 function Chart({ candles, loading, height }: { candles: Candle[]; loading: boolean; height: number }) {
-  const box: React.CSSProperties = { width: "100%", height, background: BG, border: `1px solid ${BORD}`, borderRadius: 6 };
-  if (!candles.length) {
-    return <div style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 11, color: FAINT }}>{loading ? "loading chart…" : "no chart data for this pair"}</div>;
+  const [width, setWidth] = useState(720);
+  const [hover, setHover] = useState<number | null>(null);
+  const roRef = useRef<ResizeObserver | null>(null);
+  const measureRef = useCallback((el: HTMLDivElement | null) => {
+    if (roRef.current) { roRef.current.disconnect(); roRef.current = null; }
+    if (!el) return;
+    const measure = () => { const r = el.getBoundingClientRect(); if (r.width > 0) setWidth(r.width); };
+    const ro = new ResizeObserver(measure); ro.observe(el); measure(); roRef.current = ro;
+  }, []);
+  const box: React.CSSProperties = { width: "100%", height, background: BG, border: `1px solid ${BORD}`, borderRadius: 8, position: "relative", overflow: "hidden" };
+  if (!candles.length) return <div ref={measureRef} style={{ ...box, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 11, color: FAINT }}>{loading ? "loading chart…" : "no chart data for this pair"}</div>;
+
+  const RPAD = 52, LPAD = 6, TOP = 22, TIMEH = 16, VOLH = 28, GAP = 6;
+  const priceBottom = height - TIMEH - VOLH - GAP;
+  const volTop = priceBottom + GAP, volBottom = height - TIMEH;
+  const plotW = Math.max(60, width - LPAD - RPAD);
+  const n = candles.length;
+  const min = Math.min(...candles.map((d) => d.l)), max = Math.max(...candles.map((d) => d.h)), range = max - min || 1;
+  const maxVol = Math.max(...candles.map((d) => d.v), 1);
+  const slot = plotW / n;
+  const x = (i: number) => LPAD + i * slot + slot / 2;
+  const y = (v: number) => TOP + (1 - (v - min) / range) * (priceBottom - TOP);
+  const vy = (v: number) => volBottom - (v / maxVol) * (volBottom - volTop);
+  const bodyW = Math.max(1, slot * 0.62);
+  const last = candles[n - 1], lastUp = last.c >= last.o;
+  const priceLevels = [0, 0.25, 0.5, 0.75, 1].map((f) => min + range * f);
+  const span = candles[n - 1].t - candles[0].t;
+  const timeLabels = [0, 0.34, 0.67, 1].map((f) => {
+    const i = Math.round(f * (n - 1)); const d = new Date(candles[i].t * 1000);
+    const lab = span <= 86400 ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : `${d.getMonth() + 1}/${d.getDate()}`;
+    return { x: x(i), lab };
+  });
+  // SMA(close) polylines over the visible candles — a rolling sum, O(n).
+  const maLines: { p: number; c: string; d: string; last: number | null }[] = [];
+  for (const { p, c } of CH_MA) {
+    if (n < p) continue;
+    let sum = 0, d = "", started = false, lastV: number | null = null;
+    for (let i = 0; i < n; i++) { sum += candles[i].c; if (i >= p) sum -= candles[i - p].c; if (i >= p - 1) { const v = sum / p; lastV = v; d += `${started ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`; started = true; } }
+    if (d) maLines.push({ p, c, d, last: lastV });
   }
-  const W = 800, H = height, PL = 4, PR = 56, PT = 8, PB = 18;
-  const plotW = W - PL - PR, plotH = H - PT - PB;
-  const lo = Math.min(...candles.map((d) => d.l)), hi = Math.max(...candles.map((d) => d.h)), range = hi - lo || 1;
-  const n = candles.length, slot = plotW / n;
-  const x = (i: number) => PL + i * slot + slot / 2;
-  const y = (v: number) => PT + (1 - (v - lo) / range) * plotH;
-  const bodyW = Math.max(1, slot * 0.66);
-  const last = candles[candles.length - 1].c;
-  const gridVals = [hi, lo + range * 0.5, lo];
+  const hc = hover != null && hover < n ? candles[hover] : null;
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={box}>
-      {gridVals.map((v, i) => (
-        <g key={i}>
-          <line x1={PL} x2={PL + plotW} y1={y(v)} y2={y(v)} stroke={BORD2} strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
-          <text x={PL + plotW + 4} y={y(v) + 3} fill={FAINT} fontSize={9} fontFamily={MONO}>{fmtPrice(v).replace("$", "")}</text>
-        </g>
-      ))}
-      <line x1={PL} x2={PL + plotW} y1={y(last)} y2={y(last)} stroke={MUT} strokeWidth={0.5} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
-      {candles.map((d, i) => {
-        const up = d.c >= d.o;
-        const col = up ? POS : NEG;
-        const cx = x(i);
-        const yTop = Math.min(y(d.o), y(d.c));
-        const bh = Math.max(0.8, Math.abs(y(d.c) - y(d.o)));
-        return (
+    <div ref={measureRef} style={box}>
+      {maLines.length > 0 && (
+        <div style={{ position: "absolute", top: 5, left: 8, zIndex: 2, display: "flex", gap: 10, fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.02em", pointerEvents: "none" }}>
+          {maLines.map((m) => <span key={m.p} style={{ color: m.c }}>MA{m.p} {m.last != null ? `$${chFmtPx(m.last)}` : "—"}</span>)}
+        </div>
+      )}
+      <svg width={width} height={height} style={{ display: "block", position: "absolute", top: 0, left: 0, cursor: "crosshair" }}
+        onMouseMove={(e) => { const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect(); const i = Math.round((e.clientX - r.left - LPAD - slot / 2) / slot); setHover(Math.max(0, Math.min(n - 1, i))); }}
+        onMouseLeave={() => setHover(null)}>
+        <defs><clipPath id="spot-price-clip"><rect x={LPAD} y={TOP} width={plotW} height={Math.max(0, priceBottom - TOP)} /></clipPath></defs>
+        {priceLevels.map((p, i) => (
           <g key={i}>
-            <line x1={cx} x2={cx} y1={y(d.h)} y2={y(d.l)} stroke={col} strokeWidth={0.7} vectorEffect="non-scaling-stroke" />
-            <rect x={cx - bodyW / 2} y={yTop} width={bodyW} height={bh} fill={col} />
+            <line x1={LPAD} x2={LPAD + plotW} y1={y(p)} y2={y(p)} stroke="#ffffff0d" strokeWidth={1} />
+            <text x={width - RPAD + 6} y={y(p) + 3} fontFamily={MONO} fontSize={9} fill={FAINT} stroke={BG} strokeWidth={2.2} paintOrder="stroke" strokeLinejoin="round">{chFmtPx(p)}</text>
           </g>
-        );
-      })}
-    </svg>
+        ))}
+        {timeLabels.map((t, i) => (
+          <g key={i}>
+            <line x1={t.x} x2={t.x} y1={TOP} y2={priceBottom} stroke="#ffffff0d" strokeWidth={1} />
+            <text x={t.x} y={height - 4} fontFamily={MONO} fontSize={9} fill={FAINT} textAnchor="middle">{t.lab}</text>
+          </g>
+        ))}
+        {candles.map((d, i) => {
+          const up = d.c >= d.o, col = up ? POS : NEG, cx = x(i);
+          const yTop = Math.min(y(d.o), y(d.c)), bh = Math.max(0.8, Math.abs(y(d.c) - y(d.o)));
+          return (
+            <g key={i} opacity={hover != null && hover !== i ? 0.85 : 1}>
+              <line x1={cx} x2={cx} y1={y(d.h)} y2={y(d.l)} stroke={col} strokeWidth={1} />
+              <rect x={cx - bodyW / 2} y={yTop} width={bodyW} height={bh} fill={col} />
+              <rect x={cx - bodyW / 2} y={vy(d.v)} width={bodyW} height={Math.max(0.5, volBottom - vy(d.v))} fill={col} opacity={0.3} />
+            </g>
+          );
+        })}
+        {maLines.length > 0 && <g clipPath="url(#spot-price-clip)">{maLines.map((m) => <path key={m.p} d={m.d} fill="none" stroke={m.c} strokeWidth={m.p === 20 ? 1.4 : 1.1} strokeLinejoin="round" strokeLinecap="round" opacity={0.95} />)}</g>}
+        <line x1={LPAD} x2={LPAD + plotW} y1={y(last.c)} y2={y(last.c)} stroke={lastUp ? POS : NEG} strokeWidth={0.6} strokeDasharray="1 3" opacity={0.6} />
+        <rect x={width - RPAD} y={y(last.c) - 8} width={RPAD} height={16} fill={lastUp ? POS : NEG} />
+        <text x={width - RPAD + RPAD / 2} y={y(last.c) + 3.5} fontFamily={MONO} fontSize={9} fill="#0a0a0b" fontWeight={700} textAnchor="middle">{chFmtPx(last.c)}</text>
+        {hc && hover != null && <line x1={x(hover)} x2={x(hover)} y1={TOP} y2={volBottom} stroke="#ffffff" strokeWidth={0.6} strokeDasharray="2 3" opacity={0.35} />}
+      </svg>
+      {hc && (
+        <div style={{ position: "absolute", top: TOP + 4, left: 8, zIndex: 2, background: "#0f0f11ee", border: `1px solid ${BORD}`, borderRadius: 4, padding: "5px 8px", fontFamily: MONO, fontSize: 9.5, color: MUT, pointerEvents: "none", lineHeight: 1.5 }}>
+          <span style={{ color: FAINT }}>{new Date(hc.t * 1000).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span><br />
+          O <span style={{ color: BRIGHT }}>{chFmtPx(hc.o)}</span> H <span style={{ color: BRIGHT }}>{chFmtPx(hc.h)}</span> L <span style={{ color: BRIGHT }}>{chFmtPx(hc.l)}</span> C <span style={{ color: hc.c >= hc.o ? POS : NEG }}>{chFmtPx(hc.c)}</span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -179,6 +237,7 @@ export default function TokenTerminal() {
   const [venue, setVenue] = useState<"perp" | "spot">("perp");
   const [sellAmt, setSellAmt] = useState("");
   const [sellMax, setSellMax] = useState(false);
+  const [tradeOpen, setTradeOpen] = useState(true); // collapse the buy/sell panel to give the chart room
   const [copied, setCopied] = useState(false);
   const [sig, setSig] = useState<NexusSignal | null>(null);
 
@@ -568,13 +627,13 @@ export default function TokenTerminal() {
               <div style={{ minWidth: 0 }}>
                 {/* chart + timeframe */}
                 <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, padding: 10, marginBottom: 12 }}>
-                  <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 8 }}>
                     {TIMEFRAMES.map((t, i) => (
-                      <button key={t.label} onClick={() => setTf(i)} style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", color: i === tf ? BRIGHT : FAINT, background: i === tf ? BG : "none", border: `1px solid ${i === tf ? BORD : "transparent"}`, borderRadius: 5, padding: "4px 9px", cursor: "pointer" }}>{t.label}</button>
+                      <button key={t.label} onClick={() => setTf(i)} style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", color: i === tf ? BRIGHT : FAINT, background: i === tf ? "#ededf012" : "none", border: `1px solid ${i === tf ? "#ededf033" : "transparent"}`, borderRadius: 6, padding: "5px 11px", cursor: "pointer" }}>{t.label}</button>
                     ))}
-                    <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 9, color: FAINT, alignSelf: "center" }}>chart · GeckoTerminal</span>
+                    <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.04em", color: FAINT, alignSelf: "center", textTransform: "uppercase" }}>chart · GeckoTerminal</span>
                   </div>
-                  <Chart candles={candles} loading={chartLoading} height={isMobile ? 220 : 340} />
+                  <Chart candles={candles} loading={chartLoading} height={isMobile ? 300 : 460} />
                 </div>
 
                 {/* live tape */}
@@ -634,6 +693,12 @@ export default function TokenTerminal() {
 
               {/* trade panel — honest routing, no fake fills */}
               <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, padding: 14 }}>
+                {/* collapse toggle — fold the buy/sell panel to give the chart + tape the room */}
+                <button onClick={() => setTradeOpen((o) => !o)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: "none", border: "none", padding: 0, marginBottom: tradeOpen ? 12 : 0, cursor: "pointer" }}>
+                  <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", color: BRIGHT, textTransform: "uppercase" }}>{showPerp ? "Trade · Perp" : "Trade · Spot"}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 11, color: MUT }}>{tradeOpen ? "collapse ▾" : "expand ▸"}</span>
+                </button>
+                {tradeOpen && (<>
                 {/* Perp/Spot venue — a listed perp trades BOTH our book AND spot; the toggle picks
                     which. Non-perp tokens are spot only (no toggle). */}
                 {isPerp && (
@@ -775,6 +840,7 @@ export default function TokenTerminal() {
                     ? <>Nexus doesn’t run a spot book for {pair.baseSymbol}, so we route you to <b style={{ color: MUT }}>{swapState.venue}</b> where it can fill. The read is ours; the swap is theirs.</>
                     : <>No router quotes {pair.baseSymbol} right now — no honest fill to offer, so we don’t fake it. The read above still stands.</>}
                 </div>
+                </>)}
               </div>
             </div>
 
