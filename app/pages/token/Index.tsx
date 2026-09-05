@@ -304,6 +304,7 @@ export default function TokenTerminal() {
   // sold token straight into another token in ONE swap. The sold token is still the only approve.
   const [sellOut, setSellOut] = useState<{ token: string; sym: string; decimals: number } | null>(null);
   const [tradeOpen, setTradeOpen] = useState(true); // collapse the buy/sell panel to give the chart room
+  const [tapeOpen, setTapeOpen] = useState(true);   // collapse the live tape too (same fold-away pattern)
   const [copied, setCopied] = useState(false);
   const [sig, setSig] = useState<NexusSignal | null>(null);
   // Graded call markers + estimated liq for the chart — only for a LISTED perp (the Lab data).
@@ -758,23 +759,29 @@ export default function TokenTerminal() {
                   <Chart candles={candles} loading={chartLoading} height={isMobile ? 300 : 460} calls={chartCalls} liq={chartLiq} />
                 </div>
 
-                {/* live tape */}
+                {/* live tape — collapsible (fold it away to give the chart room, like the trade panel) */}
                 <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, overflow: "hidden" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 64px", gap: 8, padding: "9px 12px", borderBottom: `1px solid ${BORD}`, fontFamily: MONO, fontSize: 9, letterSpacing: "0.08em", color: FAINT, textTransform: "uppercase" }}>
-                    <span>Amount</span><span>Price</span><span>Wallet</span><span style={{ textAlign: "right" }}>Age</span>
-                  </div>
-                  <div style={{ maxHeight: 260, overflowY: "auto" }}>
-                    {trades.length === 0
-                      ? <div style={{ fontFamily: MONO, fontSize: 11, color: FAINT, padding: "18px 12px" }}>waiting for trades…</div>
-                      : trades.map((t, i) => (
-                        <div key={t.tx + i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 64px", gap: 8, padding: "6px 12px", borderTop: i === 0 ? "none" : `1px solid ${BORD2}`, fontFamily: MONO, fontSize: 11 }}>
-                          <span style={{ color: t.kind === "buy" ? POS : NEG }}>{fmtTapeUsd(t.amountUsd)}</span>
-                          <span style={{ color: MUT }}>{fmtPrice(t.priceUsd)}</span>
-                          <span style={{ color: FAINT }}>{shortAddr(t.wallet)}</span>
-                          <span style={{ color: FAINT, textAlign: "right" }}>{fmtAge(t.ts)}</span>
-                        </div>
-                      ))}
-                  </div>
+                  <button onClick={() => setTapeOpen((o) => !o)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: "none", border: "none", borderBottom: tapeOpen ? `1px solid ${BORD}` : "none", padding: "9px 12px", cursor: "pointer" }}>
+                    <span style={{ fontFamily: MONO, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.12em", color: MUT, textTransform: "uppercase" }}>Live tape{trades.length ? ` · ${trades.length}` : ""}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 11, color: MUT }}>{tapeOpen ? "collapse ▾" : "expand ▸"}</span>
+                  </button>
+                  {tapeOpen && (<>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 64px", gap: 8, padding: "9px 12px", borderBottom: `1px solid ${BORD}`, fontFamily: MONO, fontSize: 9, letterSpacing: "0.08em", color: FAINT, textTransform: "uppercase" }}>
+                      <span>Amount</span><span>Price</span><span>Wallet</span><span style={{ textAlign: "right" }}>Age</span>
+                    </div>
+                    <div style={{ maxHeight: 260, overflowY: "auto" }}>
+                      {trades.length === 0
+                        ? <div style={{ fontFamily: MONO, fontSize: 11, color: FAINT, padding: "18px 12px" }}>waiting for trades…</div>
+                        : trades.map((t, i) => (
+                          <div key={t.tx + i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 64px", gap: 8, padding: "6px 12px", borderTop: i === 0 ? "none" : `1px solid ${BORD2}`, fontFamily: MONO, fontSize: 11 }}>
+                            <span style={{ color: t.kind === "buy" ? POS : NEG }}>{fmtTapeUsd(t.amountUsd)}</span>
+                            <span style={{ color: MUT }}>{fmtPrice(t.priceUsd)}</span>
+                            <span style={{ color: FAINT }}>{shortAddr(t.wallet)}</span>
+                            <span style={{ color: FAINT, textAlign: "right" }}>{fmtAge(t.ts)}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </>)}
                 </div>
               </div>
 
