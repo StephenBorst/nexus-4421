@@ -272,6 +272,15 @@ export function fmtUsd(n: number | null | undefined): string {
   if (a >= 1e3) return `$${(n / 1e3).toFixed(1)}K`;
   return `$${n.toFixed(2)}`;
 }
+// Tape AMOUNT column: ONE unit for the whole scroll — whole dollars with commas — so a
+// $1 stable print and a $2,449 print read as the same kind of number (not "$1.00" mixed
+// with "$2.4K"/"$1.20M", which made the column jump units row-to-row). Sub-$1 prints
+// collapse to "<$1" so the column stays integer-aligned.
+export function fmtTapeUsd(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  if (Math.abs(n) < 1) return "<$1";
+  return `$${Math.round(n).toLocaleString("en-US")}`;
+}
 export function fmtPrice(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";
   if (n >= 1000) return `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;

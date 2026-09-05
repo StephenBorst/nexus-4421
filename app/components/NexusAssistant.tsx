@@ -486,10 +486,16 @@ export default function NexusAssistant() {
         ref={launcherRef}
         style={{
           position: "fixed", zIndex: 99998, display: "flex", alignItems: "center", gap: 10,
-          ...(pos ? { left: pos.x, top: pos.y } : { right: 16, bottom: 16 }),
+          // On phones the idle orb sits ABOVE the bottom-right corner so it never lands on a
+          // page's primary CTA (Spot BUY/SHARE/→, Lab share) — the "double orb on the CTA" fix.
+          // Desktop keeps the tight corner; a dragged position (pos) always wins.
+          ...(pos ? { left: pos.x, top: pos.y } : isMobile ? { right: 14, bottom: 84 } : { right: 16, bottom: 16 }),
         }}
       >
-        {!seen && !pos && (
+        {/* First-run teaser is the "second overlay" — a wide Ask/AI card beside the orb. On a
+            phone it spans the bottom-right and covers the primary CTA, so show it on desktop
+            only; phones get the single ◆ orb (one FAB). */}
+        {!seen && !pos && !isMobile && (
           <>
             <style>{`@keyframes nexAiPulse{0%,100%{box-shadow:0 0 14px rgba(255,255,255,0.18)}50%{box-shadow:0 0 22px rgba(255,255,255,0.4)}}`}</style>
             <div

@@ -16,7 +16,7 @@ import { SectionHeader } from "@/pages/lab/components";
 import { FADE_FUNDING_FLOOR_PCT_YR } from "@/pages/lab/briefing";
 import {
   searchToken, poolCandles, poolTrades, orderlyPerpSet, nexusSignal, swapQuote,
-  fmtUsd, fmtPrice, fmtAge, shortAddr,
+  fmtUsd, fmtTapeUsd, fmtPrice, fmtAge, shortAddr,
   type TokenPair, type Candle, type Trade, type NexusSignal, type SwapQuote,
 } from "./data";
 import { fetchHoldings, addRecent, optimisticHolding, probeHeldToken, type Holding } from "./holdings";
@@ -542,7 +542,7 @@ export default function TokenTerminal() {
                       ? <div style={{ fontFamily: MONO, fontSize: 11, color: FAINT, padding: "18px 12px" }}>waiting for trades…</div>
                       : trades.map((t, i) => (
                         <div key={t.tx + i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 64px", gap: 8, padding: "6px 12px", borderTop: i === 0 ? "none" : `1px solid ${BORD2}`, fontFamily: MONO, fontSize: 11 }}>
-                          <span style={{ color: t.kind === "buy" ? POS : NEG }}>{fmtUsd(t.amountUsd)}</span>
+                          <span style={{ color: t.kind === "buy" ? POS : NEG }}>{fmtTapeUsd(t.amountUsd)}</span>
                           <span style={{ color: MUT }}>{fmtPrice(t.priceUsd)}</span>
                           <span style={{ color: FAINT }}>{shortAddr(t.wallet)}</span>
                           <span style={{ color: FAINT, textAlign: "right" }}>{fmtAge(t.ts)}</span>

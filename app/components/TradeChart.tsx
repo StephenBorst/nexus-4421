@@ -163,7 +163,12 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf,
 
   // ── layout ───────────────────────────────────────────────────────────────
   const chartH = fill ? vh : height; // draw at the measured height when filling a flex column
-  const RPAD = 52, LPAD = 6, TOP = 8, TIMEH = 16, VOLH = 30, GAP = 6;
+  // Reserve a HEADER lane at the top: the toolbar (timeframe · zoom) and the MA legend live
+  // in this band, so the price plot, price-axis labels and candles all start BELOW them
+  // instead of printing underneath (was TOP=8 → toolbar + labels + legend stacked on the
+  // candles). Taller when the MA legend row is showing.
+  const RPAD = 52, LPAD = 6, TIMEH = 16, VOLH = 30, GAP = 6;
+  const TOP = showMA ? 44 : 28;
   const priceBottom = chartH - TIMEH - VOLH - GAP;
   const volTop = priceBottom + GAP, volBottom = chartH - TIMEH;
   const plotW = Math.max(60, width - LPAD - RPAD);
@@ -212,7 +217,7 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf,
     const t0 = visible[0].t, t1 = visible[m - 1].t, tspan = t1 - t0 || 1;
     const xOfTime = (ms: number) => LPAD + ((ms - t0) / tspan) * plotW;
     return { m, min, max, range, slot, x, y, vy, bodyW, t0, t1, tspan, xOfTime, last: visible[m - 1] };
-  }, [visible, plotW, priceBottom, volTop, volBottom]);
+  }, [visible, plotW, priceBottom, volTop, volBottom, TOP]);
 
   const calls = useMemo(() => {
     if (!view) return [] as Call[];
@@ -360,7 +365,7 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf,
         {priceLevels.map((p, i) => (
           <g key={i}>
             <line x1={LPAD} x2={LPAD + plotW} y1={y(p)} y2={y(p)} stroke={GRID} strokeWidth={1} />
-            <text x={width - RPAD + 6} y={y(p) + 3} fontFamily={MONO} fontSize={9} fill={FAINT}>{fmtPx(p)}</text>
+            <text x={width - RPAD + 6} y={y(p) + 3} fontFamily={MONO} fontSize={9} fill={FAINT} stroke="#0a0a0b" strokeWidth={2.2} paintOrder="stroke" strokeLinejoin="round">{fmtPx(p)}</text>
           </g>
         ))}
         {/* vertical gridlines at time labels */}
@@ -407,8 +412,10 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf,
             </g>
           );
         })}
-        {topLong && <text x={LPAD + plotW - topLong.w - 5} y={topLong.yy - 4} fontFamily={MONO} fontSize={8} fill={NEG} textAnchor="end" opacity={0.85}>long-liq ▼ {fmtPx(topLong.price)}</text>}
-        {topShort && <text x={LPAD + plotW - topShort.w - 5} y={topShort.yy + 9} fontFamily={MONO} fontSize={8} fill={POS} textAnchor="end" opacity={0.85}>short-liq ▲ {fmtPx(topShort.price)}</text>}
+        {topLong && <text x={LPAD + plotW - topLong.w - 5} y={topLong.yy - 4} fontFamily={MONO} fontSize={8} fill={NEG} textAnchor="end" opacity={0.95} stroke="#0a0a0b" strokeWidth={2.4} paintOrder="stroke" strokeLinejoin="round">long-liq ▼ {fmtPx(topLong.price)}</text>}
+        {/* skip the short label if it would collide with the long one (clusters near the same
+            level) — the two dashed lines still show both; only the text is de-conflicted. */}
+        {topShort && (!topLong || Math.abs(topShort.yy - topLong.yy) > 15) && <text x={LPAD + plotW - topShort.w - 5} y={topShort.yy + 9} fontFamily={MONO} fontSize={8} fill={POS} textAnchor="end" opacity={0.95} stroke="#0a0a0b" strokeWidth={2.4} paintOrder="stroke" strokeLinejoin="round">short-liq ▲ {fmtPx(topShort.price)}</text>}
 
         {/* your position avg-entry */}
         {posY != null && positionEntry && (
@@ -443,17 +450,20 @@ export function TradeChart({ symbol, height = 240, positionEntry, tfIndex, onTf,
         );
       })}
 
-      {/* hover OHLC readout */}
+      {/* hover OHLC readout — placed just BELOW the header band so it never lands on the
+          MA legend (both are top-left). */}
       {hc && (
-        <div style={{ position: "absolute", top: 30, left: 8, zIndex: 3, background: "#0f0f11ee", border: `1px solid ${BORDER}`, borderRadius: 4, padding: "5px 8px", fontFamily: MONO, fontSize: 9.5, color: MUTED, pointerEvents: "none", lineHeight: 1.5 }}>
+        <div style={{ position: "absolute", top: TOP + 4, left: 8, zIndex: 3, background: "#0f0f11ee", border: `1px solid ${BORDER}`, borderRadius: 4, padding: "5px 8px", fontFamily: MONO, fontSize: 9.5, color: MUTED, pointerEvents: "none", lineHeight: 1.5 }}>
           <span style={{ color: FAINT }}>{new Date(hc.t).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span><br />
           O <span style={{ color: BONE }}>{fmtPx(hc.o)}</span> H <span style={{ color: BONE }}>{fmtPx(hc.h)}</span> L <span style={{ color: BONE }}>{fmtPx(hc.l)}</span> C <span style={{ color: hc.c >= hc.o ? POS : NEG }}>{fmtPx(hc.c)}</span>
         </div>
       )}
 
-      {/* legend — graded calls + estimated liquidation clusters */}
+      {/* legend — graded calls + estimated liquidation clusters. Sits in its OWN lane just
+          ABOVE the time-axis band (with a pill background) so it never overprints the date
+          labels — was bottom:2, landing right on top of "8/27 … 8/31". */}
       {(calls.length > 0 || (showLiq && liqRects.length > 0)) && (
-        <div style={{ position: "absolute", bottom: 2, right: 8, zIndex: 3, fontFamily: MONO, fontSize: 8, color: FAINT, letterSpacing: "0.04em", display: "flex", gap: 10 }}>
+        <div style={{ position: "absolute", bottom: TIMEH + 3, right: 8, zIndex: 3, fontFamily: MONO, fontSize: 8, color: FAINT, letterSpacing: "0.04em", display: "flex", gap: 10, background: "#0a0a0bd9", padding: "2px 6px", borderRadius: 3, pointerEvents: "none" }}>
           {showLiq && liqRects.length > 0 && <span>⚡ est. liq · <span style={{ color: NEG }}>long▼</span> <span style={{ color: POS }}>short▲</span></span>}
           {calls.length > 0 && <span>{calls.length} graded call{calls.length === 1 ? "" : "s"}</span>}
         </div>
