@@ -390,14 +390,23 @@ export default function TokenTerminal() {
     } finally { setSwapBusy(false); setSwapStep(""); }
   }, [plan, wallet, provider, pair]);
 
+  const [shareCopied, setShareCopied] = useState(false);
   const closeSwap = useCallback(() => {
     if (swapBusy) return; // never yank the modal out from under a pending signature
-    setModalOpen(false); setPlan(null); setSwapErr(null); setSwapDone(null);
+    setModalOpen(false); setPlan(null); setSwapErr(null); setSwapDone(null); setShareCopied(false);
   }, [swapBusy]);
 
   const copyCa = useCallback(() => {
     if (!pair?.baseAddress) return;
     try { navigator.clipboard.writeText(pair.baseAddress); setCopied(true); setTimeout(() => setCopied(false), 1400); } catch { /* ignore */ }
+  }, [pair]);
+
+  // Share-on-swap (Pass A): copy the token's Spot link to share the call. Verdict-only — the card
+  // states the fact (you bought X of SYM on Nexus) + this link; no E[R], no conviction, no PnL.
+  const copyShare = useCallback(() => {
+    if (!pair?.baseAddress) return;
+    const link = `${window.location.origin}/token/${pair.baseAddress}`;
+    try { navigator.clipboard.writeText(link); setShareCopied(true); setTimeout(() => setShareCopied(false), 1600); } catch { /* clipboard blocked */ }
   }, [pair]);
 
   const pageMeta = getPageMeta();
@@ -705,6 +714,17 @@ export default function TokenTerminal() {
                 <div style={{ fontSize: 28, marginBottom: 8, color: POS }}>✓</div>
                 <div style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: POS, marginBottom: 6 }}>Swap sent</div>
                 <div style={{ fontFamily: UI, fontSize: 11, color: MUT, marginBottom: 14 }}>Your {pair.baseSymbol} lands once it confirms on-chain.</div>
+
+                {/* share-on-swap card (Pass A) — the fact + a link to the token's Spot page.
+                    Verdict-only: no E[R], no conviction score, no lifetime PnL. */}
+                <div style={{ background: BG, border: `1px solid ${BORD}`, borderRadius: 8, padding: "10px 12px", marginBottom: 14, textAlign: "left" }}>
+                  <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.08em", color: FAINT, marginBottom: 3 }}>{pair.baseSymbol} · BOUGHT ON NEXUS</div>
+                  <div style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: BRIGHT, marginBottom: 9 }}>{fmtTokenAmount(plan.outAmount, plan.decimals) ?? "—"} {pair.baseSymbol}</div>
+                  <button onClick={copyShare} style={{ width: "100%", fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.03em", color: shareCopied ? POS : BRIGHT, background: "none", border: `1px solid ${shareCopied ? "#3ecf8e88" : BORD}`, borderRadius: 7, padding: "9px 0", cursor: "pointer" }}>
+                    {shareCopied ? "✓ Link copied" : `Copy ${pair.baseSymbol} link ↗`}
+                  </button>
+                </div>
+
                 {explorerTx(plan.chainId, swapDone.hash) && (
                   <a href={explorerTx(plan.chainId, swapDone.hash)!} target="_blank" rel="noopener noreferrer" style={{ fontFamily: MONO, fontSize: 11, color: BRIGHT, textDecoration: "none", display: "inline-block", marginBottom: 14 }}>view transaction ↗</a>
                 )}
