@@ -18,8 +18,9 @@
 // Two independent fail-soft fetches: /intel/mispriced (fast, KV-cached market data)
 // and /theses/consensus (the caller lean), merged by coin here on the client.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAccount } from "@orderly.network/hooks";
+import { orderlyPerpSet } from "@/pages/token/data";
 import { C, MONO, UI, RADIUS } from "@/config/theme";
 import { AGENT_API } from "./agentTypes";
 import { FADE_FUNDING_FLOOR_PCT_YR } from "./briefing";
@@ -444,9 +445,13 @@ export function MispricedBoard() {
   // Deep-link target (from a shared board link: /lab?tab=intel&guest=1&play=BTC) — scroll to that
   // row and mark it once it renders. rowRefs collects every rendered card by coin.
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [markedCoin, setMarkedCoin] = useState<string | null>(null);
   const playedRef = useRef(false);
+  // Listed-perp set for the secondary CTA (see tradeCta). Unknown → treat as listed so a
+  // listed perp never flashes a Spot CTA while the set loads.
+  const [perpSet, setPerpSet] = useState<Set<string> | null>(null);
 
   // On opening a market, pull its funding history (story-line) + reversion stat, AND the
   // price over the same window — so the SynthChart shows the fade thesis on EVERY market.
@@ -486,6 +491,15 @@ export function MispricedBoard() {
     load();
     const t = setInterval(load, 90_000); // funding moves slowly; the server caches 180s
     return () => { live = false; clearInterval(t); };
+  }, []);
+
+  // Load the listed-perp set once (module-cached in token/data) → drives the secondary CTA's
+  // route (see tradeCta). Fail-soft: on error perpSet stays null and every coin is treated as
+  // listed, so a listed perp is never mis-routed to Spot.
+  useEffect(() => {
+    let live = true;
+    orderlyPerpSet().then((s) => { if (live && s.size) setPerpSet(s); }).catch(() => { /* treat all as listed */ });
+    return () => { live = false; };
   }, []);
 
   const markets = board?.markets ?? null;
@@ -567,6 +581,26 @@ export function MispricedBoard() {
       window.dispatchEvent(new CustomEvent("nexus:lab-tab", { detail: { tab: "thesis" } }));
       window.dispatchEvent(new CustomEvent("nexus:thesis-draft"));
     } catch { /* non-browser — ignore */ }
+  };
+
+  // Secondary execution CTA on a board card: a LISTED perp trades on our own book (/perp —
+  // Long/Short), a NON-listed symbol goes to Spot (/token). Never Spot for a listed perp —
+  // those execute on Nexus. Guest-safe: both routes are viewable unauthed (the wallet wall is
+  // at order/swap time, not here). Unknown listed-ness (set still loading) defaults to LISTED
+  // so a listed perp can't flash a Spot link. stopPropagation so the tap doesn't also open the
+  // ticket via the card's onClick.
+  const tradeCta = (m: Market) => {
+    const listed = perpSet ? perpSet.has(m.coin) : true;
+    const href = listed ? `/perp/PERP_${m.coin}_USDC` : `/token/${encodeURIComponent(m.coin)}`;
+    return (
+      <a href={href} onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigate(href); }}
+        title={listed ? `Trade ${m.coin} on Nexus` : `${m.coin} isn't a listed perp — buy it on Spot`}
+        className="nx-press" style={{
+          flexShrink: 0, fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
+          color: C.text.muted, background: "none", border: `1px solid ${C.border}`, borderRadius: RADIUS.md,
+          padding: "8px 12px", cursor: "pointer", textDecoration: "none", whiteSpace: "nowrap",
+        }}>{listed ? "Long / Short ↗" : "Trade on Spot ↗"}</a>
+    );
   };
 
   const selected = openCoin ? (markets || []).find((m) => m.coin === openCoin) || null : null;
@@ -856,12 +890,24 @@ export function MispricedBoard() {
                         <span style={{ color: C.text.faint, textTransform: "uppercase", letterSpacing: "0.12em", fontSize: 8.5 }}>Top callers</span>
                         <Callers m={m} lean={l} />
                       </div>
-                      {/* Open the ticket to draft — the Draft action is GATED on the verdict
-                          there (WATCH never drafts), so the scan card can't bypass it. */}
-                      <button onClick={(e) => { e.stopPropagation(); setOpenCoin(m.coin); }} style={{
-                        marginTop: 11, width: "100%", fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
-                        color: C.accent, border: `1px solid ${C.borderStrong}`, borderRadius: RADIUS.md, padding: 8, background: "transparent", cursor: "pointer",
-                      }}>→ Open &amp; size the fade</button>
+                      {/* Actions — the whole loop on one card, guest-safe. FADE → Draft the
+                          frozen-R thesis right here (no wallet; wallet only on Publish). WATCH →
+                          open to read, never Draft-as-fade. Secondary routes to REAL execution:
+                          a listed perp to Long/Short on our book, a non-listed symbol to Spot. */}
+                      <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
+                        {isFade ? (
+                          <button onClick={(e) => { e.stopPropagation(); draftFade(m); }} title="Draft this fade into the Thesis Engine — no wallet needed (wallet only on Publish)" style={{
+                            flex: 1, fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+                            color: C.accent, border: `1px solid ${C.borderStrong}`, borderRadius: RADIUS.md, padding: 8, background: "transparent", cursor: "pointer",
+                          }}>Draft this fade →</button>
+                        ) : (
+                          <button onClick={(e) => { e.stopPropagation(); setOpenCoin(m.coin); }} style={{
+                            flex: 1, fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+                            color: C.text.muted, border: `1px solid ${C.border}`, borderRadius: RADIUS.md, padding: 8, background: "transparent", cursor: "pointer",
+                          }}>→ Open &amp; size</button>
+                        )}
+                        {tradeCta(m)}
+                      </div>
                     </div>
                   );
                 })}
