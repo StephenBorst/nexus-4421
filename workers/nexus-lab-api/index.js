@@ -5660,28 +5660,39 @@ document.getElementById("btn").addEventListener("click",go);
         if (/^0x[a-fA-F0-9]{40}$/.test(taker)) base.taker = taker;
 
         // ── optional Spot fee (Pass B) ── A small integrator fee taken by Fabric INSIDE the same
-        // swap tx (0x-style swapFeeBps/swapFeeRecipient/swapFeeToken) — no second transfer, no extra
-        // spender. Configured via SPOT_FEE_BPS + SPOT_FEE_RECIPIENT (OFF unless BOTH are set) so this
-        // ships DARK: with no fee set, the request is byte-identical to before. The fee is carved
-        // from the SELL token (USDC), so the caller still approves EXACTLY sellAmount and just
-        // receives slightly less of the bought token. Capped ≤100 bps; recipient must be an address.
+        // swap tx — no second transfer, no extra spender. Configured via SPOT_FEE_BPS +
+        // SPOT_FEE_RECIPIENT (OFF unless BOTH set) so with no fee the request is byte-identical to
+        // before (ships DARK). The fee is carved from the SELL token (USDC), so the caller still
+        // approves EXACTLY sellAmount and just receives slightly less of the bought token. Capped
+        // ≤100 bps; recipient must be an address; only applied to EXECUTABLE (taker) quotes so
+        // previews stay a single call.
+        // ⚠️ Fabric's fee param = `feeBps` (spanDEX/Fabric family), NOT 0x's `swapFeeBps` — and the
+        // recipient may be APP-CONFIGURED on Fabric's side, not per-request (that's why an earlier
+        // `swapFeeBps` attempt returned `fees: []`). So try, most→least specific: (feeBps +
+        // feeRecipient) → (feeBps alone) → (no fee). The first request that SUCCEEDS wins; the clean
+        // quote is always the last fallback, so the swap NEVER breaks regardless of what Fabric takes.
         const cfgBps = parseInt(env.SPOT_FEE_BPS || "", 10);
         const cfgRecipient = env.SPOT_FEE_RECIPIENT || "";
-        const feeOn = Number.isInteger(cfgBps) && cfgBps > 0 && cfgBps <= 100 && /^0x[a-fA-F0-9]{40}$/.test(cfgRecipient);
-        const feeParams = feeOn ? { swapFeeBps: String(cfgBps), swapFeeRecipient: cfgRecipient, swapFeeToken: tokenIn } : null;
+        const takerValid = /^0x[a-fA-F0-9]{40}$/.test(taker);
+        const feeConfigured = Number.isInteger(cfgBps) && cfgBps > 0 && cfgBps <= 100 && /^0x[a-fA-F0-9]{40}$/.test(cfgRecipient);
+        const feeVariants = (feeConfigured && takerValid)
+          ? [{ feeBps: String(cfgBps), feeRecipient: cfgRecipient }, { feeBps: String(cfgBps) }]
+          : [];
+        const attempts = [...feeVariants, null]; // fee variants first; the clean quote (null) is last
 
-        // Fetch Fabric; if the fee-param request errors (a Fabric build that doesn't take fees),
-        // RETRY once WITHOUT them so the swap NEVER breaks — the fee is best-effort, the quote is not.
-        const fetchQuote = async (withFee) => {
-          const p = withFee && feeParams ? { ...base, ...feeParams } : base;
+        const fetchQuote = async (fee) => {
+          const p = fee ? { ...base, ...fee } : base;
           const r = await fetch(`https://route.withfabric.xyz/v1/quote?${new URLSearchParams(p).toString()}`, {
             headers: { "X-App-Id": appId, "Accept": "application/json" },
           });
           return { ok: r.ok, status: r.status, body: await r.json().catch(() => null) };
         };
-        let res = await fetchQuote(!!feeParams);
-        let feeAttempted = !!feeParams;
-        if (feeParams && (!res.ok || !res.body)) { res = await fetchQuote(false); feeAttempted = false; } // regression-proof
+        let res = { ok: false, status: 0, body: null };
+        let feeSent = null;
+        for (const fee of attempts) {
+          res = await fetchQuote(fee);
+          if (res.ok && res.body) { feeSent = fee ? Object.keys(fee) : null; break; } // first success wins
+        }
         const { ok: frOk, status: frStatus, body } = res;
         if (!frOk || !body) return json({ available: true, ok: false, status: frStatus, raw: body }, request, 200);
         // Normalization PINNED to Fabric's real 200 shape: amountOut = quote out amount;
@@ -5701,13 +5712,18 @@ document.getElementById("btn").addEventListener("click",go);
         const rt = body.transaction || body.tx || null;
         const tx = rt && rt.to ? { to: rt.to, data: rt.data ?? "0x", value: rt.value ?? "0" } : null;
         const minOut = body.minimumAmountOut ?? body.minAmountOut ?? body.minBuyAmount ?? null;
-        // Disclose a fee ONLY when the fee-param request succeeded AND Fabric echoes a fee object
-        // (0x-style `fees.integratorFee`). Conservative — never assert a fee the response doesn't
-        // confirm; `raw` carries ground truth for the first live verification of the echo shape.
-        const feeEcho = body.fees?.integratorFee ?? body.fees?.appFee ?? body.integratorFee ?? body.appFee ?? null;
-        const feeApplied = feeAttempted && feeEcho != null;
+        // Fee disclosure. Fabric returns `fees` as an ARRAY (seen live: `fees: []`), so read the
+        // first entry when populated; also tolerate an object shape. Disclose ONLY when a fee
+        // request succeeded (feeSent) AND the response actually carries a fee — never assert one the
+        // quote doesn't confirm. `feeConfigured`/`feeSent` are DIAGNOSTIC: on a live quote they
+        // reveal whether the worker read the env + which param variant Fabric accepted — no secret
+        // leak (config state + param KEYS only, never the recipient value).
+        const rf = body.fees;
+        const feeEcho = Array.isArray(rf) ? (rf.length ? rf[0] : null)
+          : (rf?.integratorFee ?? rf?.appFee ?? rf ?? null);
+        const feeApplied = feeSent != null && feeEcho != null;
         const feeBps = feeApplied ? cfgBps : 0;
-        return json({ available: true, ok: outAmount != null, router: "Fabric", outAmount, priceImpact, approval, tx, minOut, feeBps, feeApplied, raw: body }, request);
+        return json({ available: true, ok: outAmount != null, router: "Fabric", outAmount, priceImpact, approval, tx, minOut, feeBps, feeApplied, feeConfigured, feeSent, raw: body }, request);
       } catch (e) {
         return json({ available: true, ok: false, error: String(e) }, request);
       }
