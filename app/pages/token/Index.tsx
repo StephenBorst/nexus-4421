@@ -423,12 +423,22 @@ export default function TokenTerminal() {
         {wallet && <HoldingsStrip holdings={holdings} loading={holdingsLoading} onOpen={(h) => navigate(`/token/${encodeURIComponent(h.address || h.sym)}`)} />}
         {/* ── SEARCH ── Definitive's "Search CA or Token" */}
         <form onSubmit={(e) => { e.preventDefault(); submit(input); }} style={{ display: "flex", gap: 8, marginBottom: 16, maxWidth: 640 }}>
-          <input
-            value={input} onChange={(e) => setInput(e.target.value)}
-            placeholder="Search any token — symbol, name, or contract address"
-            spellCheck={false} autoCapitalize="off" autoCorrect="off"
-            style={{ flex: 1, minWidth: 0, background: CARD, border: `1px solid ${BORD}`, borderRadius: 8, color: BRIGHT, fontFamily: MONO, fontSize: 13, padding: "11px 14px", outline: "none" }}
-          />
+          {/* Relative wrapper so the one-tap clear (✕) sits inside the field — wiping a long
+              pasted CA in a single tap instead of holding backspace. mouseDown-preventDefault
+              keeps focus so the caret stays for a fresh type. */}
+          <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+            <input
+              value={input} onChange={(e) => setInput(e.target.value)}
+              placeholder="Search any token — symbol, name, or contract address"
+              spellCheck={false} autoCapitalize="off" autoCorrect="off"
+              style={{ width: "100%", background: CARD, border: `1px solid ${BORD}`, borderRadius: 8, color: BRIGHT, fontFamily: MONO, fontSize: 13, padding: "11px 40px 11px 14px", outline: "none", boxSizing: "border-box" }}
+            />
+            {input && (
+              <button type="button" aria-label="Clear search" title="Clear"
+                onMouseDown={(e) => e.preventDefault()} onClick={() => setInput("")}
+                style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", color: MUT, fontFamily: MONO, fontSize: 15, lineHeight: 1, cursor: "pointer", borderRadius: 6 }}>✕</button>
+            )}
+          </div>
           <button type="submit" style={{ flexShrink: 0, background: BRIGHT, color: "#0a0a0b", border: "none", borderRadius: 8, fontFamily: MONO, fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", padding: "0 18px", cursor: "pointer" }}>SEARCH</button>
         </form>
 
