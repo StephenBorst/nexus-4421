@@ -17,7 +17,8 @@
 //
 // Two independent fail-soft fetches: /intel/mispriced (fast, KV-cached market data)
 // and /theses/consensus (the caller lean), merged by coin here on the client.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAccount } from "@orderly.network/hooks";
 import { C, MONO, UI, RADIUS } from "@/config/theme";
 import { AGENT_API } from "./agentTypes";
@@ -310,14 +311,20 @@ function reversionSentence(coin: string, r: Reversion): string {
 // the phone head and the desktop footer can never put different words on the same read; the card
 // it links to is server-rendered from the canonical verdict, so the artifact can't drift either.
 function shareRead(m: Market, isFade: boolean, draftAnyway: boolean) {
+  // The share IS the board row — the firm's /signals PLAY and nothing else: symbol · verdict ·
+  // %/yr (· HIST n when a track record is flagged). No conviction/HIGH, no price outlook, no
+  // DexScreener MC. verdict names the side exactly as the card badge does; a WATCH shares as WATCH.
+  void draftAnyway; // kept for the call signature; the verdict below already encodes it
   const pct = `${m.fundingAnnualPct >= 0 ? "+" : ""}${m.fundingAnnualPct}%/yr`;
-  const text = isFade
-    ? `${m.coin} funding is stretched — the fade is ${m.direction} (${pct}). A positioning read on Nexus, graded from public price:`
-    : draftAnyway
-    ? `${m.coin} funding is stretched (${pct}) but fading it has historically underperformed — a watch, not a clean fade. The read on Nexus:`
-    : `${m.coin} funding is elevated (${pct}) but within its typical range — no fade yet. The read on Nexus:`;
+  const verdict = isFade ? `FADE ${m.direction}` : "WATCH";
+  const hist = m.edgeQuality ? ` · HIST ${m.edgeQuality.samples}` : "";
+  const text = `${m.coin} · ${verdict} · ${pct}${hist}`;
+  // Link opens the Board ROW itself — read-only guest (?guest=1 suppresses the wall), intel tab,
+  // scrolled + marked to this coin (?play=). The recipient lands on the firm's verdict, not a
+  // DexScreener token page or a static card.
+  const url = `https://trade.nexustradinglabs.com/lab?tab=intel&guest=1&play=${encodeURIComponent(m.coin)}`;
   window.open(
-    `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(`https://og.nexustradinglabs.com/share/read/${m.coin}`)}`,
+    `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
     "_blank", "noopener",
   );
 }
@@ -434,6 +441,12 @@ export function MispricedBoard() {
   const [openCoin, setOpenCoin] = useState<string | null>(null);
   const [pos, setPos] = useState<PosResp | null>(null);
   const [price, setPrice] = useState<{ t: number; c: number }[] | null>(null);
+  // Deep-link target (from a shared board link: /lab?tab=intel&guest=1&play=BTC) — scroll to that
+  // row and mark it once it renders. rowRefs collects every rendered card by coin.
+  const [searchParams] = useSearchParams();
+  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [markedCoin, setMarkedCoin] = useState<string | null>(null);
+  const playedRef = useRef(false);
 
   // On opening a market, pull its funding history (story-line) + reversion stat, AND the
   // price over the same window — so the SynthChart shows the fade thesis on EVERY market.
@@ -481,6 +494,19 @@ export function MispricedBoard() {
   const fair = useMemo(() => (markets || []).filter((m) => m.status !== "MISPRICED"), [markets]);
   const scanned = board?.scanned ?? 0;
   const mispricedCount = board?.mispricedCount ?? 0;
+
+  // Honor a shared board link's ?play=COIN: once the row for that coin has rendered, scroll it to
+  // center and mark it briefly. Fires ONCE (playedRef) so the 90s data refresh can't re-scroll.
+  useEffect(() => {
+    if (playedRef.current || !markets) return;
+    const play = (searchParams.get("play") || "").toUpperCase();
+    const el = play ? rowRefs.current[play] : null;
+    if (!play || !el) return; // no target, or its row isn't on the board right now
+    playedRef.current = true;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setMarkedCoin(play);
+    window.setTimeout(() => setMarkedCoin(null), 6000); // fire-and-forget un-mark
+  }, [markets, searchParams]);
 
   // Weave OBSERVE → PLAN: a stretched market is a thesis waiting to be written. Draft
   // the fade (symbol + direction + a funding catalyst) into the Thesis Engine for the
@@ -800,9 +826,9 @@ export function MispricedBoard() {
                   const { verdict, isFade, draftAnyway, weakEdge, tooSmall } = ticketVerdict(m, m.stretched ?? null);
                   const badgeColor = isFade ? C.accent : draftAnyway ? C.warn : C.text.muted;
                   return (
-                    <div key={m.symbol} onClick={() => setOpenCoin(m.coin)} title="Open this market"
+                    <div key={m.symbol} ref={(el: HTMLDivElement | null) => { rowRefs.current[m.coin] = el; }} onClick={() => setOpenCoin(m.coin)} title="Open this market"
                       className="nx-card-interactive"
-                      style={{ position: "relative", border: `1px solid ${C.borderStrong}`, borderLeft: `2px solid ${isFade ? C.accent : draftAnyway ? C.warn : C.borderStrong}`, borderRadius: RADIUS.lg, padding: "13px 15px 12px", background: "linear-gradient(180deg,#161619 0%,#101012 100%)", cursor: "pointer", overflow: "hidden" }}>
+                      style={{ position: "relative", border: `1px solid ${C.borderStrong}`, borderLeft: `2px solid ${isFade ? C.accent : draftAnyway ? C.warn : C.borderStrong}`, borderRadius: RADIUS.lg, padding: "13px 15px 12px", background: "linear-gradient(180deg,#161619 0%,#101012 100%)", cursor: "pointer", overflow: "hidden", scrollMarginTop: 80, boxShadow: markedCoin === m.coin ? `0 0 0 2px ${C.accent}` : undefined }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 11 }}>
                         <span style={{ fontFamily: MONO, fontSize: 15, fontWeight: 700, color: C.text.bright }}>{m.coin}</span>
                         <span style={{ fontFamily: MONO, fontSize: 8.5, color: C.text.faint }}>{fmtUsd(m.oiUsd)} open interest</span>
