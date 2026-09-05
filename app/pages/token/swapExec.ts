@@ -56,6 +56,8 @@ export interface BuyPlan {
   minOut: bigint | null;    // slippage floor (raw token units) — enforced on-chain
   decimals: number | null;  // tokenOut decimals for display (best-effort)
   priceImpactPct: number | null;
+  feeBps: number;           // Nexus fee in bps disclosed in the modal (0 = none). Taken INSIDE
+                            // Fabric's swap tx (carved from USDC input), so the approve is unchanged.
   spender: string;          // approve target (router / permit2)
   tx: { to: string; data: string };  // swap tx (value is asserted zero, forced 0x0 on send)
 }
@@ -105,7 +107,7 @@ export async function planBuy(dsChain: string, tokenOut: string, usd: number, ta
   const u = `${AGENT_API}/swap/quote?chain=${evm.chainId}&tokenIn=${evm.usdc}&tokenOut=${encodeURIComponent(tokenOut)}&amount=${sellAmount.toString()}&taker=${taker}`;
   const res = await fetch(u, { headers: { Accept: "application/json" } });
   const j = (await res.json().catch(() => null)) as {
-    ok?: boolean; router?: string; outAmount?: string | number; priceImpact?: unknown;
+    ok?: boolean; router?: string; outAmount?: string | number; priceImpact?: unknown; feeBps?: number;
     approval?: { token?: string; amount?: string | number; spender?: string } | null;
     tx?: { to?: string; data?: string; value?: string | number } | null; minOut?: string | number | null;
   } | null;
@@ -134,10 +136,12 @@ export async function planBuy(dsChain: string, tokenOut: string, usd: number, ta
   const decimals = await readDecimals(provider, tokenOut);
   const impact = Number(j.priceImpact);
 
+  const feeBps = Number.isInteger(j.feeBps) && (j.feeBps as number) > 0 ? (j.feeBps as number) : 0;
+
   return {
     router: j.router || "Fabric", chainId: evm.chainId, usdc: evm.usdc, tokenOut, taker,
     sellAmount, usd, outAmount, minOut, decimals,
-    priceImpactPct: Number.isFinite(impact) ? impact : null,
+    priceImpactPct: Number.isFinite(impact) ? impact : null, feeBps,
     spender: j.approval.spender!, tx: { to: j.tx.to!, data: j.tx.data! },
   };
 }

@@ -692,6 +692,7 @@ export default function TokenTerminal() {
             {!swapDone ? (
               <>
                 <ModalRow label="You pay" value={`$${plan.usd.toLocaleString("en-US", { maximumFractionDigits: 2 })}`} sub={`${plan.usd.toLocaleString("en-US", { maximumFractionDigits: 2 })} USDC · ${pair.chainId}`} />
+                {plan.feeBps > 0 && <ModalRow label="Nexus fee" value={`${plan.feeBps} bps`} sub="included in your input — not added on top" />}
                 <ModalRow label="Receive (est.)" value={fmtTokenAmount(plan.outAmount, plan.decimals) ? `${fmtTokenAmount(plan.outAmount, plan.decimals)} ${pair.baseSymbol}` : "—"} />
                 <ModalRow label="Minimum received" value={fmtTokenAmount(plan.minOut, plan.decimals) ? `${fmtTokenAmount(plan.minOut, plan.decimals)} ${pair.baseSymbol}` : "—"} sub={slippagePct(plan.outAmount, plan.minOut) != null ? `reverts below this · ≤${slippagePct(plan.outAmount, plan.minOut)!.toFixed(2)}% slippage` : "on-chain slippage floor applies"} accent />
                 <ModalRow label="Route" value={plan.router} />

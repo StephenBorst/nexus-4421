@@ -5656,26 +5656,42 @@ document.getElementById("btn").addEventListener("click",go);
         // never has to know a provider's dialect. `taker` is forwarded only when the client sends
         // it (the signing pass does) so Fabric binds the swap recipient to the caller; a bare
         // preview omits it and stays a pure quote.
-        const fp = { chainId: chain, sellToken: tokenIn, buyToken: tokenOut, sellAmount: amount };
-        if (/^0x[a-fA-F0-9]{40}$/.test(taker)) fp.taker = taker;
-        const q = new URLSearchParams(fp).toString();
-        const fr = await fetch(`https://route.withfabric.xyz/v1/quote?${q}`, {
-          headers: { "X-App-Id": appId, "Accept": "application/json" },
-        });
-        const body = await fr.json().catch(() => null);
-        if (!fr.ok || !body) return json({ available: true, ok: false, status: fr.status, raw: body }, request, 200);
-        // Normalization PINNED to Fabric's real 200 shape (verified from a live response):
-        //   amountOut = the quote out amount; priceImpactBps = impact in BASIS POINTS (50 = 0.5%).
-        // Normalize bps → percent so the client's priceImpactPct matches Jupiter's semantics.
+        const base = { chainId: chain, sellToken: tokenIn, buyToken: tokenOut, sellAmount: amount };
+        if (/^0x[a-fA-F0-9]{40}$/.test(taker)) base.taker = taker;
+
+        // ── optional Spot fee (Pass B) ── A small integrator fee taken by Fabric INSIDE the same
+        // swap tx (0x-style swapFeeBps/swapFeeRecipient/swapFeeToken) — no second transfer, no extra
+        // spender. Configured via SPOT_FEE_BPS + SPOT_FEE_RECIPIENT (OFF unless BOTH are set) so this
+        // ships DARK: with no fee set, the request is byte-identical to before. The fee is carved
+        // from the SELL token (USDC), so the caller still approves EXACTLY sellAmount and just
+        // receives slightly less of the bought token. Capped ≤100 bps; recipient must be an address.
+        const cfgBps = parseInt(env.SPOT_FEE_BPS || "", 10);
+        const cfgRecipient = env.SPOT_FEE_RECIPIENT || "";
+        const feeOn = Number.isInteger(cfgBps) && cfgBps > 0 && cfgBps <= 100 && /^0x[a-fA-F0-9]{40}$/.test(cfgRecipient);
+        const feeParams = feeOn ? { swapFeeBps: String(cfgBps), swapFeeRecipient: cfgRecipient, swapFeeToken: tokenIn } : null;
+
+        // Fetch Fabric; if the fee-param request errors (a Fabric build that doesn't take fees),
+        // RETRY once WITHOUT them so the swap NEVER breaks — the fee is best-effort, the quote is not.
+        const fetchQuote = async (withFee) => {
+          const p = withFee && feeParams ? { ...base, ...feeParams } : base;
+          const r = await fetch(`https://route.withfabric.xyz/v1/quote?${new URLSearchParams(p).toString()}`, {
+            headers: { "X-App-Id": appId, "Accept": "application/json" },
+          });
+          return { ok: r.ok, status: r.status, body: await r.json().catch(() => null) };
+        };
+        let res = await fetchQuote(!!feeParams);
+        let feeAttempted = !!feeParams;
+        if (feeParams && (!res.ok || !res.body)) { res = await fetchQuote(false); feeAttempted = false; } // regression-proof
+        const { ok: frOk, status: frStatus, body } = res;
+        if (!frOk || !body) return json({ available: true, ok: false, status: frStatus, raw: body }, request, 200);
+        // Normalization PINNED to Fabric's real 200 shape: amountOut = quote out amount;
+        // priceImpactBps = impact in BASIS POINTS. Normalize bps → percent to match Jupiter.
         const outAmount = body.amountOut ?? body.buyAmount ?? body.outAmount ?? null;
         const bps = Number(body.priceImpactBps);
         const priceImpact = Number.isFinite(bps) ? bps / 100
           : (body.estimatedPriceImpact ?? body.priceImpact ?? body.priceImpactPct ?? null);
-        // Execution route (present when Fabric returns one; only used by the gated in-app signing
-        // pass, never by the preview). Surface CLEAN normalized fields so the client reads fixed
-        // names instead of guessing inside `raw` — but keep `raw` too for verification. Nothing
-        // here decides to sign: the worker only relays what Fabric returned; the client validates
-        // token/amount/spender/minOut against what the user chose before it ever prompts a wallet.
+        // Execution route. Clean normalized fields (client reads fixed names, not `raw`); `raw` kept
+        // for verification. Nothing here decides to sign — the client validates before any prompt.
         const ra = body.approval || null;
         const approval = ra && (ra.spender || ra.to) ? {
           token: ra.token ?? ra.sellToken ?? tokenIn,
@@ -5685,7 +5701,13 @@ document.getElementById("btn").addEventListener("click",go);
         const rt = body.transaction || body.tx || null;
         const tx = rt && rt.to ? { to: rt.to, data: rt.data ?? "0x", value: rt.value ?? "0" } : null;
         const minOut = body.minimumAmountOut ?? body.minAmountOut ?? body.minBuyAmount ?? null;
-        return json({ available: true, ok: outAmount != null, router: "Fabric", outAmount, priceImpact, approval, tx, minOut, raw: body }, request);
+        // Disclose a fee ONLY when the fee-param request succeeded AND Fabric echoes a fee object
+        // (0x-style `fees.integratorFee`). Conservative — never assert a fee the response doesn't
+        // confirm; `raw` carries ground truth for the first live verification of the echo shape.
+        const feeEcho = body.fees?.integratorFee ?? body.fees?.appFee ?? body.integratorFee ?? body.appFee ?? null;
+        const feeApplied = feeAttempted && feeEcho != null;
+        const feeBps = feeApplied ? cfgBps : 0;
+        return json({ available: true, ok: outAmount != null, router: "Fabric", outAmount, priceImpact, approval, tx, minOut, feeBps, feeApplied, raw: body }, request);
       } catch (e) {
         return json({ available: true, ok: false, error: String(e) }, request);
       }
