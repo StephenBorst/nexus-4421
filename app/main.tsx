@@ -1,6 +1,6 @@
 import React, { lazy } from 'react';
 import ReactDOM from 'react-dom/client';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -36,8 +36,6 @@ const RewardsIndex = lazy(() => import('./pages/rewards/Index'));
 const RewardsAffiliate = lazy(() => import('./pages/rewards/Affiliate'));
 const VaultsLayout = lazy(() => import('./pages/vaults/Layout'));
 const VaultsIndex = lazy(() => import('./pages/vaults/Index'));
-const SwapLayout = lazy(() => import('./pages/swap/Layout'));
-const SwapIndex = lazy(() => import('./pages/swap/Index'));
 const TokenLayout = lazy(() => import('./pages/token/Layout'));
 const TokenIndex = lazy(() => import('./pages/token/Index'));
 const PointsLayout = lazy(() => import('./pages/points/Layout'));
@@ -228,13 +226,9 @@ const router = createBrowserRouter([
           { index: true, element: <VaultsIndex /> },
         ],
       },
-      {
-        path: 'swap',
-        element: <SwapLayout />,
-        children: [
-          { index: true, element: <SwapIndex /> },
-        ],
-      },
+      // Swap retired as a sibling app — /swap now lands on the Spot token terminal, so any old
+      // /swap link keeps working. WooFi (if it still quotes a major) returns later as a panel on Spot.
+      { path: 'swap', element: <Navigate to="/token" replace /> },
       {
         path: 'token',
         element: <TokenLayout />,

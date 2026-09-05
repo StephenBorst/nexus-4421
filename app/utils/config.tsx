@@ -5,6 +5,7 @@ import {
   BottomNavProps,
   FooterProps,
   MainNavWidgetProps,
+  MainNavItem as SdkNavItem,
 } from "@orderly.network/ui-scaffold";
 import { AppLogos } from "@orderly.network/react-app";
 import { OrderlyActiveIcon, OrderlyIcon } from "../components/icons/orderly";
@@ -278,20 +279,48 @@ export const useOrderlyConfig = () => {
   const messagesMenu = [{ name: "MESSAGES", href: "/messages" }];
   // INTEL lives as a tab inside LAB — not in the top nav
 
-const NAV_HREF_ORDER = ["/markets", "/", "/swap", "/vaults", "/portfolio", "/leaderboard", "/points", "/rewards"];
-const byHref = (href: string) => translatedEnabledMenus.find(m => m.href === href);
-const allMenuItems = [
-  ...NAV_HREF_ORDER.slice(0, 5).map(byHref).filter(Boolean),
+const byHref = (href: string): SdkNavItem | undefined => translatedEnabledMenus.find(m => m.href === href);
+
+// ── One door ── Trade (Orderly perps, the book) + Spot (the token terminal) lead the bar;
+// the utilities collapse under "More". Swap is retired from the nav (/swap → /token in the
+// router). Target bar: Markets · Trade · Spot · Lab · Feed · Proof · Portfolio · More.
+const marketsItem   = byHref("/markets");
+const tradeItem     = byHref("/");          // "Trading" → "Trade"
+const portfolioItem = byHref("/portfolio");
+
+// "More" overflow. The SDK renders a nav item's `children` as a desktop dropdown (it gates on
+// `children?.length`); the mobile drawer (CustomLeftNav) does NOT recurse into children, so it
+// gets a FLATTENED list instead (flatMenus below) — that's the "mobile flattens More" rule.
+const moreChildren: SdkNavItem[] = [
+  byHref("/vaults"),
+  ...arenaMenu,
+  ...analyzeMenu,            // Wallet X-Ray
+  byHref("/leaderboard"),
+  byHref("/points"),
+  byHref("/rewards"),
+  ...campaignsMenu,
+].filter(Boolean) as SdkNavItem[];
+
+// Primary bar, in order. Portfolio stays visible (moved to the tail, after Proof).
+const primaryMenus: SdkNavItem[] = [
+  marketsItem,
+  tradeItem ? { ...tradeItem, name: "Trade" } : undefined,
+  ...tokenMenu,             // Spot (/token)
   ...labMenu,
   ...feedMenu,
-  ...arenaMenu,
   ...proofMenu,
-  ...analyzeMenu,
-  ...tokenMenu,
-  ...NAV_HREF_ORDER.slice(5).map(byHref).filter(Boolean),
+  portfolioItem,
   ...customMenus,
-  ...campaignsMenu,
-] as typeof translatedEnabledMenus;
+].filter(Boolean) as SdkNavItem[];
+
+// Desktop = primary + the More dropdown. Parent href = a benign fallback (first child) for a
+// click on the label; `activeHrefs` keeps "More" lit while you're on any of its children.
+const moreMenu: SdkNavItem[] = moreChildren.length
+  ? [{ name: "More", href: moreChildren[0].href, activeHrefs: moreChildren.map((c) => c.href), children: moreChildren }]
+  : [];
+const allMenuItems: SdkNavItem[] = [...primaryMenus, ...moreMenu];
+// Mobile drawer = fully flat: primary + More's children inline, no "More" wrapper.
+const flatMenus: SdkNavItem[] = [...primaryMenus, ...moreChildren];
 
     const supportedBottomNavMenus = [
       "Trading",
@@ -341,7 +370,7 @@ const allMenuItems = [
           >
             {isMobile && (
               <CustomLeftNav
-                menus={allMenuItems}
+                menus={flatMenus}
                 externalLinks={customMenus}
               />
             )}
