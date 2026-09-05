@@ -5,7 +5,7 @@
 // execution — Nexus has no spot venue, so the CTA routes to where an order can actually
 // fill: our own perp page when the token is a listed Orderly market, else a deep-link to
 // the token's pool. No fake order tabs, no dead "Buy" button.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { generatePageTitle } from "@/utils/utils";
 import { getPageMeta } from "@/utils/seo";
@@ -19,7 +19,7 @@ import {
   fmtUsd, fmtPrice, fmtAge, shortAddr,
   type TokenPair, type Candle, type Trade, type NexusSignal, type SwapQuote,
 } from "./data";
-import { fetchHoldings, addRecent, optimisticHolding, type Holding } from "./holdings";
+import { fetchHoldings, addRecent, optimisticHolding, probeHeldToken, type Holding } from "./holdings";
 import { planBuy, executeBuy, explorerTx, fmtTokenAmount, slippagePct, type BuyPlan, type Eip1193 } from "./swapExec";
 
 // Fire the global copilot (mounted in App) with a token-context question. The same
@@ -265,6 +265,27 @@ export default function TokenTerminal() {
 
   const isPerp = !!pair && perpSet.has(pair.baseSymbol);
   const route = useMemo(() => (pair ? tradeLink(pair, isPerp) : null), [pair, isPerp]);
+
+  // ── auto-hydrate recents (Order 0) ── When a connected wallet lands on a token's Spot page and
+  // actually HOLDS it, remember it — so the chip self-heals across browsers/devices without a
+  // re-buy (recents lives in this browser's localStorage; a share link opened in a fresh jar, or
+  // a wallet's in-app browser vs Safari, would otherwise show nothing). Pure read, no signing.
+  // Guarded to one probe per wallet+token per session so the 25s stats refresh can't re-run it.
+  const hydratedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!wallet || !pair?.baseAddress || isPerp) return;
+    const ca = pair.baseAddress;
+    const key = `${wallet.toLowerCase()}:${pair.chainId}:${ca.toLowerCase()}`;
+    if (hydratedRef.current.has(key)) return;
+    hydratedRef.current.add(key);
+    let alive = true;
+    probeHeldToken(wallet, pair.chainId, ca).then((res) => {
+      if (!alive || !res) return;
+      addRecent(wallet, { ca, sym: pair.baseSymbol, chain: pair.chainId, decimals: res.decimals });
+      fetchHoldings(wallet).then((h) => { if (alive) setHoldings(h); }).catch(() => { /* keep current */ });
+    }).catch(() => { /* fail-soft */ });
+    return () => { alive = false; };
+  }, [pair, wallet, isPerp]);
 
   // ── swap QUOTE (non-perp only; preview, no signing) ──
   // Perp-listed names keep Long/Short on Nexus and are never probed — the venue is our own book.

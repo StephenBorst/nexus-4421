@@ -11,6 +11,7 @@ import { fmtUsd } from "./data";
 
 const ERC20_ABI = [
   { name: "balanceOf", type: "function", stateMutability: "view", inputs: [{ name: "a", type: "address" }], outputs: [{ name: "", type: "uint256" }] },
+  { name: "decimals", type: "function", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint8" }] },
 ] as const;
 
 // CORS-friendly public RPCs (the useNexusTier list) — chain default is rate-limited from a browser.
@@ -26,7 +27,7 @@ type Tok = { sym: string; addr: `0x${string}` | null; decimals: number; stable?:
 // pin a shared minimal shape (avoids a client union that TS won't let us call methods on).
 type BalanceClient = {
   getBalance: (args: { address: `0x${string}` }) => Promise<bigint>;
-  readContract: (args: { address: `0x${string}`; abi: typeof ERC20_ABI; functionName: "balanceOf"; args: [`0x${string}`] }) => Promise<bigint>;
+  readContract: (args: { address: `0x${string}`; abi: typeof ERC20_ABI; functionName: "balanceOf" | "decimals"; args: readonly unknown[] }) => Promise<bigint>;
 };
 // dsChain = the DexScreener chain slug the terminal links + prices with.
 const CHAINS: { chainId: number; dsChain: string; client: BalanceClient; native: string; nativePriceVia: `0x${string}`; tokens: Tok[] }[] = [
@@ -91,6 +92,27 @@ export function addRecent(address: string, token: RecentToken): void {
     const next = [{ ...token, ca }, ...getRecents(address).filter((r) => r.ca.toLowerCase() !== ca)].slice(0, RECENTS_CAP);
     localStorage.setItem(RECENTS_KEY(address), JSON.stringify(next));
   } catch { /* ignore */ }
+}
+
+// Auto-hydrate probe (Order 0): does `address` hold a nonzero balance of `ca` on `dsChain`, and
+// what are its decimals? Called when a connected wallet VIEWS a token's Spot page — if it holds
+// the token, we remember it so the chip self-heals across browsers/devices WITHOUT a re-buy (the
+// localStorage jar no longer has to be the one that made the purchase). Read-only, no signing.
+// null = chain we can't read / no balance / a read miss — so it never hydrates a token you don't
+// actually hold, and never throws to the UI.
+export async function probeHeldToken(address: string, dsChain: string, ca: string): Promise<{ decimals: number } | null> {
+  if (!isCa(address) || !isCa(ca)) return null;
+  const c = CHAINS.find((x) => x.dsChain === dsChain);
+  if (!c) return null; // no public client for this chain → can't read, skip
+  try {
+    const [raw, dec] = await Promise.all([
+      c.client.readContract({ address: ca as `0x${string}`, abi: ERC20_ABI, functionName: "balanceOf", args: [address as `0x${string}`] }),
+      c.client.readContract({ address: ca as `0x${string}`, abi: ERC20_ABI, functionName: "decimals", args: [] }),
+    ]);
+    if (!((raw as bigint) > 0n)) return null; // don't hold it → nothing to hydrate
+    const decimals = Number(dec);
+    return Number.isInteger(decimals) && decimals >= 0 && decimals <= 36 ? { decimals } : null;
+  } catch { return null; }
 }
 
 // Price a held token off DexScreener (the terminal's own feed) — stables are $1, native/others by
