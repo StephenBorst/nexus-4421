@@ -20,7 +20,7 @@ import {
   type TokenPair, type Candle, type Trade, type NexusSignal, type SwapQuote,
 } from "./data";
 import { fetchHoldings, addRecent, optimisticHolding, probeHeldToken, type Holding } from "./holdings";
-import { planBuy, executeBuy, explorerTx, fmtTokenAmount, slippagePct, type BuyPlan, type Eip1193 } from "./swapExec";
+import { planBuy, planSell, executeSwap, explorerTx, fmtTokenAmount, slippagePct, type SwapPlan, type Eip1193 } from "./swapExec";
 
 // Fire the global copilot (mounted in App) with a token-context question. The same
 // nexus:assistant-ask contract the Lab's "Ask Nexus" chips use.
@@ -175,6 +175,10 @@ export default function TokenTerminal() {
   const [perpSet, setPerpSet] = useState<Set<string>>(new Set());
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
+  // Perp-listed tokens can trade EITHER our own book (perp) OR spot — this picks which panel.
+  // Non-perp tokens are always spot. sellPct drives a SPOT SELL (a % of the on-chain balance).
+  const [venue, setVenue] = useState<"perp" | "spot">("perp");
+  const [sellPct, setSellPct] = useState(100);
   const [copied, setCopied] = useState(false);
   const [sig, setSig] = useState<NexusSignal | null>(null);
 
@@ -265,6 +269,12 @@ export default function TokenTerminal() {
 
   const isPerp = !!pair && perpSet.has(pair.baseSymbol);
   const route = useMemo(() => (pair ? tradeLink(pair, isPerp) : null), [pair, isPerp]);
+  // The SPOT route regardless of perp-listing — so a perp token can ALSO be spot-traded (the
+  // Perp/Spot optionality). `route` above stays perp-aware for the Long/Short CTA.
+  const spotRoute = useMemo(() => (pair ? tradeLink(pair, false) : null), [pair]);
+  // Reset to the book (perp) view when the token changes — keyed on the CA so a 25s price poll
+  // (which makes a new `pair` object) never flips the panel out from under the user.
+  useEffect(() => { setVenue("perp"); }, [pair?.baseAddress]);
 
   // ── auto-hydrate recents (Order 0) ── When a connected wallet lands on a token's Spot page and
   // actually HOLDS it, remember it — so the chip self-heals across browsers/devices without a
@@ -297,13 +307,15 @@ export default function TokenTerminal() {
     return Number.isFinite(a) && a > 0 ? Math.min(a, 100000) : 100;
   }, [amount]);
   useEffect(() => {
-    if (!pair || isPerp) { setQuote(null); return; }
+    // Probe the SPOT route for every token (perp included) so the Spot panel — and its in-app
+    // buy/sell gate — is available even on a listed-perp name (the Perp/Spot optionality).
+    if (!pair) { setQuote(null); return; }
     let alive = true;
     const t = setTimeout(() => {
       swapQuote(pair, probeUsd).then((q) => { if (alive) setQuote(q); }).catch(() => { if (alive) setQuote(null); });
     }, 450);
     return () => { alive = false; clearTimeout(t); };
-  }, [pair, isPerp, probeUsd]);
+  }, [pair, probeUsd]);
 
   // The fill affordance, resolved once so the button and the honesty line agree:
   //  perp     → Long/Short on our book (unchanged).
@@ -317,12 +329,13 @@ export default function TokenTerminal() {
   // swap actually finishes until in-app signing lands (the deep-link). They're the same for
   // Jupiter (its own app completes it) and differ for Fabric-on-EVM (route via Fabric, complete
   // on Uniswap) — so the badge and the button name the truth for each, never a merged fiction.
+  // The SPOT fill state (kind: quote | deeplink | noroute), computed for EVERY token — the perp
+  // Long/Short CTA is now a SEPARATE surface (showPerp below), so a listed perp offers both.
   const swapState = useMemo(() => {
-    if (isPerp) return { kind: "perp" as const };
-    if (quote && route) return { kind: "quote" as const, href: route.href, quoteRouter: quote.router, completeVenue: route.venue, impact: quote.priceImpactPct, probeUsd: quote.probeUsd };
-    if (route && route.href && route.href !== "#") return { kind: "deeplink" as const, href: route.href, venue: route.venue };
+    if (quote && spotRoute) return { kind: "quote" as const, href: spotRoute.href, quoteRouter: quote.router, completeVenue: spotRoute.venue, impact: quote.priceImpactPct, probeUsd: quote.probeUsd };
+    if (spotRoute && spotRoute.href && spotRoute.href !== "#") return { kind: "deeplink" as const, href: spotRoute.href, venue: spotRoute.venue };
     return { kind: "noroute" as const };
-  }, [isPerp, quote, route]);
+  }, [quote, spotRoute]);
   const estOut = useMemo(() => {
     const a = parseFloat(amount);
     if (!pair?.priceUsd || !Number.isFinite(a) || a <= 0) return null;
@@ -337,8 +350,23 @@ export default function TokenTerminal() {
   // an explicit confirm.
   const { wallet: wc } = useWalletConnector();
   const provider = (wc?.provider as Eip1193 | undefined) || undefined;
-  const canInApp = swapState.kind === "quote" && quote?.router === "Fabric" && side === "buy" && !!wallet && !!provider;
-  const [plan, setPlan] = useState<BuyPlan | null>(null);
+  // Venue routing: a perp token can show BOTH — Long/Short on our book (showPerp) AND the spot
+  // buy/sell panel (showSpot). A non-perp token is spot only. In-app fill is Fabric-on-EVM only.
+  const showPerp = isPerp && venue === "perp";
+  const showSpot = !isPerp || venue === "spot";
+  const fabricEvm = swapState.kind === "quote" && quote?.router === "Fabric" && !!wallet && !!provider;
+  const canInAppBuy = showSpot && side === "buy" && fabricEvm;
+  // The wallet's on-chain holding of THIS token (from the balance strip) — a SELL needs it.
+  const held = useMemo(() => {
+    const ca = pair?.baseAddress?.toLowerCase();
+    if (!ca || !pair) return undefined;
+    return holdings.find((h) => (h.address || "").toLowerCase() === ca && h.chain === pair.chainId);
+  }, [holdings, pair]);
+  const holdsToken = !!held && held.amount > 0;
+  const canInAppSell = showSpot && side === "sell" && fabricEvm && holdsToken;
+  const isSpotSell = showSpot && side === "sell";
+  const sellUsdEst = held && pair?.priceUsd ? held.amount * (sellPct / 100) * pair.priceUsd : null;
+  const [plan, setPlan] = useState<SwapPlan | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [swapBusy, setSwapBusy] = useState(false);
@@ -348,7 +376,7 @@ export default function TokenTerminal() {
 
   // A changed token/side/amount invalidates a captured plan — close + clear so the modal can
   // never sign against a plan the numbers on screen no longer match.
-  useEffect(() => { setModalOpen(false); setPlan(null); setSwapErr(null); setSwapDone(null); }, [pair, side, amount]);
+  useEffect(() => { setModalOpen(false); setPlan(null); setSwapErr(null); setSwapDone(null); }, [pair?.baseAddress, side, amount, sellPct, venue]);
 
   const openSwap = useCallback(async () => {
     const usd = parseFloat(amount);
@@ -364,29 +392,46 @@ export default function TokenTerminal() {
     } finally { setPlanning(false); }
   }, [pair, wallet, provider, amount]);
 
+  // SELL a % of the on-chain balance → USDC. planSell reads the balance + decimals FRESH and sizes
+  // the exact base-units amount, so MAX sells the whole balance without a float that overshoots.
+  const openSell = useCallback(async () => {
+    setSwapErr(null); setSwapDone(null);
+    if (!pair?.baseAddress || !wallet || !provider) return;
+    if (!holdsToken) { setSwapErr("You don't hold this token to sell."); return; }
+    setPlanning(true);
+    try {
+      const p = await planSell(pair.chainId, pair.baseAddress, sellPct, wallet, provider, pair.priceUsd ?? null);
+      setPlan(p); setModalOpen(true);
+    } catch (e) {
+      setSwapErr((e as Error)?.message || "Couldn't build the sell — use the deep-link.");
+    } finally { setPlanning(false); }
+  }, [pair, wallet, provider, sellPct, holdsToken]);
+
   const confirmSwap = useCallback(async () => {
     if (!plan || !wallet || !provider) return;
     setSwapBusy(true); setSwapErr(null); setSwapStep("preparing…");
     try {
-      const { swapHash, confirmed } = await executeBuy(provider, wallet, plan, setSwapStep);
+      const { swapHash, confirmed } = await executeSwap(provider, wallet, plan, setSwapStep);
       setSwapDone({ hash: swapHash });
-      // Follow the fill: on a CONFIRMED (status=1) buy, remember the bought token per-wallet and
-      // optimistically show its chip, then reconcile the whole strip from chain (USDC drops, the
-      // bought token appears via recents). No indexer — recents just widens the balance sweep.
-      if (confirmed && pair?.baseAddress && plan.decimals != null) {
-        addRecent(wallet, { ca: pair.baseAddress, sym: pair.baseSymbol, chain: pair.chainId, decimals: plan.decimals });
-        if (plan.outAmount != null) {
-          const chip = optimisticHolding(pair.baseSymbol, pair.chainId, pair.baseAddress, plan.outAmount, plan.decimals, pair.priceUsd ?? null);
-          setHoldings((h) => [chip, ...h.filter((x) => !((x.address || "").toLowerCase() === pair.baseAddress.toLowerCase() && x.chain === pair.chainId))]);
+      // Follow the fill on a CONFIRMED (status=1) swap. BUY: remember the bought token + show an
+      // optimistic chip, then reconcile from chain. SELL: the balance just dropped (USDC rose) —
+      // nothing to remember, just reconcile the strip. Either way, refetch from chain.
+      if (confirmed && pair?.baseAddress) {
+        if (plan.dir === "buy" && plan.decimalsOut != null) {
+          addRecent(wallet, { ca: pair.baseAddress, sym: pair.baseSymbol, chain: pair.chainId, decimals: plan.decimalsOut });
+          if (plan.outAmount != null) {
+            const chip = optimisticHolding(pair.baseSymbol, pair.chainId, pair.baseAddress, plan.outAmount, plan.decimalsOut, pair.priceUsd ?? null);
+            setHoldings((h) => [chip, ...h.filter((x) => !((x.address || "").toLowerCase() === pair.baseAddress.toLowerCase() && x.chain === pair.chainId))]);
+          }
         }
-        fetchHoldings(wallet).then(setHoldings).catch(() => { /* keep the optimistic chip */ });
+        fetchHoldings(wallet).then(setHoldings).catch(() => { /* keep what's shown */ });
       }
     } catch (e) {
       const m = (e as Error)?.message || "swap failed";
-      setSwapErr(
-        /insufficient|exceeds balance|transfer amount exceeds/i.test(m) ? "Not enough USDC (+ a little ETH for gas) on this network."
-        : /user rejected|user denied|rejected the request|4001/i.test(m) ? "Cancelled in your wallet."
-        : m);
+      const lowBal = /insufficient|exceeds balance|transfer amount exceeds/i.test(m)
+        ? (plan.dir === "sell" ? `Not enough ${pair?.baseSymbol ?? "token"} (+ a little ETH for gas) on this network.` : "Not enough USDC (+ a little ETH for gas) on this network.")
+        : null;
+      setSwapErr(lowBal ?? (/user rejected|user denied|rejected the request|4001/i.test(m) ? "Cancelled in your wallet." : m));
     } finally { setSwapBusy(false); setSwapStep(""); }
   }, [plan, wallet, provider, pair]);
 
@@ -599,84 +644,136 @@ export default function TokenTerminal() {
 
               {/* trade panel — honest routing, no fake fills */}
               <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, padding: 14 }}>
+                {/* Perp/Spot venue — a listed perp trades BOTH our book AND spot; the toggle picks
+                    which. Non-perp tokens are spot only (no toggle). */}
+                {isPerp && (
+                  <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                    {(["perp", "spot"] as const).map((v) => (
+                      <button key={v} onClick={() => setVenue(v)} style={{ flex: 1, fontFamily: MONO, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: venue === v ? BRIGHT : MUT, background: venue === v ? "#ededf015" : "none", border: `1px solid ${venue === v ? "#ededf055" : BORD}`, borderRadius: 7, padding: "7px 0", cursor: "pointer" }}>
+                        {v === "perp" ? "Perp · our book" : "Spot"}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* side — Long/Short on the perp book, Buy/Sell on spot */}
                 <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
                   {(["buy", "sell"] as const).map((s) => (
-                    <button key={s} onClick={() => setSide(s)} style={{ flex: 1, fontFamily: MONO, fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: side === s ? "#0a0a0b" : s === "buy" ? POS : NEG, background: side === s ? (s === "buy" ? POS : NEG) : "none", border: `1px solid ${s === "buy" ? POS : NEG}55`, borderRadius: 7, padding: "9px 0", cursor: "pointer" }}>{isPerp ? (s === "buy" ? "Long" : "Short") : s}</button>
+                    <button key={s} onClick={() => setSide(s)} style={{ flex: 1, fontFamily: MONO, fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: side === s ? "#0a0a0b" : s === "buy" ? POS : NEG, background: side === s ? (s === "buy" ? POS : NEG) : "none", border: `1px solid ${s === "buy" ? POS : NEG}55`, borderRadius: 7, padding: "9px 0", cursor: "pointer" }}>{showPerp ? (s === "buy" ? "Long" : "Short") : s}</button>
                   ))}
                 </div>
 
-                <div style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: FAINT, textTransform: "uppercase", marginBottom: 5 }}>Amount (USD)</div>
-                <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="0.00"
-                  style={{ width: "100%", background: BG, border: `1px solid ${BORD}`, borderRadius: 8, color: BRIGHT, fontFamily: MONO, fontSize: 18, fontWeight: 600, padding: "10px 12px", outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
-                <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-                  {[50, 100, 250, 1000].map((v) => (
-                    <button key={v} onClick={() => setAmount(String(v))} style={{ flex: 1, fontFamily: MONO, fontSize: 10, color: MUT, background: BG, border: `1px solid ${BORD}`, borderRadius: 5, padding: "5px 0", cursor: "pointer" }}>${v}</button>
-                  ))}
-                </div>
+                {/* amount — USD for a buy / Long / Short; % of your on-chain balance for a SPOT SELL */}
+                {isSpotSell ? (
+                  <>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: FAINT, textTransform: "uppercase", marginBottom: 5 }}>
+                      <span>Sell amount</span>
+                      {held ? <span style={{ color: MUT }}>bal {held.amountLabel} {pair.baseSymbol}</span> : <span>no balance detected</span>}
+                    </div>
+                    <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                      {[25, 50, 100].map((v) => (
+                        <button key={v} onClick={() => setSellPct(v)} style={{ flex: 1, fontFamily: MONO, fontSize: 12, fontWeight: 700, color: sellPct === v ? "#0a0a0b" : MUT, background: sellPct === v ? NEG : BG, border: `1px solid ${sellPct === v ? NEG : BORD}`, borderRadius: 6, padding: "9px 0", cursor: "pointer" }}>{v === 100 ? "MAX" : `${v}%`}</button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: FAINT, textTransform: "uppercase", marginBottom: 5 }}>Amount (USD)</div>
+                    <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="0.00"
+                      style={{ width: "100%", background: BG, border: `1px solid ${BORD}`, borderRadius: 8, color: BRIGHT, fontFamily: MONO, fontSize: 18, fontWeight: 600, padding: "10px 12px", outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
+                    <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                      {[50, 100, 250, 1000].map((v) => (
+                        <button key={v} onClick={() => setAmount(String(v))} style={{ flex: 1, fontFamily: MONO, fontSize: 10, color: MUT, background: BG, border: `1px solid ${BORD}`, borderRadius: 5, padding: "5px 0", cursor: "pointer" }}>${v}</button>
+                      ))}
+                    </div>
+                  </>
+                )}
 
                 <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 11, color: MUT, marginBottom: 4 }}>
-                  <span>Est. {side === "buy" ? "output" : "value"}</span>
-                  <span style={{ color: BRIGHT }}>{estOut != null ? `${estOut.toLocaleString("en-US", { maximumFractionDigits: estOut >= 1 ? 2 : 6 })} ${pair.baseSymbol}` : "—"}</span>
+                  <span>Est. {isSpotSell || side === "sell" ? "value" : "output"}</span>
+                  <span style={{ color: BRIGHT }}>{isSpotSell
+                    ? (sellUsdEst != null ? `~$${sellUsdEst.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—")
+                    : (estOut != null ? `${estOut.toLocaleString("en-US", { maximumFractionDigits: estOut >= 1 ? 2 : 6 })} ${pair.baseSymbol}` : "—")}</span>
                 </div>
 
-                {/* route-confirmed preview badge — a real quote (Jupiter / Fabric), not price math */}
-                {swapState.kind === "quote" && (
+                {/* route-confirmed preview badge (spot only) — a real quote (Jupiter / Fabric) */}
+                {showSpot && swapState.kind === "quote" && (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, fontFamily: MONO, fontSize: 10.5, color: POS }}>
                     <span>✓ Route via {swapState.quoteRouter}</span>
                     {swapState.impact != null && <span style={{ color: swapState.impact >= 3 ? NEG : MUT }}>~{swapState.impact.toFixed(swapState.impact >= 1 ? 1 : 2)}% impact · ${Math.round(swapState.probeUsd).toLocaleString("en-US")}</span>}
                   </div>
                 )}
 
-                {swapState.kind === "perp" && route && (
+                {/* ── PERP: Long/Short on our own book ── */}
+                {showPerp && route && (
                   <a href={route.href}
                     style={{ display: "block", textAlign: "center", marginTop: 12, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: side === "buy" ? POS : NEG, borderRadius: 9, padding: "13px 0", textDecoration: "none" }}>
                     {side === "buy" ? "Long" : "Short"} {pair.baseSymbol} on Nexus →
                   </a>
                 )}
-                {/* in-app swap when we can sign it (Fabric · buy · wallet); the deep-link stays,
-                    demoted to a secondary line, so there's always the honest fallback. */}
-                {swapState.kind === "quote" && canInApp && (
+
+                {/* ── SPOT: in-app buy/sell when we can sign it (Fabric · EVM · wallet), else the
+                       honest deep-link. A SELL also needs a detected on-chain balance to size it. ── */}
+                {showSpot && (
                   <>
-                    <button onClick={openSwap} disabled={planning}
-                      style={{ display: "block", width: "100%", textAlign: "center", marginTop: 8, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: POS, border: "none", borderRadius: 9, padding: "13px 0", cursor: planning ? "wait" : "pointer", opacity: planning ? 0.7 : 1 }}>
-                      {planning ? "Building route…" : `Swap ${pair.baseSymbol} in-app →`}
-                    </button>
-                    <a href={swapState.href} target="_blank" rel="noopener noreferrer"
-                      style={{ display: "block", textAlign: "center", marginTop: 8, fontFamily: MONO, fontSize: 10.5, color: MUT, textDecoration: "none" }}>
-                      or complete on {swapState.completeVenue} ↗
-                    </a>
+                    {side === "buy" && swapState.kind === "quote" && canInAppBuy && (
+                      <>
+                        <button onClick={openSwap} disabled={planning}
+                          style={{ display: "block", width: "100%", textAlign: "center", marginTop: 8, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: POS, border: "none", borderRadius: 9, padding: "13px 0", cursor: planning ? "wait" : "pointer", opacity: planning ? 0.7 : 1 }}>
+                          {planning ? "Building route…" : `Buy ${pair.baseSymbol} in-app →`}
+                        </button>
+                        <a href={swapState.href} target="_blank" rel="noopener noreferrer"
+                          style={{ display: "block", textAlign: "center", marginTop: 8, fontFamily: MONO, fontSize: 10.5, color: MUT, textDecoration: "none" }}>
+                          or complete on {swapState.completeVenue} ↗
+                        </a>
+                      </>
+                    )}
+                    {side === "sell" && swapState.kind === "quote" && canInAppSell && (
+                      <>
+                        <button onClick={openSell} disabled={planning}
+                          style={{ display: "block", width: "100%", textAlign: "center", marginTop: 8, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#fff", background: NEG, border: "none", borderRadius: 9, padding: "13px 0", cursor: planning ? "wait" : "pointer", opacity: planning ? 0.7 : 1 }}>
+                          {planning ? "Building route…" : `Sell ${pair.baseSymbol} in-app →`}
+                        </button>
+                        <a href={swapState.href} target="_blank" rel="noopener noreferrer"
+                          style={{ display: "block", textAlign: "center", marginTop: 8, fontFamily: MONO, fontSize: 10.5, color: MUT, textDecoration: "none" }}>
+                          or complete on {swapState.completeVenue} ↗
+                        </a>
+                      </>
+                    )}
+                    {/* quote route but no in-app fill (no wallet, non-Fabric, or — for a sell — no
+                        detected balance) → the honest deep-link, which fills either direction. */}
+                    {swapState.kind === "quote" && !(side === "buy" ? canInAppBuy : canInAppSell) && (
+                      <a href={swapState.href} target="_blank" rel="noopener noreferrer"
+                        style={{ display: "block", textAlign: "center", marginTop: 8, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: BRIGHT, borderRadius: 9, padding: "13px 0", textDecoration: "none" }}>
+                        {side === "sell" ? "Sell" : "Buy"} {pair.baseSymbol} on {swapState.completeVenue} →
+                      </a>
+                    )}
+                    {swapState.kind === "deeplink" && (
+                      <a href={swapState.href} target="_blank" rel="noopener noreferrer"
+                        style={{ display: "block", textAlign: "center", marginTop: 12, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: BRIGHT, borderRadius: 9, padding: "13px 0", textDecoration: "none" }}>
+                        {side === "sell" ? "Sell" : "Swap"} {pair.baseSymbol} on {swapState.venue} →
+                      </a>
+                    )}
+                    {swapState.kind === "noroute" && (
+                      <div style={{ textAlign: "center", marginTop: 12, fontFamily: MONO, fontSize: 12, fontWeight: 700, letterSpacing: "0.03em", color: FAINT, background: "none", border: `1px solid ${BORD}`, borderRadius: 9, padding: "12px 0", cursor: "not-allowed" }}>
+                        No route
+                      </div>
+                    )}
                     {swapErr && !modalOpen && <div style={{ fontFamily: MONO, fontSize: 10.5, color: NEG, marginTop: 8, textAlign: "center" }}>{swapErr}</div>}
                   </>
-                )}
-                {swapState.kind === "quote" && !canInApp && (
-                  <a href={swapState.href} target="_blank" rel="noopener noreferrer"
-                    style={{ display: "block", textAlign: "center", marginTop: 8, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: BRIGHT, borderRadius: 9, padding: "13px 0", textDecoration: "none" }}>
-                    Swap {pair.baseSymbol} on {swapState.completeVenue} →
-                  </a>
-                )}
-                {swapState.kind === "deeplink" && (
-                  <a href={swapState.href} target="_blank" rel="noopener noreferrer"
-                    style={{ display: "block", textAlign: "center", marginTop: 12, fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: BRIGHT, borderRadius: 9, padding: "13px 0", textDecoration: "none" }}>
-                    Swap {pair.baseSymbol} on {swapState.venue} →
-                  </a>
-                )}
-                {swapState.kind === "noroute" && (
-                  <div style={{ textAlign: "center", marginTop: 12, fontFamily: MONO, fontSize: 12, fontWeight: 700, letterSpacing: "0.03em", color: FAINT, background: "none", border: `1px solid ${BORD}`, borderRadius: 9, padding: "12px 0", cursor: "not-allowed" }}>
-                    No route
-                  </div>
                 )}
 
                 {/* honesty: where the order actually fills */}
                 <div style={{ fontFamily: UI, fontSize: 10.5, lineHeight: 1.5, color: FAINT, marginTop: 10 }}>
-                  {swapState.kind === "perp"
-                    ? <>Nexus lists {pair.baseSymbol} as a perp — you trade it here, on our book, graded like every Nexus position.</>
+                  {showPerp
+                    ? <>Nexus lists {pair.baseSymbol} as a perp — trade it here on our book, graded like every Nexus position{isPerp ? <>, or switch to <b style={{ color: MUT }}>Spot</b> to buy/sell the token itself</> : null}.</>
                     : swapState.kind === "quote"
-                    ? (canInApp
+                    ? ((side === "buy" ? canInAppBuy : canInAppSell)
                       ? <>Route + price from <b style={{ color: MUT }}>{swapState.quoteRouter}</b> — you sign the swap in your own wallet (exact-amount approval, minimum-received enforced on-chain). Non-custodial. The read is ours.</>
-                      : <>Route + price from <b style={{ color: MUT }}>{swapState.quoteRouter}</b>{swapState.completeVenue !== swapState.quoteRouter ? <>; you complete on <b style={{ color: MUT }}>{swapState.completeVenue}</b> until in-app swap lands</> : <> — preview only, in-app signing is coming</>}. The read is ours.</>)
+                      : <>Route + price from <b style={{ color: MUT }}>{swapState.quoteRouter}</b>{side === "sell" && !holdsToken ? <> — connect the wallet holding {pair.baseSymbol} to sell in-app; meanwhile you complete on <b style={{ color: MUT }}>{swapState.completeVenue}</b></> : swapState.completeVenue !== swapState.quoteRouter ? <>; you complete on <b style={{ color: MUT }}>{swapState.completeVenue}</b></> : <> — preview only</>}. The read is ours.</>)
                     : swapState.kind === "deeplink"
                     ? <>Nexus doesn’t run a spot book for {pair.baseSymbol}, so we route you to <b style={{ color: MUT }}>{swapState.venue}</b> where it can fill. The read is ours; the swap is theirs.</>
-                    : <>No router quotes {pair.baseSymbol} right now — no honest fill to offer, so we don’t fake a Buy. The read above still stands.</>}
+                    : <>No router quotes {pair.baseSymbol} right now — no honest fill to offer, so we don’t fake it. The read above still stands.</>}
                 </div>
               </div>
             </div>
@@ -699,17 +796,28 @@ export default function TokenTerminal() {
               <button onClick={closeSwap} disabled={swapBusy} style={{ background: "none", border: "none", color: swapBusy ? FAINT : MUT, fontSize: 16, cursor: swapBusy ? "default" : "pointer", lineHeight: 1 }}>✕</button>
             </div>
 
-            {!swapDone ? (
+            {(() => {
+              // Dir-aware display: BUY = USDC → token; SELL = token → USDC. The plan's guards are
+              // identical either way; only the labels flip.
+              const isSell = plan.dir === "sell";
+              const usdStr = (plan.usd ?? 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
+              const payAmt = isSell ? (fmtTokenAmount(plan.amountIn, plan.decimalsIn) ?? "—") : `$${usdStr}`;
+              const recvFmt = fmtTokenAmount(plan.outAmount, plan.decimalsOut);
+              const recvVal = recvFmt ? (isSell ? `~$${recvFmt}` : `${recvFmt} ${pair.baseSymbol}`) : "—";
+              const minFmt = fmtTokenAmount(plan.minOut, plan.decimalsOut);
+              const minVal = minFmt ? (isSell ? `~$${minFmt}` : `${minFmt} ${pair.baseSymbol}`) : "—";
+              const approveStr = isSell ? `${payAmt} ${pair.baseSymbol}` : `$${usdStr} of USDC`;
+              return !swapDone ? (
               <>
-                <ModalRow label="You pay" value={`$${plan.usd.toLocaleString("en-US", { maximumFractionDigits: 2 })}`} sub={`${plan.usd.toLocaleString("en-US", { maximumFractionDigits: 2 })} USDC · ${pair.chainId}`} />
-                {plan.feeBps > 0 && <ModalRow label="Nexus fee" value={`${plan.feeBps} bps`} sub="included in your input — not added on top" />}
-                <ModalRow label="Receive (est.)" value={fmtTokenAmount(plan.outAmount, plan.decimals) ? `${fmtTokenAmount(plan.outAmount, plan.decimals)} ${pair.baseSymbol}` : "—"} />
-                <ModalRow label="Minimum received" value={fmtTokenAmount(plan.minOut, plan.decimals) ? `${fmtTokenAmount(plan.minOut, plan.decimals)} ${pair.baseSymbol}` : "—"} sub={slippagePct(plan.outAmount, plan.minOut) != null ? `reverts below this · ≤${slippagePct(plan.outAmount, plan.minOut)!.toFixed(2)}% slippage` : "on-chain slippage floor applies"} accent />
+                <ModalRow label={isSell ? "You sell" : "You pay"} value={isSell ? `${payAmt} ${pair.baseSymbol}` : payAmt} sub={isSell ? `on ${pair.chainId}` : `${usdStr} USDC · ${pair.chainId}`} />
+                {plan.feeBps > 0 && <ModalRow label="Nexus fee" value={`${plan.feeBps} bps`} sub="included in the swap — not added on top" />}
+                <ModalRow label="Receive (est.)" value={recvVal} />
+                <ModalRow label="Minimum received" value={minVal} sub={slippagePct(plan.outAmount, plan.minOut) != null ? `reverts below this · ≤${slippagePct(plan.outAmount, plan.minOut)!.toFixed(2)}% slippage` : "on-chain slippage floor applies"} accent />
                 <ModalRow label="Route" value={plan.router} />
                 {plan.priceImpactPct != null && <ModalRow label="Price impact" value={`~${plan.priceImpactPct.toFixed(plan.priceImpactPct >= 1 ? 1 : 2)}%`} danger={plan.priceImpactPct >= 3} />}
 
                 <div style={{ fontFamily: UI, fontSize: 10, lineHeight: 1.5, color: FAINT, margin: "12px 0 14px" }}>
-                  You approve <b style={{ color: MUT }}>exactly ${plan.usd.toLocaleString("en-US", { maximumFractionDigits: 2 })}</b> of USDC (never more), then sign the swap — both in your own wallet. Non-custodial: Nexus never holds your funds or keys.
+                  You approve <b style={{ color: MUT }}>exactly {approveStr}</b> (never more), then sign the swap — both in your own wallet. Non-custodial: Nexus never holds your funds or keys.
                 </div>
 
                 {swapBusy && <div style={{ fontFamily: MONO, fontSize: 11, color: POS, marginBottom: 10, textAlign: "center" }}>{swapStep || "working…"}</div>}
@@ -720,17 +828,16 @@ export default function TokenTerminal() {
                   <button onClick={confirmSwap} disabled={swapBusy} style={{ flex: 2, fontFamily: MONO, fontSize: 12, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: POS, border: "none", borderRadius: 8, padding: "11px 0", cursor: swapBusy ? "wait" : "pointer", opacity: swapBusy ? 0.7 : 1 }}>{swapBusy ? "Confirming…" : "Confirm swap"}</button>
                 </div>
               </>
-            ) : (
+              ) : (
               <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
                 <div style={{ fontSize: 28, marginBottom: 8, color: POS }}>✓</div>
                 <div style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: POS, marginBottom: 6 }}>Swap sent</div>
-                <div style={{ fontFamily: UI, fontSize: 11, color: MUT, marginBottom: 14 }}>Your {pair.baseSymbol} lands once it confirms on-chain.</div>
+                <div style={{ fontFamily: UI, fontSize: 11, color: MUT, marginBottom: 14 }}>{isSell ? "Your USDC" : `Your ${pair.baseSymbol}`} lands once it confirms on-chain.</div>
 
-                {/* share-on-swap card (Pass A) — the fact + a link to the token's Spot page.
-                    Verdict-only: no E[R], no conviction score, no lifetime PnL. */}
+                {/* share-on-swap card — the fact + a link to the token's Spot page. Verdict-only. */}
                 <div style={{ background: BG, border: `1px solid ${BORD}`, borderRadius: 8, padding: "10px 12px", marginBottom: 14, textAlign: "left" }}>
-                  <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.08em", color: FAINT, marginBottom: 3 }}>{pair.baseSymbol} · BOUGHT ON NEXUS</div>
-                  <div style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: BRIGHT, marginBottom: 9 }}>{fmtTokenAmount(plan.outAmount, plan.decimals) ?? "—"} {pair.baseSymbol}</div>
+                  <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.08em", color: FAINT, marginBottom: 3 }}>{pair.baseSymbol} · {isSell ? "SOLD" : "BOUGHT"} ON NEXUS</div>
+                  <div style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: BRIGHT, marginBottom: 9 }}>{isSell ? `${payAmt} ${pair.baseSymbol} → ${recvVal}` : `${recvFmt ?? "—"} ${pair.baseSymbol}`}</div>
                   <button onClick={copyShare} style={{ width: "100%", fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.03em", color: shareCopied ? POS : BRIGHT, background: "none", border: `1px solid ${shareCopied ? "#3ecf8e88" : BORD}`, borderRadius: 7, padding: "9px 0", cursor: "pointer" }}>
                     {shareCopied ? "✓ Link copied" : `Copy ${pair.baseSymbol} link ↗`}
                   </button>
@@ -741,7 +848,8 @@ export default function TokenTerminal() {
                 )}
                 <button onClick={closeSwap} style={{ display: "block", width: "100%", fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "#0a0a0b", background: BRIGHT, border: "none", borderRadius: 8, padding: "11px 0", cursor: "pointer" }}>Done</button>
               </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       )}
