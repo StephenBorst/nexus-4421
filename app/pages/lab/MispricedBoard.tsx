@@ -583,23 +583,34 @@ export function MispricedBoard() {
     } catch { /* non-browser — ignore */ }
   };
 
-  // Secondary execution CTA on a board card: a LISTED perp trades on our own book (/perp —
-  // Long/Short), a NON-listed symbol goes to Spot (/token). Never Spot for a listed perp —
-  // those execute on Nexus. Guest-safe: both routes are viewable unauthed (the wallet wall is
-  // at order/swap time, not here). Unknown listed-ness (set still loading) defaults to LISTED
-  // so a listed perp can't flash a Spot link. stopPropagation so the tap doesn't also open the
-  // ticket via the card's onClick.
-  const tradeCta = (m: Market) => {
+  // Execution row on a board card. Spot shows on EVERY card — any FADE/WATCH read is buyable on
+  // Spot — routing to the /token DEX-router terminal (NOT an Orderly spot book). A LISTED perp
+  // ADDITIONALLY plays our own book (Long/Short on /perp): Spot is ADDITIVE, never a replacement.
+  // A non-listed symbol shows Spot only (no book to play). Guest-safe: both routes are viewable
+  // unauthed (the wallet wall is at order/swap time). Unknown listed-ness (set still loading)
+  // shows the book play too — board coins are all listed, so it's correct on load. stopPropagation
+  // so a tap doesn't also open the ticket via the card's onClick.
+  const tradeRow = (m: Market) => {
     const listed = perpSet ? perpSet.has(m.coin) : true;
-    const href = listed ? `/perp/PERP_${m.coin}_USDC` : `/token/${encodeURIComponent(m.coin)}`;
+    const perpHref = `/perp/PERP_${m.coin}_USDC`;
+    const spotHref = `/token/${encodeURIComponent(m.coin)}`;
     return (
-      <a href={href} onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigate(href); }}
-        title={listed ? `Trade ${m.coin} on Nexus` : `${m.coin} isn't a listed perp — buy it on Spot`}
-        className="nx-press" style={{
-          flexShrink: 0, fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
-          color: C.text.muted, background: "none", border: `1px solid ${C.border}`, borderRadius: RADIUS.md,
-          padding: "8px 12px", cursor: "pointer", textDecoration: "none", whiteSpace: "nowrap",
-        }}>{listed ? "Long / Short ↗" : "Trade on Spot ↗"}</a>
+      <div style={{ display: "flex", gap: 8 }}>
+        {listed && (
+          <a href={perpHref} onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigate(perpHref); }}
+            title={`Long / Short ${m.coin} on Nexus`} className="nx-press" style={{
+              flex: 1, textAlign: "center", fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
+              color: C.text.muted, background: "none", border: `1px solid ${C.border}`, borderRadius: RADIUS.md,
+              padding: "8px 10px", cursor: "pointer", textDecoration: "none", whiteSpace: "nowrap",
+            }}>Long / Short ↗</a>
+        )}
+        <a href={spotHref} onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigate(spotHref); }}
+          title={`Buy ${m.coin} on Spot`} className="nx-press" style={{
+            flex: 1, textAlign: "center", fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
+            color: C.text.muted, background: "none", border: `1px solid ${C.border}`, borderRadius: RADIUS.md,
+            padding: "8px 10px", cursor: "pointer", textDecoration: "none", whiteSpace: "nowrap",
+          }}>Trade on Spot ↗</a>
+      </div>
     );
   };
 
@@ -890,23 +901,23 @@ export function MispricedBoard() {
                         <span style={{ color: C.text.faint, textTransform: "uppercase", letterSpacing: "0.12em", fontSize: 8.5 }}>Top callers</span>
                         <Callers m={m} lean={l} />
                       </div>
-                      {/* Actions — the whole loop on one card, guest-safe. FADE → Draft the
-                          frozen-R thesis right here (no wallet; wallet only on Publish). WATCH →
-                          open to read, never Draft-as-fade. Secondary routes to REAL execution:
-                          a listed perp to Long/Short on our book, a non-listed symbol to Spot. */}
-                      <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
+                      {/* Actions — the whole loop on one card, guest-safe. Row 1: FADE → Draft the
+                          frozen-R thesis right here (no wallet; wallet only on Publish); WATCH → open
+                          to read, never Draft-as-fade. Row 2: execution — Spot on EVERY card, plus
+                          Long/Short on our book for a listed perp (additive, never instead of Spot). */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 11 }}>
                         {isFade ? (
                           <button onClick={(e) => { e.stopPropagation(); draftFade(m); }} title="Draft this fade into the Thesis Engine — no wallet needed (wallet only on Publish)" style={{
-                            flex: 1, fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+                            width: "100%", fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
                             color: C.accent, border: `1px solid ${C.borderStrong}`, borderRadius: RADIUS.md, padding: 8, background: "transparent", cursor: "pointer",
                           }}>Draft this fade →</button>
                         ) : (
                           <button onClick={(e) => { e.stopPropagation(); setOpenCoin(m.coin); }} style={{
-                            flex: 1, fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+                            width: "100%", fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
                             color: C.text.muted, border: `1px solid ${C.border}`, borderRadius: RADIUS.md, padding: 8, background: "transparent", cursor: "pointer",
                           }}>→ Open &amp; size</button>
                         )}
-                        {tradeCta(m)}
+                        {tradeRow(m)}
                       </div>
                     </div>
                   );
