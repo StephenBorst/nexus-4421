@@ -5663,22 +5663,22 @@ document.getElementById("btn").addEventListener("click",go);
         // swap tx — no second transfer, no extra spender. Configured via SPOT_FEE_BPS +
         // SPOT_FEE_RECIPIENT (OFF unless BOTH set) so with no fee the request is byte-identical to
         // before (ships DARK). The fee is carved from the SELL token (USDC), so the caller still
-        // approves EXACTLY sellAmount and just receives slightly less of the bought token. Capped
-        // ≤100 bps; recipient must be an address; only applied to EXECUTABLE (taker) quotes so
-        // previews stay a single call.
-        // ⚠️ Fabric's fee param = `feeBps` (spanDEX/Fabric family), NOT 0x's `swapFeeBps` — and the
-        // recipient may be APP-CONFIGURED on Fabric's side, not per-request (that's why an earlier
-        // `swapFeeBps` attempt returned `fees: []`). So try, most→least specific: (feeBps +
-        // feeRecipient) → (feeBps alone) → (no fee). The first request that SUCCEEDS wins; the clean
-        // quote is always the last fallback, so the swap NEVER breaks regardless of what Fabric takes.
+        // approves EXACTLY sellAmount and just receives slightly less of the bought token. Only
+        // applied to EXECUTABLE (taker) quotes so previews stay a single call.
+        // ⚠️ CONFIRMED from Fabric/spanDEX docs (spandex.sh/configuration/fees): the params are
+        // `integratorSwapFeeBps` + `integratorFeeAddress` (the recipient IS per-request), NOT
+        // feeBps/swapFeeBps. Fabric's MAX is ~0.1% = 10 bps — a larger value is silently ignored
+        // (that's why 25 never applied). So cap ≤10 and send the documented pair. Regression-proof:
+        // if Fabric errors on them, fall back to a clean quote so the swap never breaks. (Optional
+        // future: integratorSurplusBps for a positive-slippage cut.)
         const cfgBps = parseInt(env.SPOT_FEE_BPS || "", 10);
         const cfgRecipient = env.SPOT_FEE_RECIPIENT || "";
         const takerValid = /^0x[a-fA-F0-9]{40}$/.test(taker);
-        const feeConfigured = Number.isInteger(cfgBps) && cfgBps > 0 && cfgBps <= 100 && /^0x[a-fA-F0-9]{40}$/.test(cfgRecipient);
-        const feeVariants = (feeConfigured && takerValid)
-          ? [{ feeBps: String(cfgBps), feeRecipient: cfgRecipient }, { feeBps: String(cfgBps) }]
-          : [];
-        const attempts = [...feeVariants, null]; // fee variants first; the clean quote (null) is last
+        const feeConfigured = Number.isInteger(cfgBps) && cfgBps > 0 && cfgBps <= 10 && /^0x[a-fA-F0-9]{40}$/.test(cfgRecipient);
+        const feeParams = (feeConfigured && takerValid)
+          ? { integratorFeeAddress: cfgRecipient, integratorSwapFeeBps: String(cfgBps) }
+          : null;
+        const attempts = feeParams ? [feeParams, null] : [null]; // fee first; clean quote is the fallback
 
         const fetchQuote = async (fee) => {
           const p = fee ? { ...base, ...fee } : base;
