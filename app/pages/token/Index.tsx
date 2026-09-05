@@ -289,6 +289,7 @@ export default function TokenTerminal() {
   const [venue, setVenue] = useState<"perp" | "spot">("perp");
   const [sellAmt, setSellAmt] = useState("");
   const [sellMax, setSellMax] = useState(false);
+  const [sellUnit, setSellUnit] = useState<"token" | "usd">("token"); // type the sell in tokens or $
   const [tradeOpen, setTradeOpen] = useState(true); // collapse the buy/sell panel to give the chart room
   const [copied, setCopied] = useState(false);
   const [sig, setSig] = useState<NexusSignal | null>(null);
@@ -496,8 +497,12 @@ export default function TokenTerminal() {
   const holdsToken = !!held && held.amount > 0;
   const canInAppSell = showSpot && side === "sell" && fabricEvm && holdsToken;
   const isSpotSell = showSpot && side === "sell";
-  const sellTokens = sellMax && held ? held.amount : (parseFloat(sellAmt) || 0);
-  const sellUsdEst = held && pair?.priceUsd ? sellTokens * pair.priceUsd : null;
+  // The token quantity a SELL resolves to, in EITHER unit (MAX = whole balance; USD = $/price).
+  const sellPrice = pair?.priceUsd || 0;
+  const sellTokens = sellMax && held ? held.amount
+    : sellUnit === "usd" ? (sellPrice > 0 ? (parseFloat(sellAmt) || 0) / sellPrice : 0)
+    : (parseFloat(sellAmt) || 0);
+  const sellUsdEst = held && sellPrice > 0 ? sellTokens * sellPrice : null;
   const [plan, setPlan] = useState<SwapPlan | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [planning, setPlanning] = useState(false);
@@ -508,7 +513,7 @@ export default function TokenTerminal() {
 
   // A changed token/side/amount invalidates a captured plan — close + clear so the modal can
   // never sign against a plan the numbers on screen no longer match.
-  useEffect(() => { setModalOpen(false); setPlan(null); setSwapErr(null); setSwapDone(null); }, [pair?.baseAddress, side, amount, sellAmt, sellMax, venue]);
+  useEffect(() => { setModalOpen(false); setPlan(null); setSwapErr(null); setSwapDone(null); }, [pair?.baseAddress, side, amount, sellAmt, sellMax, sellUnit, venue]);
 
   const openSwap = useCallback(async () => {
     const usd = parseFloat(amount);
@@ -530,15 +535,21 @@ export default function TokenTerminal() {
     setSwapErr(null); setSwapDone(null);
     if (!pair?.baseAddress || !wallet || !provider) return;
     if (!holdsToken) { setSwapErr("You don't hold this token to sell."); return; }
-    if (!sellMax && !(parseFloat(sellAmt) > 0)) { setSwapErr("Enter an amount to sell."); return; }
+    // Resolve the typed amount to a TOKEN quantity. Token mode passes the exact typed string (no
+    // float round-trip); USD mode converts $/price to tokens. planSell still reads the on-chain
+    // balance and clamps to it, so a stale price can never oversell — the modal shows the real qty.
+    const price = pair.priceUsd || 0;
+    const tokens = sellUnit === "usd" ? (price > 0 ? (parseFloat(sellAmt) || 0) / price : 0) : (parseFloat(sellAmt) || 0);
+    if (!sellMax && !(tokens > 0)) { setSwapErr(sellUnit === "usd" && price <= 0 ? "No price to size a USD sell — switch to token amount." : "Enter an amount to sell."); return; }
+    const req = sellMax ? { pct: 100 } : { amountStr: sellUnit === "usd" ? tokens.toLocaleString("en-US", { useGrouping: false, maximumFractionDigits: 18 }) : sellAmt };
     setPlanning(true);
     try {
-      const p = await planSell(pair.chainId, pair.baseAddress, sellMax ? { pct: 100 } : { amountStr: sellAmt }, wallet, provider, pair.priceUsd ?? null);
+      const p = await planSell(pair.chainId, pair.baseAddress, req, wallet, provider, pair.priceUsd ?? null);
       setPlan(p); setModalOpen(true);
     } catch (e) {
       setSwapErr((e as Error)?.message || "Couldn't build the sell — use the deep-link.");
     } finally { setPlanning(false); }
-  }, [pair, wallet, provider, sellAmt, sellMax, holdsToken]);
+  }, [pair, wallet, provider, sellAmt, sellMax, sellUnit, holdsToken]);
 
   const confirmSwap = useCallback(async () => {
     if (!plan || !wallet || !provider) return;
@@ -794,20 +805,26 @@ export default function TokenTerminal() {
                     a SPOT SELL, with 25/50/MAX quick-fills that populate the field. */}
                 {isSpotSell ? (
                   <>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: FAINT, textTransform: "uppercase", marginBottom: 5 }}>
-                      <span>Sell amount ({pair.baseSymbol})</span>
-                      {held ? <span style={{ color: MUT }}>bal {held.amountLabel}</span> : <span>no balance detected</span>}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: FAINT, textTransform: "uppercase", marginBottom: 5 }}>
+                      <span>Sell{held ? ` · bal ${held.amountLabel} ${pair.baseSymbol}` : " · no balance"}</span>
+                      {/* unit toggle — type the amount in tokens or in $ */}
+                      <span style={{ display: "flex", gap: 4 }}>
+                        {(["token", "usd"] as const).map((u) => (
+                          <button key={u} onClick={() => { setSellUnit(u); setSellAmt(""); setSellMax(false); }} style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.06em", color: sellUnit === u ? BRIGHT : FAINT, background: sellUnit === u ? "#ededf012" : "none", border: `1px solid ${sellUnit === u ? "#ededf033" : BORD}`, borderRadius: 5, padding: "3px 7px", cursor: "pointer", textTransform: "uppercase" }}>{u === "usd" ? "USD" : pair.baseSymbol}</button>
+                        ))}
+                      </span>
                     </div>
-                    <input value={sellAmt} onChange={(e) => { setSellAmt(e.target.value.replace(/[^0-9.]/g, "")); setSellMax(false); }} inputMode="decimal" placeholder="0.0"
+                    <input value={sellAmt} onChange={(e) => { setSellAmt(e.target.value.replace(/[^0-9.]/g, "")); setSellMax(false); }} inputMode="decimal" placeholder={sellUnit === "usd" ? "$0.00" : "0.0"}
                       style={{ width: "100%", background: BG, border: `1px solid ${BORD}`, borderRadius: 8, color: BRIGHT, fontFamily: MONO, fontSize: 18, fontWeight: 600, padding: "10px 12px", outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
                     <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
                       {[25, 50, 100].map((v) => {
                         const active = v === 100 && sellMax;
+                        const fill = (frac: number) => sellUnit === "usd" && sellPrice > 0 ? String(Number((frac * sellPrice).toFixed(2))) : String(Number(frac.toFixed(6)));
                         return (
                           <button key={v} disabled={!held} onClick={() => {
                             if (!held) return;
-                            if (v >= 100) { setSellMax(true); setSellAmt(String(held.amount)); }
-                            else { setSellMax(false); setSellAmt(String(Number((held.amount * v / 100).toFixed(6)))); }
+                            if (v >= 100) { setSellMax(true); setSellAmt(fill(held.amount)); }
+                            else { setSellMax(false); setSellAmt(fill(held.amount * v / 100)); }
                           }} style={{ flex: 1, fontFamily: MONO, fontSize: 11, fontWeight: 700, color: active ? "#0a0a0b" : held ? MUT : FAINT, background: active ? NEG : BG, border: `1px solid ${active ? NEG : BORD}`, borderRadius: 6, padding: "7px 0", cursor: held ? "pointer" : "not-allowed" }}>{v === 100 ? "MAX" : `${v}%`}</button>
                         );
                       })}
