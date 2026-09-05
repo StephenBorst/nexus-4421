@@ -165,7 +165,6 @@ export default function TokenTerminal() {
   const navigate = useNavigate();
   const [input, setInput] = useState(query || "");
   const [pair, setPair] = useState<TokenPair | null>(null);
-  const [alts, setAlts] = useState<TokenPair[]>([]);
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [candles, setCandles] = useState<Candle[]>([]);
@@ -176,9 +175,10 @@ export default function TokenTerminal() {
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
   // Perp-listed tokens can trade EITHER our own book (perp) OR spot — this picks which panel.
-  // Non-perp tokens are always spot. sellPct drives a SPOT SELL (a % of the on-chain balance).
+  // A SPOT SELL is sized by a typed token amount (sellAmt) or MAX (sellMax = the whole balance).
   const [venue, setVenue] = useState<"perp" | "spot">("perp");
-  const [sellPct, setSellPct] = useState(100);
+  const [sellAmt, setSellAmt] = useState("");
+  const [sellMax, setSellMax] = useState(false);
   const [copied, setCopied] = useState(false);
   const [sig, setSig] = useState<NexusSignal | null>(null);
 
@@ -203,15 +203,15 @@ export default function TokenTerminal() {
 
   // ── resolve the searched token → the deepest pair ──
   useEffect(() => {
-    if (!query) { setPair(null); setAlts([]); setNotFound(false); return; }
+    if (!query) { setPair(null); setNotFound(false); return; }
     let alive = true;
     setLoading(true); setNotFound(false);
     // independent watchdog: never leave the terminal on a spinner if the fetch hangs
     const paint = setTimeout(() => { if (alive) setLoading(false); }, 6500);
     searchToken(query)
-      .then(({ best, alts }) => {
+      .then(({ best }) => {
         if (!alive) return;
-        setPair(best); setAlts(alts); setNotFound(!best);
+        setPair(best); setNotFound(!best);
       })
       .catch(() => { if (alive) { setPair(null); setNotFound(true); } })
       .finally(() => { if (alive) { setLoading(false); clearTimeout(paint); } });
@@ -365,7 +365,8 @@ export default function TokenTerminal() {
   const holdsToken = !!held && held.amount > 0;
   const canInAppSell = showSpot && side === "sell" && fabricEvm && holdsToken;
   const isSpotSell = showSpot && side === "sell";
-  const sellUsdEst = held && pair?.priceUsd ? held.amount * (sellPct / 100) * pair.priceUsd : null;
+  const sellTokens = sellMax && held ? held.amount : (parseFloat(sellAmt) || 0);
+  const sellUsdEst = held && pair?.priceUsd ? sellTokens * pair.priceUsd : null;
   const [plan, setPlan] = useState<SwapPlan | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [planning, setPlanning] = useState(false);
@@ -376,7 +377,7 @@ export default function TokenTerminal() {
 
   // A changed token/side/amount invalidates a captured plan — close + clear so the modal can
   // never sign against a plan the numbers on screen no longer match.
-  useEffect(() => { setModalOpen(false); setPlan(null); setSwapErr(null); setSwapDone(null); }, [pair?.baseAddress, side, amount, sellPct, venue]);
+  useEffect(() => { setModalOpen(false); setPlan(null); setSwapErr(null); setSwapDone(null); }, [pair?.baseAddress, side, amount, sellAmt, sellMax, venue]);
 
   const openSwap = useCallback(async () => {
     const usd = parseFloat(amount);
@@ -398,14 +399,15 @@ export default function TokenTerminal() {
     setSwapErr(null); setSwapDone(null);
     if (!pair?.baseAddress || !wallet || !provider) return;
     if (!holdsToken) { setSwapErr("You don't hold this token to sell."); return; }
+    if (!sellMax && !(parseFloat(sellAmt) > 0)) { setSwapErr("Enter an amount to sell."); return; }
     setPlanning(true);
     try {
-      const p = await planSell(pair.chainId, pair.baseAddress, sellPct, wallet, provider, pair.priceUsd ?? null);
+      const p = await planSell(pair.chainId, pair.baseAddress, sellMax ? { pct: 100 } : { amountStr: sellAmt }, wallet, provider, pair.priceUsd ?? null);
       setPlan(p); setModalOpen(true);
     } catch (e) {
       setSwapErr((e as Error)?.message || "Couldn't build the sell — use the deep-link.");
     } finally { setPlanning(false); }
-  }, [pair, wallet, provider, sellPct, holdsToken]);
+  }, [pair, wallet, provider, sellAmt, sellMax, holdsToken]);
 
   const confirmSwap = useCallback(async () => {
     if (!plan || !wallet || !provider) return;
@@ -549,29 +551,17 @@ export default function TokenTerminal() {
                 <Stat label="24h Sells" value={pair.sells24h != null ? pair.sells24h.toLocaleString() : "—"} color={NEG} />
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
                 {pair.baseAddress && (
-                  <button onClick={copyCa} title="Copy contract address" style={{ display: "flex", alignItems: "center", gap: 5, background: BG, border: `1px solid ${BORD}`, borderRadius: 6, color: MUT, fontFamily: MONO, fontSize: 10, padding: "6px 9px", cursor: "pointer" }}>
+                  <button onClick={copyCa} title="Copy contract address" className="nx-press" style={{ display: "inline-flex", alignItems: "center", gap: 6, background: BG, border: `1px solid ${copied ? "#3ecf8e88" : BORD}`, borderRadius: 7, color: copied ? POS : MUT, fontFamily: MONO, fontSize: 10.5, padding: "6px 11px", cursor: "pointer", lineHeight: 1 }}>
                     <span>{copied ? "copied ✓" : shortAddr(pair.baseAddress)}</span>
+                    {!copied && <span style={{ color: FAINT, fontSize: 11 }}>⧉</span>}
                   </button>
                 )}
-                {pair.websites[0] && <a href={pair.websites[0]} target="_blank" rel="noopener noreferrer" style={{ fontFamily: MONO, fontSize: 11, color: MUT, textDecoration: "none", border: `1px solid ${BORD}`, borderRadius: 6, padding: "6px 9px" }}>web ↗</a>}
-                {pair.socials.filter((s) => /twitter|x/i.test(s.type)).slice(0, 1).map((s) => <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: MONO, fontSize: 11, color: MUT, textDecoration: "none", border: `1px solid ${BORD}`, borderRadius: 6, padding: "6px 9px" }}>𝕏 ↗</a>)}
+                {pair.websites[0] && <a href={pair.websites[0]} target="_blank" rel="noopener noreferrer" className="nx-press" style={{ display: "inline-flex", alignItems: "center", fontFamily: MONO, fontSize: 10.5, color: MUT, textDecoration: "none", border: `1px solid ${BORD}`, borderRadius: 7, padding: "6px 11px", lineHeight: 1 }}>web ↗</a>}
+                {pair.socials.filter((s) => /twitter|x/i.test(s.type)).slice(0, 1).map((s) => <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" className="nx-press" style={{ display: "inline-flex", alignItems: "center", fontFamily: MONO, fontSize: 10.5, color: MUT, textDecoration: "none", border: `1px solid ${BORD}`, borderRadius: 7, padding: "6px 11px", lineHeight: 1 }}>𝕏 ↗</a>)}
               </div>
             </div>
-
-            {/* did-you-mean (ambiguous ticker) */}
-            {alts.length > 0 && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-                <span style={{ fontFamily: MONO, fontSize: 9.5, color: FAINT, textTransform: "uppercase", letterSpacing: "0.08em" }}>Other pairs</span>
-                {alts.map((a) => (
-                  <button key={a.pairAddress} onClick={() => { setPair(a); setAlts((prev) => [pair, ...prev.filter((p) => p.pairAddress !== a.pairAddress)].slice(0, 4)); }}
-                    style={{ fontFamily: MONO, fontSize: 10, color: MUT, background: CARD, border: `1px solid ${BORD}`, borderRadius: 6, padding: "5px 9px", cursor: "pointer" }}>
-                    {a.baseSymbol}/{a.quoteSymbol} · {a.chainId} · {fmtUsd(a.liquidityUsd)}
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* body: chart + tape (left) · trade panel (right) */}
             <div style={{ display: isMobile ? "block" : "grid", gridTemplateColumns: "1fr 320px", gap: 12, alignItems: "start" }}>
@@ -663,17 +653,27 @@ export default function TokenTerminal() {
                   ))}
                 </div>
 
-                {/* amount — USD for a buy / Long / Short; % of your on-chain balance for a SPOT SELL */}
+                {/* amount — USD for a buy / Long / Short; a typed token amount (any size, or MAX) for
+                    a SPOT SELL, with 25/50/MAX quick-fills that populate the field. */}
                 {isSpotSell ? (
                   <>
                     <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.1em", color: FAINT, textTransform: "uppercase", marginBottom: 5 }}>
-                      <span>Sell amount</span>
-                      {held ? <span style={{ color: MUT }}>bal {held.amountLabel} {pair.baseSymbol}</span> : <span>no balance detected</span>}
+                      <span>Sell amount ({pair.baseSymbol})</span>
+                      {held ? <span style={{ color: MUT }}>bal {held.amountLabel}</span> : <span>no balance detected</span>}
                     </div>
+                    <input value={sellAmt} onChange={(e) => { setSellAmt(e.target.value.replace(/[^0-9.]/g, "")); setSellMax(false); }} inputMode="decimal" placeholder="0.0"
+                      style={{ width: "100%", background: BG, border: `1px solid ${BORD}`, borderRadius: 8, color: BRIGHT, fontFamily: MONO, fontSize: 18, fontWeight: 600, padding: "10px 12px", outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
                     <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-                      {[25, 50, 100].map((v) => (
-                        <button key={v} onClick={() => setSellPct(v)} style={{ flex: 1, fontFamily: MONO, fontSize: 12, fontWeight: 700, color: sellPct === v ? "#0a0a0b" : MUT, background: sellPct === v ? NEG : BG, border: `1px solid ${sellPct === v ? NEG : BORD}`, borderRadius: 6, padding: "9px 0", cursor: "pointer" }}>{v === 100 ? "MAX" : `${v}%`}</button>
-                      ))}
+                      {[25, 50, 100].map((v) => {
+                        const active = v === 100 && sellMax;
+                        return (
+                          <button key={v} disabled={!held} onClick={() => {
+                            if (!held) return;
+                            if (v >= 100) { setSellMax(true); setSellAmt(String(held.amount)); }
+                            else { setSellMax(false); setSellAmt(String(Number((held.amount * v / 100).toFixed(6)))); }
+                          }} style={{ flex: 1, fontFamily: MONO, fontSize: 11, fontWeight: 700, color: active ? "#0a0a0b" : held ? MUT : FAINT, background: active ? NEG : BG, border: `1px solid ${active ? NEG : BORD}`, borderRadius: 6, padding: "7px 0", cursor: held ? "pointer" : "not-allowed" }}>{v === 100 ? "MAX" : `${v}%`}</button>
+                        );
+                      })}
                     </div>
                   </>
                 ) : (

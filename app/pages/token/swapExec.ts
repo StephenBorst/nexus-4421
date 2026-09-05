@@ -186,18 +186,26 @@ export async function planBuy(dsChain: string, tokenOut: string, usd: number, ta
   return plan;
 }
 
-// SELL: token → USDC. `pct` (1–100) of the FRESH on-chain balance; 100 = the exact whole balance.
-// `priceUsd` (optional) only powers a soft sanity cap on the notional — the real safety is the
-// exact-amount approve + the on-chain minOut. Refuses if decimals or balance can't be read, or
-// there's nothing to sell.
-export async function planSell(dsChain: string, tokenIn: string, pct: number, taker: string, provider: Eip1193, priceUsd: number | null): Promise<SwapPlan> {
+// Parse a human token amount (e.g. "16251.7231") to base units WITHOUT float — pad/truncate the
+// fractional part to `dec` digits and read as a BigInt. Null on a malformed string.
+function parseTokenUnits(s: string, dec: number): bigint | null {
+  const t = (s || "").trim();
+  if (!/^\d*\.?\d*$/.test(t) || t === "" || t === ".") return null;
+  const [w, f = ""] = t.split(".");
+  const frac = (f + "0".repeat(dec)).slice(0, dec);
+  try { return BigInt(((w || "0") + frac).replace(/^0+(?=\d)/, "")); } catch { return null; }
+}
+
+// SELL: token → USDC. `req` is either an exact `pct` (1–100) of the fresh on-chain balance (100 =
+// the whole balance) OR a typed `amountStr` in tokens (parsed to base units, CLAMPED to the balance
+// so "sell whatever" can never oversell). `priceUsd` only powers a soft notional cap — the real
+// safety is the exact-amount approve + on-chain minOut. Refuses if decimals/balance can't be read.
+export async function planSell(dsChain: string, tokenIn: string, req: { pct?: number; amountStr?: string }, taker: string, provider: Eip1193, priceUsd: number | null): Promise<SwapPlan> {
   const evm = EVM_USDC[dsChain];
   if (!evm) throw new Error("In-app swap isn't available on this chain — use the deep-link.");
   if (!isAddr(tokenIn)) throw new Error("Missing token address.");
   if (!isAddr(taker)) throw new Error("Connect a wallet to swap in-app.");
   if (tokenIn.toLowerCase() === evm.usdc.toLowerCase()) throw new Error("That's already USDC.");
-  const p = Math.round(pct);
-  if (!(p >= 1 && p <= 100)) throw new Error("Pick how much to sell.");
 
   // Decimals + balance are read FRESH on-chain — a SELL is sized off the chain, never a cached float.
   const decimalsIn = await readDecimals(provider, tokenIn);
@@ -206,10 +214,21 @@ export async function planSell(dsChain: string, tokenIn: string, pct: number, ta
   if (balance == null) throw new Error("Couldn't read your balance — try again or use the deep-link.");
   if (balance <= 0n) throw new Error("You don't hold this token to sell.");
 
-  // Integer math only. 100% (MAX) sells the EXACT whole balance; a partial floors down, so the
-  // amount can never exceed what's held.
-  const amountIn = p >= 100 ? balance : (balance * BigInt(p)) / 100n;
-  if (amountIn <= 0n) throw new Error("That amount rounds to zero — pick a larger slice.");
+  // Integer math only, ALWAYS bounded by the live balance. A % floors down; a typed amount is
+  // clamped to the balance; 100% / an over-balance amount sells the EXACT whole balance.
+  let amountIn: bigint;
+  if (req.pct != null) {
+    const p = Math.round(req.pct);
+    if (!(p >= 1 && p <= 100)) throw new Error("Pick how much to sell.");
+    amountIn = p >= 100 ? balance : (balance * BigInt(p)) / 100n;
+  } else if (req.amountStr != null) {
+    const wanted = parseTokenUnits(req.amountStr, decimalsIn);
+    if (wanted == null || wanted <= 0n) throw new Error("Enter an amount to sell.");
+    amountIn = wanted > balance ? balance : wanted;
+  } else {
+    throw new Error("Pick how much to sell.");
+  }
+  if (amountIn <= 0n) throw new Error("That amount rounds to zero — enter a larger amount.");
 
   // Soft notional cap (mirrors the buy's $100k ceiling) when we have a price. Never fatal to safety.
   if (priceUsd && priceUsd > 0) {
