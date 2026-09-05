@@ -16,9 +16,11 @@ import { SectionHeader } from "@/pages/lab/components";
 import { FADE_FUNDING_FLOOR_PCT_YR } from "@/pages/lab/briefing";
 import {
   searchToken, poolCandles, poolTrades, orderlyPerpSet, nexusSignal, swapQuote, chartOverlays,
+  fetchTakes, postTake, deleteTake,
   fmtUsd, fmtTapeUsd, fmtPrice, fmtAge, shortAddr,
-  type TokenPair, type Candle, type Trade, type NexusSignal, type SwapQuote, type CallMark, type LiqMap,
+  type TokenPair, type Candle, type Trade, type NexusSignal, type SwapQuote, type CallMark, type LiqMap, type Take,
 } from "./data";
+import { SocialBar } from "@/components/SocialBar";
 import { fetchHoldings, addRecent, getRecents, optimisticHolding, probeHeldToken, type Holding } from "./holdings";
 import { planBuy, planSell, executeSwap, explorerTx, fmtTokenAmount, slippagePct, EVM_USDC, type SwapPlan, type Eip1193 } from "./swapExec";
 
@@ -36,6 +38,16 @@ const WETH_BY_CHAIN: Record<string, string> = {
 // nexus:assistant-ask contract the Lab's "Ask Nexus" chips use.
 function askNexus(prompt: string) {
   window.dispatchEvent(new CustomEvent("nexus:assistant-ask", { detail: { prompt } }));
+}
+
+// Relative age for a TAKE (createdAt is ms).
+function takeAge(ts: number): string {
+  const m = Math.floor((Date.now() - ts) / 60000);
+  const h = Math.floor(m / 60), d = Math.floor(h / 24);
+  if (d > 0) return `${d}d`;
+  if (h > 0) return `${h}h`;
+  if (m > 0) return `${m}m`;
+  return "now";
 }
 
 // The graded funding verdict for a listed market, read EXACTLY as the Board reads it (the server
@@ -305,6 +317,13 @@ export default function TokenTerminal() {
   const [sellOut, setSellOut] = useState<{ token: string; sym: string; decimals: number } | null>(null);
   const [tradeOpen, setTradeOpen] = useState(true); // collapse the buy/sell panel to give the chart room
   const [tapeOpen, setTapeOpen] = useState(true);   // collapse the live tape too (same fold-away pattern)
+  // Spot TAKES — ungraded bull/bear conviction on this token + discussion (FOMO-style, on identity).
+  const [takes, setTakes] = useState<Take[]>([]);
+  const [takesLoading, setTakesLoading] = useState(false);
+  const [takeDir, setTakeDir] = useState<"BULL" | "BEAR">("BULL");
+  const [takeText, setTakeText] = useState("");
+  const [takeTarget, setTakeTarget] = useState("");
+  const [takeBusy, setTakeBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [sig, setSig] = useState<NexusSignal | null>(null);
   // Graded call markers + estimated liq for the chart — only for a LISTED perp (the Lab data).
@@ -407,6 +426,18 @@ export default function TokenTerminal() {
     chartOverlays(sym).then((o) => { if (alive) { setChartCalls(o.calls); setChartLiq(o.liq); } }).catch(() => { if (alive) { setChartCalls([]); setChartLiq(null); } });
     return () => { alive = false; };
   }, [pair, perpSet]);
+
+  // ── TAKES for this token (fetched by chain+CA; firewalled from the graded boards) ──
+  useEffect(() => {
+    if (!pair?.baseAddress) { setTakes([]); return; }
+    let alive = true;
+    setTakesLoading(true);
+    fetchTakes(pair.chainId, pair.baseAddress)
+      .then((t) => { if (alive) setTakes(t); })
+      .catch(() => { if (alive) setTakes([]); })
+      .finally(() => { if (alive) setTakesLoading(false); });
+    return () => { alive = false; };
+  }, [pair?.baseAddress, pair?.chainId]);
 
   const submit = useCallback((q: string) => {
     const v = q.trim();
@@ -637,6 +668,26 @@ export default function TokenTerminal() {
     const link = `${window.location.origin}/token/${pair.baseAddress}`;
     try { navigator.clipboard.writeText(link); setShareCopied(true); setTimeout(() => setShareCopied(false), 1600); } catch { /* clipboard blocked */ }
   }, [pair]);
+
+  // Post a take → optimistic prepend, reconcile from the server's stamped row (id + pfp/name).
+  const submitTake = useCallback(async () => {
+    if (!pair?.baseAddress || !wallet || takeBusy) return;
+    const text = takeText.trim();
+    if (!text) return;
+    const targetNum = parseFloat(takeTarget);
+    const target = Number.isFinite(targetNum) && targetNum > 0 ? targetNum : null;
+    setTakeBusy(true);
+    try {
+      const saved = await postTake(pair.chainId, pair.baseAddress, { wallet, direction: takeDir, text, target, sym: pair.baseSymbol });
+      if (saved) { setTakes((ts) => [saved, ...ts]); setTakeText(""); setTakeTarget(""); }
+    } finally { setTakeBusy(false); }
+  }, [pair, wallet, takeDir, takeText, takeTarget, takeBusy]);
+
+  const removeTake = useCallback(async (id: string) => {
+    if (!pair?.baseAddress || !wallet) return;
+    const ok = await deleteTake(pair.chainId, pair.baseAddress, id, wallet);
+    if (ok) setTakes((ts) => ts.filter((t) => t.id !== id));
+  }, [pair, wallet]);
 
   const pageMeta = getPageMeta();
   const pageTitle = generatePageTitle(pair ? `${pair.baseSymbol} · Spot` : "Spot");
@@ -997,6 +1048,65 @@ export default function TokenTerminal() {
                 </div>
                 </>)}
               </div>
+            </div>
+
+            {/* ── TAKES — spot thesis + discussion (FOMO-style, on verifiable wallet identity).
+                Firewalled server-side: never enters grading / the caller leaderboard / the ledger. ── */}
+            <div style={{ marginTop: 18 }}>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
+                <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", color: BRIGHT }}>TAKES{takes.length ? ` · ${takes.length}` : ""}</span>
+                <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.06em", color: FAINT, textTransform: "uppercase" }}>Ungraded · discussion, not signals</span>
+              </div>
+
+              {wallet ? (
+                <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, padding: 12, marginBottom: 12 }}>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                    {(["BULL", "BEAR"] as const).map((d) => (
+                      <button key={d} onClick={() => setTakeDir(d)} style={{ flex: 1, fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: takeDir === d ? "#0a0a0b" : d === "BULL" ? POS : NEG, background: takeDir === d ? (d === "BULL" ? POS : NEG) : "none", border: `1px solid ${d === "BULL" ? POS : NEG}55`, borderRadius: 7, padding: "8px 0", cursor: "pointer" }}>{d}</button>
+                    ))}
+                  </div>
+                  <textarea value={takeText} onChange={(e) => setTakeText(e.target.value.slice(0, 280))} placeholder={`Your take on ${pair.baseSymbol}…`} rows={2}
+                    style={{ width: "100%", boxSizing: "border-box", background: BG, border: `1px solid ${BORD}`, borderRadius: 8, color: BRIGHT, fontFamily: UI, fontSize: 13, padding: "9px 11px", outline: "none", resize: "vertical", marginBottom: 8 }} />
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input value={takeTarget} onChange={(e) => setTakeTarget(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="Target $ (optional)"
+                      style={{ flex: 1, minWidth: 0, background: BG, border: `1px solid ${BORD}`, borderRadius: 8, color: MUT, fontFamily: MONO, fontSize: 12, padding: "8px 10px", outline: "none", boxSizing: "border-box" }} />
+                    <button onClick={submitTake} disabled={takeBusy || !takeText.trim()}
+                      style={{ flexShrink: 0, fontFamily: MONO, fontSize: 12, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: takeText.trim() ? BRIGHT : BORD, border: "none", borderRadius: 8, padding: "9px 18px", cursor: takeBusy ? "wait" : takeText.trim() ? "pointer" : "not-allowed", opacity: takeBusy ? 0.7 : 1 }}>{takeBusy ? "Posting…" : "Post take"}</button>
+                  </div>
+                  <div style={{ fontFamily: UI, fontSize: 10, color: FAINT, marginTop: 8, lineHeight: 1.5 }}>Public + attributed to your wallet. Ungraded — {isPerp ? <>for a scored call, <a href="/lab?tab=thesis" style={{ color: MUT }}>post a graded thesis in the Lab ↗</a>.</> : <>Nexus doesn’t grade unlisted tokens, so this is a take, not a signal.</>}</div>
+                </div>
+              ) : (
+                <div style={{ fontFamily: MONO, fontSize: 11, color: FAINT, padding: "10px 0", marginBottom: 4 }}>Connect a wallet to post a take.</div>
+              )}
+
+              {takesLoading ? (
+                <div style={{ fontFamily: MONO, fontSize: 11, color: FAINT, padding: "12px 0" }}>loading takes…</div>
+              ) : takes.length === 0 ? (
+                <div style={{ fontFamily: MONO, fontSize: 11, color: FAINT, padding: "12px 0" }}>No takes yet — drop the first read on {pair.baseSymbol}.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {takes.map((tk) => {
+                    const bull = tk.direction === "BULL";
+                    const mine = !!wallet && tk.wallet.toLowerCase() === wallet.toLowerCase();
+                    return (
+                      <div key={tk.id} style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, padding: "12px 14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                          {tk.pfp
+                            ? <img src={tk.pfp} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                            : <div style={{ width: 22, height: 22, borderRadius: "50%", background: BG, border: `1px solid ${BORD}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 9, color: MUT }}>{(tk.displayName || tk.wallet).slice(0, 1).toUpperCase()}</div>}
+                          <span style={{ fontFamily: MONO, fontSize: 11, color: MUT }}>{tk.displayName || shortAddr(tk.wallet)}</span>
+                          <span style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.06em", color: bull ? POS : NEG, background: (bull ? POS : NEG) + "18", border: `1px solid ${(bull ? POS : NEG)}44`, borderRadius: 5, padding: "2px 6px" }}>{tk.direction}</span>
+                          <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 9.5, color: FAINT }}>{takeAge(tk.createdAt)}</span>
+                          {mine && <button onClick={() => removeTake(tk.id)} title="Delete" style={{ background: "none", border: "none", color: FAINT, cursor: "pointer", fontFamily: MONO, fontSize: 11, padding: 0 }}>✕</button>}
+                        </div>
+                        <div style={{ fontFamily: UI, fontSize: 13, color: BRIGHT, lineHeight: 1.55, wordBreak: "break-word" }}>{tk.text}</div>
+                        {tk.target ? <div style={{ fontFamily: MONO, fontSize: 10, color: MUT, marginTop: 6 }}>🎯 target {fmtPrice(tk.target)}</div> : null}
+                        <SocialBar autoload thesisId={tk.id} walletAddress={wallet} authorWallet={tk.wallet} symbol={pair.baseSymbol} direction={bull ? "LONG" : "SHORT"} />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* provenance */}

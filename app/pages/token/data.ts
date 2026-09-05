@@ -236,6 +236,39 @@ export async function chartOverlays(coin: string): Promise<{ calls: CallMark[]; 
   return { calls, liq };
 }
 
+// ── Spot TAKES — ungraded bull/bear conviction on a token, discussable (FOMO-style, but on
+// verifiable wallet identity). Firewalled server-side under takes:{chain}:{ca} — never touches
+// grading / the caller leaderboard / the ledger. Each take's `id` seeds a SocialBar (🔥 + comments).
+export interface Take {
+  id: string; wallet: string; direction: "BULL" | "BEAR"; text: string;
+  target: number | null; sym?: string; pfp?: string | null; displayName?: string | null; createdAt: number;
+}
+export async function fetchTakes(chain: string, ca: string): Promise<Take[]> {
+  const j = (await getJson(`${AGENT_API}/takes/${encodeURIComponent(chain)}/${encodeURIComponent(ca)}`)) as { takes?: Take[] } | null;
+  return Array.isArray(j?.takes) ? j!.takes! : [];
+}
+export async function postTake(
+  chain: string, ca: string,
+  body: { wallet: string; direction: "BULL" | "BEAR"; text: string; target?: number | null; sym?: string },
+): Promise<Take | null> {
+  try {
+    const r = await fetch(`${AGENT_API}/takes/${encodeURIComponent(chain)}/${encodeURIComponent(ca)}`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    if (!r.ok) return null;
+    const j = (await r.json()) as { take?: Take };
+    return j?.take ?? null;
+  } catch { return null; }
+}
+export async function deleteTake(chain: string, ca: string, id: string, wallet: string): Promise<boolean> {
+  try {
+    const r = await fetch(`${AGENT_API}/takes/${encodeURIComponent(chain)}/${encodeURIComponent(ca)}/${encodeURIComponent(id)}`, {
+      method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet }),
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
 export async function nexusSignal(symbol: string): Promise<NexusSignal | null> {
   const j = (await getJson(`${AGENT_API}/signals`)) as { signals?: unknown[] } | null;
   const rows = Array.isArray(j?.signals) ? j!.signals! : [];

@@ -14,7 +14,7 @@ import { safeChartUrl } from "./logic.mjs";
 import { RESOLVED_FEED_KEY } from "./resolutions.mjs";
 
 export async function handleFeed(parts, request, env) {
-  if (!["feed", "comments", "reactions"].includes(parts[0])) return null;
+  if (!["feed", "comments", "reactions", "takes"].includes(parts[0])) return null;
   const url = new URL(request.url);
 
   if (parts[0] === "feed" && !parts[1]) {
@@ -292,5 +292,69 @@ export async function handleFeed(parts, request, env) {
 
   // ── Ph27: /notifications/:wallet ──────────────────────
 
-  return null; // a feed/comments/reactions path we don't serve → fall through
+  // ── Spot TAKES — /takes/:chain/:ca ─────────────────────
+  // FOMO-style ungraded conviction on a token (bull/bear + free text), keyed by the token
+  // itself, discussable via the SAME comments/reactions layer (each take's id → SocialBar).
+  // ⚠️ FIREWALL: takes live under their OWN key (`takes:{chain}:{ca}`), never in `lab:` — so
+  // they can NEVER enter grading, the caller leaderboard, or the on-chain ledger. Memecoin
+  // opinions stay off the trustless perp moat by construction. Wallet-attributed (same trust
+  // model as comments), self-delete only.
+  if (parts[0] === "takes" && parts[1] && parts[2]) {
+    const chain = String(parts[1]).toLowerCase().slice(0, 24);
+    const ca = String(parts[2]).trim();
+    if (!/^[a-z0-9-]{1,24}$/.test(chain) || !/^[a-zA-Z0-9]{1,64}$/.test(ca))
+      return json({ error: "bad token" }, request, 400);
+    const takesKey = `takes:${chain}:${ca}`;
+
+    if (request.method === "GET" && parts.length === 3) {
+      const raw = await env.LAB_STORE.get(takesKey);
+      return json({ takes: raw ? JSON.parse(raw) : [] }, request);
+    }
+
+    if (request.method === "POST" && parts.length === 3) {
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const wallet = typeof body.wallet === "string" ? body.wallet.toLowerCase().trim() : null;
+      const text = typeof body.text === "string" ? body.text.trim().slice(0, 280) : null;
+      const direction = body.direction === "BULL" || body.direction === "BEAR" ? body.direction : null;
+      if (!/^0x[a-f0-9]{40}$/.test(wallet || "")) return json({ error: "bad wallet" }, request, 400);
+      if (!text) return json({ error: "missing text" }, request, 400);
+      if (!direction) return json({ error: "direction must be BULL or BEAR" }, request, 400);
+      const targetNum = Number(body.target);
+      const target = Number.isFinite(targetNum) && targetNum > 0 ? targetNum : null;
+      const sym = typeof body.sym === "string" ? body.sym.replace(/[^A-Za-z0-9]/g, "").slice(0, 16) : "";
+      // Stamp identity from the wallet's saved profile (pfp/displayName), best-effort.
+      let pfp = null, displayName = null;
+      try {
+        const pRaw = await env.LAB_STORE.get(`profile:${wallet}`);
+        if (pRaw) { const p = JSON.parse(pRaw); pfp = p.pfp || null; displayName = p.displayName || null; }
+      } catch { /* profile optional */ }
+      const raw = await env.LAB_STORE.get(takesKey);
+      const list = raw ? JSON.parse(raw) : [];
+      const take = { id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, wallet, direction, text, target, sym, pfp, displayName, createdAt: Date.now() };
+      list.unshift(take);
+      await env.LAB_STORE.put(takesKey, JSON.stringify(list.slice(0, 100)));
+      return json({ ok: true, take }, request);
+    }
+
+    if (request.method === "DELETE" && parts.length === 4) {
+      const takeId = parts[3];
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "invalid json" }, request, 400); }
+      const wallet = typeof body.wallet === "string" ? body.wallet.toLowerCase().trim() : null;
+      if (!wallet) return json({ error: "missing wallet" }, request, 400);
+      const raw = await env.LAB_STORE.get(takesKey);
+      if (!raw) return json({ ok: true }, request);
+      const list = JSON.parse(raw);
+      const target = list.find((t) => t.id === takeId);
+      if (!target) return json({ error: "not found" }, request, 404);
+      if (target.wallet !== wallet) return json({ error: "forbidden" }, request, 403);
+      await env.LAB_STORE.put(takesKey, JSON.stringify(list.filter((t) => t.id !== takeId)));
+      return json({ ok: true }, request);
+    }
+
+    return json({ error: "method not allowed" }, request, 405);
+  }
+
+  return null; // a feed/comments/reactions/takes path we don't serve → fall through
 }
