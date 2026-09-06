@@ -562,6 +562,23 @@ export default function TokenTerminal() {
   // an explicit confirm.
   const { wallet: wc } = useWalletConnector();
   const provider = (wc?.provider as Eip1193 | undefined) || undefined;
+  // ── Solana signer LIVE CHECK (Jupiter pass · commit 1, read-only) ──────────────────────────
+  // The app is Privy-based, so a connected Solana wallet is exposed by the SAME accessor as EVM —
+  // useWalletConnector().wallet.provider — which for Solana carries { signTransaction, sendTransaction,
+  // signMessage, network, rpcUrl } (verified in @orderly.network/wallet-connector-privy). This probe
+  // just proves the signer + pubkey are reachable live before ANY signing code is written. No new
+  // provider, no new dep. Removed when the real BUY path lands.
+  const solSigner = (() => {
+    const w = wc as unknown as { provider?: Record<string, unknown>; accounts?: { address?: string }[]; address?: string; label?: string } | undefined;
+    const p = w?.provider;
+    return {
+      hasSign: typeof p?.signTransaction === "function",
+      hasSend: typeof p?.sendTransaction === "function",
+      address: w?.accounts?.[0]?.address ?? w?.address ?? null,
+      network: p?.network != null ? String(p.network) : null,
+      label: w?.label != null ? String(w.label) : null,
+    };
+  })();
   // Venue routing: a perp token can show BOTH — Long/Short on our book (showPerp) AND the spot
   // buy/sell panel (showSpot). A non-perp token is spot only. In-app fill is Fabric-on-EVM only.
   const showPerp = isPerp && venue === "perp";
@@ -904,6 +921,24 @@ export default function TokenTerminal() {
                       </>
                     ) : (
                       <div style={{ fontFamily: UI, fontSize: 10, color: FAINT, lineHeight: 1.5 }}>No in-app buys tracked yet — buy on Spot to track your avg entry + P&L here.</div>
+                    )}
+                  </div>
+                )}
+
+                {/* ◎ SOLANA SIGNER — live-check readout (commit 1 of the Jupiter pass). Shows for
+                    Solana tokens so a connected Solana wallet can be verified end-to-end before any
+                    signing code exists. Read-only; replaced by the real in-app BUY once confirmed. */}
+                {pair.chainId === "solana" && (
+                  <div style={{ background: CARD, border: `1px solid ${solSigner.hasSign && solSigner.hasSend ? "#3ecf8e55" : BORD}`, borderRadius: 10, padding: "11px 14px", marginBottom: 12 }}>
+                    <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.12em", color: FAINT, textTransform: "uppercase", marginBottom: 6 }}>◎ Solana signer · live check</div>
+                    {solSigner.hasSign || solSigner.hasSend || solSigner.address ? (
+                      <div style={{ fontFamily: MONO, fontSize: 11, color: MUT, lineHeight: 1.6 }}>
+                        <div>provider.signTransaction: <span style={{ color: solSigner.hasSign ? POS : NEG }}>{solSigner.hasSign ? "✓ reachable" : "✗ missing"}</span> · sendTransaction: <span style={{ color: solSigner.hasSend ? POS : NEG }}>{solSigner.hasSend ? "✓" : "✗"}</span></div>
+                        <div>pubkey: <span style={{ color: BRIGHT, wordBreak: "break-all" }}>{solSigner.address ?? "—"}</span></div>
+                        <div style={{ color: FAINT }}>wallet: {solSigner.label ?? "—"} · network: {solSigner.network ?? "—"}</div>
+                      </div>
+                    ) : (
+                      <div style={{ fontFamily: UI, fontSize: 11, color: FAINT, lineHeight: 1.5 }}>Connect a <b style={{ color: MUT }}>Solana wallet</b> via the wallet modal, then reopen this token — this line will show the signer + your pubkey once the connector exposes it.</div>
                     )}
                   </div>
                 )}
