@@ -260,6 +260,28 @@ export async function postTake(
     return j?.take ?? null;
   } catch { return null; }
 }
+// ── Caller merit map — a take carries its author's EARNED graded rank (the FOMO-killer: they
+// show self-reported PnL, we show "this bull take is from a 55%-hit Apex caller"). Sourced from
+// the SAME /theses/leaderboard the Feed ranks on, module-cached so repeated /token views share
+// one call. Only RANKED callers (5+ graded calls, net-positive R) appear; everyone else = no badge.
+export interface CallerMerit { tier: string; title: string; glyph: string; hitRate: number; avgR: number; calls: number }
+let _meritCache: { at: number; map: Record<string, CallerMerit> } | null = null;
+export async function fetchCallerMerit(): Promise<Record<string, CallerMerit>> {
+  if (_meritCache && Date.now() - _meritCache.at < 120000) return _meritCache.map;
+  const map: Record<string, CallerMerit> = {};
+  try {
+    const j = (await getJson(`${AGENT_API}/theses/leaderboard`)) as { leaderboard?: Record<string, unknown>[] } | null;
+    for (const e of (Array.isArray(j?.leaderboard) ? j!.leaderboard! : [])) {
+      const w = String(e.wallet || "").toLowerCase();
+      const m = e.meritRank as { tier?: string; title?: string; glyph?: string } | null;
+      if (!w || !m || !m.glyph) continue;
+      map[w] = { tier: String(m.tier || ""), title: String(m.title || ""), glyph: String(m.glyph), hitRate: Number(e.hitRate) || 0, avgR: Number(e.avgR) || 0, calls: Number(e.calls) || 0 };
+    }
+    _meritCache = { at: Date.now(), map };
+  } catch { /* fail-soft — no badges rather than a broken page */ }
+  return map;
+}
+
 export async function deleteTake(chain: string, ca: string, id: string, wallet: string): Promise<boolean> {
   try {
     const r = await fetch(`${AGENT_API}/takes/${encodeURIComponent(chain)}/${encodeURIComponent(ca)}/${encodeURIComponent(id)}`, {

@@ -16,9 +16,9 @@ import { SectionHeader } from "@/pages/lab/components";
 import { FADE_FUNDING_FLOOR_PCT_YR } from "@/pages/lab/briefing";
 import {
   searchToken, poolCandles, poolTrades, orderlyPerpSet, nexusSignal, swapQuote, chartOverlays,
-  fetchTakes, postTake, deleteTake,
+  fetchTakes, postTake, deleteTake, fetchCallerMerit,
   fmtUsd, fmtTapeUsd, fmtPrice, fmtAge, shortAddr,
-  type TokenPair, type Candle, type Trade, type NexusSignal, type SwapQuote, type CallMark, type LiqMap, type Take,
+  type TokenPair, type Candle, type Trade, type NexusSignal, type SwapQuote, type CallMark, type LiqMap, type Take, type CallerMerit,
 } from "./data";
 import { SocialBar } from "@/components/SocialBar";
 import { fetchHoldings, addRecent, getRecents, optimisticHolding, probeHeldToken, type Holding } from "./holdings";
@@ -48,6 +48,15 @@ function takeAge(ts: number): string {
   if (h > 0) return `${h}h`;
   if (m > 0) return `${m}m`;
   return "now";
+}
+// Token age from a creation timestamp (ms) — for the About panel.
+function tokenAgeLabel(ts: number | null): string {
+  if (!ts) return "—";
+  const days = Math.floor((Date.now() - ts) / 86400000);
+  if (days >= 365) return `${(days / 365).toFixed(1)}y`;
+  if (days >= 1) return `${days}d`;
+  const h = Math.floor((Date.now() - ts) / 3600000);
+  return h > 0 ? `${h}h` : "new";
 }
 
 // The graded funding verdict for a listed market, read EXACTLY as the Board reads it (the server
@@ -324,6 +333,8 @@ export default function TokenTerminal() {
   const [takeText, setTakeText] = useState("");
   const [takeTarget, setTakeTarget] = useState("");
   const [takeBusy, setTakeBusy] = useState(false);
+  const [meritMap, setMeritMap] = useState<Record<string, CallerMerit>>({}); // author wallet → earned graded rank
+  const [tokenTab, setTokenTab] = useState<"takes" | "about">("takes"); // below-terminal organizer (FOMO-style)
   const [copied, setCopied] = useState(false);
   const [sig, setSig] = useState<NexusSignal | null>(null);
   // Graded call markers + estimated liq for the chart — only for a LISTED perp (the Lab data).
@@ -436,6 +447,9 @@ export default function TokenTerminal() {
       .then((t) => { if (alive) setTakes(t); })
       .catch(() => { if (alive) setTakes([]); })
       .finally(() => { if (alive) setTakesLoading(false); });
+    // Author merit ranks (module-cached → cheap on repeat views) so each take shows the caller's
+    // EARNED graded record, not a self-reported number.
+    fetchCallerMerit().then((m) => { if (alive) setMeritMap(m); }).catch(() => { /* no badges */ });
     return () => { alive = false; };
   }, [pair?.baseAddress, pair?.chainId]);
 
@@ -1053,11 +1067,16 @@ export default function TokenTerminal() {
             {/* ── TAKES — spot thesis + discussion (FOMO-style, on verifiable wallet identity).
                 Firewalled server-side: never enters grading / the caller leaderboard / the ledger. ── */}
             <div style={{ marginTop: 18 }}>
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
-                <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", color: BRIGHT }}>TAKES{takes.length ? ` · ${takes.length}` : ""}</span>
-                <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.06em", color: FAINT, textTransform: "uppercase" }}>Ungraded · discussion, not signals</span>
+              {/* token tabs (Takes | About) — FOMO-style below-terminal organizer */}
+              <div style={{ display: "flex", alignItems: "center", gap: 4, borderBottom: `1px solid ${BORD}`, marginBottom: 12 }}>
+                {([["takes", `TAKES${takes.length ? ` · ${takes.length}` : ""}`], ["about", "ABOUT"]] as const).map(([id, label]) => (
+                  <button key={id} onClick={() => setTokenTab(id)}
+                    style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.08em", color: tokenTab === id ? BRIGHT : FAINT, background: "none", border: "none", borderBottom: `2px solid ${tokenTab === id ? BRIGHT : "transparent"}`, padding: "8px 12px", marginBottom: -1, cursor: "pointer" }}>{label}</button>
+                ))}
+                {tokenTab === "takes" && <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.06em", color: FAINT, textTransform: "uppercase" }}>Ungraded · discussion</span>}
               </div>
 
+              {tokenTab === "takes" ? (<>
               {wallet ? (
                 <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, padding: 12, marginBottom: 12 }}>
                   <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
@@ -1088,6 +1107,7 @@ export default function TokenTerminal() {
                   {takes.map((tk) => {
                     const bull = tk.direction === "BULL";
                     const mine = !!wallet && tk.wallet.toLowerCase() === wallet.toLowerCase();
+                    const merit = meritMap[tk.wallet.toLowerCase()]; // earned graded rank, or undefined
                     return (
                       <div key={tk.id} style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, padding: "12px 14px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -1095,6 +1115,12 @@ export default function TokenTerminal() {
                             ? <img src={tk.pfp} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
                             : <div style={{ width: 22, height: 22, borderRadius: "50%", background: BG, border: `1px solid ${BORD}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 9, color: MUT }}>{(tk.displayName || tk.wallet).slice(0, 1).toUpperCase()}</div>}
                           <span style={{ fontFamily: MONO, fontSize: 11, color: MUT }}>{tk.displayName || shortAddr(tk.wallet)}</span>
+                          {merit && (
+                            <span title={`${merit.title} caller · ${merit.hitRate}% hit · ${merit.avgR >= 0 ? "+" : ""}${merit.avgR}R avg over ${merit.calls} graded calls`}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 3, fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.04em", color: POS, background: POS + "14", border: `1px solid ${POS}44`, borderRadius: 5, padding: "2px 6px" }}>
+                              {merit.glyph} {merit.title.toUpperCase()} · {merit.hitRate}%
+                            </span>
+                          )}
                           <span style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.06em", color: bull ? POS : NEG, background: (bull ? POS : NEG) + "18", border: `1px solid ${(bull ? POS : NEG)}44`, borderRadius: 5, padding: "2px 6px" }}>{tk.direction}</span>
                           <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 9.5, color: FAINT }}>{takeAge(tk.createdAt)}</span>
                           {mine && <button onClick={() => removeTake(tk.id)} title="Delete" style={{ background: "none", border: "none", color: FAINT, cursor: "pointer", fontFamily: MONO, fontSize: 11, padding: 0 }}>✕</button>}
@@ -1105,6 +1131,57 @@ export default function TokenTerminal() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+              </>) : (
+                /* ── ABOUT — the token's identity + public stats, one clean reference ── */
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8 }}>
+                    {([
+                      ["Price", fmtPrice(pair.priceUsd)],
+                      ["24h", pair.priceChange24h != null ? `${pair.priceChange24h >= 0 ? "+" : ""}${pair.priceChange24h.toFixed(2)}%` : "—"],
+                      ["Liquidity", fmtUsd(pair.liquidityUsd)],
+                      ["24h Vol", fmtUsd(pair.volume24h)],
+                      ["Market Cap", fmtUsd(pair.marketCap ?? pair.fdv)],
+                      ["Age", tokenAgeLabel(pair.createdAt)],
+                    ] as const).map(([label, val]) => (
+                      <div key={label} style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 8, padding: "10px 12px" }}>
+                        <div style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.08em", color: FAINT, textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
+                        <div style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: label === "24h" && pair.priceChange24h != null ? (pair.priceChange24h >= 0 ? POS : NEG) : BRIGHT }}>{val}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, padding: 14 }}>
+                    <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.1em", color: FAINT, textTransform: "uppercase", marginBottom: 10 }}>Identity</div>
+                    {([
+                      ["Name", pair.baseName || pair.baseSymbol],
+                      ["Symbol", pair.baseSymbol],
+                      ["Chain", pair.chainId],
+                      ["DEX", pair.dexId],
+                      ...(pair.buys24h != null ? [["24h trades", `${pair.buys24h} buys · ${pair.sells24h ?? 0} sells`] as const] : []),
+                    ] as const).map(([label, val]) => (
+                      <div key={label} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "5px 0", borderBottom: `1px solid ${BORD2}`, fontFamily: MONO, fontSize: 11 }}>
+                        <span style={{ color: FAINT }}>{label}</span>
+                        <span style={{ color: MUT, textAlign: "right", wordBreak: "break-word" }}>{val}</span>
+                      </div>
+                    ))}
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "5px 0", fontFamily: MONO, fontSize: 11 }}>
+                      <span style={{ color: FAINT }}>Contract</span>
+                      <button onClick={copyCa} style={{ background: "none", border: "none", color: MUT, fontFamily: MONO, fontSize: 11, cursor: "pointer", padding: 0 }}>{shortAddr(pair.baseAddress)} {copied ? "✓" : "⧉"}</button>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                      {pair.websites[0] && <a href={pair.websites[0]} target="_blank" rel="noopener noreferrer" style={{ fontFamily: MONO, fontSize: 10.5, color: MUT, textDecoration: "none", border: `1px solid ${BORD}`, borderRadius: 7, padding: "6px 11px" }}>web ↗</a>}
+                      {pair.socials.filter((s) => /twitter|x/i.test(s.type)).slice(0, 1).map((s) => <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: MONO, fontSize: 10.5, color: MUT, textDecoration: "none", border: `1px solid ${BORD}`, borderRadius: 7, padding: "6px 11px" }}>𝕏 ↗</a>)}
+                      {pair.url && <a href={pair.url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: MONO, fontSize: 10.5, color: MUT, textDecoration: "none", border: `1px solid ${BORD}`, borderRadius: 7, padding: "6px 11px" }}>DexScreener ↗</a>}
+                    </div>
+                  </div>
+
+                  <div style={{ fontFamily: UI, fontSize: 11, lineHeight: 1.55, color: FAINT }}>
+                    {isPerp
+                      ? <>Nexus lists <b style={{ color: MUT }}>{pair.baseSymbol}</b> as a graded perp market — calls on it are trustlessly graded against public price, and the funding/positioning read is ours.</>
+                      : <><b style={{ color: MUT }}>Unverified token.</b> Nexus doesn’t run a graded market on it — stats are public (DexScreener/GeckoTerminal) and the takes here are ungraded conviction, not signals.</>}
+                  </div>
                 </div>
               )}
             </div>
