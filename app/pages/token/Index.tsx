@@ -23,6 +23,8 @@ import {
 import { SocialBar } from "@/components/SocialBar";
 import { fetchHoldings, addRecent, getRecents, optimisticHolding, probeHeldToken, getCostBasis, addCostLot, type Holding, type CostLot } from "./holdings";
 import { planBuy, planSell, executeSwap, explorerTx, fmtTokenAmount, slippagePct, EVM_USDC, type SwapPlan, type Eip1193 } from "./swapExec";
+import { planSolBuy, executeSolBuy, fmtSolTokenAmount, solSlippagePct, solscanTx, type SolBuyPlan, type SolProvider } from "./solSwapExec";
+import { getRuntimeConfigBoolean } from "@/utils/runtime-config";
 
 // Canonical WETH per DexScreener chain slug — the always-available token→token target on a SELL
 // (alongside the user's own recents). Address-list data only; the received token is NEVER approved
@@ -579,6 +581,19 @@ export default function TokenTerminal() {
       label: w?.label != null ? String(w.label) : null,
     };
   })();
+  // ── Solana in-app BUY (Jupiter, wSOL → token) — ships behind VITE_SOL_INAPP_BUY (default OFF) so
+  // the money-path is inert until /security-review + a real $ test. Shows only for a Solana token with
+  // a Jupiter quote and a reachable Solana signer. The one signing site is solSwapExec.ts. ──
+  const SOL_INAPP_BUY = getRuntimeConfigBoolean("VITE_SOL_INAPP_BUY");
+  const solProvider = wc?.provider as unknown as SolProvider | undefined;
+  const [solAmt, setSolAmt] = useState("");
+  const [solPlan, setSolPlan] = useState<SolBuyPlan | null>(null);
+  const [solModalOpen, setSolModalOpen] = useState(false);
+  const [solPlanning, setSolPlanning] = useState(false);
+  const [solBusy, setSolBusy] = useState(false);
+  const [solStep, setSolStep] = useState("");
+  const [solErr, setSolErr] = useState<string | null>(null);
+  const [solDone, setSolDone] = useState<{ sig: string } | null>(null);
   // Venue routing: a perp token can show BOTH — Long/Short on our book (showPerp) AND the spot
   // buy/sell panel (showSpot). A non-perp token is spot only. In-app fill is Fabric-on-EVM only.
   const showPerp = isPerp && venue === "perp";
@@ -594,6 +609,10 @@ export default function TokenTerminal() {
   const holdsToken = !!held && held.amount > 0;
   const canInAppSell = showSpot && side === "sell" && fabricEvm && holdsToken;
   const isSpotSell = showSpot && side === "sell";
+  // Solana in-app BUY availability: flag on · Solana token · spot BUY · a Jupiter quote · a reachable
+  // Solana signer + pubkey. Everything else (EVM, no signer, flag off) keeps the "Swap via Jupiter" deep-link.
+  const isSolToken = pair?.chainId === "solana";
+  const canSolBuy = SOL_INAPP_BUY && isSolToken && showSpot && side === "buy" && swapState.kind === "quote" && quote?.router === "Jupiter" && (solSigner.hasSign || solSigner.hasSend) && !!solSigner.address;
   // The token quantity a SELL resolves to, in EITHER unit (MAX = whole balance; USD = $/price).
   const sellPrice = pair?.priceUsd || 0;
   const sellTokens = sellMax && held ? held.amount
@@ -762,6 +781,42 @@ export default function TokenTerminal() {
     const ok = await deleteTake(pair.chainId, pair.baseAddress, id, wallet);
     if (ok) setTakes((ts) => ts.filter((t) => t.id !== id));
   }, [pair, wallet]);
+
+  // ── Solana in-app BUY handlers (Jupiter, wSOL → token) — plan validates + guards; execute re-fetches
+  // fresh bytes, re-guards, simulates, then signs via the Privy Solana provider. Fail-soft → deep-link. ──
+  const openSolBuy = useCallback(async () => {
+    setSolErr(null); setSolDone(null);
+    if (!pair?.baseAddress || !solProvider || !solSigner.address) return;
+    const amt = parseFloat(solAmt);
+    if (!Number.isFinite(amt) || amt <= 0) { setSolErr("Enter an amount of SOL to swap."); return; }
+    setSolPlanning(true);
+    try {
+      const p = await planSolBuy(pair.baseAddress, pair.baseSymbol, amt, solSigner.address, solProvider);
+      setSolPlan(p); setSolModalOpen(true);
+    } catch (e) {
+      setSolErr((e as Error)?.message || "Couldn't build the swap — use the deep-link.");
+    } finally { setSolPlanning(false); }
+  }, [pair, solProvider, solSigner.address, solAmt]);
+
+  const confirmSolBuy = useCallback(async () => {
+    if (!solPlan || !solProvider) return;
+    setSolBusy(true); setSolErr(null); setSolStep("preparing…");
+    try {
+      const { sig } = await executeSolBuy(solProvider, solPlan, setSolStep);
+      setSolDone({ sig });
+    } catch (e) {
+      const m = (e as Error)?.message || "swap failed";
+      setSolErr(/user reject|denied|cancel|4001/i.test(m) ? "Cancelled in your wallet." : m);
+    } finally { setSolBusy(false); setSolStep(""); }
+  }, [solPlan, solProvider]);
+
+  const closeSolModal = useCallback(() => {
+    if (solBusy) return; // never yank the modal mid-signature
+    setSolModalOpen(false); setSolPlan(null); setSolErr(null); setSolDone(null);
+  }, [solBusy]);
+
+  // A changed token/amount invalidates a captured Solana plan.
+  useEffect(() => { setSolModalOpen(false); setSolPlan(null); setSolErr(null); setSolDone(null); }, [pair?.baseAddress, solAmt]);
 
   const pageMeta = getPageMeta();
   const pageTitle = generatePageTitle(pair ? `${pair.baseSymbol} · Spot` : "Spot");
@@ -1144,6 +1199,27 @@ export default function TokenTerminal() {
                         </a>
                       </>
                     )}
+                    {/* ◎ Solana in-app BUY (Jupiter · wSOL→token) — additive; the deep-link below stays. */}
+                    {canSolBuy && (
+                      <div style={{ marginTop: 10, background: BG, border: `1px solid ${POS}44`, borderRadius: 9, padding: 11 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
+                          <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.1em", color: POS, textTransform: "uppercase" }}>◎ Buy with SOL · in-app</span>
+                          <span style={{ fontFamily: MONO, fontSize: 8, color: FAINT }}>Jupiter · you sign</span>
+                        </div>
+                        <input value={solAmt} onChange={(e) => setSolAmt(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="0.0 SOL"
+                          style={{ width: "100%", boxSizing: "border-box", background: CARD, border: `1px solid ${BORD}`, borderRadius: 8, color: BRIGHT, fontFamily: MONO, fontSize: 16, fontWeight: 600, padding: "9px 11px", outline: "none", marginBottom: 7 }} />
+                        <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                          {[0.05, 0.1, 0.5, 1].map((v) => (
+                            <button key={v} onClick={() => setSolAmt(String(v))} style={{ flex: 1, fontFamily: MONO, fontSize: 10, color: MUT, background: CARD, border: `1px solid ${BORD}`, borderRadius: 6, padding: "6px 0", cursor: "pointer" }}>{v}</button>
+                          ))}
+                        </div>
+                        <button onClick={openSolBuy} disabled={solPlanning}
+                          style={{ display: "block", width: "100%", textAlign: "center", fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: POS, border: "none", borderRadius: 9, padding: "12px 0", cursor: solPlanning ? "wait" : "pointer", opacity: solPlanning ? 0.7 : 1 }}>
+                          {solPlanning ? "Building route…" : `Buy ${pair.baseSymbol} with SOL →`}
+                        </button>
+                        {solErr && !solModalOpen && <div style={{ fontFamily: MONO, fontSize: 10, color: NEG, marginTop: 7, textAlign: "center" }}>{solErr}</div>}
+                      </div>
+                    )}
                     {/* quote route but no in-app fill (no wallet, non-Fabric, or — for a sell — no
                         detected balance) → the honest deep-link, which fills either direction. */}
                     {swapState.kind === "quote" && !(side === "buy" ? canInAppBuy : canInAppSell) && (
@@ -1378,6 +1454,50 @@ export default function TokenTerminal() {
                 )}
                 <button onClick={closeSwap} style={{ display: "block", width: "100%", fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "#0a0a0b", background: BRIGHT, border: "none", borderRadius: 8, padding: "11px 0", cursor: "pointer" }}>Done</button>
               </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* ── Solana in-app BUY confirm modal (Jupiter · wSOL→token) — nothing signs until "Confirm swap".
+          The plan is re-fetched + re-guarded + simulated on fresh bytes at confirm time. ── */}
+      {solModalOpen && solPlan && pair && (
+        <div onClick={closeSolModal} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.72)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 384, background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, padding: 18 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: BRIGHT }}>CONFIRM SWAP · SOLANA</span>
+              <button onClick={closeSolModal} disabled={solBusy} style={{ background: "none", border: "none", color: solBusy ? FAINT : MUT, fontSize: 16, cursor: solBusy ? "default" : "pointer", lineHeight: 1 }}>✕</button>
+            </div>
+            {(() => {
+              const recvFmt = fmtSolTokenAmount(solPlan.outAmount, solPlan.outDecimals);
+              const minFmt = fmtSolTokenAmount(solPlan.minOut, solPlan.outDecimals);
+              const slip = solSlippagePct(solPlan.outAmount, solPlan.minOut);
+              return !solDone ? (
+                <>
+                  <ModalRow label="You pay" value={`${solPlan.solIn.toLocaleString("en-US", { maximumFractionDigits: 6 })} SOL`} sub="native SOL · Solana" />
+                  <ModalRow label="Receive (est.)" value={recvFmt ? `${recvFmt} ${solPlan.outSym}` : "—"} />
+                  <ModalRow label="Minimum received" value={minFmt ? `${minFmt} ${solPlan.outSym}` : "on-chain floor applies"} sub={slip != null ? `reverts below this · ≤${slip.toFixed(2)}% slippage` : "slippage floor enforced on-chain"} accent />
+                  <ModalRow label="Route" value={solPlan.router} />
+                  {solPlan.priceImpactPct != null && <ModalRow label="Price impact" value={`~${solPlan.priceImpactPct.toFixed(solPlan.priceImpactPct >= 1 ? 1 : 2)}%`} danger={solPlan.priceImpactPct >= 3} />}
+                  <div style={{ fontFamily: UI, fontSize: 10, lineHeight: 1.5, color: FAINT, margin: "12px 0 14px" }}>
+                    You sign in your own Solana wallet. The route is <b style={{ color: MUT }}>simulated</b> and its programs allow-listed before signing; the minimum-received floor is enforced on-chain. Non-custodial.
+                  </div>
+                  {solBusy && <div style={{ fontFamily: MONO, fontSize: 11, color: POS, marginBottom: 10, textAlign: "center" }}>{solStep || "working…"}</div>}
+                  {solErr && <div style={{ fontFamily: MONO, fontSize: 11, color: NEG, marginBottom: 10, textAlign: "center" }}>{solErr}</div>}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={closeSolModal} disabled={solBusy} style={{ flex: 1, fontFamily: MONO, fontSize: 12, fontWeight: 700, color: MUT, background: "none", border: `1px solid ${BORD}`, borderRadius: 8, padding: "11px 0", cursor: solBusy ? "default" : "pointer" }}>Cancel</button>
+                    <button onClick={confirmSolBuy} disabled={solBusy} style={{ flex: 2, fontFamily: MONO, fontSize: 12, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: POS, border: "none", borderRadius: 8, padding: "11px 0", cursor: solBusy ? "wait" : "pointer", opacity: solBusy ? 0.7 : 1 }}>{solBusy ? "Confirming…" : "Confirm swap"}</button>
+                  </div>
+                </>
+              ) : (
+                <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
+                  <div style={{ fontSize: 28, marginBottom: 8, color: POS }}>✓</div>
+                  <div style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: POS, marginBottom: 6 }}>Swap sent</div>
+                  <div style={{ fontFamily: UI, fontSize: 11, color: MUT, marginBottom: 14 }}>Your {solPlan.outSym} lands once it confirms on Solana.</div>
+                  <a href={solscanTx(solDone.sig)} target="_blank" rel="noopener noreferrer" style={{ fontFamily: MONO, fontSize: 11, color: BRIGHT, textDecoration: "none", display: "inline-block", marginBottom: 14, wordBreak: "break-all" }}>view on Solscan ↗</a>
+                  <button onClick={closeSolModal} style={{ display: "block", width: "100%", fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "#0a0a0b", background: BRIGHT, border: "none", borderRadius: 8, padding: "11px 0", cursor: "pointer" }}>Done</button>
+                </div>
               );
             })()}
           </div>
