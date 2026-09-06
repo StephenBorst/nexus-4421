@@ -38,6 +38,7 @@ const AGENT_API = "https://og.nexustradinglabs.com";
 const JUP_QUOTE = `${AGENT_API}/swap/jup/quote`;
 const JUP_SWAP = `${AGENT_API}/swap/jup/swap`;
 export const WSOL_MINT = "So11111111111111111111111111111111111111112";
+const USDC_SOL_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; // USDC on Solana (6 decimals)
 const LAMPORTS_PER_SOL = 1_000_000_000;
 export const MAX_SLIPPAGE_BPS = 300; // 3% hard cap — refuse any quote/route asking for more.
 // Public Solana RPC fallback if the wallet provider doesn't carry one. The wallet's own rpcUrl is
@@ -211,6 +212,26 @@ export function solSlippagePct(outAmount: number | null, minOut: number | null):
   return (1 - minOut / outAmount) * 100;
 }
 export const solscanTx = (sig: string): string => `https://solscan.io/tx/${sig}`;
+
+// Ticket helpers (for the BUY panel's SOL-% chips + USD chips + est output). Fail-soft → nulls, so
+// the ticket degrades gracefully (no chips / no est) rather than breaking. Never touches signing.
+export async function getSolWalletContext(provider: SolProvider, pubkey: string): Promise<{ balanceSol: number | null; solUsd: number | null }> {
+  let balanceSol: number | null = null, solUsd: number | null = null;
+  if (!isSolAddr(pubkey)) return { balanceSol, solUsd };
+  try {
+    const conn = new Connection(resolveRpc(provider), "confirmed");
+    const lamports = await conn.getBalance(new PublicKey(pubkey));
+    if (Number.isFinite(lamports)) balanceSol = lamports / LAMPORTS_PER_SOL;
+  } catch { /* no balance → no %-chips */ }
+  try {
+    // SOL/USD from a Jupiter quote (1 SOL → USDC), through the same worker proxy.
+    const r = await fetch(`${JUP_QUOTE}?inputMint=${WSOL_MINT}&outputMint=${USDC_SOL_MINT}&amount=${LAMPORTS_PER_SOL}&slippageBps=50&swapMode=ExactIn`, { headers: { Accept: "application/json" } });
+    const j = (await r.json().catch(() => null)) as { outAmount?: string | number } | null;
+    const out = Number(j?.outAmount);
+    if (Number.isFinite(out) && out > 0) solUsd = out / 1e6;
+  } catch { /* no price → no USD chips */ }
+  return { balanceSol, solUsd };
+}
 
 // Execute the plan: RE-FETCH a fresh swap tx (fresh blockhash) and RE-RUN every guard on the exact
 // bytes we will sign, simulate it, then sign + send + confirm. A stale plan is never signed; a

@@ -23,8 +23,12 @@ import {
 import { SocialBar } from "@/components/SocialBar";
 import { fetchHoldings, addRecent, getRecents, optimisticHolding, probeHeldToken, getCostBasis, addCostLot, type Holding, type CostLot } from "./holdings";
 import { planBuy, planSell, executeSwap, explorerTx, fmtTokenAmount, slippagePct, EVM_USDC, type SwapPlan, type Eip1193 } from "./swapExec";
-import { planSolBuy, executeSolBuy, fmtSolTokenAmount, solSlippagePct, solscanTx, type SolBuyPlan, type SolProvider } from "./solSwapExec";
+import { planSolBuy, executeSolBuy, getSolWalletContext, fmtSolTokenAmount, solSlippagePct, solscanTx, type SolBuyPlan, type SolProvider } from "./solSwapExec";
 import { getRuntimeConfigBoolean } from "@/utils/runtime-config";
+// The app is Privy-based; a connected Solana wallet is NOT on useWalletConnector().wallet (that's the
+// EVM slot). The Privy connector exposes walletEVM/walletSOL separately — walletSOL carries the Solana
+// signer (provider.signTransaction/sendTransaction). Safe outside the provider (useContext default).
+import { useWalletConnectorPrivy } from "@orderly.network/wallet-connector-privy";
 
 // Canonical WETH per DexScreener chain slug — the always-available token→token target on a SELL
 // (alongside the user's own recents). Address-list data only; the received token is NEVER approved
@@ -564,29 +568,28 @@ export default function TokenTerminal() {
   // an explicit confirm.
   const { wallet: wc } = useWalletConnector();
   const provider = (wc?.provider as Eip1193 | undefined) || undefined;
-  // ── Solana signer LIVE CHECK (Jupiter pass · commit 1, read-only) ──────────────────────────
-  // The app is Privy-based, so a connected Solana wallet is exposed by the SAME accessor as EVM —
-  // useWalletConnector().wallet.provider — which for Solana carries { signTransaction, sendTransaction,
-  // signMessage, network, rpcUrl } (verified in @orderly.network/wallet-connector-privy). This probe
-  // just proves the signer + pubkey are reachable live before ANY signing code is written. No new
-  // provider, no new dep. Removed when the real BUY path lands.
+  // ── Solana signer (Privy walletSOL) ──────────────────────────────────────────────────────────
+  // walletSOL = { label, provider:{signTransaction,sendTransaction,signMessage,network,rpcUrl},
+  // accounts:[{address}] } when a Solana wallet is connected via the Orderly/Privy modal.
+  const { walletSOL } = (useWalletConnectorPrivy() as unknown as { walletSOL?: { provider?: Record<string, unknown>; accounts?: { address?: string }[]; label?: string } | null }) || {};
+  const solProvider = walletSOL?.provider as unknown as SolProvider | undefined;
   const solSigner = (() => {
-    const w = wc as unknown as { provider?: Record<string, unknown>; accounts?: { address?: string }[]; address?: string; label?: string } | undefined;
-    const p = w?.provider;
+    const p = walletSOL?.provider;
     return {
       hasSign: typeof p?.signTransaction === "function",
       hasSend: typeof p?.sendTransaction === "function",
-      address: w?.accounts?.[0]?.address ?? w?.address ?? null,
+      address: walletSOL?.accounts?.[0]?.address ?? null,
       network: p?.network != null ? String(p.network) : null,
-      label: w?.label != null ? String(w.label) : null,
+      label: walletSOL?.label != null ? String(walletSOL.label) : null,
     };
   })();
-  // ── Solana in-app BUY (Jupiter, wSOL → token) — ships behind VITE_SOL_INAPP_BUY (default OFF) so
-  // the money-path is inert until /security-review + a real $ test. Shows only for a Solana token with
-  // a Jupiter quote and a reachable Solana signer. The one signing site is solSwapExec.ts. ──
+  // ── Solana in-app BUY (Jupiter, wSOL → token) — behind VITE_SOL_INAPP_BUY. Shows only for a Solana
+  // token with a Jupiter quote and a reachable Solana signer. The one signing site is solSwapExec.ts. ──
   const SOL_INAPP_BUY = getRuntimeConfigBoolean("VITE_SOL_INAPP_BUY");
-  const solProvider = wc?.provider as unknown as SolProvider | undefined;
   const [solAmt, setSolAmt] = useState("");
+  const [solUnit, setSolUnit] = useState<"sol" | "usd">("sol"); // type the buy in SOL or $ (Grok ticket parity)
+  const [solBalance, setSolBalance] = useState<number | null>(null); // wallet SOL balance (for 25/50/MAX)
+  const [solUsd, setSolUsd] = useState<number | null>(null);         // USD per SOL (for USD chips + est out)
   const [solPlan, setSolPlan] = useState<SolBuyPlan | null>(null);
   const [solModalOpen, setSolModalOpen] = useState(false);
   const [solPlanning, setSolPlanning] = useState(false);
@@ -613,6 +616,14 @@ export default function TokenTerminal() {
   // Solana signer + pubkey. Everything else (EVM, no signer, flag off) keeps the "Swap via Jupiter" deep-link.
   const isSolToken = pair?.chainId === "solana";
   const canSolBuy = SOL_INAPP_BUY && isSolToken && showSpot && side === "buy" && swapState.kind === "quote" && quote?.router === "Jupiter" && (solSigner.hasSign || solSigner.hasSend) && !!solSigner.address;
+  // The SOL amount the ticket resolves to (SOL mode = as typed; USD mode = $/SOL price). est output
+  // tokens ≈ ($value) / token price — a display estimate; the confirm modal shows the real Jupiter quote.
+  const solInSol = (() => {
+    const v = parseFloat(solAmt);
+    if (!Number.isFinite(v) || v <= 0) return 0;
+    return solUnit === "usd" ? (solUsd && solUsd > 0 ? v / solUsd : 0) : v;
+  })();
+  const solEstOut = (isSolToken && solInSol > 0 && solUsd && (pair?.priceUsd || 0) > 0) ? (solInSol * solUsd) / (pair!.priceUsd as number) : null;
   // The token quantity a SELL resolves to, in EITHER unit (MAX = whole balance; USD = $/price).
   const sellPrice = pair?.priceUsd || 0;
   const sellTokens = sellMax && held ? held.amount
@@ -784,11 +795,22 @@ export default function TokenTerminal() {
 
   // ── Solana in-app BUY handlers (Jupiter, wSOL → token) — plan validates + guards; execute re-fetches
   // fresh bytes, re-guards, simulates, then signs via the Privy Solana provider. Fail-soft → deep-link. ──
+  // SOL balance + SOL/USD for the buy ticket (%-chips + USD chips + est output). Fail-soft → nulls.
+  useEffect(() => {
+    if (!isSolToken || !solProvider || !solSigner.address) { setSolBalance(null); setSolUsd(null); return; }
+    let alive = true;
+    getSolWalletContext(solProvider, solSigner.address)
+      .then((c) => { if (alive) { setSolBalance(c.balanceSol); setSolUsd(c.solUsd); } })
+      .catch(() => { if (alive) { setSolBalance(null); setSolUsd(null); } });
+    return () => { alive = false; };
+  }, [isSolToken, solSigner.address]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const openSolBuy = useCallback(async () => {
     setSolErr(null); setSolDone(null);
     if (!pair?.baseAddress || !solProvider || !solSigner.address) return;
-    const amt = parseFloat(solAmt);
-    if (!Number.isFinite(amt) || amt <= 0) { setSolErr("Enter an amount of SOL to swap."); return; }
+    // Resolve the typed amount to SOL (USD mode → $/SOL price). planSolBuy quotes + guards the real amount.
+    const amt = solUnit === "usd" ? (solUsd && solUsd > 0 ? (parseFloat(solAmt) || 0) / solUsd : 0) : (parseFloat(solAmt) || 0);
+    if (!Number.isFinite(amt) || amt <= 0) { setSolErr(solUnit === "usd" && !solUsd ? "No SOL price yet — switch to SOL amount." : "Enter an amount to buy."); return; }
     setSolPlanning(true);
     try {
       const p = await planSolBuy(pair.baseAddress, pair.baseSymbol, amt, solSigner.address, solProvider);
@@ -796,7 +818,7 @@ export default function TokenTerminal() {
     } catch (e) {
       setSolErr((e as Error)?.message || "Couldn't build the swap — use the deep-link.");
     } finally { setSolPlanning(false); }
-  }, [pair, solProvider, solSigner.address, solAmt]);
+  }, [pair, solProvider, solSigner.address, solAmt, solUnit, solUsd]);
 
   const confirmSolBuy = useCallback(async () => {
     if (!solPlan || !solProvider) return;
@@ -1199,19 +1221,43 @@ export default function TokenTerminal() {
                         </a>
                       </>
                     )}
-                    {/* ◎ Solana in-app BUY (Jupiter · wSOL→token) — additive; the deep-link below stays. */}
+                    {/* ◎ Solana in-app BUY (Jupiter · wSOL→token) — additive; the deep-link below stays.
+                        Mounts on signer + Jupiter quote (NOT on amount). Ticket mirrors the SPOT SELL:
+                        SOL|USD unit toggle, 25/50/MAX-of-balance (SOL) or $ presets (USD), Est. output. */}
                     {canSolBuy && (
                       <div style={{ marginTop: 10, background: BG, border: `1px solid ${POS}44`, borderRadius: 9, padding: 11 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
                           <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.1em", color: POS, textTransform: "uppercase" }}>◎ Buy with SOL · in-app</span>
-                          <span style={{ fontFamily: MONO, fontSize: 8, color: FAINT }}>Jupiter · you sign</span>
+                          {/* unit toggle — type the buy in SOL or in $ (matches the SELL ticket) */}
+                          <span style={{ display: "flex", gap: 4 }}>
+                            {(["sol", "usd"] as const).map((u) => (
+                              <button key={u} onClick={() => { setSolUnit(u); setSolAmt(""); }} style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.06em", color: solUnit === u ? BRIGHT : FAINT, background: solUnit === u ? "#ededf012" : "none", border: `1px solid ${solUnit === u ? "#ededf033" : BORD}`, borderRadius: 5, padding: "3px 7px", cursor: "pointer", textTransform: "uppercase" }}>{u === "usd" ? "USD" : "SOL"}</button>
+                            ))}
+                          </span>
                         </div>
-                        <input value={solAmt} onChange={(e) => setSolAmt(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="0.0 SOL"
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.08em", color: FAINT, textTransform: "uppercase", marginBottom: 5 }}>
+                          <span>{solBalance != null ? `Bal ${solBalance.toLocaleString("en-US", { maximumFractionDigits: 4 })} SOL${solUsd ? ` · $${(solBalance * solUsd).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : ""}` : "Balance —"}</span>
+                          <span style={{ color: FAINT }}>Jupiter · you sign</span>
+                        </div>
+                        <input value={solAmt} onChange={(e) => setSolAmt(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder={solUnit === "usd" ? "$0.00" : "0.0 SOL"}
                           style={{ width: "100%", boxSizing: "border-box", background: CARD, border: `1px solid ${BORD}`, borderRadius: 8, color: BRIGHT, fontFamily: MONO, fontSize: 16, fontWeight: 600, padding: "9px 11px", outline: "none", marginBottom: 7 }} />
                         <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-                          {[0.05, 0.1, 0.5, 1].map((v) => (
-                            <button key={v} onClick={() => setSolAmt(String(v))} style={{ flex: 1, fontFamily: MONO, fontSize: 10, color: MUT, background: CARD, border: `1px solid ${BORD}`, borderRadius: 6, padding: "6px 0", cursor: "pointer" }}>{v}</button>
-                          ))}
+                          {solUnit === "usd"
+                            ? [5, 25, 100].map((v) => (
+                                <button key={v} onClick={() => setSolAmt(String(v))} style={{ flex: 1, fontFamily: MONO, fontSize: 10, color: MUT, background: CARD, border: `1px solid ${BORD}`, borderRadius: 6, padding: "6px 0", cursor: "pointer" }}>${v}</button>
+                              ))
+                            : [25, 50, 100].map((v) => {
+                                const canFill = solBalance != null && solBalance > 0;
+                                // MAX reserves a small SOL buffer for fees + wSOL rent so it doesn't guarantee-fail.
+                                return (
+                                  <button key={v} disabled={!canFill} onClick={() => { if (!canFill) return; const frac = v >= 100 ? Math.max(0, solBalance! - 0.01) : (solBalance! * v / 100); setSolAmt(String(Number(frac.toFixed(6)))); }}
+                                    style={{ flex: 1, fontFamily: MONO, fontSize: 10, fontWeight: 700, color: canFill ? MUT : FAINT, background: CARD, border: `1px solid ${BORD}`, borderRadius: 6, padding: "6px 0", cursor: canFill ? "pointer" : "not-allowed" }}>{v === 100 ? "MAX" : `${v}%`}</button>
+                                );
+                              })}
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 10.5, color: MUT, marginBottom: 8 }}>
+                          <span>Est. output{solInSol > 0 ? ` · ${solInSol.toLocaleString("en-US", { maximumFractionDigits: 4 })} SOL` : ""}</span>
+                          <span style={{ color: BRIGHT }}>{solEstOut != null ? `≈ ${solEstOut.toLocaleString("en-US", { maximumFractionDigits: solEstOut >= 1 ? 2 : 6 })} ${pair.baseSymbol}` : "—"}</span>
                         </div>
                         <button onClick={openSolBuy} disabled={solPlanning}
                           style={{ display: "block", width: "100%", textAlign: "center", fontFamily: MONO, fontSize: 13, fontWeight: 700, letterSpacing: "0.03em", color: "#0a0a0b", background: POS, border: "none", borderRadius: 9, padding: "12px 0", cursor: solPlanning ? "wait" : "pointer", opacity: solPlanning ? 0.7 : 1 }}>
