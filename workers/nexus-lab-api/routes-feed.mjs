@@ -299,6 +299,28 @@ export async function handleFeed(parts, request, env) {
   // they can NEVER enter grading, the caller leaderboard, or the on-chain ledger. Memecoin
   // opinions stay off the trustless perp moat by construction. Wallet-attributed (same trust
   // model as comments), self-delete only.
+  // ── /takes/hot — latest takes across ALL tokens (discovery strip for the Feed) ──
+  // Cross-pollination: surface fresh conviction from every token so the Feed drives traffic
+  // back into /token pages. Recency-ranked (cheap); still firewalled (read-only aggregate of
+  // the same takes: store — never joins the graded boards).
+  if (parts[0] === "takes" && parts[1] === "hot" && parts.length === 2) {
+    if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+    const listed = await env.LAB_STORE.list({ prefix: "takes:" });
+    const all = [];
+    for (const key of listed.keys) {
+      const rest = key.name.slice("takes:".length);
+      const sep = rest.indexOf(":");
+      if (sep < 0) continue;
+      const chain = rest.slice(0, sep), ca = rest.slice(sep + 1);
+      const raw = await env.LAB_STORE.get(key.name);
+      if (!raw) continue;
+      let list; try { list = JSON.parse(raw); } catch { continue; }
+      for (const t of (Array.isArray(list) ? list : [])) all.push({ ...t, chain, ca });
+    }
+    all.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return json({ takes: all.slice(0, 24) }, request);
+  }
+
   if (parts[0] === "takes" && parts[1] && parts[2]) {
     const chain = String(parts[1]).toLowerCase().slice(0, 24);
     const ca = String(parts[2]).trim();

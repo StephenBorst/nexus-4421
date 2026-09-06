@@ -94,6 +94,36 @@ export function addRecent(address: string, token: RecentToken): void {
   } catch { /* ignore */ }
 }
 
+// ── cost basis ("your position") ─────────────────────────────────────────────
+// No indexer means we can't know a wallet's external cost basis — but we DO know every
+// in-app BUY (USD spent + tokens received at confirm time). We record those lots per
+// wallet+token in localStorage so the /token page can show an HONEST position: avg entry,
+// invested, and P&L on the TRACKED tokens (labelled "from your Nexus buys"), plus entry
+// markers on the chart. Identity is the wallet — switching accounts shows only that wallet's.
+export interface CostLot { ts: number; usd: number; tokens: number }
+const COST_KEY = (addr: string, chain: string, ca: string): string => `nexus_cost_${addr.toLowerCase()}_${chain}_${ca.toLowerCase()}`;
+const COST_CAP = 50;
+
+export function getCostBasis(addr: string, chain: string, ca: string): CostLot[] {
+  if (!isCa(addr) || !isCa(ca)) return [];
+  try {
+    const raw = localStorage.getItem(COST_KEY(addr, chain, ca));
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((l): l is CostLot => l && Number.isFinite(l.ts) && Number.isFinite(l.usd) && Number.isFinite(l.tokens) && l.usd > 0 && l.tokens > 0);
+  } catch { return []; }
+}
+
+// Record one in-app buy lot (call ONLY after a confirmed status=1 buy). Newest first, capped.
+export function addCostLot(addr: string, chain: string, ca: string, lot: CostLot): void {
+  if (!isCa(addr) || !isCa(ca) || !(lot.usd > 0) || !(lot.tokens > 0)) return;
+  try {
+    const next = [lot, ...getCostBasis(addr, chain, ca)].slice(0, COST_CAP);
+    localStorage.setItem(COST_KEY(addr, chain, ca), JSON.stringify(next));
+  } catch { /* ignore */ }
+}
+
 // Auto-hydrate probe (Order 0): does `address` hold a nonzero balance of `ca` on `dsChain`, and
 // what are its decimals? Called when a connected wallet VIEWS a token's Spot page — if it holds
 // the token, we remember it so the chip self-heals across browsers/devices WITHOUT a re-buy (the

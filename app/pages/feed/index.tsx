@@ -23,6 +23,7 @@ import { Sparkline, SectionHeader } from "@/pages/lab/components";
 import { getAgentSig } from "@/pages/lab/agentKeys";
 import { chartImageList, effectiveStatus } from "@/pages/lab/helpers";
 import LiveNow from "./LiveNow";
+import TakesStrip from "./TakesStrip";
 import Contested from "./Contested";
 import Contrarians from "./Contrarians";
 import Resolved, { type ResolutionEvent } from "./Resolved";
@@ -1811,6 +1812,7 @@ export default function FeedPage() {
             {!loading && !error && <FeedPulse feed={feed} />}
             {!loading && !error && <Resolved events={resolutions} />}
             {!loading && !error && <LiveNow />}
+            {!loading && !error && <TakesStrip />}
             {!loading && !error && <Contested />}
             {!loading && !error && <Contrarians />}
             {!loading && !error && <Desks walletAddress={walletAddress} />}

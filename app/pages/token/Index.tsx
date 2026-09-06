@@ -21,7 +21,7 @@ import {
   type TokenPair, type Candle, type Trade, type NexusSignal, type SwapQuote, type CallMark, type LiqMap, type Take, type CallerMerit,
 } from "./data";
 import { SocialBar } from "@/components/SocialBar";
-import { fetchHoldings, addRecent, getRecents, optimisticHolding, probeHeldToken, type Holding } from "./holdings";
+import { fetchHoldings, addRecent, getRecents, optimisticHolding, probeHeldToken, getCostBasis, addCostLot, type Holding, type CostLot } from "./holdings";
 import { planBuy, planSell, executeSwap, explorerTx, fmtTokenAmount, slippagePct, EVM_USDC, type SwapPlan, type Eip1193 } from "./swapExec";
 
 // Canonical WETH per DexScreener chain slug — the always-available token→token target on a SELL
@@ -115,7 +115,7 @@ function SpotCallAvatar({ pfp, name, ring }: { pfp: string | null; name: string 
     </div>
   );
 }
-function Chart({ candles, loading, height, calls, liq }: { candles: Candle[]; loading: boolean; height: number; calls?: CallMark[]; liq?: LiqMap | null }) {
+function Chart({ candles, loading, height, calls, liq, entries }: { candles: Candle[]; loading: boolean; height: number; calls?: CallMark[]; liq?: LiqMap | null; entries?: { t: number; price: number }[] }) {
   const [width, setWidth] = useState(720);
   const [hover, setHover] = useState<number | null>(null);
   const roRef = useRef<ResizeObserver | null>(null);
@@ -167,6 +167,11 @@ function Chart({ candles, loading, height, calls, liq }: { candles: Candle[]; lo
     .filter((c) => c.t / 1000 >= t0 && c.t / 1000 <= t1)
     .slice(0, 16)
     .map((c) => ({ ...c, cx: xOfTime(c.t), cy: c.entry >= min && c.entry <= max ? y(c.entry) : (c.entry < min ? priceBottom - 8 : TOP + 8) }));
+  // YOUR entry markers (from tracked in-app buys) — small ⊕ pins at your buy price/time.
+  const entryMarks = (entries || [])
+    .filter((e) => e.t / 1000 >= t0 && e.t / 1000 <= t1 && e.price >= min && e.price <= max)
+    .slice(0, 24)
+    .map((e) => ({ cx: xOfTime(e.t), cy: y(e.price), price: e.price }));
   const liqBands = liq ? [
     ...(liq.below || []).map((c) => ({ price: c.price, mag: c.mag, dir: "long" as const })),
     ...(liq.above || []).map((c) => ({ price: c.price, mag: c.mag, dir: "short" as const })),
@@ -225,6 +230,14 @@ function Chart({ candles, loading, height, calls, liq }: { candles: Candle[]; lo
         <line x1={LPAD} x2={LPAD + plotW} y1={y(last.c)} y2={y(last.c)} stroke={lastUp ? POS : NEG} strokeWidth={0.6} strokeDasharray="1 3" opacity={0.6} />
         <rect x={width - RPAD} y={y(last.c) - 8} width={RPAD} height={16} fill={lastUp ? POS : NEG} />
         <text x={width - RPAD + RPAD / 2} y={y(last.c) + 3.5} fontFamily={MONO} fontSize={9} fill="#0a0a0b" fontWeight={700} textAnchor="middle">{chFmtPx(last.c)}</text>
+        {entryMarks.map((e, i) => (
+          <g key={`entry-${i}`}>
+            <line x1={LPAD} x2={LPAD + plotW} y1={e.cy} y2={e.cy} stroke={POS} strokeWidth={0.5} strokeDasharray="1 4" opacity={0.35} />
+            <circle cx={e.cx} cy={e.cy} r={4.5} fill={POS} stroke={BG} strokeWidth={1.5} />
+            <line x1={e.cx - 2} x2={e.cx + 2} y1={e.cy} y2={e.cy} stroke="#0a0a0b" strokeWidth={1.1} />
+            <line x1={e.cx} x2={e.cx} y1={e.cy - 2} y2={e.cy + 2} stroke="#0a0a0b" strokeWidth={1.1} />
+          </g>
+        ))}
         {hc && hover != null && <line x1={x(hover)} x2={x(hover)} y1={TOP} y2={volBottom} stroke="#ffffff" strokeWidth={0.6} strokeDasharray="2 3" opacity={0.35} />}
       </svg>
       {hc && (
@@ -239,10 +252,11 @@ function Chart({ candles, loading, height, calls, liq }: { candles: Candle[]; lo
           <SpotCallAvatar pfp={c.pfp} name={c.name} ring={c.dir === "LONG" ? POS : NEG} />
         </div>
       ))}
-      {(callMarks.length > 0 || liqRects.length > 0) && (
+      {(callMarks.length > 0 || liqRects.length > 0 || entryMarks.length > 0) && (
         <div style={{ position: "absolute", bottom: TIMEH + 3, right: 8, zIndex: 2, fontFamily: MONO, fontSize: 8, color: FAINT, letterSpacing: "0.04em", display: "flex", gap: 10, background: "#0a0a0bd9", padding: "2px 6px", borderRadius: 3, pointerEvents: "none" }}>
           {liqRects.length > 0 && <span>⚡ est. liq · <span style={{ color: NEG }}>long▼</span> <span style={{ color: POS }}>short▲</span></span>}
           {callMarks.length > 0 && <span>{callMarks.length} graded call{callMarks.length === 1 ? "" : "s"}</span>}
+          {entryMarks.length > 0 && <span style={{ color: POS }}>⊕ your entries</span>}
         </div>
       )}
     </div>
@@ -335,6 +349,7 @@ export default function TokenTerminal() {
   const [takeBusy, setTakeBusy] = useState(false);
   const [meritMap, setMeritMap] = useState<Record<string, CallerMerit>>({}); // author wallet → earned graded rank
   const [tokenTab, setTokenTab] = useState<"takes" | "about">("takes"); // below-terminal organizer (FOMO-style)
+  const [costLots, setCostLots] = useState<CostLot[]>([]); // your in-app buy lots for this token (cost basis + chart pins)
   const [copied, setCopied] = useState(false);
   const [sig, setSig] = useState<NexusSignal | null>(null);
   // Graded call markers + estimated liq for the chart — only for a LISTED perp (the Lab data).
@@ -453,6 +468,12 @@ export default function TokenTerminal() {
     return () => { alive = false; };
   }, [pair?.baseAddress, pair?.chainId]);
 
+  // Your tracked cost basis (in-app buy lots) for this token — powers the position card + chart pins.
+  useEffect(() => {
+    if (!pair?.baseAddress || !wallet) { setCostLots([]); return; }
+    setCostLots(getCostBasis(wallet, pair.chainId, pair.baseAddress));
+  }, [pair?.baseAddress, pair?.chainId, wallet]);
+
   const submit = useCallback((q: string) => {
     const v = q.trim();
     if (v) navigate(`/token/${encodeURIComponent(v)}`);
@@ -562,6 +583,22 @@ export default function TokenTerminal() {
     : sellUnit === "usd" ? (sellPrice > 0 ? (parseFloat(sellAmt) || 0) / sellPrice : 0)
     : (parseFloat(sellAmt) || 0);
   const sellUsdEst = held && sellPrice > 0 ? sellTokens * sellPrice : null;
+  // YOUR POSITION (from tracked in-app buys) — invested, avg entry, and P&L on the TRACKED tokens
+  // (honest: we only know what you bought in-app, not external cost basis). null when nothing tracked.
+  const position = useMemo(() => {
+    if (!costLots.length) return null;
+    const invested = costLots.reduce((s, l) => s + l.usd, 0);
+    const boughtTokens = costLots.reduce((s, l) => s + l.tokens, 0);
+    if (!(invested > 0) || !(boughtTokens > 0)) return null;
+    const avgEntry = invested / boughtTokens;
+    const price = pair?.priceUsd || 0;
+    const trackedValue = price > 0 ? boughtTokens * price : null;
+    const pnl = trackedValue != null ? trackedValue - invested : null;
+    const pnlPct = pnl != null && invested > 0 ? (pnl / invested) * 100 : null;
+    return { invested, boughtTokens, avgEntry, trackedValue, pnl, pnlPct };
+  }, [costLots, pair?.priceUsd]);
+  // Buy points for the chart (⊕ pins at your entry price/time).
+  const chartEntries = useMemo(() => costLots.map((l) => ({ t: l.ts, price: l.tokens > 0 ? l.usd / l.tokens : 0 })).filter((e) => e.price > 0), [costLots]);
   // Token→token receive targets for a SELL: WETH (if the chain has one) + the wallet's own recents on
   // this chain, minus USDC (the default) and the token being sold. Each carries known decimals/sym, so
   // no arbitrary on-chain resolution — the received token is never spent, this is a convenience list.
@@ -647,6 +684,12 @@ export default function TokenTerminal() {
           if (plan.outAmount != null) {
             const chip = optimisticHolding(pair.baseSymbol, pair.chainId, pair.baseAddress, plan.outAmount, plan.decimalsOut, pair.priceUsd ?? null);
             setHoldings((h) => [chip, ...h.filter((x) => !((x.address || "").toLowerCase() === pair.baseAddress.toLowerCase() && x.chain === pair.chainId))]);
+            // Record the buy lot (USD spent + tokens received) → cost basis + a chart entry pin.
+            const boughtTokens = Number(plan.outAmount) / 10 ** plan.decimalsOut;
+            if (plan.usd && plan.usd > 0 && boughtTokens > 0) {
+              addCostLot(wallet, pair.chainId, pair.baseAddress, { ts: Date.now(), usd: plan.usd, tokens: boughtTokens });
+              setCostLots(getCostBasis(wallet, pair.chainId, pair.baseAddress));
+            }
           }
         } else if (plan.dir === "sell" && plan.outSym !== "USDC" && plan.decimalsOut != null) {
           // token→token: remember the RECEIVED token so the strip shows it once the on-chain read lands.
@@ -821,8 +864,49 @@ export default function TokenTerminal() {
                     ))}
                     <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.04em", color: FAINT, alignSelf: "center", textTransform: "uppercase" }}>chart · GeckoTerminal</span>
                   </div>
-                  <Chart candles={candles} loading={chartLoading} height={isMobile ? 300 : 460} calls={chartCalls} liq={chartLiq} />
+                  <Chart candles={candles} loading={chartLoading} height={isMobile ? 300 : 460} calls={chartCalls} liq={chartLiq} entries={chartEntries} />
                 </div>
+
+                {/* ── YOUR POSITION — shown when you hold the token; cost basis from tracked in-app buys ── */}
+                {held && (
+                  <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, padding: 14, marginBottom: 12 }}>
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
+                      <span style={{ fontFamily: MONO, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.12em", color: BRIGHT }}>YOUR POSITION</span>
+                      {position?.pnlPct != null && <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: position.pnl! >= 0 ? POS : NEG }}>{position.pnl! >= 0 ? "+" : ""}{position.pnlPct.toFixed(2)}%</span>}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: position ? 12 : 0 }}>
+                      <div>
+                        <div style={{ fontFamily: MONO, fontSize: 22, fontWeight: 700, color: BRIGHT, lineHeight: 1 }}>{held.usdLabel}</div>
+                        <div style={{ fontFamily: MONO, fontSize: 11, color: MUT, marginTop: 4 }}>{held.amountLabel} {pair.baseSymbol}</div>
+                      </div>
+                      {position?.pnl != null && (
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontFamily: MONO, fontSize: 15, fontWeight: 700, color: position.pnl >= 0 ? POS : NEG }}>{position.pnl >= 0 ? "+" : "−"}${Math.abs(position.pnl).toLocaleString("en-US", { maximumFractionDigits: 2 })}</div>
+                          <div style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.06em", color: FAINT, textTransform: "uppercase", marginTop: 3 }}>tracked P&L</div>
+                        </div>
+                      )}
+                    </div>
+                    {position ? (
+                      <>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: 8 }}>
+                          {([
+                            ["Invested", `$${position.invested.toLocaleString("en-US", { maximumFractionDigits: 2 })}`],
+                            ["Avg entry", fmtPrice(position.avgEntry)],
+                            ["Tracked", `${position.boughtTokens.toLocaleString("en-US", { maximumFractionDigits: position.boughtTokens >= 1 ? 2 : 6 })} ${pair.baseSymbol}`],
+                          ] as const).map(([label, val]) => (
+                            <div key={label} style={{ background: BG, border: `1px solid ${BORD}`, borderRadius: 7, padding: "8px 10px" }}>
+                              <div style={{ fontFamily: MONO, fontSize: 8, letterSpacing: "0.08em", color: FAINT, textTransform: "uppercase", marginBottom: 3 }}>{label}</div>
+                              <div style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: BRIGHT }}>{val}</div>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ fontFamily: UI, fontSize: 9.5, color: FAINT, marginTop: 8, lineHeight: 1.5 }}>Cost basis + P&L from your <b style={{ color: MUT }}>in-app Nexus buys</b> only (we can’t see external buys). ⊕ marks your entries on the chart.</div>
+                      </>
+                    ) : (
+                      <div style={{ fontFamily: UI, fontSize: 10, color: FAINT, lineHeight: 1.5 }}>No in-app buys tracked yet — buy on Spot to track your avg entry + P&L here.</div>
+                    )}
+                  </div>
+                )}
 
                 {/* live tape — collapsible (fold it away to give the chart room, like the trade panel) */}
                 <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 10, overflow: "hidden" }}>
