@@ -305,6 +305,11 @@ export async function handleFeed(parts, request, env) {
   // the same takes: store — never joins the graded boards).
   if (parts[0] === "takes" && parts[1] === "hot" && parts.length === 2) {
     if (request.method !== "GET") return json({ error: "method not allowed" }, request, 405);
+    // Served from a 60s KV cache so the cross-token scan + 🔥 reads run at most once/min globally,
+    // not once per viewer poll (the Feed polls every 30s). Hardening for the discovery strip.
+    const CACHE_KEY = "cache:takes:hot";
+    try { const c = await env.LAB_STORE.get(CACHE_KEY); if (c) return json(JSON.parse(c), request); } catch { /* recompute */ }
+
     const listed = await env.LAB_STORE.list({ prefix: "takes:" });
     const all = [];
     for (const key of listed.keys) {
@@ -317,8 +322,27 @@ export async function handleFeed(parts, request, env) {
       let list; try { list = JSON.parse(raw); } catch { continue; }
       for (const t of (Array.isArray(list) ? list : [])) all.push({ ...t, chain, ca });
     }
+    // Rank by HOTNESS, not just recency: take the 60 most recent as candidates, read their 🔥
+    // counts (bounded), score = 🔥·3 + a decaying <24h freshness nudge. Cached 60s so the reaction
+    // reads are amortized. Fresh conviction people are reacting to floats up; stale posts sink.
     all.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    return json({ takes: all.slice(0, 24) }, request);
+    const candidates = all.slice(0, 60);
+    const now = Date.now();
+    await Promise.all(candidates.map(async (t) => {
+      let fire = 0;
+      try { const rRaw = await env.LAB_STORE.get(`reactions:${t.id}`); const r = rRaw ? JSON.parse(rRaw) : {}; fire = Array.isArray(r["🔥"]) ? r["🔥"].length : 0; } catch { /* 0 */ }
+      t.fire = fire;
+      const ageH = (now - (t.createdAt || now)) / 3600000;
+      t._score = fire * 3 + Math.max(0, 24 - ageH) / 4;
+    }));
+    candidates.sort((a, b) => (b._score || 0) - (a._score || 0) || (b.createdAt || 0) - (a.createdAt || 0));
+    const takes = candidates.slice(0, 24).map((t) => ({
+      id: t.id, wallet: t.wallet, direction: t.direction, text: t.text, target: t.target,
+      sym: t.sym, pfp: t.pfp, displayName: t.displayName, createdAt: t.createdAt, chain: t.chain, ca: t.ca, fire: t.fire || 0,
+    }));
+    const payload = { takes };
+    try { await env.LAB_STORE.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 60 }); } catch { /* best-effort */ }
+    return json(payload, request);
   }
 
   if (parts[0] === "takes" && parts[1] && parts[2]) {

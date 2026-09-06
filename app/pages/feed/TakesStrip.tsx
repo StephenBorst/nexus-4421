@@ -5,6 +5,7 @@
 // Each card deep-links to that token's Spot page (/token/:ca), where the full thread lives.
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { fetchCallerMerit, type CallerMerit } from "@/pages/token/data";
 
 const API_BASE = "https://og.nexustradinglabs.com";
 const green = "#3ecf8e";
@@ -14,7 +15,7 @@ const mono = "var(--nx-font-mono)";
 type HotTake = {
   id: string; wallet: string; direction: "BULL" | "BEAR"; text: string;
   target: number | null; sym?: string; pfp?: string | null; displayName?: string | null;
-  createdAt: number; chain: string; ca: string;
+  createdAt: number; chain: string; ca: string; fire?: number;
 };
 
 const shortAddr = (w: string) => `${w.slice(0, 6)}…${w.slice(-4)}`;
@@ -28,6 +29,7 @@ const ago = (ms: number) => {
 
 export default function TakesStrip() {
   const [takes, setTakes] = useState<HotTake[] | null>(null);
+  const [merit, setMerit] = useState<Record<string, CallerMerit>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -39,6 +41,8 @@ export default function TakesStrip() {
       } catch { if (alive) setTakes([]); }
     };
     load();
+    // Author merit ranks (module-cached) → the differentiator on the discovery surface too.
+    fetchCallerMerit().then((m) => { if (alive) setMerit(m); }).catch(() => { /* no badges */ });
     const id = setInterval(load, 30000);
     return () => { alive = false; clearInterval(id); };
   }, []);
@@ -48,13 +52,14 @@ export default function TakesStrip() {
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
-        <span style={{ fontFamily: mono, fontSize: 11, fontWeight: "bold", color: "#ededf0", letterSpacing: "0.12em" }}>⊕ LATEST TAKES</span>
+        <span style={{ fontFamily: mono, fontSize: 11, fontWeight: "bold", color: "#ededf0", letterSpacing: "0.12em" }}>🔥 HOT TAKES</span>
         <span style={{ fontFamily: mono, fontSize: 9, color: "#52525b" }}>ungraded conviction on Spot tokens · tap to open</span>
       </div>
 
       <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
         {takes.map((t) => {
           const bull = t.direction === "BULL";
+          const m = merit[t.wallet.toLowerCase()];
           return (
             <div
               key={t.id}
@@ -68,11 +73,16 @@ export default function TakesStrip() {
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
                 <span style={{ fontSize: 12, fontWeight: "bold", color: "#fff" }}>${t.sym || "—"}</span>
                 <span style={{ fontSize: 8.5, fontWeight: "bold", letterSpacing: "0.04em", color: bull ? green : red }}>{t.direction}</span>
-                <span style={{ marginLeft: "auto", fontSize: 8, color: "#52525b" }}>{ago(t.createdAt)}</span>
+                <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+                  {t.fire ? <span style={{ fontSize: 8.5, color: "#f7931a" }}>🔥 {t.fire}</span> : null}
+                  <span style={{ fontSize: 8, color: "#52525b" }}>{ago(t.createdAt)}</span>
+                </span>
               </div>
               <div style={{ fontSize: 11, color: "#d4d4d8", lineHeight: 1.45, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{t.text}</div>
-              <div style={{ fontSize: 8, color: "#52525b", marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {t.displayName || shortAddr(t.wallet)}{t.target ? ` · 🎯 ${t.target}` : ""}
+              <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 6, overflow: "hidden" }}>
+                <span style={{ fontSize: 8, color: "#52525b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.displayName || shortAddr(t.wallet)}</span>
+                {m && <span title={`${m.title} caller · ${m.hitRate}% hit`} style={{ flexShrink: 0, fontSize: 7.5, fontWeight: "bold", letterSpacing: "0.03em", color: green, border: `1px solid ${green}44`, borderRadius: 4, padding: "1px 4px" }}>{m.glyph} {m.hitRate}%</span>}
+                {t.target ? <span style={{ flexShrink: 0, fontSize: 8, color: "#52525b" }}>🎯 {t.target}</span> : null}
               </div>
             </div>
           );
