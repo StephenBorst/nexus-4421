@@ -1661,6 +1661,39 @@ Redirecting to the call… <a style="color:#ededf0" href="${appUrl}">view on Nex
       const NEXUS_TOLERANCE = 0.12;   // accept ≥88% of target (low-liq token slippage)
       const SUB_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 
+      // GET /sub/stats → aggregate PRO conversion (COUNTS ONLY — no addresses, no $ amounts) so
+      // the founder can actually SEE whether PRO is converting instead of flying blind. Cached 60s
+      // (reads every sub key to check expiry). Low-sensitivity by design; doubles as social proof.
+      if (parts[0] === "sub" && parts[1] === "stats" && request.method === "GET") {
+        const CK = "cache:sub:stats";
+        try { const c = await env.LAB_STORE.get(CK); if (c) return json(JSON.parse(c), request); } catch { /* recompute */ }
+        try {
+          const now = Date.now();
+          let activePro = 0, totalSubs = 0, payments = 0;
+          const byToken = { USDC: 0, NEXUS: 0 };
+          let cursor;
+          do {
+            const page = await env.LAB_STORE.list({ prefix: "sub:", cursor });
+            for (const k of page.keys) {
+              if (k.name.startsWith("sub:redeemed:")) { payments++; continue; }
+              if (!/^sub:0x[0-9a-fA-F]{40}$/.test(k.name)) continue; // only real subscriber keys
+              totalSubs++;
+              try {
+                const s = JSON.parse((await env.LAB_STORE.get(k.name)) || "null");
+                if (s?.expiresAt && s.expiresAt > now) {
+                  activePro++;
+                  if (String(s.token || "").toUpperCase().includes("NEXUS")) byToken.NEXUS++; else byToken.USDC++;
+                }
+              } catch { /* skip a bad record */ }
+            }
+            cursor = page.list_complete ? null : page.cursor;
+          } while (cursor);
+          const payload = { activePro, totalSubs, payments, byToken, at: now };
+          try { await env.LAB_STORE.put(CK, JSON.stringify(payload), { expirationTtl: 60 }); } catch { /* best-effort */ }
+          return json(payload, request);
+        } catch { return json({ activePro: 0, totalSubs: 0, payments: 0, byToken: { USDC: 0, NEXUS: 0 } }, request); }
+      }
+
       // GET /sub/:address → { expiresAt, active }  (read by useSubscription)
       if (parts[0] === "sub" && parts[1] && parts[1] !== "verify" && request.method === "GET") {
         try {

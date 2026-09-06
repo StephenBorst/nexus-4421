@@ -58,6 +58,19 @@ export function NexusTreasuryStack({ compact = false }: { compact?: boolean }) {
         <span style={{ fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: C.text.muted }}>% of supply</span>
         <span style={{ fontSize: compact ? 14 : 18, fontWeight: 700, color: C.text.bright }}>{pct}%</span>
       </div>
+      {/* The earned-revenue story: this isn't "buy the lows" alone — it's a war chest funded by
+          real, recurring product revenue, accumulated as $NEXUS and HELD. Sources are labelled
+          (not live $ — receiver balances are personal/mixed), the accumulation above is on-chain. */}
+      {!compact && (
+        <>
+          <div style={{ width: 1, alignSelf: "stretch", background: C.border }} />
+          <div style={{ flex: 1, minWidth: 190, display: "flex", flexDirection: "column", gap: 3, textAlign: "right" }}>
+            <span style={{ fontSize: 8.5, letterSpacing: "0.14em", textTransform: "uppercase", color: C.text.muted }}>Fed by earned revenue</span>
+            <span style={{ fontSize: 9.5, color: C.text.faint, lineHeight: 1.4 }}>broker + spot swap fees · PRO subs · x402 data</span>
+            <span style={{ fontSize: 8, color: C.text.faint }}>swept → accumulated as $NEXUS &amp; held · on-chain, verifiable</span>
+          </div>
+        </>
+      )}
     </div>
   );
 }

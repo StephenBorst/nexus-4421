@@ -38,6 +38,19 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
   const [subMsg, setSubMsg] = useState("");
   const [copied, setCopied] = useState(false);
   const [nexusAmt, setNexusAmt] = useState<string | null>(null);
+  // PRO conversion count (public counts-only aggregate) — social proof when it's meaningful; the
+  // raw number (active/total/payments) is always at GET /sub/stats for founder visibility.
+  const [proCount, setProCount] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(`${API_BASE}/sub/stats`).then((r) => r.json())
+      .then((d) => { if (alive && typeof d?.activePro === "number") setProCount(d.activePro); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const proProof = proCount != null && proCount >= 5
+    ? <span style={{ fontFamily: mono, fontSize: 9, color: "#3ecf8e", border: "1px solid #3ecf8e44", borderRadius: 3, padding: "2px 7px", letterSpacing: "0.04em" }}>◆ {proCount.toLocaleString()} on {TIER_NAME}</span>
+    : null;
 
   // Live $NEXUS quote (client-side DexScreener) → required tokens with a small buffer
   // so the user clears the worker's tolerance band. The worker re-prices on verify.
@@ -100,6 +113,7 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
       <div style={{ ...card, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ fontFamily: mono, fontSize: 12, fontWeight: "bold", color: "#ededf0", letterSpacing: "0.08em" }}>◆ {TIER_NAME.toUpperCase()} · ACTIVE</span>
         <NexusTierBadge tier={tier} size="md" />
+        {proProof}
         <span style={{ fontFamily: mono, fontSize: 10, color: "#a1a1aa", marginLeft: "auto" }}>
           {via === "holder" ? "unlocked via $NEXUS holdings" : "subscription active"}
         </span>
@@ -112,6 +126,7 @@ export function NexusPro({ walletAddress }: { walletAddress: string | null }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
         <span style={{ fontFamily: mono, fontSize: 13, fontWeight: "bold", color: "#ededf0", letterSpacing: "0.1em" }}>◆ {TIER_NAME.toUpperCase()}</span>
         <span style={{ fontFamily: mono, fontSize: 10, color: "#a1a1aa" }}>the operator tier — unlock the full terminal</span>
+        {proProof}
         <button
           onClick={dismiss}
           style={{
