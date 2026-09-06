@@ -313,7 +313,9 @@ export async function nexusSignal(symbol: string): Promise<NexusSignal | null> {
 // EVM stays on the honest named deep-link rather than a faked quote. Fail-soft: any error →
 // null → the panel falls back to the deep-link, so a changed Jupiter endpoint never breaks the
 // page, it just hides the badge. This does NOT execute anything; signing is a separate pass.
-const JUP_QUOTE = "https://quote-api.jup.ag/v6/quote";
+// Jupiter quote via OUR worker (og.nexustradinglabs.com/swap/jup/quote) so the api.jup.ag x-api-key
+// stays server-side; response shape is unchanged (Jupiter /swap/v1 == the old /v6 schema).
+const JUP_QUOTE = `${AGENT_API}/swap/jup/quote`;
 const USDC_SOL = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; // USDC mint, Solana
 // USDC by DexScreener chainId → numeric chainId, for the EVM (Fabric) quote probe. Only chains
 // where we know the canonical USDC; anything else simply doesn't get an EVM quote (deep-link).

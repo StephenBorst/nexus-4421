@@ -32,8 +32,11 @@
 
 import { Connection, VersionedTransaction, PublicKey } from "@solana/web3.js";
 
-const JUP_QUOTE = "https://quote-api.jup.ag/v6/quote";
-const JUP_SWAP = "https://quote-api.jup.ag/v6/swap";
+// Jupiter is reached through OUR worker (og.nexustradinglabs.com/swap/jup/*) so the api.jup.ag
+// x-api-key stays server-side. The response is Jupiter's raw quote/swap, guarded below before signing.
+const AGENT_API = "https://og.nexustradinglabs.com";
+const JUP_QUOTE = `${AGENT_API}/swap/jup/quote`;
+const JUP_SWAP = `${AGENT_API}/swap/jup/swap`;
 export const WSOL_MINT = "So11111111111111111111111111111111111111112";
 const LAMPORTS_PER_SOL = 1_000_000_000;
 export const MAX_SLIPPAGE_BPS = 300; // 3% hard cap — refuse any quote/route asking for more.

@@ -5664,6 +5664,39 @@ document.getElementById("btn").addEventListener("click",go);
       }, request);
     }
 
+    // ── Jupiter (Solana) swap proxy — GET /swap/jup/quote + POST /swap/jup/swap ──
+    // The Solana in-app BUY money-path (solSwapExec.ts) and the Spot preview call Jupiter THROUGH
+    // here so our api.jup.ag x-api-key (paid tier) never reaches the browser. Thin AUTHENTICATED
+    // passthrough to a FIXED host (no SSRF): the quote forwards only a whitelist of known params, the
+    // swap forwards the JSON body verbatim. It returns Jupiter's raw body unchanged — the BROWSER
+    // then runs every guard (input/amount/output bind, program allowlist, fee-payer, simulate) on the
+    // returned bytes before any signature, so this relay adds no trust. Key from env.JUP_API_KEY
+    // (JUPITER_API_KEY honored as an alt); with no key it still forwards and Jupiter decides.
+    if (parts[0] === "swap" && parts[1] === "jup" && (parts[2] === "quote" || parts[2] === "swap")) {
+      const jupKey = env.JUP_API_KEY || env.JUPITER_API_KEY || "";
+      const jupHdr = { Accept: "application/json" };
+      if (jupKey) jupHdr["x-api-key"] = jupKey;
+      try {
+        if (parts[2] === "quote" && request.method === "GET") {
+          const p = new URLSearchParams();
+          for (const k of ["inputMint", "outputMint", "amount", "slippageBps", "swapMode", "onlyDirectRoutes", "restrictIntermediateTokens", "maxAccounts"]) {
+            const v = url.searchParams.get(k);
+            if (v != null && v !== "") p.set(k, v);
+          }
+          const r = await fetch(`https://api.jup.ag/swap/v1/quote?${p.toString()}`, { headers: jupHdr });
+          return new Response(await r.text(), { status: r.status, headers: { "Content-Type": "application/json", ...cors(request) } });
+        }
+        if (parts[2] === "swap" && request.method === "POST") {
+          const inBody = await request.text(); // { quoteResponse, userPublicKey, wrapAndUnwrapSol, ... }
+          const r = await fetch("https://api.jup.ag/swap/v1/swap", { method: "POST", headers: { ...jupHdr, "Content-Type": "application/json" }, body: inBody });
+          return new Response(await r.text(), { status: r.status, headers: { "Content-Type": "application/json", ...cors(request) } });
+        }
+        return json({ error: "method not allowed" }, request, 405);
+      } catch (e) {
+        return json({ error: "jup_proxy_failed", detail: String(e?.message || e) }, request, 502);
+      }
+    }
+
     // ── GET /swap/quote — EVM swap quote via Fabric (secret X-App-Id stays server-side) ──
     // The token terminal's EVM router. Jupiter (Solana) is keyless and quoted client-side; Fabric
     // needs our App ID, which must NEVER reach the browser — so it is injected HERE and nowhere
